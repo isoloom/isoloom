@@ -49,7 +49,7 @@ pub(crate) struct Listing {
     pub(crate) settings: spec::Settings,
 }
 
-/// The targets `generate_all` left out, each a refusal of the lab; those left out for any other
+/// The targets `generate_all` left out, each a refusal of the environment; those left out for any other
 /// reason (a backend failed) as the error, every one of them, so
 /// neither `generate` nor `check` passes over a target whose files it couldn't make.
 fn refusals(skipped: Vec<GenerateError>) -> Result<Vec<GenerateError>> {

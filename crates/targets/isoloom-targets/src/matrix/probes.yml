@@ -1,6 +1,6 @@
 # The rows of the capability matrix (`isoloom matrix`), beside the OS rows the matrix adds from
 # the spec's own OS table. Each row is a spec field (a value of it, or fields together) and the
-# change to a one-machine lab that uses it: every target decides on the changed lab exactly as it
+# change to a one-machine environment that uses it: every target decides on the changed environment exactly as it
 # decides on any spec, and the matrix shows what it decided. Nothing here says what a target
 # supports.
 #
@@ -14,10 +14,10 @@
 #   `uses: features`, its features among the spec's requirements on the target.
 #   With `uses: refusal`, lowering refusing the spec at the row's field (a field the spec lacks).
 # - `only`: the targets the field means something on; the others show it as not applicable.
-# - `hosts: false`: `external`'s lab gives its machines no existing host.
-# - `cloud: true`: a row of the cloud-services lab (`cloud:`), not applicable to machines.
+# - `hosts: false`: `external`'s environment gives its machines no existing host.
+# - `cloud: true`: a row of the cloud-services environment (`cloud:`), not applicable to machines.
 
-# The lab every row changes: one machine with both forms (a published image for containers, a
+# The environment every row changes: one machine with both forms (a published image for containers, a
 # step for VMs) on one network.
 base:
   version: 1
@@ -35,7 +35,7 @@ hybrid:
   c: { networks: { lan: 20 }, app: { image: "nginx:1.27" } }
   v: { os: debian@12, networks: { lan: 30 }, ports: { web: 80 }, app: { steps: [{ run: v.sh }] } }
 
-# The lab of cloud services.
+# The environment of cloud services.
 cloud:
   version: 1
   name: probe
@@ -288,12 +288,12 @@ rows:
     features: [tmpfs-modes]
     patch: { machines: { m: { tmpfs: [{ path: /run/cache, mode: "1777" }] } } }
   - field: machines.*.host_folders
-    about: a folder of the computer that runs the lab, mounted both ways
+    about: a folder of the computer that runs the environment, mounted both ways
     features: [host-folders]
     patch: { machines: { m: { host_folders: [{ from: /srv/shared, path: /srv/shared }] } } }
   - field: machines.*.host_folders[].read_only
     value: true
-    about: a folder of the computer that runs the lab, mounted read-only
+    about: a folder of the computer that runs the environment, mounted read-only
     features: [host-folders]
     patch: { machines: { m: { host_folders: [{ from: /srv/shared, path: /srv/shared, read_only: true }] } } }
 

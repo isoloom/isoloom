@@ -2,7 +2,7 @@
 //! through the VM core. One compute instance per machine on one VCN, a subnet per network; OCI
 //! pins a VNIC's private IP, so every machine keeps its spec address, with a VNIC on each of its
 //! networks. Each network has its own security list (`network`), and a network a machine routes
-//! goes through it. Linux labs: the module refuses Windows and a controller.
+//! goes through it. Linux environments: the module refuses Windows and a controller.
 //!
 //! A dual-stack network carries the spec's IPv6 block as its subnet's prefix, and each VNIC on it
 //! an address from that prefix (`ipv6`). An IPv6-only network is refused by the plan: machines
@@ -13,7 +13,7 @@
 //!
 //! The image is looked up, not given: a `data "oci_core_images"` finds the newest Canonical
 //! Ubuntu for the shape, as the `cloud-docker` module does. Oracle Cloud ships no Debian platform
-//! image, so Debian labs run on Ubuntu too; the SSH login is `ubuntu` either way.
+//! image, so Debian environments run on Ubuntu too; the SSH login is `ubuntu` either way.
 
 mod addresses;
 mod ipv6;
@@ -87,7 +87,7 @@ fn refusal(env: &Environment) -> Option<String> {
         .or_else(|| ipv6::refusal(env))
 }
 
-/// The Ubuntu version each OS runs on: Oracle Cloud has no Debian image, so Debian labs fall back
+/// The Ubuntu version each OS runs on: Oracle Cloud has no Debian image, so Debian environments fall back
 /// to the newest Ubuntu LTS, as cloud-docker does.
 const IMAGES: UbuntuImages = UbuntuImages(OsImages(&[
     ("ubuntu-22.04", "22.04"),

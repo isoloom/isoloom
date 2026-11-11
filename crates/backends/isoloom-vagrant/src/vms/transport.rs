@@ -39,7 +39,7 @@ impl Os {
     }
 }
 
-/// The `vm.provision` lines of lab machine `machine`, from its planned steps.
+/// The `vm.provision` lines of environment machine `machine`, from its planned steps.
 pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
     let Some(mp) = env.machines.get(machine) else { return };
     let mut default: Option<(Vec<Route>, Ipv4Addr)> = None;
@@ -58,7 +58,7 @@ pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: O
     }
 }
 
-/// The provisioners of one step, `machine` being a lab machine or one of Isoloom's own VMs.
+/// The provisioners of one step, `machine` being an environment machine or one of Isoloom's own VMs.
 pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
     match (os, step) {
         (_, Step::Project) => {

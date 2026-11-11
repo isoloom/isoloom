@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-/// Every file of every target the lab allows, as (path, contents).
+/// Every file of every target the environment allows, as (path, contents).
 fn render(lab: &isoloom_targets::Lab) -> Vec<(String, String)> {
     let (files, _skipped) = isoloom_targets::generate_all(lab);
     files.into_iter().map(|f| (f.path, f.contents)).collect()

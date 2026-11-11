@@ -1,4 +1,4 @@
-//! The DigitalOcean `cloud-vm` driver: it takes a single-network, single-Linux-VM lab (one
+//! The DigitalOcean `cloud-vm` driver: it takes a single-network, single-Linux-VM environment (one
 //! droplet, a firewall, the ready marker) and refuses anything else. `refusal` itself is
 //! internal, so these tests read its decision from the presence of the generated file.
 
@@ -70,7 +70,7 @@ machines:
     Ok(())
 }
 
-/// A one-machine lab whose machine has `resources`, on DigitalOcean: its module, or why it is
+/// A one-machine environment whose machine has `resources`, on DigitalOcean: its module, or why it is
 /// refused there.
 fn sized(resources: &str) -> Outcome<Result<String, String>> {
     let lab = isoloom_targets::Lab::parse(&format!(

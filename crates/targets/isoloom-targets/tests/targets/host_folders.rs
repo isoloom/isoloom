@@ -1,4 +1,4 @@
-//! `host_folders`: a folder of the computer that runs the lab, mounted in a machine both ways.
+//! `host_folders`: a folder of the computer that runs the environment, mounted in a machine both ways.
 //! The targets whose machines run on that computer mount it (`docker`, `docker-vm` on a local
 //! provider, `vagrant` on a provider with a two-way shared folder); every other one refuses the
 //! spec, naming the field.

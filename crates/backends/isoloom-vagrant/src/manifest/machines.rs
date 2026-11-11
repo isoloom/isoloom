@@ -1,4 +1,4 @@
-//! Every VM of the Vagrantfile as a manifest machine: the lab's own with their OS, size,
+//! Every VM of the Vagrantfile as a manifest machine: the environment's own with their OS, size,
 //! addresses and forwarded ports; Isoloom's (the router, the tool shell, the controller) as
 //! `infra` or `tool`; each with its define name and its VM's name under every provider that
 //! names one (what status and orphan clean-up match, exactly), and the digest of what Vagrant

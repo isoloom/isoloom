@@ -76,7 +76,7 @@ fn udp_source() -> Outcome<isoloom_spec::Spec> {
     )?)
 }
 
-/// [`udp_source`] as a lab with no problem.
+/// [`udp_source`] as an environment with no problem.
 fn udp_spec() -> Outcome<Lab> {
     let spec = Lab::new(udp_source()?);
     assert_eq!(spec.problems(), vec![]);

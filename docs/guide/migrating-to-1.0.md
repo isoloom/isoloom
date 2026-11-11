@@ -118,7 +118,7 @@ machines:
     setup: [build/database/seed.sh]         # reads /run/lab/launch-token
 ```
 
-If a 0.x lab delivered a token or password through the environment, move it to a
+If a 0.x environment delivered a token or password through an environment variable, move it to a
 `files: [{ path, input }]` entry and read it from that path.
 
 ## 4. The egress seal
@@ -179,8 +179,8 @@ The CLI commands in 1.0 are `validate`, `generate`, `check`, `targets`, `resourc
 
 ## 7. Engine-compatibility gating
 
-`isoloom validate --json` reports a lab's `specFormat` and the `isoloomVersion` it validated
-against. An app that bundles Isoloom and a runner can store those with each lab and offer only
-the labs whose format is the 1.0 form and whose engine version is at or below the one it
-bundles: a 0.x-format lab, or one validated against a newer engine, is then re-validated before
+`isoloom validate --json` reports an environment's `specFormat` and the `isoloomVersion` it validated
+against. An app that bundles Isoloom and a runner can store those with each environment and offer only
+the environments whose format is the 1.0 form and whose engine version is at or below the one it
+bundles: a 0.x-format environment, or one validated against a newer engine, is then re-validated before
 it runs.

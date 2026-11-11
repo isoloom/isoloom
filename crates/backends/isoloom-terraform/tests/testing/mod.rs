@@ -10,7 +10,7 @@ use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
 
-/// A Windows Server the controller provisions: a lab with a controller and a Windows password.
+/// A Windows Server the controller provisions: an environment with a controller and a Windows password.
 pub const WINDOWS_PROVISIONED: &str = "version: 1
 name: t
 networks: { lan: { cidr: 10.9.0.0/24 } }
@@ -94,7 +94,7 @@ pub fn refusal(backend: &dyn Backend, yaml: &str) -> Outcome<Option<String>> {
     Ok(backend.refusal(&planned(&parsed(yaml)?, backend.target())?))
 }
 
-/// The lab of `yaml`, valid or not.
+/// The environment of `yaml`, valid or not.
 fn parsed(yaml: &str) -> Outcome<Lab> {
     Lab::parse(yaml).map_err(|problems| format!("the spec doesn't parse: {problems:?}").into())
 }

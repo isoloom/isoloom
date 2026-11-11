@@ -2291,7 +2291,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "description": "The folder on the computer that runs the lab: relative to the project folder (`shared`,\n`../notes`), in the home folder of the user running it (`~/work`), or absolute\n(`/srv/share`, `C:\\share`). A project folder must exist; a home or absolute one is the\nrunning computer's (the lab may run on another computer than the one generating it), so\nit isn't checked, and it is created when missing."
+          "description": "The folder on the computer that runs the environment: relative to the project folder (`shared`,\n`../notes`), in the home folder of the user running it (`~/work`), or absolute\n(`/srv/share`, `C:\\share`). A project folder must exist; a home or absolute one is the\nrunning computer's (the environment may run on another computer than the one generating it), so\nit isn't checked, and it is created when missing."
         },
         "path": {
           "type": "string",
@@ -2306,7 +2306,7 @@
         "from",
         "path"
       ],
-      "description": "A folder of the computer that runs the lab, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `docker-vm` on a local\nprovider, `vagrant`); the others refuse a spec that asks for one."
+      "description": "A folder of the computer that runs the environment, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `docker-vm` on a local\nprovider, `vagrant`); the others refuse a spec that asks for one."
     },
     "Tmpfs": {
       "anyOf": [
@@ -2678,7 +2678,7 @@
           "items": {
             "type": "string"
           },
-          "description": "DNS server addresses, in order (e.g. the lab's domain controller).",
+          "description": "DNS server addresses, in order (e.g. the environment's domain controller).",
           "default": []
         },
         "search": {
@@ -3809,7 +3809,7 @@
           "items": {
             "type": "string"
           },
-          "description": "The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask\nnames of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's\ncontroller, and the router's resolver forwarding the lab's queries. Without it, the\npublic `1.1.1.1`."
+          "description": "The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask\nnames of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's\ncontroller, and the router's resolver forwarding the environment's queries. Without it, the\npublic `1.1.1.1`."
         },
         "ca_certificates": {
           "type": "array",

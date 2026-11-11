@@ -82,7 +82,7 @@ fn ansible_pair_from_the_controller() -> Outcome {
     Ok(())
 }
 
-/// A VM mounting three folders of the computer that runs the lab: one of the project, one of the
+/// A VM mounting three folders of the computer that runs the environment: one of the project, one of the
 /// home folder (read-only), one absolute.
 const SHARED_DESK: &str = "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }, { from: '~/notes', path: /home/notes, read_only: true }, { from: /srv/drop, path: /srv/drop }] }\n";
 

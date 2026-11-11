@@ -1,4 +1,4 @@
-//! One rule says which targets can run a lab: `Lab::possible` keeps the targets
+//! One rule says which targets can run an environment: `Lab::possible` keeps the targets
 //! `Lab::not_possible` rules nothing out for, and the generator refuses exactly the others as not
 //! possible, on every example and on a spec whose access machine the runner supplies (the image
 //! table decides its forms). `isoloom_spec::effective` once answered from the spec's forms alone,

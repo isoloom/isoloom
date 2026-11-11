@@ -12,12 +12,12 @@ use serde_json::Value;
 use super::resolve_with;
 use crate::{Error, Result};
 
-/// The lab's `message` with its `{{ path }}` placeholders filled from the snapshot; an error
+/// The environment's `message` with its `{{ path }}` placeholders filled from the snapshot; an error
 /// names a placeholder that points at nothing.
 ///
 /// # Errors
 ///
-/// [`Error::Instance`] when the lab can't be made that instance, [`Error::Placeholder`] for a
+/// [`Error::Instance`] when the environment can't be made that instance, [`Error::Placeholder`] for a
 /// placeholder the message can't have or that points at nothing in the snapshot, and
 /// [`Error::Unclosed`] for a `{{` without its `}}`.
 pub fn render_message(lab: &Lab, instance: Option<u8>) -> Result<Option<String>> {
@@ -105,7 +105,7 @@ pub fn fill(text: &str, snapshot: &Value) -> Result<String> {
 ///
 /// # Errors
 ///
-/// As [`render_message`], but a placeholder that points at nothing: the lab can't be made
+/// As [`render_message`], but a placeholder that points at nothing: the environment can't be made
 /// instance `instance`, or the message can't be read.
 pub(crate) fn manifest_message(lab: &Lab, instance: Option<u8>, target: Target) -> Result<Option<Template>> {
     let Some(text) = lab.source().message.as_ref() else { return Ok(None) };

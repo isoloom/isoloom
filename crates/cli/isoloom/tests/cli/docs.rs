@@ -359,3 +359,31 @@ fn the_backends_read_vms_checks_and_the_controller_from_the_plan() -> Outcome {
     assert!(found.is_empty(), "{found:#?}");
     Ok(())
 }
+
+/// The code's docs say "environment" for what a spec describes, as every user-facing text does:
+/// no doc comment calls it "the environment" or "an environment" outside a code span (`Lab`, the type, keeps its
+/// name in `isoloom_plan::lab`).
+#[test]
+fn the_code_s_docs_say_environment_not_lab() -> Outcome {
+    let mut files = Vec::new();
+    sources(&root().join("crates"), &mut files)?;
+    let lab = |prose: &str| {
+        let words: Vec<&str> = prose.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()).collect();
+        words
+            .windows(2)
+            .any(|w| matches!(w[0], "the" | "The" | "a" | "A") && matches!(w[1], "lab" | "labs"))
+    };
+    let mut found = Vec::new();
+    for file in files.iter().filter(|f| !f.ends_with("isoloom-plan/src/lab.rs")) {
+        for (n, line) in std::fs::read_to_string(file)?.lines().enumerate() {
+            let Some(doc) = line.trim_start().strip_prefix("///").or_else(|| line.trim_start().strip_prefix("//!")) else {
+                continue;
+            };
+            if doc.split('`').step_by(2).any(lab) {
+                found.push(format!("{}:{}: {}", file.display(), n + 1, line.trim()));
+            }
+        }
+    }
+    assert!(found.is_empty(), "{found:#?}");
+    Ok(())
+}

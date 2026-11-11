@@ -19,7 +19,7 @@ fn examples() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
 }
 
-/// An example: its name, its lab and its spec as written.
+/// An example: its name, its environment and its spec as written.
 struct Example {
     name: String,
     lab: Lab,
@@ -134,7 +134,7 @@ fn no_row_an_example_uses_is_refused_where_the_example_is_generated() -> Outcome
     Ok(())
 }
 
-/// The generator's own answer for `column`: `None` when it generates the lab there.
+/// The generator's own answer for `column`: `None` when it generates the environment there.
 fn generators(lab: &Lab, column: &Column) -> Option<String> {
     match (column.target, column.variant) {
         (Target::Vagrant, Some(p)) => refusal_on(lab, Target::Vagrant, Some(p)),

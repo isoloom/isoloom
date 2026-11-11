@@ -63,7 +63,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
 }
 
 /// The `lifecycle` block failing the apply when the router reports no uplink address: with no
-/// DHCP on the uplink port group, VMware Tools reports one of its lab addresses instead.
+/// DHCP on the uplink port group, VMware Tools reports one of its environment addresses instead.
 fn uplink_checked(env: &Environment) -> Block {
     let own = list(env.networks.keys().map(|n| string(env.block(n).router().to_string())));
     let ip = || reference("self.ip_address");

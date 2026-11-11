@@ -45,7 +45,7 @@ pub(crate) fn no_host_to_run_from(f: &mut fmt::Formatter<'_>, check: &str) -> fm
 #[cfg(test)]
 mod tests {
     use super::*;
-    /// What the checks ask of a lab with `machines` and `checks`, each machine an existing host
+    /// What the checks ask of an environment with `machines` and `checks`, each machine an existing host
     /// when `existing`.
     fn existing_host_checks_of(machines: &str, checks: &str, existing: bool) -> Option<Requirement> {
         let spec = crate::testing::spec(&format!(

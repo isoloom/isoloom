@@ -108,7 +108,7 @@ mod tests {
     use super::super::{DaemonTable, recipe};
     use super::*;
 
-    /// What machine `m` (YAML) of a lab of its own runs in a container.
+    /// What machine `m` (YAML) of an environment of its own runs in a container.
     fn process(yaml: &str) -> Result<ContainerProcess, NoProcess> {
         let m: syntax::Machine = serde_yaml_ng::from_str(yaml).unwrap_or_else(|e| panic!("{yaml}: {e}"));
         let os = m.os.expect("the test's machine has an os");

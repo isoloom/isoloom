@@ -9,7 +9,7 @@ guest (a removed default route), which root could add back. On a cloud, machines
 internet *during* set-up (to install packages), so cutting egress up front breaks provisioning —
 but leaving it open after set-up means `internet: false` isn't a real guarantee. Earlier
 `tf-test` runs recorded this as a known bug on every cloud; the most serious case was Azure, whose
-default `AllowVnetInBound` let segmented labs reach across segments.
+default `AllowVnetInBound` let segmented environments reach across segments.
 
 ## Decision
 

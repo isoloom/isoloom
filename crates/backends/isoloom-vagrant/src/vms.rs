@@ -72,7 +72,7 @@ use crate::vagrantfile;
 /// The folder of the target's files, under [`OUTPUT_DIR`].
 const DIR: &str = "vagrant";
 /// The define names of Isoloom's own VMs (the router's is `router::NAME`), which are also their
-/// display names, step ids and file names: under the prefix a lab machine can't take, so none is
+/// display names, step ids and file names: under the prefix an environment machine can't take, so none is
 /// ever a machine's.
 pub(crate) const CONTROLLER: &str = isoloom_manifest::contract::CONTROLLER;
 const TOOL_SHELL: &str = "isoloom-tool-shell";
@@ -294,7 +294,7 @@ fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
 }
 
 /// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> - <define>`,
-/// after its define name (a lab machine's, or one of Isoloom's own under `isoloom-`). ASCII only:
+/// after its define name (an environment machine's, or one of Isoloom's own under `isoloom-`). ASCII only:
 /// Vagrant interpolates it into its own messages, and a reload fails on a non-ASCII name
 /// (`incompatible character encodings: UTF-8 and ASCII-8BIT`).
 pub(crate) fn label(env: &Environment, define: &str) -> String {
@@ -345,7 +345,7 @@ pub(crate) struct Runner {
 pub(crate) struct Shape {
     /// Every VM, in the Vagrantfile's order.
     pub(crate) defines: Vec<Define>,
-    /// The check runners, the lab's VMs first, then the controller's.
+    /// The check runners, the environment's VMs first, then the controller's.
     pub(crate) runners: Vec<Runner>,
 }
 

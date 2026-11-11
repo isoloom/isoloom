@@ -1,4 +1,4 @@
-//! The target-neutral plan of a lab: the authored spec lowered for a target ([`Lab`], [`lower`]),
+//! The target-neutral plan of an environment: the authored spec lowered for a target ([`Lab`], [`lower`]),
 //! then planned into the [`Environment`] a backend renders (networks, machines, their addresses,
 //! routes, volumes and set-up steps), its checks resolved to positions and probes, and the
 //! requirements a backend must meet to render it.

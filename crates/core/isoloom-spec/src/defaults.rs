@@ -2,7 +2,7 @@
 //! the last one winning:
 //!
 //! 1. built in (the image table in [`crate::images`], each cloud's region in its generator,
-//!    which the lab writes into its module and run manifest: `Lab::with_regions`),
+//!    which the environment writes into its module and run manifest: `Lab::with_regions`),
 //! 2. the user's file, `$ISOLOOM_HOME/defaults.yml` (`~/.isoloom/defaults.yml`),
 //! 3. the project's file, `isoloom.defaults.yml` next to the spec (committed: the team's),
 //! 4. the profile's `defaults:` (`profiles/<name>.yml`, [`crate::profile`]),

@@ -118,7 +118,7 @@ fn ports_of(env: &Environment, name: &str) -> Vec<PublishedPort> {
 
 /// A service with published ports: each at its fixed host port, on every address of the Docker
 /// host (Vagrant forwards it to this machine's loopback), through Docker's bridge network
-/// (macvlan can't publish), its default route staying on its lab networks.
+/// (macvlan can't publish), its default route staying on its environment networks.
 fn publish(svc: &mut Service, ports: &[PublishedPort], published: &mut Vec<(u16, Protocol)>) {
     svc.ports = ports
         .iter()

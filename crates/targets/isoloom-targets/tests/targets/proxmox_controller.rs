@@ -1,5 +1,5 @@
 //! Environment-level `provision:` on Proxmox: a controller VM runs the playbooks, as on Vagrant
-//! and the clouds. Before this, Proxmox refused such labs outright.
+//! and the clouds. Before this, Proxmox refused such environments outright.
 
 use isoloom_spec::Target;
 use isoloom_targets::generate;

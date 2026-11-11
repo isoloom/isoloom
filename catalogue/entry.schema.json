@@ -30,7 +30,7 @@
     "default": {
       "type": "string",
       "pattern": "^[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*$",
-      "description": "The release `service: <name>` resolves to: one of `releases`, pinned, so a lab never\nchanges under its author when a newer release is added."
+      "description": "The release `service: <name>` resolves to: one of `releases`, pinned, so an environment never\nchanges under its author when a newer release is added."
     },
     "images": {
       "type": "object",
@@ -490,7 +490,7 @@
         {
           "type": "string",
           "const": "password",
-          "description": "A literal (lab content), `{ secret: <name> }` or `{ input: <NAME> }`: a value file at\n`/run/isoloom/with/<setting>`, reached as `{{ with.<setting>.path }}`."
+          "description": "A literal (environment content), `{ secret: <name> }` or `{ input: <NAME> }`: a value file at\n`/run/isoloom/with/<setting>`, reached as `{{ with.<setting>.path }}`."
         },
         {
           "type": "string",

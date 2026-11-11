@@ -82,7 +82,7 @@ pub struct Machine {
     pub volumes: IndexMap<String, Mount>,
     /// Its data disks.
     pub disks: IndexMap<String, Disk>,
-    /// Folders of the computer that runs the lab, mounted in it.
+    /// Folders of the computer that runs the environment, mounted in it.
     pub host_folders: Vec<HostFolder>,
     /// Its memory-backed mounts.
     pub tmpfs: Vec<Tmpfs>,

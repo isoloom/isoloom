@@ -1,4 +1,4 @@
-//! Every VM a cloud module starts from user data that runs once (a lab machine's set-up, the
+//! Every VM a cloud module starts from user data that runs once (an environment machine's set-up, the
 //! controller's, a Docker host's expiry) keeps it across a later apply: a `lifecycle` ignoring
 //! that user data, wherever the cloud would replace or restart the VM for a change in it (the
 //! launch's inputs, `var.expires_at` among them, differ on every run).
@@ -100,7 +100,7 @@ fn checked(module: &str, what: &str) -> Vec<String> {
     names
 }
 
-/// The labs whose `cloud-vm` modules are checked, on every cloud that takes them.
+/// The environments whose `cloud-vm` modules are checked, on every cloud that takes them.
 const LABS: &[&str] = &["solo-web", "hello-stack", "ansible-pair", "windows-hello", "segmented", "configured-windows"];
 
 #[test]

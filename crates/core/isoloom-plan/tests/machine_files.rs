@@ -1,4 +1,4 @@
-//! `machines.*.files` through parsing and the lab's checks: one mistake per spec, each problem at
+//! `machines.*.files` through parsing and the environment's checks: one mistake per spec, each problem at
 //! its field with what to do.
 
 use isoloom_spec::syntax::{FileSource, Problem};

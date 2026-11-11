@@ -1,10 +1,10 @@
 //! The capability matrix (`isoloom matrix`, `docs/matrix.md`): spec fields against targets, each
-//! cell what the target decides about a lab using the field.
+//! cell what the target decides about an environment using the field.
 //!
-//! Nothing in it is written by hand. Each row is a change to a small lab that uses one field (its
+//! Nothing in it is written by hand. Each row is a change to a small environment that uses one field (its
 //! value, or fields together): `probes.yml`, and one row per OS of the spec's own table, read
 //! with a runner's image table that supplies the access machine a spec leaves to it. Each
-//! column (`Column`) decides on the changed lab exactly as it decides on any spec (`decide`):
+//! column (`Column`) decides on the changed environment exactly as it decides on any spec (`decide`):
 //! lowering, the backend's declared capabilities, its own limits, a Vagrant provider's, a
 //! cloud's. A cell is generated, refused with the step that refused it and why, or not
 //! applicable. Tests hold every feature of the plan to a row, and every example's refusals to
@@ -59,10 +59,10 @@ pub(crate) struct Row {
     uses: Uses,
 }
 
-/// What a column decides about a lab using a row's field.
+/// What a column decides about an environment using a row's field.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Cell {
-    /// It generates the lab.
+    /// It generates the environment.
     Supported,
     /// It refuses it: the step, and why.
     Refused(Refused),
@@ -94,9 +94,9 @@ impl Row {
         }
     }
 
-    /// Whether the spec `written` (whose lab is `lab`) uses the row on `target`: the row's
+    /// Whether the spec `written` (whose environment is `lab`) uses the row on `target`: the row's
     /// field written in it (with its value, its count, the fields beside it), or, for a row
-    /// about a combination the spec's text can't show, one of its features among what the lab
+    /// about a combination the spec's text can't show, one of its features among what the environment
     /// requires of `target`. The examples' check reads it (`examples`).
     #[cfg(test)]
     fn used_by(&self, written: &Authored, lab: &Lab, target: Target) -> bool {
@@ -129,7 +129,7 @@ pub fn matrix() -> Result<Matrix> {
     })
 }
 
-/// The labs a row's columns decide on: the plain one, `hybrid`'s (with a container-only and a
+/// The environments a row's columns decide on: the plain one, `hybrid`'s (with a container-only and a
 /// VM-only machine beside), `external`'s (each machine an existing host), and the cloud lab.
 struct Labs {
     plain: std::result::Result<Lab, String>,
@@ -138,7 +138,7 @@ struct Labs {
     cloud: std::result::Result<Lab, String>,
 }
 
-/// The lab of `start`, with `patch` merged in (and each machine an existing host, with
+/// The environment of `start`, with `patch` merged in (and each machine an existing host, with
 /// `hosts`), or why it isn't a spec.
 fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, String> {
     let mut v = start.clone();
@@ -151,12 +151,12 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
     isoloom_spec::parse(&text).map(|s| Lab::new(s).with_images(images)).map_err(|e| e.to_string())
 }
 
-/// The image table every row's lab is read with, as a runner gives one: it supplies the access
+/// The image table every row's environment is read with, as a runner gives one: it supplies the access
 /// machine a spec leaves to the runner (no `os`), in both forms. Without it, every target that
 /// creates the machines (all but `external` and `cloud-services`) refuses that machine.
 const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:1, vm: debian@12 }\n";
 
-/// A row: its labs, then each column's decision about the one it reads.
+/// A row: its environments, then each column's decision about the one it reads.
 fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Row {
     let labs = Labs {
         plain: lab(&probes.base, &p.patch, false),
@@ -174,7 +174,7 @@ fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Row {
     }
 }
 
-/// What `column` decides about the row's lab, or not applicable when the row is about another
+/// What `column` decides about the row's environment, or not applicable when the row is about another
 /// target or another kind of lab.
 fn cell(p: &Probe, labs: &Labs, column: &Column) -> Cell {
     let target = column.target;

@@ -31,7 +31,7 @@ pub struct Recipe {
     pub start: Vec<Resource>,
     /// The foreground forms of its enabled services, in recipe order: the container's daemons.
     pub daemons: Vec<Daemon>,
-    /// The text of each of its templates, by the template's `from`, its lab placeholders not yet
+    /// The text of each of its templates, by the template's `from`, its environment placeholders not yet
     /// filled in ([`super::fill`] does, per machine and target). A template missing here wasn't
     /// read: the renderers refuse it rather than install something else.
     pub files: BTreeMap<ProjectPath, String>,

@@ -1,6 +1,6 @@
-//! What a target decides about a lab, typed: it generates it, or it refuses it and at which step
+//! What a target decides about an environment, typed: it generates it, or it refuses it and at which step
 //! (lowering, the backend's capabilities, the backend's own limits, a Vagrant provider's, a
-//! cloud's), or the lab isn't one the target takes at all. The one place a target decides:
+//! cloud's), or the environment isn't one the target takes at all. The one place a target decides:
 //! [`refusal`], [`refusal_on`] and the capability matrix ([`crate::matrix`]) read these
 //! decisions, so the matrix is what the generators decide and nothing more.
 //!
@@ -47,7 +47,7 @@ pub(crate) fn columns() -> Vec<Column> {
         .collect()
 }
 
-/// The step that refuses a lab.
+/// The step that refuses an environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub(crate) enum Code {
@@ -56,7 +56,7 @@ pub(crate) enum Code {
     /// Lowering: a machine has no form the target runs, or a step the target doesn't run,
     /// at the field that rules it out.
     Lowering,
-    /// The target's backend lacks the capability the lab needs.
+    /// The target's backend lacks the capability the environment needs.
     Capability(Feature),
     /// A limit of the target's own (its images, its platform's rules).
     Target,
@@ -117,14 +117,14 @@ impl Refused {
     }
 }
 
-/// What a column decides about a lab.
+/// What a column decides about an environment.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Decision {
-    /// It generates the lab.
+    /// It generates the environment.
     Generated,
     /// It refuses it.
     Refused(Refused),
-    /// The lab isn't one the target takes: cloud services on a machine target, machines on
+    /// The environment isn't one the target takes: cloud services on a machine target, machines on
     /// `cloud-services`, `hybrid` without both containers and VMs, a target `targets:` leaves
     /// out.
     NotApplicable,

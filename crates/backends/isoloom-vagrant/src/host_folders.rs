@@ -1,7 +1,7 @@
-//! Folders of the computer that runs the lab, shared into a VM both ways (`host_folders`): each
+//! Folders of the computer that runs the environment, shared into a VM both ways (`host_folders`): each
 //! provider's own two-way shared folder, set in that provider's block (its `override`), so only
 //! the provider `vagrant up` runs shares them. A provider with none stops `vagrant up` with the
-//! reason before creating the VM (and the run manifest's provider says it can't run the lab),
+//! reason before creating the VM (and the run manifest's provider says it can't run the environment),
 //! rather than fall back to a one-way copy (rsync).
 //!
 //! - VirtualBox: `virtualbox` (vboxsf, the box's Guest Additions).
@@ -13,7 +13,7 @@
 //! - libvirt: `virtiofs` (libvirt 6.2 or later), the VM's memory shared with `virtiofsd`.
 //! - Hyper-V: none Isoloom uses: its two-way folder is SMB, which asks for a Windows account's
 //!   password at every `vagrant up`.
-//! - ESXi: none: its VMs run on the ESXi host, not on the computer that runs the lab.
+//! - ESXi: none: its VMs run on the ESXi host, not on the computer that runs the environment.
 
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container::host_folders;
@@ -22,7 +22,7 @@ use isoloom_spec::model::HostFolder;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vms::provider::Provider;
 
-/// Why `provider` can't share a folder of the computer that runs the lab into a VM, if it can't:
+/// Why `provider` can't share a folder of the computer that runs the environment into a VM, if it can't:
 /// it has no two-way shared folder Isoloom uses, or (`read_only`) it can't make one read-only.
 fn why_not(provider: Provider<'_>, read_only: bool) -> Option<String> {
     let id = provider.id();

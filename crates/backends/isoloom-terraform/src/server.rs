@@ -111,7 +111,7 @@ pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variable
 /// A base OS image pinned to a dated release, with the checksum that verifies the download.
 ///
 /// The server targets never emit a floating `latest`/`current` URL: an image is pinned to a
-/// dated snapshot so a lab generated today keeps booting the same OS build, and every download is
+/// dated snapshot so an environment generated today keeps booting the same OS build, and every download is
 /// verified against the checksum published for that build before it boots. A refresh changes the
 /// URL and its checksum together. Debian publishes SHA-512 sums, Ubuntu and the RPM families SHA-256.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -168,7 +168,7 @@ pub(crate) fn check_step(position: &str, guest: &Guest, script: &str, timeout_s:
     Ok(s)
 }
 
-/// The derived checks' switch, when the lab has check runners.
+/// The derived checks' switch, when the environment has check runners.
 pub(crate) fn derived(runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestError> {
     let steps = runners.iter().map(|r| r.step.id.clone()).collect();
     Ok(isoloom_render::run_manifest::derived_switch(steps)?.into_iter().collect())

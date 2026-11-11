@@ -8,7 +8,7 @@ use crate::configure::ContainerProcess;
 use crate::environment::{Build, Image};
 use crate::testing;
 
-/// A lab of `web`, written as `machine`, on one network beside `fpm`.
+/// An environment of `web`, written as `machine`, on one network beside `fpm`.
 fn lab(machine: &str) -> crate::Lab {
     testing::lab(&format!(
         "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web: {machine}\n  fpm: {{ os: debian@12, networks: {{ lab: 20 }} }}\n"

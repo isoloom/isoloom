@@ -151,7 +151,7 @@ pub struct Machine {
     #[serde(default)]
     pub shm_size: Option<String>,
     /// How the machine resolves names: which DNS servers to use, search domains, and its own
-    /// domain. Useful to point a Linux box at the lab's domain controller. A VM sets its resolver
+    /// domain. Useful to point a Linux box at the environment's domain controller. A VM sets its resolver
     /// in its own provisioning (resolv.conf).
     #[serde(default)]
     pub dns: Option<Dns>,
@@ -220,7 +220,7 @@ pub struct Machine {
     /// disks go with the machine.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub disks: IndexMap<String, Disk>,
-    /// Folders of the computer that runs the lab, mounted in the machine both ways: `{ from,
+    /// Folders of the computer that runs the environment, mounted in the machine both ways: `{ from,
     /// path, read_only }`. A container binds it; a VM shares it with its provider's own shared
     /// folders. The targets whose machines run elsewhere refuse it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -272,7 +272,7 @@ pub struct Port {
     #[serde(default)]
     pub http: bool,
     /// It speaks TLS (HTTPS for an `http` port): probes and checks use TLS, certificates
-    /// unchecked (lab services sign their own).
+    /// unchecked (environment services sign their own).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tls: bool,
     /// Reachable from the user's machine on this port (loopback only), besides the
@@ -280,7 +280,7 @@ pub struct Port {
     #[serde(default)]
     pub publish: Option<u16>,
     /// Keep `publish` as the host port on local Docker too (normally a free one is picked, so
-    /// labs never collide): for apps whose pages call `localhost:<that port>` themselves. The
+    /// environments never collide): for apps whose pages call `localhost:<that port>` themselves. The
     /// environment can't start while another holds that port.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,

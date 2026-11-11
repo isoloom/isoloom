@@ -42,7 +42,7 @@ impl Backend for CloudServicesBackend {
     }
 
     /// The run manifest, beside the variables, unless the services need what a manifest can't
-    /// hold (then the lab is converted, not run).
+    /// hold (then the environment is converted, not run).
     fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
         let Some(cloud) = env.spec().cloud.as_ref().filter(|c| manifest::refusal(c).is_none()) else {
             return Ok(Vec::new());

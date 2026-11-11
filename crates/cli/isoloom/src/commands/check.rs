@@ -71,7 +71,7 @@ impl FileResult {
 /// profile) in memory and compares each file with the one on disk, the list of what it wrote
 /// (`.isoloom/.generated`) included; a file `generate` wrote there before and would now remove
 /// (`generated::stale`) is out of date too; one `generate` would refuse to write through a
-/// symbolic link is the same error as there. A target left out because it refuses the lab has no
+/// symbolic link is the same error as there. A target left out because it refuses the environment has no
 /// files to compare; when no target is left (the one asked for, or every one, refuses), there is
 /// nothing to vouch for: a no. One left out for any other reason (its backend failed) is an
 /// error, since its committed files can't be vouched for.

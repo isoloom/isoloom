@@ -201,7 +201,7 @@ pub(super) struct Vm {
     pub(super) own_boot: Option<isoloom_spec::model::Boot>,
     /// Whether it is an aarch64 VM, emulated (`arch: arm64`).
     pub(super) arm: bool,
-    /// When the guest agent reports its uplink address (the router): its lab addresses, which
+    /// When the guest agent reports its uplink address (the router): its environment addresses, which
     /// don't count as one.
     pub(super) agent: Option<Vec<String>>,
     /// Its network devices.

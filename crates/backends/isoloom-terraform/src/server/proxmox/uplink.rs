@@ -45,7 +45,7 @@ pub(super) fn first_address(vm: &str, own: &[String]) -> Expression {
 }
 
 /// The IPv4 addresses `vm` (`self`, or a resource address) reports that are neither the loopback
-/// nor one of `own` (its lab addresses); none while the provider reports none at all (`null`
+/// nor one of `own` (its environment addresses); none while the provider reports none at all (`null`
 /// before the guest agent answers), so the postcondition fails with its own message rather than
 /// Terraform's "Invalid function argument" from `flatten(null)`.
 pub(super) fn addresses(vm: &str, own: &[String]) -> Expression {
@@ -60,7 +60,7 @@ pub(super) fn addresses(vm: &str, own: &[String]) -> Expression {
 }
 
 /// The `lifecycle` block failing the apply, with the reason, when the VM reported no uplink
-/// address (its lab addresses `own` don't count); `what` names the VM.
+/// address (its environment addresses `own` don't count); `what` names the VM.
 pub(super) fn checked(what: &str, own: &[String]) -> Block {
     let condition = binary(call("length", [addresses("self", own)]), BinaryOperator::Greater, number(0));
     let message = Template::text(format!("{what} got no IPv4 address on its uplink bridge `"))

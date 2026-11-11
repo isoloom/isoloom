@@ -1,5 +1,5 @@
 //! The steps that make accounts: `user` and `group`. A user's `password` in a step is a literal,
-//! lab content that lands in generated files: steps have no secrets.
+//! environment content that lands in generated files: steps have no secrets.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -57,7 +57,7 @@ pub struct GroupStep {
     pub system: bool,
 }
 
-/// A user's password in a step: a literal, which is lab content (it lands in generated files).
+/// A user's password in a step: a literal, which is environment content (it lands in generated files).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Password(String);
 

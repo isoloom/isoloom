@@ -1,4 +1,4 @@
-//! What the targets' tests share: the repository's examples as labs or plans, specs written in
+//! What the targets' tests share: the repository's examples as environments or plans, specs written in
 //! a test, their problems, and the files a target generates, found by path.
 
 use std::path::{Path, PathBuf};
@@ -22,17 +22,17 @@ pub(crate) fn source(name: &str) -> Outcome<Spec> {
     Ok(isoloom_spec::load(&examples().join(name))?)
 }
 
-/// The repository's example `name`, as a lab.
+/// The repository's example `name`, as an environment.
 pub(crate) fn example(name: &str) -> Outcome<Lab> {
     Ok(Lab::new(source(name)?))
 }
 
-/// A spec written in a test, as a lab (checked or not).
+/// A spec written in a test, as an environment (checked or not).
 pub(crate) fn lab(yaml: &str) -> Outcome<Lab> {
     Ok(Lab::new(isoloom_spec::parse(yaml)?))
 }
 
-/// A spec written in a test, as a lab with no problem.
+/// A spec written in a test, as an environment with no problem.
 pub(crate) fn valid(yaml: &str) -> Outcome<Lab> {
     let lab = lab(yaml)?;
     match problems(&lab) {
@@ -41,7 +41,7 @@ pub(crate) fn valid(yaml: &str) -> Outcome<Lab> {
     }
 }
 
-/// A lab's problems, each as `path: reason`.
+/// An environment's problems, each as `path: reason`.
 pub(crate) fn problems(lab: &Lab) -> Vec<String> {
     lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect()
 }
@@ -95,7 +95,7 @@ pub(crate) fn before<'a>(text: &'a str, end: &str) -> Outcome<&'a str> {
         .ok_or_else(|| format!("no `{end}` in:\n{text}").into())
 }
 
-/// A one-network lab named `name`: `web` (a published HTTP port, on `web_os`) and `db` (Ubuntu),
+/// A one-network environment named `name`: `web` (a published HTTP port, on `web_os`) and `db` (Ubuntu),
 /// each set up by a script.
 pub(crate) fn web_and_db(name: &str, web_os: &str) -> String {
     format!(

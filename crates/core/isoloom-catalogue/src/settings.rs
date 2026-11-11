@@ -55,7 +55,7 @@ pub enum SettingValue {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Endpoint {
-    /// A machine of the lab, on the first network it shares with this one.
+    /// A machine of the environment, on the first network it shares with this one.
     Machine {
         /// The machine.
         machine: String,
@@ -77,7 +77,7 @@ pub enum Endpoint {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Password {
-    /// Written in the spec: lab content, which lands in generated files.
+    /// Written in the spec: environment content, which lands in generated files.
     Literal(String),
     /// A secret of the spec, read from its store at each start.
     Secret(String),

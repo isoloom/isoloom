@@ -6,7 +6,7 @@ use isoloom_spec::model::Target;
 
 use crate::{EsxiBackend, ProxmoxBackend};
 
-/// A lab with nothing to seal.
+/// An environment with nothing to seal.
 const OPEN: &str = "version: 1
 name: shop
 networks:
@@ -17,7 +17,7 @@ checks:
   - { http: http://web/, expect: 200, wait: 120 }
 ";
 
-/// A lab with an `internet: false` network, so the run is sealed: `cache` is on `back` alone.
+/// An environment with an `internet: false` network, so the run is sealed: `cache` is on `back` alone.
 const SEALED: &str = "version: 1
 name: seg
 networks:

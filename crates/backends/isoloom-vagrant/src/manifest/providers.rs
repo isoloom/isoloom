@@ -1,5 +1,5 @@
 //! Vagrant's providers for a run: where each exists, its plugin, whether its commands need
-//! elevation, whether its VMs run on a server, and why this lab can't run on it (Isoloom's own
+//! elevation, whether its VMs run on a server, and why this environment can't run on it (Isoloom's own
 //! refusal); and the tools a run probes before it starts.
 
 use std::collections::BTreeSet;
@@ -12,7 +12,7 @@ use super::vagrant_argv;
 use crate::error::Result;
 use crate::vms::provider::{Known, Provider as Vagrant, provider_refusal};
 
-/// Known provider `k` as a manifest provider, with `elevation` and this lab's `refusal` on it.
+/// Known provider `k` as a manifest provider, with `elevation` and this environment's `refusal` on it.
 fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<VagrantProvider> {
     Ok(VagrantProvider {
         id: k.manifest,
@@ -25,7 +25,7 @@ fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<
 }
 
 /// The providers the Vagrantfile has a block for ([`Vagrant::runs_vms`]: all but UTM), with
-/// this lab's refusal on each, and Vagrant's state folder for the run.
+/// this environment's refusal on each, and Vagrant's state folder for the run.
 pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
     let providers = Vagrant::ALL
         .iter()

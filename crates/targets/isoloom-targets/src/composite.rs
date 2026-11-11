@@ -6,7 +6,7 @@
 //! - `cloud-docker`: the `docker` target's files, then a Terraform module per cloud.
 //! - `docker-vm`: the `docker` target's files, the Vagrantfile, then the Proxmox module (a Docker
 //!   host VM on a Proxmox server, Terraform making only the VM, unless a container mounts a
-//!   folder of the computer that runs the lab); and a run manifest for each
+//!   folder of the computer that runs the environment); and a run manifest for each
 //!   (`docker-vm/run.json`, `docker-vm/proxmox/run.json`), the VM's steps from its backend, then
 //!   the Compose file run inside it as the Compose backend says.
 //! - `hybrid`: the Vagrant VMs and the containers' host, with the containers' Compose file.
@@ -95,7 +95,7 @@ impl Backend for DockerVmBackend {
     }
 
     /// Compose's but existing networks, as for `cloud-docker`: the VM runs the Compose file. And
-    /// folders of the computer that runs the lab, which a local VM shares (`docker_vm_refusal`
+    /// folders of the computer that runs the environment, which a local VM shares (`docker_vm_refusal`
     /// says which providers can't, `docker_vm_proxmox_refusal` that the server can't).
     fn capabilities(&self) -> Capabilities {
         isoloom_compose::capabilities_on_a_vm().with(Feature::HostFolders)
@@ -103,7 +103,7 @@ impl Backend for DockerVmBackend {
 
     /// The `docker` target's Compose file (and the files it mounts), the Vagrantfile, and the
     /// Proxmox module with its set-up script, unless the containers mount folders of the
-    /// computer that runs the lab (the server's VM runs elsewhere).
+    /// computer that runs the environment (the server's VM runs elsewhere).
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::DockerVm, env, &self.capabilities())?;
         let guest = guest(env, DOCKER_VM_ROOT)?;
@@ -116,7 +116,7 @@ impl Backend for DockerVmBackend {
     }
 
     /// One manifest per way the VM is made: Vagrant's (`docker-vm/run.json`), Proxmox's
-    /// (`docker-vm/proxmox/run.json`) when the lab can run there.
+    /// (`docker-vm/proxmox/run.json`) when the environment can run there.
     fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
         let guest = guest(env, DOCKER_VM_ROOT)?;
         let mut out = vec![Placed::here(docker_vm::manifest(env, &guest)?)];
@@ -128,13 +128,13 @@ impl Backend for DockerVmBackend {
 }
 
 /// Whether `docker-vm` writes its Proxmox module: unless the containers need a VM on the computer
-/// that runs the lab (`docker_vm_proxmox_refusal`).
+/// that runs the environment (`docker_vm_proxmox_refusal`).
 fn on_proxmox(env: &Environment) -> bool {
     docker_vm_proxmox_refusal(env).is_none()
 }
 
 /// Why `docker-vm` can't run on the Proxmox server, if it can't: a container mounts a folder of the
-/// computer that runs the lab, which the server's VM, running on the server, can't share.
+/// computer that runs the environment, which the server's VM, running on the server, can't share.
 pub(crate) fn docker_vm_proxmox_refusal(env: &Environment) -> Option<String> {
     let name = host_folders::needing_a_local_vm(env)?;
     Some(format!(

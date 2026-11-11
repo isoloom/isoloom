@@ -1,6 +1,6 @@
 //! Why a backend didn't render an environment: the one error every backend reports, so the
 //! registry (`isoloom-targets`) and the command line read each the same way. A refusal (the
-//! target can't run the lab) is kept apart from a failure (a bug of the backend, or a file it
+//! target can't run the environment) is kept apart from a failure (a bug of the backend, or a file it
 //! can't read): a refusal leaves the target out, a failure stops generation.
 
 use std::sync::Arc;
@@ -28,7 +28,7 @@ pub enum Error {
         /// What it doesn't support, as the refusal reads.
         what: String,
     },
-    /// The backend failed, not the lab: a value its own types refused, a file its writer couldn't
+    /// The backend failed, not the environment: a value its own types refused, a file its writer couldn't
     /// write, a project file it couldn't read. Not a refusal: generation stops on it.
     #[error("{}: {what}", target.id())]
     Internal {
@@ -60,7 +60,7 @@ impl Error {
         }
     }
 
-    /// Why the target refuses the lab, as the refusal reads after its target; `None` for a
+    /// Why the target refuses the environment, as the refusal reads after its target; `None` for a
     /// failure of the backend ([`Error::Internal`]), which isn't a refusal.
     #[must_use]
     pub fn refusal(&self) -> Option<String> {

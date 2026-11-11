@@ -1,7 +1,7 @@
-//! Why a lab isn't generated for a target: refused by the plan or by the target's backend, or (on
+//! Why an environment isn't generated for a target: refused by the plan or by the target's backend, or (on
 //! `cloud-vm`) a cloud whose module is dropped. These answer what `isoloom targets` lists and the
 //! snapshot's `targets` section holds, from the decisions the capability matrix shows
-//! ([`crate::decision`]); why a target isn't possible for the lab at all is the lab's own answer
+//! ([`crate::decision`]); why a target isn't possible for the environment at all is the environment's own answer
 //! ([`Lab::not_possible`]).
 
 use isoloom_plan::{Environment, Lab};
@@ -30,21 +30,21 @@ pub struct Clouds {
     pub refused: Vec<CloudRefusal>,
 }
 
-/// Why `target`'s generator would refuse this lab, if it would: a field lowering rules out, a
+/// Why `target`'s generator would refuse this environment, if it would: a field lowering rules out, a
 /// capability its backend lacks, a limit of its own (a Windows machine's name too long on
 /// Proxmox, environment-level provisioning on Docker, ...). `None` when `generate` produces the
-/// target, and when the target isn't possible for the lab at all ([`Lab::not_possible`] says
+/// target, and when the target isn't possible for the environment at all ([`Lab::not_possible`] says
 /// why). Lets `isoloom targets` tell the truth: a target can be possible by its machines' forms
 /// and still not be generated.
 ///
-/// Safe on a lab that hasn't been checked: an invalid lab is refused by every target, with its
+/// Safe on an environment that hasn't been checked: an invalid environment is refused by every target, with its
 /// first problem as the reason, instead of reaching a generator that assumes validity.
 #[must_use]
 pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
     refusal_on(lab, target, None)
 }
 
-/// [`refusal`], for a target run with a given provider: why `target` can't run this lab when
+/// [`refusal`], for a target run with a given provider: why `target` can't run this environment when
 /// its tool uses `provider`, if it can't. `provider` is the name the target's tool knows it by,
 /// as `defaults.yml` sets it: for Vagrant, `vagrant up --provider` (`virtualbox`, `libvirt`,
 /// `qemu`, ...). `None` is the target whatever the provider, which is [`refusal`].

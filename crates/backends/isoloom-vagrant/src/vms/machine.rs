@@ -1,4 +1,4 @@
-//! A lab machine's VM: its box, communicator, networks, published ports, providers, then its
+//! An environment machine's VM: its box, communicator, networks, published ports, providers, then its
 //! planned set-up as provisioners and its checks.
 
 use std::net::Ipv4Addr;
@@ -19,12 +19,12 @@ use crate::host_folders::Share;
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
 
-/// Whether lab machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
+/// Whether environment machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
 pub(crate) fn has_vm(env: &Environment, name: &str) -> bool {
     env.vm(name).and_then(boxes::vagrant).is_some()
 }
 
-/// Lab machine `name`'s VM, and the check runner it uploads, if it has checks. Nothing when it
+/// Environment machine `name`'s VM, and the check runner it uploads, if it has checks. Nothing when it
 /// has no Vagrant box (refused before rendering).
 pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let env = ctx.env;
@@ -117,7 +117,7 @@ fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
 
 /// The guest's hostname, set from `name` on Linux. Windows: no hostname here — Vagrant renames
 /// the guest from it over WinRM, which fails on some boxes with a misleading "not a valid name";
-/// the lab's own provisioning names it.
+/// the environment's own provisioning names it.
 fn hostname(r: &mut Ruby, name: &str, os: Os) {
     if os == Os::Linux {
         r.assign("m.vm.hostname", Value::str(name));

@@ -1,4 +1,4 @@
-//! The Linode driver of the `cloud-vm` target: a Linux lab gets a `linode/main.tf` with each
+//! The Linode driver of the `cloud-vm` target: a Linux environment gets a `linode/main.tf` with each
 //! machine pinned to its spec address on its network's VPC subnet, behind a firewall of its own;
 //! a machine on several networks (a Linode has one VPC interface) is refused, so no Linode file
 //! is produced.

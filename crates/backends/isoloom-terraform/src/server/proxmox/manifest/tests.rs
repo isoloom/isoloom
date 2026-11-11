@@ -53,7 +53,7 @@ fn the_module_is_applied_with_the_runners_state_and_values() {
 }
 
 /// Regression: a Proxmox host reset after a cut-short apply had lost the network's IP set, and
-/// every destroy of the lab failed on it (`-refresh=false`, so no read dropped it first).
+/// every destroy of the environment failed on it (`-refresh=false`, so no read dropped it first).
 #[test]
 fn the_manifest_names_the_providers_errors_for_a_resource_already_gone() {
     let m = manifest(&env(LAB)).unwrap();

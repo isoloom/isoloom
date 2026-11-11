@@ -1,5 +1,5 @@
-//! The Oracle Cloud (OCI) driver of the cloud-vm target: a single-network, multi-VM Linux lab
-//! is accepted and keeps each machine's fixed private IP; multi-network labs are refused.
+//! The Oracle Cloud (OCI) driver of the cloud-vm target: a single-network, multi-VM Linux environment
+//! is accepted and keeps each machine's fixed private IP; multi-network environments are refused.
 
 use isoloom_spec::Target;
 

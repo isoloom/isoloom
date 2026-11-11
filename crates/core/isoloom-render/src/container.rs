@@ -84,7 +84,7 @@ pub fn check_runner(pos: &Position, default: &Position) -> String {
 }
 
 /// The VM the containers run in (`docker-vm`'s, `cloud-docker`'s, the hybrid target's), as run
-/// manifests and Vagrantfiles name it: Isoloom's own, under the prefix a lab's machines can't
+/// manifests and Vagrantfiles name it: Isoloom's own, under the prefix an environment's machines can't
 /// take, so it never collides with one (a machine named `docker` included).
 pub const DOCKER_HOST: &str = "isoloom-docker-host";
 

@@ -1,5 +1,5 @@
 //! Forwarding: a gateway's is the plan's step every VM backend renders, and a router's and a
-//! gateway's IPv6 forwarding follow one rule, whether the lab routes IPv6.
+//! gateway's IPv6 forwarding follow one rule, whether the environment routes IPv6.
 
 use isoloom_spec::Target;
 use isoloom_targets::generate;
@@ -7,7 +7,7 @@ use isoloom_targets::generate;
 use crate::testing::{Outcome, example, file};
 
 /// A gateway between two networks (IPv4 only: a gateway's network carries no IPv6), and the
-/// lab's router routing IPv6 between two others (`v6`) or not.
+/// environment's router routing IPv6 between two others (`v6`) or not.
 fn gateway(v6: bool) -> String {
     let ipv6 = |n: u8| {
         if v6 {

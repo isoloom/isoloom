@@ -8,7 +8,7 @@ use isoloom_targets::{GeneratedFile, Lab, generate, project_copies};
 
 use crate::testing::{Outcome, example, examples, file};
 
-/// The example `name`'s folder, its lab and its Kubernetes files.
+/// The example `name`'s folder, its environment and its Kubernetes files.
 fn kubernetes(name: &str) -> Outcome<(PathBuf, Lab, Vec<GeneratedFile>)> {
     let lab = example(name)?;
     let files = generate(&lab, Target::Kubernetes)?;

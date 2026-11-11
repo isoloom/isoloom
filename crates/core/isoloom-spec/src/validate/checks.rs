@@ -152,7 +152,7 @@ fn tcp(at: &str, t: &str, d: &Declared, p: &mut Problems) {
 mod tests {
     use crate::testing::{lab, problems};
 
-    /// The problems of the checks `checks` (a YAML list) in a lab of a Linux container (`web`), a
+    /// The problems of the checks `checks` (a YAML list) in an environment of a Linux container (`web`), a
     /// network appliance (`r1`) and a Windows VM (`win`).
     fn of(checks: &str) -> Vec<String> {
         problems(&lab(&format!(

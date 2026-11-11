@@ -1,6 +1,6 @@
 //! The `docker-vm` target's run manifest on a VM Vagrant makes (`.isoloom/docker-vm/run.json`):
-//! Vagrant brings the VM up with Docker and the project in it (every provisioner but the lab's
-//! start), then the lab's containers start in it through `vagrant ssh`, as Compose's backend says
+//! Vagrant brings the VM up with Docker and the project in it (every provisioner but the environment's
+//! start), then the environment's containers start in it through `vagrant ssh`, as Compose's backend says
 //! ([`GuestCompose`]). The VM forwards each published port from this computer's loopback at its
 //! fixed number, so a start first checks none is taken (`vagrant.check_forwarded_ports`). Parking
 //! suspends the VM with everything in it; checks and the containers' states are read inside it.
@@ -102,7 +102,7 @@ fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
     })
 }
 
-/// Up (the VM, then the lab in it), down, park (suspend only: the containers keep their memory),
+/// Up (the VM, then the environment in it), down, park (suspend only: the containers keep their memory),
 /// resume and status.
 fn lifecycle(env: &Environment, guest: &GuestCompose, way_in: &dyn Fn(&Template) -> Result<Run, ManifestError>) -> Result<Lifecycle> {
     let mut discard = run_manifest::tolerated(act("discard-saved", Action::VagrantDiscardAbortedSaved)?);
@@ -144,7 +144,7 @@ fn lifecycle(env: &Environment, guest: &GuestCompose, way_in: &dyn Fn(&Template)
 }
 
 /// `vagrant up --provider ${run.provider} --provision-with <the VM's own>`: the VM with Docker and
-/// the project, not the lab's start, which the next steps run.
+/// the project, not the environment's start, which the next steps run.
 fn up_step(env: &Environment, guest: &GuestCompose) -> Result<Step> {
     let with = prepares(env, guest)?.join(",");
     let mut s = run(UP, on_provider(&["up"], &["--provision-with", &with])?, UP_TIMEOUT_S)?;

@@ -1,6 +1,6 @@
 //! Isoloom's own Vagrant VMs (the router, the tool VM, the controller, the containers' host) are
-//! named after their `isoloom-` define names everywhere a lab machine's name also goes: their
-//! display names, their checks' step ids and runner files. A lab machine may be called
+//! named after their `isoloom-` define names everywhere an environment machine's name also goes: their
+//! display names, their checks' step ids and runner files. An environment machine may be called
 //! `controller`, `router`, `docker` or `containers` and still stand beside them.
 
 use std::collections::BTreeSet;
@@ -11,7 +11,7 @@ use isoloom_targets::generate;
 
 use crate::testing::{Outcome, file, valid};
 
-/// Lab machines named as Isoloom's own VMs once were, with a router (`reach`), the `shell` tool,
+/// Environment machines named as Isoloom's own VMs once were, with a router (`reach`), the `shell` tool,
 /// and a controller (playbooks, and checks from the networks).
 const LAB: &str = "
 version: 1

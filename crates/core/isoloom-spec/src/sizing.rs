@@ -108,7 +108,7 @@ pub fn totals(spec: &model::Spec) -> Totals {
 
 /// What the whole spec needs on `target`: every machine sized the way that target runs it (a
 /// container reserves less than a VM), its `resources` filling the rest. The minimum to run the
-/// lab there, so the Docker targets read lighter than the VM ones for the same spec.
+/// environment there, so the Docker targets read lighter than the VM ones for the same spec.
 #[must_use]
 pub fn totals_for(spec: &model::Spec, target: model::Target) -> Totals {
     add_up(spec, |m| machine_size(m, runs_as_container(target, m)))

@@ -1,7 +1,7 @@
 //! Compose inside a VM (`docker-vm`): the `docker` target's Compose file run from the VM's copy of
 //! the project, by shell commands the VM's backend runs through its own way in. The same services,
 //! roles, slots, start plan and check runners as on this computer's Docker ([`super::docker`]),
-//! with what differs in a VM: the file's own project name (one lab per VM), every published port
+//! with what differs in a VM: the file's own project name (one environment per VM), every published port
 //! fixed at its `publish` number (the VM forwards it, or answers at its own address), the project
 //! files Compose reads from its environment read from the VM's copy, and root's Docker (through
 //! `sudo` keeping the values the way in forwarded, unless the way in is root: [`AsRoot`]).

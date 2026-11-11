@@ -91,7 +91,7 @@ pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> 
 /// networks: a container reaches the host's LAN through a macvlan network made beforehand
 /// (`external`). Data disks are named volumes, a tmpfs takes a mode, and a volume can be kept
 /// past `down` or exist already; no raw disk (a container gets no block device). Only on the
-/// `docker` target, folders of the computer that runs the lab: its containers run there (a
+/// `docker` target, folders of the computer that runs the environment: its containers run there (a
 /// hosting service's and the hybrid VM's don't).
 pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
     let caps = Capabilities::of([

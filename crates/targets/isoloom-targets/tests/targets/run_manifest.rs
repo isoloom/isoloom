@@ -65,8 +65,8 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
     Ok(())
 }
 
-/// cloud-docker lists the lab's networks as docker-vm does, by their Compose names in the VM: the
-/// runner reads them for the lab's status. An empty list left a runner's UI drawing networks
+/// cloud-docker lists the environment's networks as docker-vm does, by their Compose names in the VM: the
+/// runner reads them for the environment's status. An empty list left a runner's UI drawing networks
 /// guessed from the machines' addresses.
 #[test]
 fn cloud_docker_lists_the_labs_networks() -> Outcome {
@@ -165,7 +165,7 @@ fn examples(target: Target) -> Outcome<Vec<(String, Lab)>> {
 }
 
 /// Compose refuses `up` and `start` while a secret's variable is unset, and an input's file is
-/// such a secret; the runner delivers a VM lab's slot without a value only when the manifest says
+/// such a secret; the runner delivers a VM environment's slot without a value only when the manifest says
 /// what to deliver: the manifest never leaves the runner a slot it may skip. A slot it delivers
 /// through the environment is required, or says what to deliver when it has no value.
 #[test]
@@ -328,7 +328,7 @@ fn secrets_project_files_kept_volumes_and_tools_reach_the_manifest() -> Outcome 
     Ok(())
 }
 
-/// A lab with an access machine of its own, checked from its seat: the checks run from a
+/// An environment with an access machine of its own, checked from its seat: the checks run from a
 /// stand-in at its address, started before them. After them, whatever happened, the stand-in is
 /// taken down, or the access machine (brought up on demand) finds its address taken.
 const ACCESS_SEAT: &str = "

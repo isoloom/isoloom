@@ -11,11 +11,11 @@ Which targets have one, and where:
 |---|---|
 | `docker` | `.isoloom/docker/run.json` |
 | `vagrant` | `.isoloom/vagrant/run.json` (one for every provider) |
-| `docker-vm` | `.isoloom/docker-vm/run.json` (the VM made by Vagrant), and `.isoloom/docker-vm/proxmox/run.json` (made on a Proxmox server) unless a container mounts a folder of the computer that runs the lab |
+| `docker-vm` | `.isoloom/docker-vm/run.json` (the VM made by Vagrant), and `.isoloom/docker-vm/proxmox/run.json` (made on a Proxmox server) unless a container mounts a folder of the computer that runs the environment |
 | `proxmox` | `.isoloom/proxmox/run.json` |
 | `esxi` | `.isoloom/esxi/run.json` |
-| `cloud-vm` | `.isoloom/cloud-vm/<cloud>/run.json`, one per cloud that takes the lab |
-| `cloud-docker` | `.isoloom/cloud-docker/<cloud>/run.json`, one per cloud that takes the lab |
+| `cloud-vm` | `.isoloom/cloud-vm/<cloud>/run.json`, one per cloud that takes the environment |
+| `cloud-docker` | `.isoloom/cloud-docker/<cloud>/run.json`, one per cloud that takes the environment |
 | `cloud-services` | `.isoloom/cloud-services/run.json`, when the spec has `cloud:`, unless it has `before` steps (host scripts) or a variable holding a launch value inside a larger value |
 | `kubernetes`, `hybrid`, `external`, `hosted` | none: their files are run by hand |
 
@@ -33,7 +33,7 @@ A run manifest holds only documented data — the driver does the work:
 - **outputs**: addresses, host ports and URLs; a published port's is named
   `<machine>__<port>` in snake case (`web__portal`), and no two outputs share a name;
 - how to run the **checks**, with self-contained timeouts (waits + 15 s per check + 60 s), so a
-  long-waiting lab is never cut off by a fixed cap;
+  long-waiting environment is never cut off by a fixed cap;
 - **secret slots**: each secret's and input's name and destination, and an optional `default`,
   **never a value**.
 
@@ -85,7 +85,7 @@ operation):
 | `down` | Runs `lifecycle.down`, which removes everything the run created |
 
 A runner keeps each run's state (its record, the values it set, the host ports it pinned) outside
-the lab folder. A secret or input value reaches only the steps its delivery names, and a runner
+the environment folder. A secret or input value reaches only the steps its delivery names, and a runner
 never writes a sensitive value to a log or an error.
 
 ### What a VM takes only when it boots
@@ -124,7 +124,7 @@ manifests name bpg/proxmox's IP set, VM and container.
 `check` runs the manifest's `checks` in three phases, and a runner keeps to them:
 
 1. **`checks.setup`**, in order: what the check runners need first, such as the stand-in for an
-   access machine the lab brings up on demand (`stand-ins`: the checks that run from its seat run
+   access machine the environment brings up on demand (`stand-ins`: the checks that run from its seat run
    from the stand-in's addresses). A failed set-up step fails the checks: no runner runs, but the
    teardown still does.
 2. **`checks.runners`**, in order: each runner's step, under its own time limit, prints its

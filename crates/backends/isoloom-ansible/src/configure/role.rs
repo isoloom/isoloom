@@ -23,7 +23,7 @@ pub fn role_name(machine: &str) -> String {
 ///
 /// # Errors
 ///
-/// [`crate::Error::WindowsPackages`] for a `packages` step on Windows, which the lab's lowering
+/// [`crate::Error::WindowsPackages`] for a `packages` step on Windows, which the environment's lowering
 /// refuses first.
 pub fn files(c: &Configured<'_>, dir: &str) -> crate::Result<Vec<GeneratedFile>> {
     let resources: Vec<&Resource> = c.recipe().resources().collect();

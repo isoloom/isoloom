@@ -1,4 +1,4 @@
-//! The `cloud-services` run manifest (`.isoloom/cloud-services/run.json`): the lab's own
+//! The `cloud-services` run manifest (`.isoloom/cloud-services/run.json`): the environment's own
 //! Terraform module, copied into the run's state folder (`terraform.copy_module`) and applied
 //! there with the spec's fixed variables (`terraform.tfvars.json`, beside the manifest) and the
 //! launch's values (`inputs.tfvars.json`, written by the runner into the run's state folder and

@@ -94,7 +94,7 @@ fn an_input_file_reaches_the_steps_that_create_and_start_its_machine() -> Outcom
 
 /// A machine that publishes an image it also builds (the Compose build+image combo) makes the run
 /// pull the published image first; `up` then drops `--build`, so a user runs the published
-/// image and only an image that could not be pulled is built. A lab that only builds locally keeps
+/// image and only an image that could not be pulled is built. An environment that only builds locally keeps
 /// `--build` and gains no pull step, so an author's edits always rebuild.
 #[test]
 fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() -> Outcome {

@@ -3,7 +3,7 @@
 //! step inside it runs over SSH with the runner's key (`ssh.run` to `${outputs.ip}` as `isoloom`):
 //! the project's archive, then `setup.sh` (Docker) ([`into_vm`]), then the Compose file started as
 //! Compose's backend says ([`GuestCompose`]), the values given at launch carried into the session. The containers' published ports answer at the VM's address; checks
-//! and the containers' states are read inside it. A server lab isn't parked: it is made or
+//! and the containers' states are read inside it. A server environment isn't parked: it is made or
 //! destroyed.
 
 use isoloom_manifest::{Error as ManifestError, Lifecycle, Manifest, Placeholder, RelPath, SnakeName, Template};

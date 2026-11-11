@@ -1,6 +1,6 @@
 //! A `user` step's literal password as Linux stores it: SHA-512 crypt (`$6$`, the glibc and
-//! musl default, 5000 rounds), with a salt derived from the lab, the machine and the user, so the
-//! same spec always renders the same line. The password is lab content (it lands in generated
+//! musl default, 5000 rounds), with a salt derived from the environment, the machine and the user, so the
+//! same spec always renders the same line. The password is environment content (it lands in generated
 //! files anyway); hashing keeps it out of `/etc/shadow` in clear.
 
 use sha2::{Digest, Sha512};

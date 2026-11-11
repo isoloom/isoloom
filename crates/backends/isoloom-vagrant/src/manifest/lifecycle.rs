@@ -1,7 +1,7 @@
 //! The operations of a Vagrant run (the run manifest's `lifecycle`), when it counts as ready, and
 //! how a start that tripped over a previous run's leftovers is retried. The controller is powered
-//! off once the lab is built (it comes back for provisioning and checks), except on QEMU, where it
-//! is the access position on the lab network, and when the spec keeps it running.
+//! off once the environment is built (it comes back for provisioning and checks), except on QEMU, where it
+//! is the access position on the environment network, and when the spec keeps it running.
 
 use std::num::NonZeroU32;
 
@@ -20,7 +20,7 @@ pub(super) const PROVISION: &str = "provision";
 /// One machine set up again.
 pub(super) const PROVISION_MACHINE: &str = "provision-machine";
 
-/// How long `vagrant up` may run: a lab of Windows VMs emulated by QEMU can take hours, and the
+/// How long `vagrant up` may run: an environment of Windows VMs emulated by QEMU can take hours, and the
 /// runner keeps no shorter limit than the tool would.
 const UP_TIMEOUT_S: u32 = 21_600;
 /// Halting or suspending every VM.
@@ -37,7 +37,7 @@ const ESXI_STATUS_BASE_S: u32 = 60;
 const ESXI_STATUS_PER_VM_S: u32 = 30;
 
 /// What a failed start's output says when it tripped over a previous run's leftovers, not over
-/// the lab (VirtualBox's names taken, a lock, a record on another provider).
+/// the environment (VirtualBox's names taken, a lock, a record on another provider).
 const STALE_MARKERS: [&str; 5] = [
     "verr_already_exists",
     "could not rename",
@@ -87,7 +87,7 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
     })
 }
 
-/// `vagrant status --machine-readable`, with more time on ESXi for each of the lab's VMs.
+/// `vagrant status --machine-readable`, with more time on ESXi for each of the environment's VMs.
 fn status(shape: &Shape) -> Result<Step> {
     let mut s = run("status", vagrant_argv(&["status", "--machine-readable"])?, STATUS_TIMEOUT_S)?;
     let vms = u32::try_from(shape.defines.len()).unwrap_or(u32::MAX);
@@ -133,7 +133,7 @@ fn resume(env: &Environment, shape: &Shape) -> Result<Vec<Step>> {
     back_up(&running(env, shape))
 }
 
-/// Every VM that runs while the lab does, which a resume brings back (`vagrant up
+/// Every VM that runs while the environment does, which a resume brings back (`vagrant up
 /// --no-provision`: a suspended one resumes, a halted one boots): the controller stays off.
 fn running<'a>(env: &Environment, shape: &'a Shape) -> Vec<&'a str> {
     let keep = keeps_controller(env);
@@ -218,19 +218,19 @@ fn provision(env: &Environment, shape: &Shape) -> Result<Provision> {
     })
 }
 
-/// `up` succeeded (every VM booted and ran its provisioners), then every lab machine runs.
+/// `up` succeeded (every VM booted and ran its provisioners), then every environment machine runs.
 pub(super) fn ready(shape: &Shape) -> Result<Vec<Condition>> {
     let up = Condition::StepOk {
         step: StepId::parse(UP)?,
         means: Some("every VM booted and ran its provisioners, the controller's playbooks included".into()),
     };
-    let lab: Vec<Name> = shape
+    let members: Vec<Name> = shape
         .defines
         .iter()
         .filter(|d| d.kind == Kind::Machine)
         .map(|d| Name::parse(&d.name))
         .collect::<Result<_, _>>()?;
-    Ok(vec![up, Condition::MachinesRunning { machines: lab }])
+    Ok(vec![up, Condition::MachinesRunning { machines: members }])
 }
 
 /// A start whose output says it tripped over leftovers (`STALE_MARKERS`) clears them (destroy,

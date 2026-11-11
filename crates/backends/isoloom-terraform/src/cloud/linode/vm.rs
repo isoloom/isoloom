@@ -2,7 +2,7 @@
 //! through the VM core. One Linode per machine on its network's VPC subnet, each with its
 //! private IPv4 pinned (`ipv4.vpc`), so the machines reach each other at exactly the spec's
 //! addresses, and a firewall per machine enforcing `reach` both ways and opening only its own
-//! published ports (`network`). Linux labs, a machine on one network (a Linode has one VPC
+//! published ports (`network`). Linux environments, a machine on one network (a Linode has one VPC
 //! interface): the module refuses the rest, Windows and a controller.
 
 mod network;

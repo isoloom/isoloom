@@ -75,9 +75,9 @@ pub enum Reference {
 pub enum PortField {
     /// Its number in the machine.
     Port,
-    /// The host port it is published on: known only once the lab runs.
+    /// The host port it is published on: known only once the environment runs.
     Published,
-    /// Its URL (`http` and `https` ports): known only once the lab runs.
+    /// Its URL (`http` and `https` ports): known only once the environment runs.
     Url,
 }
 
@@ -107,7 +107,7 @@ pub enum SettingField {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Place {
-    /// The spec's `message`, shown once the lab is up.
+    /// The spec's `message`, shown once the environment is up.
     Message,
     /// An app's `template` step's file.
     Template,
@@ -118,7 +118,7 @@ pub enum Place {
 }
 
 impl Reference {
-    /// Whether its value is only known once the lab runs (a published port, a URL).
+    /// Whether its value is only known once the environment runs (a published port, a URL).
     #[must_use]
     pub(crate) fn is_run_time(&self) -> bool {
         matches!(

@@ -70,7 +70,7 @@ pub(crate) fn router_attachment(env: &Environment, net: &str, v4: Ipv4Addr) -> A
 }
 
 /// The sysctls of a container that forwards (the router, a gateway): IPv4 forwarding, and IPv6
-/// forwarding when the lab routes IPv6 (`isoloom_plan::routing::forwarding`).
+/// forwarding when the environment routes IPv6 (`isoloom_plan::routing::forwarding`).
 pub(crate) fn forwarding(env: &Environment) -> IndexMap<String, String> {
     isoloom_plan::routing::forwarding(!env.router6.is_empty())
         .into_iter()

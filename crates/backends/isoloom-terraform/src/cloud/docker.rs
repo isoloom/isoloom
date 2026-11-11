@@ -156,7 +156,7 @@ pub fn modules(env: &Environment) -> Result<Files> {
     hosting(env).map(|cloud| module(cloud, env)).collect()
 }
 
-/// The Docker host's network on every cloud that makes one: its block, outside the lab's own
+/// The Docker host's network on every cloud that makes one: its block, outside the environment's own
 /// (the containers' networks live inside the host).
 pub(crate) const HOST_NETWORK: &str = "10.42.0.0/16";
 
@@ -230,7 +230,7 @@ fn setup_files(env: &Environment) -> Vec<GeneratedFile> {
         .collect()
 }
 
-/// The setup scripts beside the modules, for a lab the clouds can host.
+/// The setup scripts beside the modules, for an environment the clouds can host.
 ///
 /// # Errors
 ///

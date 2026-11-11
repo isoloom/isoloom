@@ -1,4 +1,4 @@
-//! The lab's VMs and how a module sets them up, built once on the plan ([`Environment`]) with
+//! The environment's VMs and how a module sets them up, built once on the plan ([`Environment`]) with
 //! the HCL builder. Every VM target renders through it: Proxmox, ESXi, and each cloud of
 //! `cloud-vm`. A target brings its own resources (networks, instances, images, firewall
 //! rules) and picks a transport for the machines' set-up; this module brings the rest:

@@ -1,5 +1,5 @@
 //! Helpers shared by the Terraform run-manifest builders (the clouds and the servers):
-//! the small template and step-id utilities, a bare machine, a lab machine with its ports
+//! the small template and step-id utilities, a bare machine, an environment machine with its ports
 //! fixed, and a state-read output. Each builder differs in its lifecycle, credentials and the
 //! machines it makes; these are what they have in common, kept in one place so no copy drifts.
 

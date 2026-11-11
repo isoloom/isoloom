@@ -1,6 +1,6 @@
 //! The access machine a spec leaves to the runner (`access: true`, no `os`, nothing to run): its
 //! forms come from the runner's image table (`access:`). A target the table gives none of the
-//! form it runs can't produce it, so it refuses the lab rather than leave out a machine the others
+//! form it runs can't produce it, so it refuses the environment rather than leave out a machine the others
 //! still name (in their hosts files, as their checks' seat).
 
 use isoloom_spec::model::{Shape, Target};

@@ -22,7 +22,7 @@ checks:
   - check.sh
 ";
 
-/// [`WITH_INPUT`] with a Windows VM beside its container: a lab for `hybrid`.
+/// [`WITH_INPUT`] with a Windows VM beside its container: an environment for `hybrid`.
 fn with_a_vm() -> String {
     WITH_INPUT.replace(
         "checks:",

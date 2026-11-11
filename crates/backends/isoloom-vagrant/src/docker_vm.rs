@@ -4,7 +4,7 @@
 //! - One Debian VM, sized for every container together (and Docker itself).
 //! - Docker from Docker's own repository; the project copied to /opt/isoloom, with the `docker`
 //!   target's folder and the configuration files of Isoloom's outputs (no other target's, nor the
-//!   tools' state); then the lab started with `.isoloom/docker/compose.yml`, the `docker` target's
+//!   tools' state); then the environment started with `.isoloom/docker/compose.yml`, the `docker` target's
 //!   Compose file, rendered with it by the Compose backend: the commands Compose's backend gives
 //!   ([`GuestCompose`]).
 //! - When everything answers: /var/lib/isoloom/ready, for runners to poll.
@@ -14,7 +14,7 @@
 //! - The containers' host folders: each shared into the VM by its provider's own shared folder,
 //!   under `/mnt/isoloom`, where the commands run there tell Compose to bind it from.
 //! - The run manifest (`docker-vm/run.json`, [`manifest`]): the runner brings the VM up
-//!   with every provisioner but the lab's start (`prepares`), then runs the same commands
+//!   with every provisioner but the environment's start (`prepares`), then runs the same commands
 //!   through `vagrant ssh`, the values given at launch forwarded into the VM (SSH's `SendEnv`,
 //!   accepted by the VM's `sshd`), never written in it.
 //! - On a Proxmox server: `.isoloom/docker-vm/proxmox/main.tf` (Terraform, bpg/proxmox), one

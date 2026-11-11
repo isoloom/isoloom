@@ -1,4 +1,4 @@
-//! Each case of a contract as a lab: the service machine with the case's settings, its helpers,
+//! Each case of a contract as an environment: the service machine with the case's settings, its helpers,
 //! the probe, the checks filled in for the case, and each fact as a check of its own.
 
 use isoloom_catalogue::conformance::{LabError, MACHINE, PROBE};

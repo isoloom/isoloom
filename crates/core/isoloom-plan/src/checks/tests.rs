@@ -3,7 +3,7 @@ use isoloom_spec::model::{Check, Declared, Expect, Spec};
 use super::*;
 use crate::testing;
 
-/// A lab with an access machine (`user`), a web server and its checks: `checks` is the YAML
+/// An environment with an access machine (`user`), a web server and its checks: `checks` is the YAML
 /// list, `checks/` scripts and playbooks included.
 fn spec(checks: &str) -> Spec {
     testing::spec(&format!(

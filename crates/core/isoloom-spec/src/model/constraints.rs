@@ -49,7 +49,7 @@ pub struct Constraints {
     pub ntp: Vec<String>,
     /// The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask
     /// names of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's
-    /// controller, and the router's resolver forwarding the lab's queries. Without it, the
+    /// controller, and the router's resolver forwarding the environment's queries. Without it, the
     /// public `1.1.1.1`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dns: Vec<String>,

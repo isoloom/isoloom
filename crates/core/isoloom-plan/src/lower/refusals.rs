@@ -13,7 +13,7 @@ use super::overrides;
 use super::service::Services;
 use crate::configure::{self, DaemonTable};
 
-/// The machines `target` has no form for, in machine order (`services`: the lab's catalogue
+/// The machines `target` has no form for, in machine order (`services`: the environment's catalogue
 /// services, resolved).
 pub(super) fn forms(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
     if source.cloud.is_some() {

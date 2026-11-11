@@ -1,4 +1,4 @@
-//! Filling in a template: its `{{ path }}` placeholders replaced by the lab's values for one
+//! Filling in a template: its `{{ path }}` placeholders replaced by the environment's values for one
 //! machine on one target (addresses move with a target's own network blocks), when Isoloom
 //! generates. Logic-free, and never a run-time value or a secret: every CM tool then installs the
 //! same bytes.
@@ -57,8 +57,8 @@ impl<'a> Context<'a> {
 /// # Errors
 ///
 /// The first placeholder that can't be filled in: [`Error::Placeholder`] when it can't be read
-/// in a template, [`Error::Unfilled`] when it names nothing the lab has. The spec's checks
-/// report each one at validation, so a valid lab's templates always fill in.
+/// in a template, [`Error::Unfilled`] when it names nothing the environment has. The spec's checks
+/// report each one at validation, so a valid environment's templates always fill in.
 pub fn fill(text: &str, context: &Context<'_>) -> Result<String> {
     let parts = placeholder::read(text, Place::Template).map_err(|wrong| {
         wrong

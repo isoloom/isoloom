@@ -20,7 +20,7 @@ fn noise(bytes: usize) -> String {
         .collect()
 }
 
-/// A lab of one Linux machine, `web`, then `rest` (YAML at the top level or under `web`).
+/// An environment of one Linux machine, `web`, then `rest` (YAML at the top level or under `web`).
 fn one_machine(rest: &str) -> String {
     format!(
         "version: 1
@@ -35,7 +35,7 @@ machines:
     )
 }
 
-/// A lab of one Linux machine, `web`, whose recipe runs a command carrying `bytes` of noise.
+/// An environment of one Linux machine, `web`, whose recipe runs a command carrying `bytes` of noise.
 fn lab(bytes: usize) -> String {
     one_machine(&format!(
         "    app:
@@ -47,7 +47,7 @@ fn lab(bytes: usize) -> String {
     ))
 }
 
-/// Why `cloud` refuses `yaml`'s lab, if it does; and that rendering it says the same.
+/// Why `cloud` refuses `yaml`'s environment, if it does; and that rendering it says the same.
 fn refusal(cloud: Cloud, yaml: &str) -> Outcome<Option<String>> {
     let env = plan(yaml, Target::CloudVm)?;
     let module = CloudVmModule::new(cloud);
@@ -125,7 +125,7 @@ fn a_cloud_refusing_for_size_drops_only_its_module() -> Outcome {
     Ok(())
 }
 
-/// A lab whose environment-level playbook carries `bytes` of noise in its vars: the controller's
+/// An environment whose environment-level playbook carries `bytes` of noise in its vars: the controller's
 /// set-up runs it, so its user data carries them.
 fn controller_lab(bytes: usize) -> String {
     one_machine(&format!(

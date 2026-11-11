@@ -161,7 +161,7 @@ pub struct MachinePlan {
     pub files: Vec<MachineFile>,
     /// Its data disks, in spec order.
     pub disks: Vec<DataDisk>,
-    /// The folders of the computer that runs the lab it mounts both ways (`host_folders`), in
+    /// The folders of the computer that runs the environment it mounts both ways (`host_folders`), in
     /// spec order.
     pub host_folders: Vec<HostFolder>,
     /// The settings a container gets from its runtime and a VM from its set-up.
@@ -544,7 +544,7 @@ fn rate_limit(name: &str, m: &Machine) -> Result<Option<Rate>, PlanError> {
 }
 
 /// Machine `name` (`m`), planned for `target`. Lowering refuses a configuration that doesn't
-/// resolve (an app's steps per target, a service's for the lab), so the lowered spec `build`
+/// resolve (an app's steps per target, a service's for the environment), so the lowered spec `build`
 /// plans has its recipe; one that doesn't is an error, not a machine with no configuration.
 fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<MachinePlan, PlanError> {
     let shape = shape(target, m);

@@ -13,7 +13,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
    regenerated `.isoloom/` if you commit it. Most generated files change, and `isoloom check`
    fails until you do. From scratch, because 1.x listed none of the files it wrote in
    `.isoloom/.generated`, so 2.0 never removes those it no longer writes; the tools' state under
-   `.isoloom/` (a `.terraform/` folder, `.vagrant/`) goes with it, so destroy a running lab first.
+   `.isoloom/` (a `.terraform/` folder, `.vagrant/`) goes with it, so destroy a running environment first.
 4. Upgrade your runner to a release that reads run manifest version 1 (Isothrum 2.0).
 
 ## Specs 2.0 refuses
@@ -59,9 +59,9 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - **The Vagrantfile no longer carries a hook for a runner's own ad-hoc VM.** A spec that wants an
   access machine declares it (`access: true`).
 - **`resolved.json`** is `resolved_version: 5`: a machine's size in each form (`resources.docker`,
-  `resources.vm`), and a lab machine's `role` is `member` (was `target`).
+  `resources.vm`), and an environment machine's `role` is `member` (was `target`).
 - The example `pivot-dmz` is now `dmz-jump`.
-- **Isoloom's own router and controller are renamed on Proxmox, ESXi and the clouds** (`isoloom-router`, `isoloom-controller`: their snippets, VM names and cloud resource names). A lab applied with 1.x has them under the old names: `terraform apply` replaces them (destroy and re-create), or run `isothrum down` and `up` again.
+- **Isoloom's own router and controller are renamed on Proxmox, ESXi and the clouds** (`isoloom-router`, `isoloom-controller`: their snippets, VM names and cloud resource names). An environment applied with 1.x has them under the old names: `terraform apply` replaces them (destroy and re-create), or run `isothrum down` and `up` again.
 
 ## Runner authors
 
@@ -75,7 +75,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   `during_step` has succeeded, else once `up`'s steps all have, as the run manifest reference
   says.
 
-- **A lab machine's role is `member`** (was `target`, a word the manifest's top-level `target`
+- **An environment machine's role is `member`** (was `target`, a word the manifest's top-level `target`
   uses for something else): `machines[].role` is `member`, `job`, `infra`, `access`, `tool` or
   `check` (`isoloom_manifest::Role::Member`, was `Role::Target`). A runner matching on `target`
   matches `member` instead.
@@ -88,7 +88,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   `generated` slot kind, the `ssh` and `credential` output roles, the `static` output source and
   the `minutes_from_now` expiry unit.
 - New, optional: each Vagrant VM's `machines[].native.boot_digest` (reload a running VM whose
-  digest changed), each lab machine's `machines[].resources`.
+  digest changed), each environment machine's `machines[].resources`.
 - A published port's output is named `<machine>__<port>` (`web__portal`, was `web_portal`),
   and a manifest naming an output twice is refused.
 - A manifest giving one name twice in any list (machines, networks, tools, params, secret slots,
@@ -118,12 +118,12 @@ list is the [CHANGELOG](../../CHANGELOG.md).
 - The demo secret names in the fixtures are `DEMO_SECRET` and `DEMO_SECRET_<X>`.
 - On Vagrant (and `hybrid`), the controller's check runner step is `check-isoloom-controller`
   (was `check-controller`) and its runner script `checks/isoloom-controller.sh` (was
-  `checks/controller.sh`). Isoloom's own VMs show as `<lab> - isoloom-controller`,
-  `<lab> - isoloom-router` and `<lab> - isoloom-tool-shell` (`<lab>-isoloom-…` on Hyper-V and
+  `checks/controller.sh`). Isoloom's own VMs show as `<environment> - isoloom-controller`,
+  `<environment> - isoloom-router` and `<environment> - isoloom-tool-shell` (`<environment>-isoloom-…` on Hyper-V and
   ESXi; were `controller`, `router`, `tool shell`), the docker-vm and hybrid hosts as
   `isoloom-docker-host` (were `docker`, `containers`): read them from `machines[].native.vm_names`.
-- A Vagrant VM's display name (VirtualBox, VMware, Parallels, UTM) is `<lab> - <machine>`, ASCII
-  (was `<lab> · <machine>`): Vagrant renames an existing VM when it next boots it.
+- A Vagrant VM's display name (VirtualBox, VMware, Parallels, UTM) is `<environment> - <machine>`, ASCII
+  (was `<environment> · <machine>`): Vagrant renames an existing VM when it next boots it.
 
 ## Library users
 
@@ -140,7 +140,7 @@ among others (the CHANGELOG's **Removed** section lists every item):
 - `isoloom_spec::model::secret_variable` is `isoloom_manifest::contract::secret_variable` (beside
   `contract::SECRET_PREFIX`), and `isoloom_manifest::access::{IMAGE_ENV, BOX_ENV}` are
   `isoloom_manifest::contract::{ACCESS_IMAGE, ACCESS_BOX}`, with the same values.
-- `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}`: the lab takes
+- `isoloom_spec::defaults::{apply_to_files, set_region, BUILTIN_REGIONS, builtin}`: the environment takes
   the regions (`Lab::with_regions`, from `Defaults::regions`); `isoloom_targets::default_regions`
   gives each cloud's built-in one.
 - `isoloom_spec::files` (`GeneratedFile` is re-exported by `isoloom-targets` as before),
@@ -166,7 +166,7 @@ among others (the CHANGELOG's **Removed** section lists every item):
 - `isoloom_spec::model::Spec::inputs` is a list of `Input` (`name`, `sensitive`), and
   `Spec::plain_inputs` is removed: read `input.sensitive`.
   `isoloom_spec::validate::kebab` is `isoloom_manifest::is_kebab`.
-- `isoloom_spec::targets` (`derive`, `effective`, `missing`, `mixed`) is removed: ask the lab,
+- `isoloom_spec::targets` (`derive`, `effective`, `missing`, `mixed`) is removed: ask the environment,
   `isoloom_targets::Lab::possible` for the targets that can run a spec and
   `Lab::not_possible(target)` for why one can't, which count the access machine and the image
   table as the generator does.

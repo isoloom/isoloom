@@ -39,7 +39,7 @@ fn esxi_segmented() -> Outcome {
 
 /// The router holds the sealed ruleset from its first boot, and the run manifest's seal applies
 /// that very file over SSH once the machines are set up: `internet: false` networks lose the
-/// internet on ESXi, as on Proxmox. A lab with nothing to seal has neither.
+/// internet on ESXi, as on Proxmox. An environment with nothing to seal has neither.
 #[test]
 fn the_router_holds_the_sealed_ruleset_the_seal_applies() -> Outcome {
     let e = env("segmented")?;

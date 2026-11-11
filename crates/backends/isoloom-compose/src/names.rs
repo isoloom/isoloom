@@ -12,7 +12,7 @@ pub(crate) use isoloom_render::container::check_runner as check_runner_service;
 pub(crate) const STAND_IN: &str = "isoloom-access";
 
 /// The network sidecar of a machine (or of the [`STAND_IN`]), which sets its routes:
-/// `isoloom-routes-<machine>`, under the prefix a lab's machines can't take, so no machine's name
+/// `isoloom-routes-<machine>`, under the prefix an environment's machines can't take, so no machine's name
 /// is another's sidecar.
 #[must_use]
 pub(crate) fn routes_service(machine: &str) -> String {

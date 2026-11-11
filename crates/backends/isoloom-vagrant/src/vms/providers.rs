@@ -1,4 +1,4 @@
-//! Every provider's block for one VM: the same set for the lab's machines and Isoloom's own
+//! Every provider's block for one VM: the same set for the environment's machines and Isoloom's own
 //! (router, controller, tool shell), so a provider added here reaches all of them.
 
 use std::net::Ipv4Addr;
@@ -46,7 +46,7 @@ impl Size {
         }
     }
 
-    /// A lab machine's size as it runs ([`isoloom_plan::MachinePlan::size`]); its disk only when
+    /// An environment machine's size as it runs ([`isoloom_plan::MachinePlan::size`]); its disk only when
     /// the spec sets one (else the box's).
     pub(crate) fn of(mp: &isoloom_plan::MachinePlan) -> Size {
         let size = mp.size();
@@ -217,7 +217,7 @@ pub(crate) fn qemu_arch(a: Arch) -> &'static str {
     }
 }
 
-/// libvirt runs a lab machine as its own CPU (emulated when the host's is another), as QEMU
+/// libvirt runs an environment machine as its own CPU (emulated when the host's is another), as QEMU
 /// does; Isoloom's own VMs take the host's.
 fn libvirt(r: &mut Ruby, g: &Guest) {
     let params = if g.libvirt_box.is_some() { "v, o" } else { "v" };

@@ -36,7 +36,7 @@ Register a self-hosted runner for each real local/server target, labelled so the
 |---|---|---|
 | `virtualbox` | `vagrant/virtualbox` | Vagrant, VirtualBox, Rust (stable), git |
 | `libvirt` | `vagrant/libvirt` | Vagrant, libvirt/KVM + `vagrant-libvirt`, Rust, git |
-| `proxmox` | `proxmox` server mode | Terraform, SSH client, Rust, git, network reach to the cluster API, its node (SSH) and the lab router |
+| `proxmox` | `proxmox` server mode | Terraform, SSH client, Rust, git, network reach to the cluster API, its node (SSH) and the environment router |
 
 Then declare which runners exist, so the gate jobs only schedule what can run:
 
@@ -62,7 +62,7 @@ The budget guard caps spend and guarantees teardown:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `REAL_AWS_REGION` | `eu-west-3` | Region the lab runs in |
+| `REAL_AWS_REGION` | `eu-west-3` | Region the environment runs in |
 | `REAL_CLOUD_MAX_HOURS` | `3` | Expiry tag lifetime; also the runner lifetime passed to `isothrum up --lifetime` |
 
 Each machine's size is the module's own (the smallest that takes what the example asks for). On
@@ -91,7 +91,7 @@ the module has no default), and these, each optional (an unset one keeps the mod
 `PROXMOX_IMAGE_DATASTORE`, `PROXMOX_SNIPPETS_DATASTORE`, `PROXMOX_UPLINK_BRIDGE`,
 `PROXMOX_SSH_USERNAME`, `PROXMOX_SSH_ADDRESS`, `PROXMOX_INSECURE`.
 
-Each run also makes a throwaway SSH keypair for the lab's VMs and deletes both keys in an `always()`
+Each run also makes a throwaway SSH keypair for the environment's VMs and deletes both keys in an `always()`
 step. Guest SSH from the runner (for checks) uses that per-run key.
 
 ## Where the tier records come from and go

@@ -1,23 +1,23 @@
-//! What the unit tests share: labs written in a test, and their environments planned for a
+//! What the unit tests share: environments written in a test, and their environments planned for a
 //! target.
 
 use isoloom_spec::model::{Spec, Target};
 
 use crate::{Environment, Lab};
 
-/// The lab of `yaml`, written in the authored format.
+/// The environment of `yaml`, written in the authored format.
 pub(crate) fn lab(yaml: &str) -> Lab {
     Lab::parse(yaml).unwrap_or_else(|problems| panic!("the test's spec parses: {problems:?}"))
 }
 
-/// The lab of `yaml`, checked valid.
+/// The environment of `yaml`, checked valid.
 pub(crate) fn valid(yaml: &str) -> Lab {
     let lab = lab(yaml);
     assert_eq!(lab.problems(), [], "the test's spec is valid");
     lab
 }
 
-/// The spec of `yaml` as the lab itself lowers it: every form, no target's own facts.
+/// The spec of `yaml` as the environment itself lowers it: every form, no target's own facts.
 pub(crate) fn spec(yaml: &str) -> Spec {
     lab(yaml).spec()
 }

@@ -1,6 +1,6 @@
 //! An entry's placeholders filled in for one machine: `{{ version }}`, `{{ os.* }}`,
 //! `{{ vars.* }}`, `{{ with.* }}` and, in a step repeated with `for_each`, `{{ item.* }}`. The
-//! lab's own paths (`{{ machine.name }}`, `{{ machines.<m>.addresses.<n> }}`) are left as they
+//! environment's own paths (`{{ machine.name }}`, `{{ machines.<m>.addresses.<n> }}`) are left as they
 //! are in a template's text, for the plan to fill in per target; anywhere else they are refused,
 //! since a step runs before the machine reaches the others.
 
@@ -23,7 +23,7 @@ pub(crate) enum Unfilled {
     Unknown(String),
     /// A secret's or an input's value: only its file's path is ever written.
     Sensitive(String),
-    /// A value that can't stand in a text here (a list, a path of what has no file, a lab path
+    /// A value that can't stand in a text here (a list, a path of what has no file, an environment path
     /// outside a template).
     Misplaced { reference: String, why: &'static str },
 }
@@ -42,7 +42,7 @@ impl std::fmt::Display for Unfilled {
     }
 }
 
-/// Where a text is: a template's file keeps the lab's paths; anything else refuses them.
+/// Where a text is: a template's file keeps the environment's paths; anything else refuses them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Text {
     /// A template's file.

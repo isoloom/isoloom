@@ -748,7 +748,7 @@ fn the_cli_reference_page_is_what_docs_cli_prints() -> Outcome {
 }
 
 /// The access machine left to the runner: a target refuses it unless the image table gives it a
-/// form there. Every command that judges the lab takes the table and `-s` as `generate` does, so
+/// form there. Every command that judges the environment takes the table and `-s` as `generate` does, so
 /// none says ✗ for a target `generate --images` writes.
 #[test]
 fn every_command_judges_the_lab_generate_writes() -> Outcome {

@@ -12,7 +12,7 @@ use isoloom_spec::model::Target;
 
 use super::{project, role_files, role_name};
 
-/// The environment `target` plans for a one-machine lab whose machine `m` has `body`
+/// The environment `target` plans for a one-machine environment whose machine `m` has `body`
 /// (`os: …, app: …`), with `templates` as the project's template texts.
 fn env(m: &str, target: Target, templates: &[(&str, &str)]) -> Environment {
     let yaml = format!("version: 1\nname: lab\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  m: {{ networks: {{ lan: 10 }}, {m} }}\n");
@@ -162,7 +162,7 @@ fn a_service_gets_a_restart_handler_notified_by_the_earlier_steps() {
     assert!(handlers.contains("state: restarted"), "{handlers}");
 }
 
-/// The Ansible project a lab of `machines` (and its `overrides.external`) renders on the external
+/// The Ansible project an environment of `machines` (and its `overrides.external`) renders on the external
 /// target, under `.isoloom/external`.
 fn external_project(body: &str) -> Vec<GeneratedFile> {
     let yaml = format!("version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{body}");

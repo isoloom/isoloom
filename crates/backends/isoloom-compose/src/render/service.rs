@@ -128,7 +128,7 @@ fn dns(spec: &model::Machine, svc: &mut Service) {
 }
 
 /// The access machine: brought up on demand, never by the initial `up`. It sits in the `access`
-/// Compose profile (so `up` skips it) and stays up idle for the user to work from. A lab that
+/// Compose profile (so `up` skips it) and stays up idle for the user to work from. An environment that
 /// builds its own image for it (a `build`) keeps it; otherwise it runs its planned image, which
 /// the runner can override with one it is given.
 fn access_box(plan: &isoloom_plan::MachinePlan, svc: &mut Service) {

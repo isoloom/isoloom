@@ -19,7 +19,7 @@ fn project(name: &str, files: &[(&str, &str)]) -> std::io::Result<PathBuf> {
     Ok(dir)
 }
 
-/// A lab whose machine `web` has `steps`, beside `db`.
+/// An environment whose machine `web` has `steps`, beside `db`.
 fn lab(steps: &str) -> String {
     format!(
         "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web: {{ os: debian@12, networks: {{ lab: 10 }}, command: x, app: {{ steps: {steps} }} }}\n  db: {{ os: debian@12, networks: {{ lab: 20 }}, command: y, ports: {{ pg: 5432 }} }}\n"

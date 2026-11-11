@@ -15,10 +15,10 @@ use crate::entry::{Setting, SettingType};
 use crate::family::Family;
 use crate::names::SettingName;
 
-/// What the values may name: the lab, the machine they are for and its OS's family.
+/// What the values may name: the environment, the machine they are for and its OS's family.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Around<'a> {
-    /// The lab.
+    /// The environment.
     pub spec: &'a syntax::Spec,
     /// The machine.
     pub machine: &'a str,
@@ -95,7 +95,7 @@ fn first_sentence(text: &str) -> &str {
     text.split_once(". ").map_or(text, |(s, _)| s).trim_end_matches('.')
 }
 
-/// Where a value is read: the lab, the setting, the list item (its index from 1 and field) and
+/// Where a value is read: the environment, the setting, the list item (its index from 1 and field) and
 /// the value's path.
 struct Place<'a> {
     around: Around<'a>,

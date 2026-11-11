@@ -45,7 +45,7 @@ pub fn of_containers(env: &Environment) -> Vec<ContainerFolder<'_>> {
         .collect()
 }
 
-/// The first container of `env` that mounts a folder of the computer that runs the lab, if one
+/// The first container of `env` that mounts a folder of the computer that runs the environment, if one
 /// does: the VM its Compose runs in (`docker-vm`, `cloud-docker`) must then run on that computer,
 /// to share the folder into it.
 #[must_use]

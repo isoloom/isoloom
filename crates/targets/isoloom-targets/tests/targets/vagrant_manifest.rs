@@ -1,5 +1,5 @@
 //! The run manifest the `vagrant` target writes (`.isoloom/vagrant/run.json`): two specs shaped
-//! like the corpus's VM labs write the shared fixtures the runner tests against (a Windows domain
+//! like the corpus's VM environments write the shared fixtures the runner tests against (a Windows domain
 //! with a controller, and a Linux web machine with its secret as a file), check runners get the
 //! docker target's time rule, and an input left out is delivered empty. Every example's manifest
 //! is checked in `run_manifest`, with the docker target's.
@@ -10,7 +10,7 @@ use isoloom_targets::generate;
 
 use crate::testing::{Outcome, file, lab, matches_fixture};
 
-/// A small Active Directory lab, `mini-ad`: two Windows machines (the secret a file on `dc01`), a
+/// A small Active Directory environment, `mini-ad`: two Windows machines (the secret a file on `dc01`), a
 /// domain built by the environment's playbook from the controller, checks with long waits.
 const MINI_AD: &str = "
 version: 1

@@ -38,7 +38,7 @@ pub(crate) struct Known {
     pub(crate) provider: Provider<'static>,
     /// Its id in the run manifest.
     pub(crate) manifest: ManifestProvider,
-    /// How it shares a folder of the computer that runs the lab both ways (Vagrant's synced
+    /// How it shares a folder of the computer that runs the environment both ways (Vagrant's synced
     /// folder `type:`), if it has a way Isoloom uses (`host_folders`).
     pub(crate) share: Option<&'static str>,
     /// The hosts it exists on.

@@ -1,4 +1,4 @@
-//! What a lab's steps say beyond the spec's own checks: the project files they name (each
+//! What an environment's steps say beyond the spec's own checks: the project files they name (each
 //! `copy`'s source, each `template` and its placeholders, each folder or file a catalogue
 //! service's settings name), present in the project folder.
 

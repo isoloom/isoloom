@@ -1,4 +1,4 @@
-//! A lab's problems, each spec with one mistake: every problem names the field the author wrote
+//! An environment's problems, each spec with one mistake: every problem names the field the author wrote
 //! and says what is wrong, so an author can fix it without reading the generators.
 
 use std::path::{Path, PathBuf};

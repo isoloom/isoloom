@@ -35,7 +35,7 @@ pub(crate) fn provider(tags: Expression) -> Block {
 
 /// `resource "aws_instance" "<id>"`, the same on both targets: it terminates when it shuts down
 /// (a machine's own expiry shutdown ends it, nothing is left stopped and billed for its disk),
-/// and its metadata service takes session tokens only (`IMDSv2`: a request forwarded by a lab's
+/// and its metadata service takes session tokens only (`IMDSv2`: a request forwarded by an environment's
 /// service can't read it).
 pub(crate) fn ec2_instance(id: &str) -> BlockBuilder {
     resource("aws_instance", id)
@@ -116,7 +116,7 @@ pub(crate) fn egress() -> Block {
     egress_to(list([string("0.0.0.0/0")]))
 }
 
-/// A security group's `egress` rule to `cidrs`, every protocol (a sealed machine's: the lab's
+/// A security group's `egress` rule to `cidrs`, every protocol (a sealed machine's: the environment's
 /// own blocks).
 pub(crate) fn egress_to(cidrs: Expression) -> Block {
     Block::builder("egress")

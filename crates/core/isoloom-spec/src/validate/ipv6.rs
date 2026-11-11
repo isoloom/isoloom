@@ -54,7 +54,7 @@ fn only(spec: &Spec, name: &str, net: &Network, p: &mut Problems) {
 mod tests {
     use crate::testing::{lab, problems};
 
-    /// The problems of a lab whose second network, `v6`, is `network`, with `rest` after it.
+    /// The problems of an environment whose second network, `v6`, is `network`, with `rest` after it.
     fn of(network: &str, rest: &str) -> Vec<String> {
         problems(&lab(&format!(
             "  v6: {network}\nmachines:\n  web: {{ networks: {{ lan: 10, v6: 10 }}, docker: {{ image: nginx }} }}\n{rest}"

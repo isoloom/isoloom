@@ -1,5 +1,5 @@
 //! The containers' host: one more VM in the hybrid Vagrantfile, on the containers' networks with
-//! promiscuous interfaces, where Docker creates a macvlan network per lab network and runs the
+//! promiscuous interfaces, where Docker creates a macvlan network per environment network and runs the
 //! containers' Compose file.
 
 use isoloom_plan::Environment;
@@ -13,7 +13,7 @@ use crate::error::{Error, Result};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile::{self, shell};
 
-/// One lab network on the host: its interface and the macvlan network on it.
+/// One environment network on the host: its interface and the macvlan network on it.
 pub(super) struct Nic {
     /// The address Vagrant requires on a private network (the host takes none itself).
     ip: String,
@@ -39,7 +39,7 @@ pub(super) fn write(r: &mut Ruby, env: &Environment, containers: &Containers, ni
     r.define(HOST, true, |r| define(r, env, containers, nics));
 }
 
-/// The host's VM: its box, published ports and lab interfaces, its size, then Docker, the
+/// The host's VM: its box, published ports and environment interfaces, its size, then Docker, the
 /// project, the macvlan networks and the containers.
 fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]) {
     r.assign("m.vm.box", Value::str(crate::boxes::DEBIAN_12));
@@ -66,7 +66,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
     docker_host::start(r, env, "m", "containers", &up);
 }
 
-/// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every lab
+/// Sized for every container at once plus Docker's own 1 GB (2 to 16 CPUs), every environment
 /// interface promiscuous so each container answers at its own MAC address.
 fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
     let size = HostSize::of(env);
@@ -86,7 +86,7 @@ fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
     });
 }
 
-/// Network `net`, the host's `index`th lab network.
+/// Network `net`, the host's `index`th environment network.
 fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
     let c = env.networks.get(net).map(|n| n.cidr).ok_or_else(|| Error::Unsupported {
         target: Target::Hybrid,
@@ -103,7 +103,7 @@ fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
     })
 }
 
-/// Each lab interface up and promiscuous, found by its MAC address, and its macvlan network.
+/// Each environment interface up and promiscuous, found by its MAC address, and its macvlan network.
 fn networks_script(nics: &[Nic]) -> String {
     let each = nics.iter().map(|n| {
         let mac: Vec<String> = n

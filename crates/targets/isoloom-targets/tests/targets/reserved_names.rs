@@ -1,4 +1,4 @@
-//! What Isoloom names beside a lab's machines (a check runner's script, a machine's published
+//! What Isoloom names beside an environment's machines (a check runner's script, a machine's published
 //! Service) is under its own `isoloom-` prefix, which no machine's name takes, so a machine named
 //! like one of them (`exec-web`, `networks`, `web-published`) never meets it.
 

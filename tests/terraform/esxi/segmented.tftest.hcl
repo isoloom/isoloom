@@ -131,7 +131,7 @@ run "the_outputs_reach_the_machines_through_the_router" {
 
 # The uplink fix (Phase 3): with no DHCP on the uplink, VMware Tools reports a lab address (or
 # none); the apply fails with that reason instead of giving it as the lab's address.
-run "a_router_reporting_a_lab_address_fails_the_apply" {
+run "a_router_reporting_an_environment_address_fails_the_apply" {
   command = plan
 
   override_resource {

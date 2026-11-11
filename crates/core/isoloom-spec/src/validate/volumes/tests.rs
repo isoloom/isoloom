@@ -8,7 +8,7 @@ fn mounting(name: &str, volumes: &str) -> Vec<String> {
 }
 
 /// The problems of shared volume `share` (written `volume`) mounted at /share by `a` and `b`
-/// on `lan`, with the lab's other networks and machines in `more`.
+/// on `lan`, with the environment's other networks and machines in `more`.
 fn shared(volume: &str, more: &str) -> Vec<String> {
     problems(&lab(&format!(
         "volumes:\n  share: {volume}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, vm: {{ os: debian@12 }}, volumes: {{ share: /share }} }}\n  b: {{ networks: {{ lan: 11 }}, vm: {{ os: debian@12 }}, volumes: {{ share: /share }} }}\n{more}"

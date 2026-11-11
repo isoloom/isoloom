@@ -8,7 +8,7 @@ use isoloom_spec::model::Target;
 
 use crate::decision::Column;
 
-/// The lab each column generates for a Linux VM: one alone.
+/// The environment each column generates for a Linux VM: one alone.
 const LINUX: &str = "version: 1
 name: consoles
 networks: { lab: { cidr: 10.20.0.0/24 } }
@@ -16,7 +16,7 @@ machines:
   linux: { networks: { lab: 10 }, os: debian@12 }
 ";
 
-/// The lab for a Windows VM: one opening 3389/tcp, beside a Linux one (what a tunnel goes
+/// The environment for a Windows VM: one opening 3389/tcp, beside a Linux one (what a tunnel goes
 /// through).
 const WINDOWS: &str = "version: 1
 name: consoles
@@ -54,7 +54,7 @@ pub(crate) fn rows(columns: &[Column]) -> Vec<ConsoleRow> {
         .collect()
 }
 
-/// The run manifest `column` writes for `lab`, when it generates the lab.
+/// The run manifest `column` writes for `lab`, when it generates that environment.
 fn manifest_of(lab: &Lab, column: &Column) -> Option<Manifest> {
     let files = crate::generate(lab, column.target).ok()?;
     let path = match (column.target, column.variant) {

@@ -28,7 +28,7 @@ steps' environment.
 
 Two exceptions are by design, and worth knowing:
 
-- **`user` steps' `password` is a literal**, lab content written into the generated files:
+- **`user` steps' `password` is a literal**, environment content written into the generated files:
   hashed (SHA-512 crypt) for Linux users, in clear in the PowerShell that creates a Windows user.
   A secret or input is refused there. For a real credential, use a catalogue entry's password
   setting with `{ secret: <name> }` (`openssh`'s `password`, `mysql`'s `user_password`), or a

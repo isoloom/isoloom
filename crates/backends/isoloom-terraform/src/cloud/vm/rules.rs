@@ -27,7 +27,7 @@ pub(crate) const SECURITY_GROUPS_TC: &str = "link impairment (`tc`) needs a rout
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Networks {
     /// One network and one VM (DigitalOcean: a droplet joins one VPC, at an address the cloud
-    /// picks, so the lab's fixed addressing holds only alone).
+    /// picks, so the environment's fixed addressing holds only alone).
     OneVm,
     /// Several networks, each machine on one (Linode: an instance has one VPC interface).
     OnePerMachine,
@@ -518,7 +518,7 @@ impl Rules {
         disks::too_small(env, self.cloud, self.volumes)
     }
 
-    /// Why a cloud running Linux labs only on the networks it models (DigitalOcean, Linode,
+    /// Why a cloud running Linux environments only on the networks it models (DigitalOcean, Linode,
     /// Oracle Cloud) can't run this environment, if it can't: its networks, Linux only, no
     /// controller, its features, its TPM, its images.
     pub(crate) fn linux_refusal(&self, env: &Environment) -> Option<String> {

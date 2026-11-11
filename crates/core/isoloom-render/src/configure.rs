@@ -73,7 +73,7 @@ impl<'a> Configured<'a> {
     /// # Errors
     ///
     /// Why it can't be: its text wasn't in the project when the files were generated, or a placeholder
-    /// names nothing the lab has (`isoloom validate` reports that first), as the line a recipe
+    /// names nothing the environment has (`isoloom validate` reports that first), as the line a recipe
     /// fails with.
     pub fn template(&self, from: &ProjectPath) -> Result<String, String> {
         let text = self
@@ -102,7 +102,7 @@ impl<'a> Configured<'a> {
             .collect()
     }
 
-    /// User `user`'s literal `password`, hashed as Linux keeps it (the same for the same lab).
+    /// User `user`'s literal `password`, hashed as Linux keeps it (the same for the same environment).
     #[must_use]
     pub fn password(&self, user: &str, password: &str) -> String {
         password::hash(&self.env.name, self.machine, user, password)

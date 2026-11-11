@@ -3,7 +3,7 @@ use isoloom_spec::model::{Constraints, Target};
 use super::{linux_prelude, machine_env, of};
 use crate::testing;
 
-/// The plan's constraints of a lab with `constraints` appended (YAML, empty for none).
+/// The plan's constraints of an environment with `constraints` appended (YAML, empty for none).
 fn constraints(constraints: &str) -> Option<Constraints> {
     testing::env(
         &format!(

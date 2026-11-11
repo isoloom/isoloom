@@ -25,7 +25,7 @@ pub struct DockerImpl {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dockerfile: Option<String>,
     /// The stage of a multi-stage Dockerfile to build (`FROM ... AS <target>`), when not its
-    /// last: the lab's image beside the release one, from one Dockerfile.
+    /// last: the environment's image beside the release one, from one Dockerfile.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
     /// Build arguments (`ARG`s of the Dockerfile), fixed values.
@@ -201,7 +201,7 @@ pub enum Winrm {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Dns {
-    /// DNS server addresses, in order (e.g. the lab's domain controller).
+    /// DNS server addresses, in order (e.g. the environment's domain controller).
     #[serde(default)]
     pub servers: Vec<String>,
     /// Search domains appended to bare names.

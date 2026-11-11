@@ -1,4 +1,4 @@
-//! A lab's problems and the targets its machines' forms allow (the examples are checked in the
+//! An environment's problems and the targets its machines' forms allow (the examples are checked in the
 //! `examples` test).
 
 use isoloom_spec::Error;

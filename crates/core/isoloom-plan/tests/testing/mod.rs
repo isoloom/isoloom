@@ -1,4 +1,4 @@
-//! What the integration tests share: labs written in a test, what an author sees of them, and
+//! What the integration tests share: environments written in a test, what an author sees of them, and
 //! their plans.
 
 use isoloom_plan::{Environment, Lab};
@@ -8,7 +8,7 @@ use isoloom_spec::syntax::{self, Problem, Problems};
 /// A test's outcome: the problems that stop its spec from being read are the report.
 pub type Outcome<T = ()> = Result<T, Problems>;
 
-/// The lab of `yaml`, or the problems that stop it from being read.
+/// The environment of `yaml`, or the problems that stop it from being read.
 ///
 /// # Errors
 ///
@@ -23,7 +23,7 @@ pub fn refused(yaml: &str) -> Vec<Problem> {
     syntax::parse(yaml).err().unwrap_or_default()
 }
 
-/// What an author sees for `yaml`: the parser's problems, or the lab's once the spec parses,
+/// What an author sees for `yaml`: the parser's problems, or the environment's once the spec parses,
 /// one line each.
 #[must_use]
 pub fn problems(yaml: &str) -> Vec<String> {
@@ -67,7 +67,7 @@ pub fn plan_anyway(yaml: &str, target: Target) -> Outcome<Environment> {
 ///
 /// # Errors
 ///
-/// The parser's problems, or the lab's, or why it can't be planned.
+/// The parser's problems, or the environment's, or why it can't be planned.
 pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
     let lab = lab(yaml)?;
     let problems = lab.problems();

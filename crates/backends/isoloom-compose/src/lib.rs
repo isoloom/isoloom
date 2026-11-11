@@ -21,10 +21,10 @@
 //! - Checks run in a `check` profile, one runner per position (`isoloom-check` where a user
 //!   stands, `isoloom-check-<machine>` for the others), each a sh script in `checks/`.
 //! - A service's `publish` port is published on the host's loopback (127.0.0.1) only, on an
-//!   ephemeral host port Docker picks, so two labs publishing the same port never collide; the
+//!   ephemeral host port Docker picks, so two environments publishing the same port never collide; the
 //!   runner reads the real port back from `docker compose ps`. `ISOLOOM_PUBLISH_ADDRESS`
 //!   overrides the address and `ISOLOOM_PUBLISH_FIXED` pins the host port to `publish` (both
-//!   set inside the docker-vm and cloud VMs, where the lab is alone and that fixed port is
+//!   set inside the docker-vm and cloud VMs, where the environment is alone and that fixed port is
 //!   forwarded from loopback).
 //! - `volumes:` become named volumes: they survive re-creating a container, and go with
 //!   `docker compose down -v`.

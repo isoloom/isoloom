@@ -20,7 +20,7 @@ fn vm(hardware: &str) -> Outcome<Lab> {
     ))
 }
 
-/// Why `target` refuses the lab.
+/// Why `target` refuses the environment.
 fn refusal(spec: &Lab, target: Target) -> Outcome<String> {
     match generate(spec, target) {
         Err(Error::Generate(GenerateError::Unsupported { what, .. })) => Ok(what),

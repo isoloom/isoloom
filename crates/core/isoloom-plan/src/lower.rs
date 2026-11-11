@@ -4,7 +4,7 @@
 //! being lowered fill in its platform facts; and a machine the target can't run is a refusal
 //! naming the field that rules it out (`machines.web.app.build`), never a silent stand-in.
 //!
-//! Lowered for the lab as a whole ([`Scope::Lab`]), no target's own facts apply: that is the
+//! Lowered for the environment as a whole ([`Scope::Lab`]), no target's own facts apply: that is the
 //! spec validation, the snapshot and the derived targets read.
 
 mod carry;
@@ -25,7 +25,7 @@ use isoloom_spec::syntax::{self, Problem};
 /// What a lowering is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
-    /// The lab itself: every form, no target's own facts.
+    /// The environment itself: every form, no target's own facts.
     Lab,
     /// One target: its overrides applied, its refusals found.
     Target(Target),
@@ -60,7 +60,7 @@ pub struct Lowered {
     pub problems: Vec<Problem>,
 }
 
-/// What lowering reads besides a machine: the spec, the scope, and the lab's catalogue services,
+/// What lowering reads besides a machine: the spec, the scope, and the environment's catalogue services,
 /// resolved once.
 pub(super) struct Lowering<'a> {
     source: &'a syntax::Spec,
@@ -137,7 +137,7 @@ pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowe
 }
 
 /// The first machine `target` has no form for, as a `refused` problem at the field that rules it
-/// out: the target can't run the lab at all (its catalogue services resolved in `catalogue`).
+/// out: the target can't run the environment at all (its catalogue services resolved in `catalogue`).
 #[must_use]
 pub fn missing_form(source: &syntax::Spec, catalogue: &Catalogue, target: Target) -> Option<Problem> {
     refusals::forms(source, &service::Services::of(catalogue, source), target).into_iter().next()

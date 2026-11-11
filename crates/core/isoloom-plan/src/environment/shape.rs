@@ -10,7 +10,7 @@ pub enum MachineShape {
     /// A virtual machine.
     Vm,
     /// An access machine the spec leaves to the runner with none of the target's forms from the
-    /// image table: the target refuses the lab, so nothing renders it.
+    /// image table: the target refuses the environment, so nothing renders it.
     Supplied,
     /// An existing machine, reached as it is (every machine on the `external` target).
     External,

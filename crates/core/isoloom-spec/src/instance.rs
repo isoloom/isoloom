@@ -103,7 +103,7 @@ mod tests {
     use super::*;
     use crate::testing::{lab, model};
 
-    /// A web machine publishing port 80 on the host's `publish`, on the lab's network.
+    /// A web machine publishing port 80 on the host's `publish`, on the environment's network.
     fn web(publish: u16) -> Result<Spec, String> {
         model(&lab(&format!(
             "machines:\n  web:\n    docker: {{ image: nginx }}\n    networks: {{ lan: 10 }}\n    ports: [{{ port: 80, publish: {publish} }}]\n"

@@ -1,4 +1,4 @@
-//! A machine's `host_folders`: a folder of the computer that runs the lab, at a safe path of its
+//! A machine's `host_folders`: a folder of the computer that runs the environment, at a safe path of its
 //! own in a Linux machine. Whether a project folder exists is [`super::validate_files`]'s.
 
 use std::collections::BTreeSet;

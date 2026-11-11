@@ -10,10 +10,10 @@ use isoloom_spec::model::Target;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// A target's files weren't generated: the target refuses the lab, or its backend failed.
+    /// A target's files weren't generated: the target refuses the environment, or its backend failed.
     #[error(transparent)]
     Generate(#[from] GenerateError),
-    /// The lab can't be made the instance asked for (`isoloom_spec::instance::apply`).
+    /// The environment can't be made the instance asked for (`isoloom_spec::instance::apply`).
     #[error("instance {number}: {source}")]
     Instance {
         /// The instance number asked for.
@@ -70,15 +70,15 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Why a target's files weren't generated: a refusal ([`GenerateError::is_refusal`]), the
-/// target leaving the lab out as `isoloom targets` says, or a failure, which no lab should
+/// target leaving the environment out as `isoloom targets` says, or a failure, which no environment should
 /// cause.
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]
 pub enum GenerateError {
-    /// The lab's machines have no form this target runs (see `isoloom targets`).
+    /// The environment's machines have no form this target runs (see `isoloom targets`).
     #[error("{}: not possible for this spec (see `isoloom targets`)", .0.id())]
     NotPossible(Target),
-    /// The target is possible, but its backend refuses a feature the lab uses, as the refusal
+    /// The target is possible, but its backend refuses a feature the environment uses, as the refusal
     /// reads.
     #[error("{}: {what}", target.id())]
     Unsupported {
@@ -87,9 +87,9 @@ pub enum GenerateError {
         /// What it doesn't support, as the refusal reads.
         what: String,
     },
-    /// The lab can't be made the instance asked for on the target (`isoloom_spec::instance::apply`:
+    /// The environment can't be made the instance asked for on the target (`isoloom_spec::instance::apply`:
     /// a number out of range, a name too long, a published port or an IPv6 block moved past its
-    /// end). Not a refusal: the target takes the lab, not that instance of it.
+    /// end). Not a refusal: the target takes the environment, not that instance of it.
     #[error("{}: instance {number}: {source}", target.id())]
     Instance {
         /// The target being generated.
@@ -100,7 +100,7 @@ pub enum GenerateError {
         #[source]
         source: Arc<isoloom_spec::Error>,
     },
-    /// The backend failed, not the lab (a bug: a value the run manifest's types refused, a file
+    /// The backend failed, not the environment (a bug: a value the run manifest's types refused, a file
     /// its writer couldn't write), with the error it failed with.
     #[error("{}: {what}", target.id())]
     Internal {
@@ -115,9 +115,9 @@ pub enum GenerateError {
 }
 
 impl GenerateError {
-    /// Whether the target refuses the lab ([`GenerateError::NotPossible`],
+    /// Whether the target refuses the environment ([`GenerateError::NotPossible`],
     /// [`GenerateError::Unsupported`]): the one reason a target may be left out of `generate`
-    /// and `check` without failing them. A failed backend is never the lab's doing.
+    /// and `check` without failing them. A failed backend is never the environment's doing.
     #[must_use]
     pub fn is_refusal(&self) -> bool {
         matches!(self, GenerateError::NotPossible(_) | GenerateError::Unsupported { .. })

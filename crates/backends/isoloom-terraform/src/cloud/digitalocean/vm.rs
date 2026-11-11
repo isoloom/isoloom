@@ -1,8 +1,8 @@
 //! DigitalOcean's `cloud-vm` module, `.isoloom/cloud-vm/digitalocean/main.tf`, rendered from the
-//! plan through the VM core. One droplet for the lab's single Linux machine, on a VPC with the
+//! plan through the VM core. One droplet for the environment's single Linux machine, on a VPC with the
 //! network's range. DigitalOcean can't pin a droplet's private IPv4 to a chosen address, so the
-//! lab's fixed inter-machine addressing wouldn't hold: the module takes only single-network,
-//! single-Linux-VM labs and refuses the rest.
+//! environment's fixed inter-machine addressing wouldn't hold: the module takes only single-network,
+//! single-Linux-VM environments and refuses the rest.
 
 use crate::hcl_builder::{Block, Expression, Module, list, reference, string};
 use isoloom_plan::{Environment, MachinePlan, Vm};

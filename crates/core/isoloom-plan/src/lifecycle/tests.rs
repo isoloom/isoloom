@@ -108,7 +108,7 @@ fn a_step_runs_first_from_the_prelude_and_ends_ready() {
     assert!(web.contains(&Step::Project) && web.contains(&Step::Settings) && web.contains(&Step::Trunks));
 }
 
-/// The steps of machine `m` of a lab whose machines are `machines`.
+/// The steps of machine `m` of an environment whose machines are `machines`.
 fn steps_of(machines: &str, m: &str) -> MachineLifecycle {
     let yaml = format!(
         "version: 1\nname: t\nsecrets: {{ db: {{ env: DB }} }}\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24, ipv6: {{ cidr: \"fd00:9::/64\" }} }}, b: {{ cidr: 10.8.0.0/24 }} }}\nvolumes: {{ shared: {{ owner: a }} }}\nmachines:\n{machines}"

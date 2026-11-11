@@ -16,14 +16,14 @@ pub struct HostSize {
 }
 
 impl HostSize {
-    /// The smallest disk of a containers' host: room for the system, Docker, and the lab's images
+    /// The smallest disk of a containers' host: room for the system, Docker, and the environment's images
     /// while they are pulled (each download beside its unpacked layers), which the 5 GB a
     /// container counts by default don't cover for a large one: a full desktop or tools image
     /// unpacks to about 12 GB, and an access machine's image may be one the runner is given
     /// (`ISOLOOM_ACCESS_IMAGE`), which the spec doesn't size. 20 GB filled up.
     pub const MIN_DISK_GB: u32 = 40;
 
-    /// The smallest memory of a containers' host: Debian, Docker and a small lab's containers
+    /// The smallest memory of a containers' host: Debian, Docker and a small environment's containers
     /// together, which 1.5 GB (one container and Docker's own gigabyte) leaves short.
     pub(crate) const MIN_MEMORY_MB: u32 = 2048;
 

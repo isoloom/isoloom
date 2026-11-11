@@ -43,7 +43,7 @@ pub enum Step {
         default: Option<Ipv4Addr>,
     },
     /// A gateway's forwarding between its networks, on now and at every boot: IPv4, and IPv6
-    /// when the lab routes IPv6 ([`crate::routing::forwarding`]). Its own provisioning sets the
+    /// when the environment routes IPv6 ([`crate::routing::forwarding`]). Its own provisioning sets the
     /// rules.
     Forwarding {
         /// The kernel parameters, each with its value.
@@ -186,7 +186,7 @@ pub enum RunKind {
 
 /// The step trusting the certificate authorities of `constraints` (`ca_certificates`, the
 /// plan's [`crate::Environment::constraints`]) from the unpacked project, which comes after
-/// [`Step::Project`] and before anything downloads: on a lab machine and on Isoloom's own VMs (a
+/// [`Step::Project`] and before anything downloads: on an environment machine and on Isoloom's own VMs (a
 /// Docker host, the controller, the router) alike. None when they name none.
 #[must_use]
 pub fn ca_certificates(constraints: Option<&Constraints>) -> Option<Step> {

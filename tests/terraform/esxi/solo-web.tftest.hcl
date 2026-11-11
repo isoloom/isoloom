@@ -89,7 +89,7 @@ run "the_published_port_is_an_output_keyed_by_machine_and_port_name" {
 
 # Without its uplink address the published port would point into the lab: the apply fails
 # instead (Phase 3).
-run "a_router_reporting_its_lab_address_fails_the_apply" {
+run "a_router_reporting_its_environment_address_fails_the_apply" {
   command = plan
 
   override_resource {

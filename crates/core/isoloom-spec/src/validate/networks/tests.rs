@@ -1,6 +1,6 @@
 use crate::testing::{lab, problems};
 
-/// The problems of the lab with `networks` beside `lan`, and a web server on `lan`.
+/// The problems of the environment with `networks` beside `lan`, and a web server on `lan`.
 fn with(networks: &str) -> Vec<String> {
     problems(&lab(&format!(
         "{networks}machines:\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }} }}\n"

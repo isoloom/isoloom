@@ -10,7 +10,7 @@
           "$ref": "#/$defs/Case"
         }
       },
-      "description": "The set-ups a conformance lab is built for, by name; `default` always runs."
+      "description": "The set-ups a conformance environment is built for, by name; `default` always runs."
     },
     "checks": {
       "type": "array",
@@ -50,7 +50,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "The lab's project files, by path: their content, inline.",
+          "description": "The environment's project files, by path: their content, inline.",
           "default": {}
         },
         "machines": {
@@ -60,7 +60,7 @@
           "default": {}
         }
       },
-      "description": "One set-up of the conformance lab."
+      "description": "One set-up of the conformance environment."
     },
     "ContractCheck": {
       "type": "object",

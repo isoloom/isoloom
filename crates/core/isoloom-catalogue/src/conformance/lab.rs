@@ -1,4 +1,4 @@
-//! One case of an entry's contract as a lab: the service machine (`web`), the case's helper
+//! One case of an entry's contract as an environment: the service machine (`web`), the case's helper
 //! machines, and an access machine the runner supplies (`probe`), on one network with the
 //! internet (the recipe fetches its packages); the contract's checks, filled in for the case, run
 //! from `probe` (an `exec`, in `web`); each fact as a check of its own.
@@ -22,7 +22,7 @@ pub(crate) const FACT_PREFIX: &str = "fact: ";
 /// output.
 const NEVER: &str = "isoloom-fact-output-follows";
 
-/// One case of the contract, as a lab.
+/// One case of the contract, as an environment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ConformanceLab {
@@ -36,7 +36,7 @@ pub struct ConformanceLab {
     pub facts: Vec<String>,
 }
 
-/// Why a case can't be run as a lab.
+/// Why a case can't be run as an environment.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum LabError {
@@ -64,7 +64,7 @@ pub enum LabError {
 }
 
 impl Entry {
-    /// Case `case` of the contract as a lab of `release` on `os`, its helpers' services looked up
+    /// Case `case` of the contract as an environment of `release` on `os`, its helpers' services looked up
     /// in `catalogue`.
     ///
     /// # Errors

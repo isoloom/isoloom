@@ -1,4 +1,4 @@
-//! Shared helpers: the fixture catalogue, read from disk and changed in memory, and a lab of one
+//! Shared helpers: the fixture catalogue, read from disk and changed in memory, and an environment of one
 //! service machine.
 
 use std::collections::BTreeMap;
@@ -39,7 +39,7 @@ pub(crate) fn demo() -> Result<Catalogue, Box<dyn std::error::Error>> {
     Ok(load(&fixture_files()?)?)
 }
 
-/// A lab whose machine `web` runs `service` on `os` with `with` (inline YAML), beside `app` on
+/// An environment whose machine `web` runs `service` on `os` with `with` (inline YAML), beside `app` on
 /// the same network.
 pub(crate) fn lab(os: &str, service: &str, with: &str) -> Result<syntax::Spec, Vec<Problem>> {
     syntax::parse(&format!(

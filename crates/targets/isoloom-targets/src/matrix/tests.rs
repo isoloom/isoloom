@@ -11,7 +11,7 @@ fn built() -> Matrix {
     matrix().unwrap()
 }
 
-/// The labs a row is decided on, by target: its plain one, `hybrid`'s and `external`'s.
+/// The environments a row is decided on, by target: its plain one, `hybrid`'s and `external`'s.
 fn labs_of(p: &Probe) -> Vec<(Target, Lab)> {
     let probes = probe::probes().unwrap();
     Target::ALL
@@ -74,7 +74,7 @@ fn the_lab_every_row_changes_is_generated_everywhere_but_where_a_network_is_refu
 }
 
 /// The features lowering rules out before any backend is asked: `hardware.devices` gives a
-/// machine no VM form, `nested_virtualization` no container form, so no lab asks a backend for a
+/// machine no VM form, `nested_virtualization` no container form, so no environment asks a backend for a
 /// VM with the host's devices or a container nesting VMs. Their rows still show what each target
 /// does with the field. When lowering lets one through, this test says so.
 const RULED_OUT: [Feature; 2] = [Feature::VmDevices, Feature::ContainerNestedVirtualization];
@@ -246,9 +246,9 @@ fn every_column_generates_some_row() {
 }
 
 /// A row about a step shows what each target does with the step, the container targets
-/// included: its lab runs the step as the machine's only recipe (no `app.image` the container
+/// included: its environment runs the step as the machine's only recipe (no `app.image` the container
 /// targets would run instead, skipping the step), and each column's cell is what the generator
-/// says of that lab. The playbook and reboot rows once kept the image, so the container columns
+/// says of that environment. The playbook and reboot rows once kept the image, so the container columns
 /// showed ✓ for steps they refuse.
 #[test]
 fn every_step_row_is_decided_on_the_step_itself() {

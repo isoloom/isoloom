@@ -1,6 +1,6 @@
 use crate::testing::{lab, model, problems};
 
-/// The problems of a lab whose machines are `machines` (YAML lines under `machines:`).
+/// The problems of an environment whose machines are `machines` (YAML lines under `machines:`).
 fn of(machines: &str) -> Vec<String> {
     problems(&lab(&format!("machines:\n{machines}")))
 }

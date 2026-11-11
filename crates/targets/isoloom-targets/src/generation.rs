@@ -1,4 +1,4 @@
-//! A lab's files for a target: lowered for the target, planned, rendered by the target's
+//! An environment's files for a target: lowered for the target, planned, rendered by the target's
 //! backend, with its run manifest and the resolved snapshot beside them.
 
 use std::path::Path;
@@ -16,7 +16,7 @@ use crate::{Error, GenerateError, Result, gitignore, resolved};
 ///
 /// # Errors
 ///
-/// [`Error::Generate`]: the target isn't possible for the lab, or its backend refuses the lab or
+/// [`Error::Generate`]: the target isn't possible for the environment, or its backend refuses the environment or
 /// fails.
 pub fn generate(lab: &Lab, target: Target) -> Result<Vec<GeneratedFile>> {
     Ok(with_snapshot(lab, target)?)
@@ -31,7 +31,7 @@ fn with_snapshot(lab: &Lab, target: Target) -> std::result::Result<Vec<Generated
     Ok(files)
 }
 
-/// The files for one target as instance `n` of the lab (see [`isoloom_spec::instance`]): names
+/// The files for one target as instance `n` of the environment (see [`isoloom_spec::instance`]): names
 /// suffixed, Docker blocks and published ports moved, everything under `.isoloom-<n>/`.
 ///
 /// # Errors
@@ -51,10 +51,10 @@ pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<Generat
         .collect())
 }
 
-/// Every target the lab allows: the files (each once: `docker-vm` runs the `docker` target's
+/// Every target the environment allows: the files (each once: `docker-vm` runs the `docker` target's
 /// Compose file), and why each target left out wasn't generated. A caller that writes or checks
 /// the files fails on any that isn't a refusal ([`GenerateError::is_refusal`]): a failed backend
-/// leaves its target's files out, which would otherwise read as a target the lab can't use.
+/// leaves its target's files out, which would otherwise read as a target the environment can't use.
 #[must_use]
 pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     let mut files: Vec<GeneratedFile> = Vec::new();
@@ -113,7 +113,7 @@ pub fn project_copies(lab: &Lab, files: &[GeneratedFile], dir: &Path) -> Result<
     isoloom_kubernetes::project_copies(&env, dir).map_err(Error::ProjectCopies)
 }
 
-/// `spec`, the lab as `target` runs it (as instance `instance`), planned. A lab that lowered
+/// `spec`, the environment as `target` runs it (as instance `instance`), planned. An environment that lowered
 /// clean always plans: one that doesn't is a failure, not a refusal.
 fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std::result::Result<Environment, GenerateError> {
     lab.plan(spec, target, instance).map_err(|e| GenerateError::Internal {
@@ -123,7 +123,7 @@ fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std:
     })
 }
 
-/// The lab as `target` runs it: lowered for it, as instance `n` when one is asked.
+/// The environment as `target` runs it: lowered for it, as instance `n` when one is asked.
 fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Spec, GenerateError> {
     let spec = lab.for_target(target);
     match instance {
@@ -137,7 +137,7 @@ fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Resu
 }
 
 /// A target's own files, without the snapshot (which asks every backend whether it would
-/// refuse the lab, so it can't be part of what a backend renders): the plan for the target,
+/// refuse the environment, so it can't be part of what a backend renders): the plan for the target,
 /// rendered by its backend.
 fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
     if let Some(refused) = lab.refusal(target) {

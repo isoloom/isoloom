@@ -88,7 +88,7 @@ fn pinned_ports() -> Result<PathTemplate> {
 enum Project {
     /// The run's (`${run.name}`): Compose on this computer's Docker, run by the runner.
     Run,
-    /// The Compose file's own name: Compose inside a VM, one lab per VM.
+    /// The Compose file's own name: Compose inside a VM, one environment per VM.
     Named(String),
 }
 

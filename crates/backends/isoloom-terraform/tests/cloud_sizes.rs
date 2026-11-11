@@ -99,7 +99,7 @@ fn a_disk_picks_the_size_that_comes_with_as_much_or_is_refused() -> Outcome {
     Ok(())
 }
 
-/// A lab of `networks` networks: `db` on every one, and a controller when `provision`.
+/// An environment of `networks` networks: `db` on every one, and a controller when `provision`.
 fn wide(networks: usize, provision: bool) -> String {
     let nets: Vec<String> = (0..networks).map(|i| format!("  n{i}: {{ cidr: 10.6{i}.0.0/24 }}")).collect();
     let on: Vec<String> = (0..networks).map(|i| format!("n{i}: 10")).collect();

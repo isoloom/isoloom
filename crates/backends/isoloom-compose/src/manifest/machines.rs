@@ -101,7 +101,7 @@ fn runner(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, Op
     Some((Role::Check, of))
 }
 
-/// Each member as a machine: the lab's own with their architecture, size, addresses, volumes
+/// Each member as a machine: the environment's own with their architecture, size, addresses, volumes
 /// and ports; Isoloom's with what they have of those.
 /// Volumes are named as `project` names them.
 pub(super) fn machines(env: &Environment, file: &ComposeFile, members: &[Member], project: &Project) -> Result<Vec<Machine>> {

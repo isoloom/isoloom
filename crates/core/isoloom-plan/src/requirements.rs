@@ -94,7 +94,7 @@ pub enum Feature {
     RawDisks,
     /// A mode on a memory-backed mount (`tmpfs[].mode`).
     TmpfsModes,
-    /// Folders of the computer that runs the lab, mounted in its machines (`host_folders`).
+    /// Folders of the computer that runs the environment, mounted in its machines (`host_folders`).
     HostFolders,
     /// Several addresses on one network for a VM (`lan: [10, 11]`), added by its set-up.
     VmMoreAddresses,
@@ -268,7 +268,7 @@ pub enum Requirement {
         /// The first machine that does.
         machine: String,
     },
-    /// A machine mounts folders of the computer that runs the lab (`host_folders`).
+    /// A machine mounts folders of the computer that runs the environment (`host_folders`).
     HostFolders {
         /// The first machine that does.
         machine: String,

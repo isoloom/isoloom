@@ -106,7 +106,7 @@ fn names_lab(text: &str) -> bool {
     })
 }
 
-/// No generated name says "lab" for the environment: an example that names nothing `lab` gets
+/// No generated name says "environment" for the environment: an example that names nothing `lab` gets
 /// none (GCP's sealed machines' firewall rule was `<machine>_lab_<network>`).
 #[test]
 fn no_generated_name_says_lab_unless_the_spec_does() -> Outcome {

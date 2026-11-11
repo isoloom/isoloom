@@ -211,7 +211,7 @@ fn initialization(env: &Environment, c: Container) -> Block {
     b.build()
 }
 
-/// The router's hosts file, which its resolver answers the lab's names from.
+/// The router's hosts file, which its resolver answers the environment's names from.
 const ROUTER_HOSTS: &str = isoloom_spec::linux_config_path!("/hosts");
 
 /// The router's name server for the containers: dnsmasq on its network addresses, answering

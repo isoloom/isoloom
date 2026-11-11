@@ -114,7 +114,7 @@ fn embedder_param(name: &str, description: &str, deliver: NonEmpty<Delivery>) ->
     })
 }
 
-/// Where a module of the lab's own (cloud-services) runs on `cloud`, as its provider reads it from
+/// Where a module of the environment's own (cloud-services) runs on `cloud`, as its provider reads it from
 /// the environment (the region, the account, the project), on the Terraform `steps`; and the
 /// module's `region` variable, which a module that declares one takes. Each a param, so the
 /// runner records it at `up` and a destroy goes where the apply went. A name `taken` already

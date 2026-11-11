@@ -1,6 +1,6 @@
 //! The recipe resolves everywhere it claims to: on each release and each of its OSes, with the
 //! settings left to their defaults, with each optional one set in turn, and with all of them
-//! set, every step fills in, pins from `lock.yml` and parses. Each run resolves a small lab of
+//! set, every step fills in, pins from `lock.yml` and parses. Each run resolves a small environment of
 //! its own: the service machine, a peer for endpoints, a secret and an input.
 
 use indexmap::IndexMap;
@@ -47,7 +47,7 @@ fn reasons(problems: &[syntax::Problem]) -> String {
     problems.iter().map(|p| format!("{}: {}", p.path, p.reason)).collect::<Vec<_>>().join("; ")
 }
 
-/// A lab of the service machine and its peer, written as a spec.
+/// An environment of the service machine and its peer, written as a spec.
 fn lab(entry: &Entry, release: &Release, os: OsRef, with: &IndexMap<String, Value>) -> String {
     let with = serde_json::to_string(with).unwrap_or_default();
     format!(

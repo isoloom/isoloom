@@ -50,7 +50,7 @@ pub fn is_gateway(spec: &Spec, name: &str) -> bool {
     spec.networks.values().any(|n| n.gateway.as_deref() == Some(name))
 }
 
-/// Whether the lab routes IPv6: its router has an IPv6 address on a network it routes. The one
+/// Whether the environment routes IPv6: its router has an IPv6 address on a network it routes. The one
 /// test of every router's and gateway's IPv6 forwarding.
 #[must_use]
 pub(crate) fn routes_ipv6(spec: &Spec) -> bool {
@@ -58,7 +58,7 @@ pub(crate) fn routes_ipv6(spec: &Spec) -> bool {
 }
 
 /// The kernel parameters a machine that forwards between networks (the router, a gateway)
-/// sets: IPv4 forwarding, and IPv6 forwarding when the lab routes IPv6 (`ipv6`).
+/// sets: IPv4 forwarding, and IPv6 forwarding when the environment routes IPv6 (`ipv6`).
 #[must_use]
 pub fn forwarding(ipv6: bool) -> Vec<(&'static str, &'static str)> {
     let mut out = vec![("net.ipv4.ip_forward", "1")];

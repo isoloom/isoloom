@@ -83,7 +83,7 @@ pub(crate) fn disks(name: &str, m: &Machine) -> Vec<DataDisk> {
 }
 
 /// What the spec's storage asks of a backend: volumes kept past `down` or existing already,
-/// data disks (raw ones apart), tmpfs modes, folders of the computer that runs the lab. At most
+/// data disks (raw ones apart), tmpfs modes, folders of the computer that runs the environment. At most
 /// one of each kind: the first that asks.
 #[must_use]
 pub(crate) fn requirements(spec: &Spec) -> Vec<Requirement> {
@@ -145,7 +145,7 @@ pub(crate) fn no_tmpfs_modes(f: &mut std::fmt::Formatter<'_>, machine: &str) -> 
     write!(f, "machine `{machine}` sets a tmpfs `mode`: this target sets no mode on a memory mount")
 }
 
-/// Why a target whose machines don't run on the computer that runs the lab (or that doesn't
+/// Why a target whose machines don't run on the computer that runs the environment (or that doesn't
 /// share its folders) refuses machine `machine`'s host folders.
 pub(crate) fn no_host_folders(f: &mut std::fmt::Formatter<'_>, machine: &str) -> std::fmt::Result {
     write!(

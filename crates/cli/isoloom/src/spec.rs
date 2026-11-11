@@ -81,7 +81,7 @@ pub(crate) fn defaults_of<'a>(
     }
 }
 
-/// What a command does with a template the lab fills in that can't be read.
+/// What a command does with a template the environment fills in that can't be read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Unread {
     /// It is an error, with the read error: the files would be generated without it.
@@ -90,8 +90,8 @@ pub(crate) enum Unread {
     Skipped,
 }
 
-/// The lab with `-s` overrides, the image table, the clouds' regions and the defaults' tags
-/// applied, and the defaults in effect: the lab every command reads, as `generate` writes it. A
+/// The environment with `-s` overrides, the image table, the clouds' regions and the defaults' tags
+/// applied, and the defaults in effect: the environment every command reads, as `generate` writes it. A
 /// template that can't be read is an error.
 pub(crate) fn with_settings(profile: &Profile, dir: &Path, given: &Settings) -> Result<(Lab, Resolved)> {
     let profile = profile.load(dir)?;
@@ -99,7 +99,7 @@ pub(crate) fn with_settings(profile: &Profile, dir: &Path, given: &Settings) -> 
 }
 
 /// [`with_settings`] with `profile` already loaded (or none), and a template that can't be read
-/// handled as `unread` says: the one pipeline every command reads the lab through, `isoloom
+/// handled as `unread` says: the one pipeline every command reads the environment through, `isoloom
 /// profiles` included.
 pub(crate) fn settled(profile: Option<&isoloom_spec::profile::Profile>, dir: &Path, given: &Settings, unread: Unread) -> Result<(Lab, Resolved)> {
     let sets = &given.sets;
@@ -130,7 +130,7 @@ fn templates(lab: &Lab, dir: &Path, unread: Unread) -> Result<std::collections::
     Ok(out)
 }
 
-/// The lab, when it has no problem: generators assume a checked spec, so a spec that parses but
+/// The environment, when it has no problem: generators assume a checked spec, so a spec that parses but
 /// is wrong stops with its problems, never a panic.
 pub(crate) fn checked(lab: Lab, dir: &Path) -> Result<Lab> {
     let problems = lab.problems();
@@ -144,7 +144,7 @@ pub(crate) fn checked(lab: Lab, dir: &Path) -> Result<Lab> {
     }
 }
 
-/// The lab read with `settings` ([`with_settings`]), checked, and checked that instance
+/// The environment read with `settings` ([`with_settings`]), checked, and checked that instance
 /// `instance` can be made of it when one is asked; with the defaults in effect.
 pub(crate) fn valid(profile: &Profile, dir: &Path, instance: Option<u8>, settings: &Settings) -> Result<(Lab, Resolved)> {
     let (lab, resolved) = with_settings(profile, dir, settings)?;
@@ -155,7 +155,7 @@ pub(crate) fn valid(profile: &Profile, dir: &Path, instance: Option<u8>, setting
     Ok((lab, resolved))
 }
 
-/// The resolved snapshot of the lab [`valid`] reads (as an instance when asked).
+/// The resolved snapshot of the environment [`valid`] reads (as an instance when asked).
 pub(crate) fn snapshot(lab: &Lab, instance: Option<u8>) -> Result<serde_json::Value> {
     Ok(isoloom_targets::resolved::resolve_with(lab, instance)?)
 }

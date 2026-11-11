@@ -1109,7 +1109,7 @@ Folders of the computer that runs the environment, mounted in the machine both w
 
 ### `machines.*.host_folders[].from`
 
-The folder on the computer that runs the lab: relative to the project folder (`shared`, `../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist; a home or absolute one is the running computer's (the lab may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
+The folder on the computer that runs the environment: relative to the project folder (`shared`, `../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist; a home or absolute one is the running computer's (the environment may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
 
 - **Type:** string
 
@@ -1365,7 +1365,7 @@ How it resolves names: `servers` (addresses, or machines sharing a network), `se
 
 ### `machines.*.dns.servers`
 
-DNS server addresses, in order (e.g. the lab's domain controller).
+DNS server addresses, in order (e.g. the environment's domain controller).
 
 - **Type:** list of strings
 
@@ -2133,7 +2133,7 @@ The time servers (names or addresses) the Linux VMs synchronise their clocks wit
 
 ### `constraints.dns`
 
-The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask names of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's controller, and the router's resolver forwarding the lab's queries. Without it, the public `1.1.1.1`.
+The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its own ask names of, where the place forbids a public one: the Proxmox and ESXi VMs, Isoloom's controller, and the router's resolver forwarding the environment's queries. Without it, the public `1.1.1.1`.
 
 - **Type:** list of strings
 

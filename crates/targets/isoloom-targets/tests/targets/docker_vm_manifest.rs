@@ -190,8 +190,8 @@ fn the_containers_published_ports_answer_where_the_driver_says_the_vm_does() -> 
     Ok(())
 }
 
-/// A lab's machine may be named `docker`: the VM the containers run in is Isoloom's own
-/// (`isoloom-docker-host`), so every target that takes the lab generates it, and each run
+/// An environment's machine may be named `docker`: the VM the containers run in is Isoloom's own
+/// (`isoloom-docker-host`), so every target that takes the environment generates it, and each run
 /// manifest lists the machine and the VM apart. A container named so (the container targets),
 /// one beside a Windows VM (hybrid), and a VM named so (the VM targets).
 #[test]

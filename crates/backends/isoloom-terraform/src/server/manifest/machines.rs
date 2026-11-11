@@ -1,4 +1,4 @@
-//! The machines a server's run creates (the lab's machines, the router, the controller), and what
+//! The machines a server's run creates (the environment's machines, the router, the controller), and what
 //! it gives back: the router's uplink address (`ip`, the way in), the SSH user, the ready file,
 //! and each published port at the router's address.
 
@@ -18,7 +18,7 @@ use crate::server::router::NAME as ROUTER;
 /// The router's uplink address: every published port answers there.
 const IP: &str = "ip";
 
-/// The lab's machines in start order, then the router and the controller. A published port is
+/// The environment's machines in start order, then the router and the controller. A published port is
 /// forwarded by the router on its own `publish` number, at the router's address.
 pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError> {
     let at = Template::from(Placeholder::Output(SnakeName::parse(IP)?));
@@ -38,7 +38,7 @@ pub(super) fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError>
     Ok(out)
 }
 
-/// `at` on each network of the lab.
+/// `at` on each network of the environment.
 fn by_network(env: &Environment, at: impl Fn(&str) -> IpAddr) -> Result<BTreeMap<Name, IpAddr>, ManifestError> {
     env.networks.keys().map(|n| Ok((Name::parse(n)?, at(n)))).collect()
 }

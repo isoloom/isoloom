@@ -31,7 +31,7 @@ users:
 database: { type: string, pattern: "[a-z]+", required: true, description: The database. It is made at the first start. }
 "#;
 
-/// A lab of `web` (with `with`) and its peers, read.
+/// An environment of `web` (with `with`) and its peers, read.
 fn lab(with: &str) -> syntax::Spec {
     let yaml = format!(
         "version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }}, other: {{ cidr: 10.8.0.0/24 }} }}\nsecrets: {{ db: {{ env: DB }} }}\ninputs: [DEMO_SECRET]\nmachines:\n  web: {{ os: debian@12, service: x, with: {with}, networks: {{ lab: 10 }} }}\n  app: {{ os: debian@12, networks: {{ other: 5, lab: 20 }} }}\n  far: {{ os: debian@12, networks: {{ other: 6 }} }}\n"

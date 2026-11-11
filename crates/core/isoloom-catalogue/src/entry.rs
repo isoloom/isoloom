@@ -38,7 +38,7 @@ pub struct Definition {
     pub licence: Licence,
     /// The releases a machine may ask for (`service: nginx@1.30`), each with its OSes.
     pub releases: Vec<Release>,
-    /// The release `service: <name>` resolves to: one of `releases`, pinned, so a lab never
+    /// The release `service: <name>` resolves to: one of `releases`, pinned, so an environment never
     /// changes under its author when a newer release is added.
     pub default: Version,
     /// The official images, by OS: an image reference with `{{ version }}`

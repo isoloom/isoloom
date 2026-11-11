@@ -180,7 +180,7 @@ pub const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || t
 /// On a Docker host VM, published ports reach containers whatever their routes: what arrives from
 /// outside the VM (a forward to this computer, a client of the server's address) is DNAT'ed by
 /// Docker with its source kept, and a container of an `internet: false` network, its default route
-/// removed, can't answer it. Masquerading that traffic into the lab's bridges makes it come from
+/// removed, can't answer it. Masquerading that traffic into the environment's bridges makes it come from
 /// the bridge's own address, which every container reaches. A unit keeps the rule across reboots,
 /// after Docker's own. Run as root; running it again changes nothing.
 pub const PUBLISHED_FROM_OUTSIDE: &str = r"cat > /etc/systemd/system/isoloom-published.service <<'UNIT'
@@ -202,7 +202,7 @@ systemctl enable --now isoloom-published.service
 ";
 
 /// The Docker Engine a Docker host gets (`docker-vm`, `cloud-docker`, `hybrid`), exactly: the
-/// version Isoloom's Compose files are proven with, so two runs of one lab get the same engine.
+/// version Isoloom's Compose files are proven with, so two runs of one environment get the same engine.
 const DOCKER_VERSION: &str = "29.9.0";
 
 /// The Compose plugin a Docker host gets, exactly (on hosts with `apt`: Debian and Ubuntu).
@@ -221,7 +221,7 @@ const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807c
 /// pinned SHA-256 as the apt branch's is. The apt branch fails closed (a `set -e` subshell, the
 /// key verified before use). On a non-x86 host (an Apple Silicon Mac's VM, an Arm cloud VM) the
 /// apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered with binfmt for
-/// every container), since a lab's images are x86 unless its spec says otherwise.
+/// every container), since an environment's images are x86 unless its spec says otherwise.
 #[must_use]
 pub fn install_docker() -> String {
     // The engine's version as `apt-cache madison` writes it, after an optional epoch.

@@ -70,7 +70,7 @@ pub enum SettingType {
     Folder,
     /// A file of the project (`nginx/site.conf`).
     File,
-    /// A literal (lab content), `{ secret: <name> }` or `{ input: <NAME> }`: a value file at
+    /// A literal (environment content), `{ secret: <name> }` or `{ input: <NAME> }`: a value file at
     /// `/run/isoloom/with/<setting>`, reached as `{{ with.<setting>.path }}`.
     Password,
     /// A list of items, each a map of `items`' fields: a step repeats for each with `for_each`.

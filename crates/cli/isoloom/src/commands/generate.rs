@@ -30,7 +30,7 @@ pub(crate) struct Generation {
 /// What `generate` writes and removes, worked out before anything is.
 pub(super) struct Planned {
     /// The files, with the project copies the targets add; none when the target asked for, or
-    /// every target, refuses the lab.
+    /// every target, refuses the environment.
     pub(super) files: Vec<GeneratedFile>,
     /// The paths Isoloom wrote before and no longer writes, in the generation's scope.
     pub(super) stale: Vec<String>,
@@ -69,10 +69,10 @@ pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Pa
 /// Writes the files, removes those Isoloom wrote before and no longer writes (in the target's
 /// folder, or anywhere under `.isoloom/` for every target), then says why each target left out
 /// wasn't generated; nothing is written before all of it is worked out ([`planned`]). A
-/// generation with no file (the target asked for, or every target, refuses the lab) is a no, and
+/// generation with no file (the target asked for, or every target, refuses the environment) is a no, and
 /// writes and removes nothing: the files there stay as they were. Skipping some of all the
 /// targets isn't a no, unless one was left out for a failure of its backend rather than a refusal
-/// of the lab: then nothing is written or removed.
+/// of the environment: then nothing is written or removed.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
     let Planned { files, stale, list, skipped } = planned(&a.generation, profile, dir)?;

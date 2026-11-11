@@ -1,4 +1,4 @@
-//! The project's template files a lab's steps fill in: which ones its machines name (so the
+//! The project's template files an environment's steps fill in: which ones its machines name (so the
 //! caller that generates reads them, at the edge), and their texts added to each machine's
 //! configuration once lowered, so the renderers install them without reading the project.
 

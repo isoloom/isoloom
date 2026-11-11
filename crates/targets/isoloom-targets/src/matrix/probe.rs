@@ -1,5 +1,5 @@
-//! The matrix's rows as `probes.yml` writes them, read once: each row's change to the lab, the
-//! lab each column decides on, and what makes a spec use the row.
+//! The matrix's rows as `probes.yml` writes them, read once: each row's change to the environment, the
+//! environment each column decides on, and what makes a spec use the row.
 
 use isoloom_plan::Feature;
 use isoloom_spec::model::Target;
@@ -11,7 +11,7 @@ use crate::{Error, Result};
 /// The rows, as written.
 const DATA: &str = include_str!("probes.yml");
 
-/// The file: the lab, `hybrid`'s two more machines, the cloud lab, the rows.
+/// The file: the environment, `hybrid`'s two more machines, the cloud environment, the rows.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct File {
@@ -77,7 +77,7 @@ pub(crate) struct Written {
     pub(crate) without: Vec<String>,
 }
 
-/// A row: a field, why it is there, its features, its change to the lab and where it applies.
+/// A row: a field, why it is there, its features, its change to the environment and where it applies.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Probe {
     pub(crate) field: String,
@@ -89,19 +89,19 @@ pub(crate) struct Probe {
     pub(crate) only: Vec<Target>,
     /// A row of the cloud-services lab.
     pub(crate) cloud: bool,
-    /// Whether `external`'s lab gives each machine an existing host.
+    /// Whether `external`'s environment gives each machine an existing host.
     pub(crate) hosts: bool,
     pub(crate) patch: Value,
 }
 
-/// The labs the rows change, and the rows.
+/// The environments the rows change, and the rows.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Probes {
-    /// The one-machine lab.
+    /// The one-machine environment.
     pub(crate) base: Value,
     /// The same, with `hybrid`'s container-only and VM-only machines beside.
     pub(crate) hybrid: Value,
-    /// The lab of cloud services.
+    /// The environment of cloud services.
     pub(crate) cloud: Value,
     pub(crate) rows: Vec<Probe>,
 }

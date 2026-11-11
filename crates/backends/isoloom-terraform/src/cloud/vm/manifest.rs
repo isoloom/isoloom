@@ -78,7 +78,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Resu
     crate::cloud::manifest::build(env, frame)
 }
 
-/// The lab's VMs in start order, each published port fixed at its own number on the machine's
+/// The environment's VMs in start order, each published port fixed at its own number on the machine's
 /// public address; then the controller.
 fn machines(env: &Environment) -> Result<Vec<Machine>, ManifestError> {
     let mut out = Vec::new();

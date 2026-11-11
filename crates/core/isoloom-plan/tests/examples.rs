@@ -1,5 +1,5 @@
 //! The examples, written in the authored format, through lowering: each is valid, gets the
-//! targets its machines' forms allow, and lowers for the lab as snapshotted (a change to parsing,
+//! targets its machines' forms allow, and lowers for the environment as snapshotted (a change to parsing,
 //! normalization or lowering shows up here as a diff to review, not only as a changed generated
 //! file).
 

@@ -42,7 +42,7 @@ pub(super) fn rendered(from: &str) -> String {
 ///
 /// # Errors
 ///
-/// [`Error::WindowsPackages`] for a `packages` step on Windows, which the lab's lowering refuses
+/// [`Error::WindowsPackages`] for a `packages` step on Windows, which the environment's lowering refuses
 /// first.
 pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], seq: usize) -> Result<Vec<Value>> {
     // Registers a task sets are prefixed with the role's name (`ansible-lint`'s `var-naming`).

@@ -52,7 +52,7 @@ impl PortProtocol {
 pub enum Publish {
     /// `true`: a free host port, the port's own number when it is free.
     Free,
-    /// A number: that host port when it is free, else a free one (labs never collide).
+    /// A number: that host port when it is free, else a free one (environments never collide).
     Preferred(NonZeroU16),
     /// `{ host, fixed: true }`: that host port or nothing (an app that calls
     /// `localhost:<port>` itself); the environment can't start while another holds it.

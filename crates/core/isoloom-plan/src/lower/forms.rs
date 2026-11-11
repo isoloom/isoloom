@@ -205,7 +205,7 @@ mod tests {
     use super::*;
     use crate::testing;
 
-    /// Machine `m` of a lab that has only it, written as `yaml`.
+    /// Machine `m` of an environment that has only it, written as `yaml`.
     fn machine(yaml: &str) -> Machine {
         let lab = testing::lab(&format!("version: 1\nname: t\nmachines:\n  m: {yaml}\n"));
         lab.source().machines.get("m").cloned().expect("the test's machine")

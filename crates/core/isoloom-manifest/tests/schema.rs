@@ -33,7 +33,7 @@ fn write_the_committed_schema() {
 }
 
 /// What the schema says calls the environment an environment, as every user-facing text does:
-/// never a lab (a word in a pattern or an example name aside).
+/// never an environment (a word in a pattern or an example name aside).
 #[test]
 fn the_schema_says_environment() {
     let text = generated().unwrap();

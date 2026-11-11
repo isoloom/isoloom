@@ -70,7 +70,7 @@ fn on_provider(args: &[&str], after: &[&str]) -> Result<HostArgv> {
     vagrant_with(all)
 }
 
-/// Whether the controller stays on once the lab is built: then nothing halts it.
+/// Whether the controller stays on once the environment is built: then nothing halts it.
 fn keeps_controller(env: &Environment) -> bool {
     env.controller.as_ref().is_some_and(|c| c.keep_running)
 }

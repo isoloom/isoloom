@@ -1,5 +1,5 @@
 //! An entry's parity contract, `catalogue/<entry>/contract.yml`, written by hand:
-//! the cases a conformance lab is built for, the checks both forms must pass, and the facts
+//! the cases a conformance environment is built for, the checks both forms must pass, and the facts
 //! whose output must be equal in both. `cargo xtask catalogue check` runs it.
 
 use isoloom_spec::placeholders::{self, Piece};
@@ -16,7 +16,7 @@ use crate::version::Version;
 #[derive(Debug, Clone, PartialEq, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Contract {
-    /// The set-ups a conformance lab is built for, by name; `default` always runs.
+    /// The set-ups a conformance environment is built for, by name; `default` always runs.
     pub cases: IndexMap<CaseName, Case>,
     /// What both forms must pass, in the spec's check grammar.
     pub checks: Vec<ContractCheck>,
@@ -25,14 +25,14 @@ pub struct Contract {
     pub facts: Vec<Fact>,
 }
 
-/// One set-up of the conformance lab.
+/// One set-up of the conformance environment.
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Case {
     /// The service machine's `with:`.
     #[serde(default)]
     pub with: IndexMap<String, serde_json::Value>,
-    /// The lab's project files, by path: their content, inline.
+    /// The environment's project files, by path: their content, inline.
     #[serde(default)]
     pub project: IndexMap<String, String>,
     /// Helper machines, by name, as a spec writes a machine (`{ service: php-fpm, with: … }`):

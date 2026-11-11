@@ -5,7 +5,7 @@ use isoloom_spec::Target;
 
 use crate::testing::{Outcome, generated, lab};
 
-/// The Vagrantfile of a one-machine lab whose `resources` end with `disk`.
+/// The Vagrantfile of a one-machine environment whose `resources` end with `disk`.
 fn vagrantfile(disk: &str) -> Outcome<String> {
     let lab = lab(&format!(
         "version: 1
@@ -47,7 +47,7 @@ fn without_a_disk_the_box_keeps_its_own() -> Outcome {
 }
 
 /// docker-vm's VM on QEMU takes the containers' host disk, as cloud-docker's and Proxmox's do: at
-/// least 40 GB, more when the lab's containers ask for more.
+/// least 40 GB, more when the environment's containers ask for more.
 #[test]
 fn docker_vms_qemu_disk_is_the_containers_host_disk() -> Outcome {
     let with_disk = |gb: u32| {

@@ -11,7 +11,7 @@ use isoloom_catalogue::{Catalogue, ImageStart, Password, Resolved};
 use isoloom_spec::model::{self, Mount};
 use isoloom_spec::syntax::{self, Code, FieldPath, File, FileSource, Kind, Mode, Problem, Problems};
 
-/// Every service machine of a lab, resolved: its services, or the problems of its `service`,
+/// Every service machine of an environment, resolved: its services, or the problems of its `service`,
 /// `os` and `with`.
 #[derive(Debug, Clone, Default)]
 pub(super) struct Services(IndexMap<String, Result<Vec<Resolved>, Problems>>);

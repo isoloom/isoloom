@@ -1,6 +1,6 @@
 //! Isoloom's own VMs: the router (when `reach` rules need one), the `shell` tool, and the
 //! controller that runs the environment's playbooks and the checks standing on every network.
-//! Their set-up goes through the same step renderings and transport as the lab's machines.
+//! Their set-up goes through the same step renderings and transport as the environment's machines.
 
 use isoloom_manifest::contract::HALTING;
 use isoloom_spec::linux::CONFIG_DIR;

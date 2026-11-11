@@ -26,7 +26,7 @@ pub use message::{fill, lookup, render_message, render_message_on};
 
 /// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's
 /// `ports` keyed by name, each with its `protocol`, `published` and `url`; 4: a machine's
-/// `resources` keyed by form, `docker` and `vm`, each its size in that form; 5: a lab machine's
+/// `resources` keyed by form, `docker` and `vm`, each its size in that form; 5: an environment machine's
 /// `role` is `member`, as in the run manifest).
 pub const RESOLVED_VERSION: u32 = 5;
 
@@ -38,7 +38,7 @@ pub(crate) fn file(lab: &Lab) -> GeneratedFile {
     snapshot_file(&resolve(lab))
 }
 
-/// The snapshot of instance `n` of the lab.
+/// The snapshot of instance `n` of the environment.
 pub(crate) fn file_with(lab: &Lab, n: u8) -> Result<GeneratedFile> {
     resolve_with(lab, Some(n)).map(|s| snapshot_file(&s))
 }
@@ -58,24 +58,24 @@ pub(crate) fn entries<'a>(snapshot: &'a Value, key: &str) -> impl Iterator<Item 
     snapshot.get(key).and_then(Value::as_object).into_iter().flatten()
 }
 
-/// The snapshot as JSON (checked labs only).
+/// The snapshot as JSON (checked environments only).
 #[must_use]
 pub fn resolve(lab: &Lab) -> Value {
     snapshot(lab, &lab.spec(), None)
 }
 
-/// The snapshot of an instance (`None`: the lab as written): every form, no target's own facts.
+/// The snapshot of an instance (`None`: the environment as written): every form, no target's own facts.
 ///
 /// # Errors
 ///
-/// [`Error::Instance`] when the lab can't be made instance `instance`.
+/// [`Error::Instance`] when the environment can't be made instance `instance`.
 pub fn resolve_with(lab: &Lab, instance: Option<u8>) -> Result<Value> {
     let Some(n) = instance else { return Ok(resolve(lab)) };
     let spec = isoloom_spec::instance::apply(&lab.spec(), n).map_err(|source| Error::Instance { number: n, source })?;
     Ok(snapshot(lab, &spec, Some(n)))
 }
 
-/// The snapshot of `spec`, the lab as instance `instance` (or as written).
+/// The snapshot of `spec`, the environment as instance `instance` (or as written).
 fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     let docker = isoloom_plan::environment::lay_out(spec, Target::Docker);
     let routed = isoloom_render::router::needed(spec);

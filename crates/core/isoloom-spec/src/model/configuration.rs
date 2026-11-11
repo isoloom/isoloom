@@ -21,7 +21,7 @@ pub struct Configuration {
     /// Start: an entry's per-start preparation (an app has none).
     pub start: Vec<Step>,
     /// The text of each template its steps fill in, by the template's `from`: an entry's own
-    /// (its placeholders filled in, the lab's left for the plan), or a project file read by the
+    /// (its placeholders filled in, the environment's left for the plan), or a project file read by the
     /// caller that generates (`isoloom_plan::Lab::with_templates`).
     pub files: BTreeMap<ProjectPath, String>,
 }

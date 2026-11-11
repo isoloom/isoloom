@@ -18,7 +18,7 @@ use crate::vms::{CONTROLLER, Shape};
 const WAKE_TIMEOUT_S: u32 = 1800;
 
 /// The id of the step running `vm`'s checks, after its define name (`check-web`,
-/// `check-isoloom-controller`): a lab machine's or one of Isoloom's own, never both.
+/// `check-isoloom-controller`): an environment machine's or one of Isoloom's own, never both.
 fn step_id(vm: &str) -> String {
     format!("check-{vm}")
 }

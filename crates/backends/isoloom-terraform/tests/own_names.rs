@@ -1,5 +1,5 @@
 //! Isoloom's own VMs (the router, the controller) take Isoloom's names (`isoloom-router`,
-//! `isoloom-controller`) for their Terraform resources, snippets and VMs, so lab machines named
+//! `isoloom-controller`) for their Terraform resources, snippets and VMs, so environment machines named
 //! `router` or `controller` never collide with them.
 
 pub mod testing;

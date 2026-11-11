@@ -1,6 +1,6 @@
 //! A VM's own boot (`vm.boot`): a kernel booted directly, a UEFI firmware file, the boot devices'
 //! order and a network boot. Most machines boot their image the way it was built; these are for
-//! the labs that study the boot itself (a custom kernel, a board's device tree, PXE).
+//! the environments that study the boot itself (a custom kernel, a board's device tree, PXE).
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

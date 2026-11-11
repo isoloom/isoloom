@@ -153,7 +153,7 @@ fn a_backend_refuses_the_first_requirement_it_lacks_the_feature_for() {
     }
 }
 
-/// The container checks' requirement of a lab with `machines` and `checks`.
+/// The container checks' requirement of an environment with `machines` and `checks`.
 fn container_checks_of(machines: &str, checks: &str) -> Option<Requirement> {
     container_checks(&crate::testing::spec(&format!(
         "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n{machines}checks: {checks}\n"
