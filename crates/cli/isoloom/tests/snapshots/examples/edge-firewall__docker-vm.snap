@@ -574,6 +574,8 @@ Vagrant.configure("2") do |config|
   config.vm.provider "libvirt" do |v|
     v.cpus = 4
     v.memory = 3072
+    v.memorybacking :access, mode: "shared"
+    v.memorybacking :source, type: "memfd"
   end
   config.vm.provider "vmware_esxi" do |v|
     v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -2170,7 +2172,7 @@ systemctl enable --now isoloom-published.service
           "utm": "edge-firewall - isoloom-docker-host",
           "vmware_esxi": "edge-firewall-isoloom-docker-host"
         },
-        "boot_digest": "sha256:ad8ef59883f14609cbf32655d3f28a94827f0755116c9b4edb657a6a5d2dd54a"
+        "boot_digest": "sha256:23f72a3778685056c86a5e2e1e2d9b743ecea1d06068dd28007f3ed14dd6b237"
       }
     },
     {

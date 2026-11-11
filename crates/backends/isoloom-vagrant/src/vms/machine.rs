@@ -58,7 +58,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         guest.hyperv.published = relays(&published);
         providers::blocks(r, &guest);
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
-        crate::host_folders::render(r, "m", &shares);
+        crate::host_folders::render(r, "m", &shares, crate::host_folders::LibvirtMemory::WithShares);
         transport::provisioners(r, env, name, os);
         if let Some(g) = group {
             checks::provisioner(r, name, g);

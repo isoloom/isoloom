@@ -70,9 +70,27 @@ impl Share {
     }
 }
 
+/// libvirt's memory for a VM that shares folders: virtiofsd reads the VM's memory, so it is
+/// shared, and backed by a memory file. libvirt can't add it to a VM that runs, so a VM that may
+/// get folders later (`docker_vm`'s host, when a machine with host folders is added to the
+/// environment) has it from the start.
+pub(crate) fn libvirt_shared_memory(r: &mut Ruby) {
+    r.call(Call::new("v.memorybacking").arg(Value::sym("access")).kw("mode", Value::str("shared")));
+    r.call(Call::new("v.memorybacking").arg(Value::sym("source")).kw("type", Value::str("memfd")));
+}
+
+/// Whether [`render`] sets libvirt's shared memory itself, or the VM's own libvirt block does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LibvirtMemory {
+    /// [`render`] sets it, with the shares.
+    WithShares,
+    /// The VM's block sets it always ([`libvirt_shared_memory`]).
+    Always,
+}
+
 /// The providers' blocks sharing `shares` into the VM `scope` configures (`m`, `config`), then a
 /// trigger stopping `vagrant up` on the providers that can't. Nothing without shares.
-pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
+pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: LibvirtMemory) {
     if shares.is_empty() {
         return;
     }
@@ -82,10 +100,8 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
         let head = Call::new(format!("{scope}.vm.provider")).arg(Value::str(p.id()));
         let params = if p == Provider::Libvirt { "v, o" } else { "_, o" };
         r.block(head, params, |r| {
-            if p == Provider::Libvirt {
-                // virtiofsd reads the VM's memory: it is shared, and backed by a memory file.
-                r.call(Call::new("v.memorybacking").arg(Value::sym("access")).kw("mode", Value::str("shared")));
-                r.call(Call::new("v.memorybacking").arg(Value::sym("source")).kw("type", Value::str("memfd")));
+            if p == Provider::Libvirt && memory == LibvirtMemory::WithShares {
+                libvirt_shared_memory(r);
             }
             for s in shares {
                 r.call(synced_folder(p, kind, s));
@@ -165,7 +181,7 @@ mod tests {
 
     fn ruby(shares: &[Share]) -> String {
         let mut r = Ruby::new();
-        render(&mut r, "m", shares);
+        render(&mut r, "m", shares, LibvirtMemory::WithShares);
         r.finish()
     }
 

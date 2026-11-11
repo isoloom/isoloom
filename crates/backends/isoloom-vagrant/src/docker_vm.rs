@@ -176,7 +176,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
             read_only: false,
         })
         .collect();
-    crate::host_folders::render(r, "config", &shares);
+    crate::host_folders::render(r, "config", &shares, crate::host_folders::LibvirtMemory::Always);
     crate::vms::utm::placeholder(r, "config");
     // The project, with the outputs Compose reads.
     docker_host::set_up(r, env, "config", &COMPOSE_OUTPUTS);
@@ -248,6 +248,9 @@ fn desktop_providers(r: &mut Ruby, label: &str, (cpus, mem): (u32, u32), disk_gb
     r.block(provider("libvirt"), "v", |r| {
         r.assign("v.cpus", cpus);
         r.assign("v.memory", mem);
+        // Shared from the start: a machine with host folders can be added to the environment
+        // while the VM runs, and libvirt can't share a running VM's memory then.
+        crate::host_folders::libvirt_shared_memory(r);
     });
 }
 
@@ -353,4 +356,36 @@ fn checks_script(env: &Environment, guest: &GuestCompose) -> Result<Option<Strin
         values::linux_decode(&env.input_names()),
         sequence(&guest.check_teardown)?
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_hosts_libvirt_memory_is_shared_from_the_start_once() {
+        // Regression: a machine with host folders added to a running environment (an attack box
+        // with the shared folder) reloaded the host, and libvirt refused to attach the folder
+        // ("'virtiofs' requires shared memory"): the host had been created without any.
+        let mut r = Ruby::new();
+        desktop_providers(&mut r, "env_vm", (2, 2048), 20);
+        crate::host_folders::render(
+            &mut r,
+            "config",
+            &[crate::host_folders::Share {
+                from: "shared".into(),
+                guest: "/srv/shared".into(),
+                read_only: false,
+            }],
+            crate::host_folders::LibvirtMemory::Always,
+        );
+        let out = r.finish();
+        let (_, libvirt) = out.split_once("config.vm.provider \"libvirt\" do |v|").unwrap_or_default();
+        let (libvirt, _) = libvirt.split_once("\nend").unwrap_or_default();
+        assert!(
+            libvirt.contains("v.memorybacking :access, mode: \"shared\"") && libvirt.contains("v.memorybacking :source, type: \"memfd\""),
+            "{libvirt}"
+        );
+        assert_eq!(out.matches("v.memorybacking :access").count(), 1, "set once, by the host's own block: {out}");
+    }
 }

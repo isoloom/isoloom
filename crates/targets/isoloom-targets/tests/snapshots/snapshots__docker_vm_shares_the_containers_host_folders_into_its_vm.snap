@@ -16,8 +16,6 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
     o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "parallels", create: true
   end
   config.vm.provider "libvirt" do |v, o|
-    v.memorybacking :access, mode: "shared"
-    v.memorybacking :source, type: "memfd"
     o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "virtiofs", create: true
     o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "virtiofs", create: true
   end

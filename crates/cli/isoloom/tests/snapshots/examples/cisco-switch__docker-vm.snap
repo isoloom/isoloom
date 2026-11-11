@@ -578,6 +578,8 @@ Vagrant.configure("2") do |config|
   config.vm.provider "libvirt" do |v|
     v.cpus = 4
     v.memory = 3072
+    v.memorybacking :access, mode: "shared"
+    v.memorybacking :source, type: "memfd"
   end
   config.vm.provider "vmware_esxi" do |v|
     v.esxi_hostname = ENV.fetch("ESXI_HOSTNAME", "")
@@ -2004,7 +2006,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-switch - isoloom-docker-host",
           "vmware_esxi": "cisco-switch-isoloom-docker-host"
         },
-        "boot_digest": "sha256:3e571930e6940fb6cc42046bbc0ecd38dd39a87f732c3462398942157cd8f71d"
+        "boot_digest": "sha256:bf7a6767ed27861393f838dad64543f9c040f7d4daf7759e901f5e42eb238646"
       }
     },
     {
