@@ -310,14 +310,15 @@ fn link(r: &mut Ruby, l: &Link) {
         r.comment(&format!("No private network on QEMU: {why}."));
     }
     if let (Some(opts), Link::Hub(h)) = (l.socket_opts(), l) {
-        r.comment(&format!("Port {} of network `{}`'s hub (see IsoloomQemu).", h.port, h.net));
+        r.comment(&format!("Its port of network `{}`'s hub (see IsoloomQemu).", h.net));
         r.assign("v.advanced_network", true);
         r.assign("v.net_mode", Value::sym("socket"));
-        r.assign("v.socket_opts", Value::str(&opts));
+        r.assign("v.socket_opts", opts);
     }
 }
 
-/// The hub of the VM's network, started before QEMU starts the VM (unless it runs) and stopped
+/// The hub of the VM's network, started before QEMU starts the VM (unless it runs on the ports
+/// this read of the Vagrantfile picked, `QEMU_HUBS[net]`) and stopped
 /// once the network's last VM is destroyed, whichever VM that is: `vagrant destroy <vm>` alone
 /// leaves the hub to the VMs still there. Action triggers: only QEMU runs these actions, so no
 /// other provider runs (or prints) them.
@@ -329,7 +330,7 @@ fn hub_triggers(r: &mut Ruby, h: &HubPort) {
             .kw("type", Value::sym("action"))
     };
     r.block(trigger("before", "StartInstance"), "t", |r| {
-        r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.hub({net}, QEMU_HUBS[{net}].values) }}"));
+        r.line(format_args!("t.ruby {{ |_, _| IsoloomQemu.hub({net}, QEMU_HUBS[{net}]) }}"));
     });
     r.block(trigger("after", "Destroy"), "t", |r| {
         r.line(format_args!(

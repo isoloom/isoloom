@@ -226,12 +226,11 @@ $forwards.each { |m, guest, host| puts "forward #{guest} #{host}" if m == ARGV[1
 $ps.each { |s| puts "ps #{s}" }
 "#;
 
-/// What [`HYPERV_TRIGGERS_RB`] prints for machine `machine` of `example`'s Vagrantfile, with
-/// `ISOLOOM_HOSTPORTS` set to `hostports` (unset when `None`). The Vagrantfile loads from its
-/// rendered outputs, the example's folder its project.
-fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Outcome<String> {
-    let scratch = tempfile::Builder::new().prefix("isoloom-hyperv-ports-").tempdir()?;
-    let dir = scratch.path();
+/// `example`'s rendered outputs written under `dir`, as a copy of the project has them, with the
+/// example's own folder as the project's root (`ISOLOOM_TEST_ROOT`), and Vagrant's
+/// `vagrant/util/is_port_open` (which the Vagrantfile requires on a Mac) empty for `ruby -I dir`:
+/// the Vagrantfile's path, and `ruby` ready to load it.
+fn loadable(example: &str, dir: &Path) -> Outcome<(std::path::PathBuf, Command)> {
     let mut vagrantfile = None;
     for f in render(example)? {
         let path = dir.join(&f.path);
@@ -245,26 +244,44 @@ fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Out
             vagrantfile = Some(path);
         }
     }
-    // `vagrant/util/is_port_open`, which the Vagrantfile requires on a Mac: Vagrant's own, empty.
     std::fs::create_dir_all(dir.join("vagrant/util"))?;
     std::fs::write(dir.join("vagrant/util/is_port_open.rb"), "")?;
     let mut ruby = Command::new("ruby");
-    ruby.arg("-I").arg(dir).arg("-e").arg(HYPERV_TRIGGERS_RB);
-    ruby.arg(vagrantfile.ok_or("no Vagrantfile")?).arg(machine);
+    ruby.arg("-I").arg(dir);
     ruby.env(
         "ISOLOOM_TEST_ROOT",
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples").join(example),
     );
-    match hostports {
-        Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
-        None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
-    };
+    Ok((vagrantfile.ok_or("no Vagrantfile")?, ruby))
+}
+
+/// What `ruby` printed, or why it failed.
+fn printed(mut ruby: Command) -> Outcome<String> {
     let out = ruby.output()?;
     if !out.status.success() {
         return Err(format!("ruby failed: {}", String::from_utf8_lossy(&out.stderr)).into());
     }
     // Ruby's standard output is in text mode on Windows: each line ends in "\r\n" there.
     Ok(String::from_utf8(out.stdout)?.replace("\r\n", "\n"))
+}
+
+/// Whether `ruby` runs here (CI has it); a test that needs it says it is skipped otherwise.
+fn ruby_runs() -> bool {
+    Command::new("ruby").arg("-v").output().is_ok_and(|o| o.status.success())
+}
+
+/// What [`HYPERV_TRIGGERS_RB`] prints for machine `machine` of `example`'s Vagrantfile, with
+/// `ISOLOOM_HOSTPORTS` set to `hostports` (unset when `None`). The Vagrantfile loads from its
+/// rendered outputs, the example's folder its project.
+fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Outcome<String> {
+    let scratch = tempfile::Builder::new().prefix("isoloom-hyperv-ports-").tempdir()?;
+    let (vagrantfile, mut ruby) = loadable(example, scratch.path())?;
+    ruby.arg("-e").arg(HYPERV_TRIGGERS_RB).arg(vagrantfile).arg(machine);
+    match hostports {
+        Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
+        None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
+    };
+    printed(ruby)
 }
 
 /// On Hyper-V the run's URL is the port the runner chose: Hyper-V ignores `forwarded_port`, so
@@ -274,7 +291,7 @@ fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Out
 /// the PATH (CI has it).
 #[test]
 fn the_hyperv_relay_listens_on_the_host_port_the_forward_takes() -> Outcome {
-    if !Command::new("ruby").arg("-v").output().is_ok_and(|o| o.status.success()) {
+    if !ruby_runs() {
         eprintln!("skipped: needs ruby");
         return Ok(());
     }
@@ -288,6 +305,101 @@ fn the_hyperv_relay_listens_on_the_host_port_the_forward_takes() -> Outcome {
         let other = if port == 8080 { 53544 } else { 8080 };
         assert!(!out.contains(&format!("listenport={other}")), "a relay on another port: {out}");
     }
+    Ok(())
+}
+
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant, its machines left out
+/// (`QEMU_HUBS` is set before them), and prints the QEMU hub port it picked for each VM, a
+/// `<network> <vm> <port>` line each. With `ARGV[1]` `running`, every network's hub is taken to
+/// run (its process the one its pid file names): the ports its record (`IsoloomQemu.ports_file`)
+/// holds are then its own.
+const QEMU_PORTS_RB: &str = r##"
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); end
+end
+if ARGV[1] == "running"
+  # Ahead of the file's own `running`, which it defines when it loads.
+  module IsoloomQemu; end
+  IsoloomQemu.singleton_class.prepend(Module.new { def running(_net); 4242; end })
+end
+load ARGV[0]
+QEMU_HUBS.each { |net, vms| vms.each { |vm, port| puts "#{net} #{vm} #{port}" } }
+"##;
+
+/// The QEMU hub ports `example`'s Vagrantfile picks when loaded from the copy of the project at
+/// `dir` (see [`QEMU_PORTS_RB`]), as `<network>/<vm>` and port, and the Vagrantfile's path.
+fn qemu_hub_ports(example: &str, dir: &Path, running: bool) -> Outcome<(Vec<(String, u16)>, std::path::PathBuf)> {
+    let (vagrantfile, mut ruby) = loadable(example, dir)?;
+    ruby.arg("-e").arg(QEMU_PORTS_RB).arg(&vagrantfile);
+    if running {
+        ruby.arg("running");
+    }
+    let ports = printed(ruby)?
+        .lines()
+        .map(|l| match l.split(' ').collect::<Vec<_>>()[..] {
+            [net, vm, port] => Ok((format!("{net}/{vm}"), port.parse()?)),
+            _ => Err(format!("not a hub port: {l}").into()),
+        })
+        .collect::<Outcome<_>>()?;
+    Ok((ports, vagrantfile))
+}
+
+/// Two copies of one environment (its name, two folders) run side by side under QEMU: their
+/// networks' hubs listen on the host's loopback, so their ports are the copy's, never the spec's.
+/// They were one block from a hash of the environment's name, and a second `solo-web` failed to
+/// start its hub (the first held 39761 and 39762). Each copy's ports are distinct, in
+/// 20000-39999, and kept from one read of its Vagrantfile to the next.
+#[test]
+fn two_copies_of_one_environment_get_disjoint_qemu_hub_ports() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-hubs-").tempdir()?;
+    for example in ["solo-web", "segmented"] {
+        let mut copies = Vec::new();
+        for copy in ["one", "two"] {
+            let dir = scratch.path().join(example).join(copy);
+            let (ports, _) = qemu_hub_ports(example, &dir, false)?;
+            assert!(ports.len() >= 2, "{example}: {ports:?}");
+            assert!(ports.iter().all(|(_, p)| (20000..40000).contains(p)), "{example}: {ports:?}");
+            let distinct: std::collections::BTreeSet<u16> = ports.iter().map(|(_, p)| *p).collect();
+            assert_eq!(distinct.len(), ports.len(), "{example} {copy}: two VMs share a port: {ports:?}");
+            assert_eq!(qemu_hub_ports(example, &dir, false)?.0, ports, "{example} {copy}: read again");
+            copies.push(distinct);
+        }
+        assert!(copies[0].is_disjoint(&copies[1]), "{example}: the copies share ports: {copies:?}");
+    }
+    Ok(())
+}
+
+/// A copy's hub that runs keeps its ports, even taken (it holds them); one that doesn't run gets a
+/// port that is free in place of one that something else holds.
+#[test]
+fn a_running_hub_keeps_its_ports_and_a_held_port_is_passed_over() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-held-").tempdir()?;
+    let (ports, vagrantfile) = qemu_hub_ports("solo-web", scratch.path(), false)?;
+    let held = std::net::TcpListener::bind(("127.0.0.1", ports[0].1))?;
+    // What the hub's start recorded: its ports, by VM.
+    let hubs = vagrantfile.parent().ok_or("a folder")?.join(".vagrant/isoloom-qemu-hubs");
+    std::fs::create_dir_all(&hubs)?;
+    let record: Vec<String> = ports
+        .iter()
+        .map(|(key, p)| format!("\"{}\":{p}", key.split_once('/').map_or(key.as_str(), |(_, vm)| vm)))
+        .collect();
+    std::fs::write(hubs.join("app.ports.json"), format!("{{{}}}", record.join(",")))?;
+
+    assert_eq!(qemu_hub_ports("solo-web", scratch.path(), true)?.0, ports, "the running hub's own");
+    let (fresh, _) = qemu_hub_ports("solo-web", scratch.path(), false)?;
+    assert_ne!(fresh[0].1, ports[0].1, "a held port: {fresh:?}");
+    assert_eq!(fresh.len(), ports.len());
+    drop(held);
     Ok(())
 }
 

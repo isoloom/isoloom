@@ -53,12 +53,13 @@ fn have(tool: &str) -> bool {
 const FILTER_MAP_FOR_OLD_RUBY: &str = "Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map); ";
 
 /// Archives `root` with the Ruby of a generated Vagrantfile, Isoloom's `outputs` in, and lists the
-/// archive (`tar -tv`).
+/// archive (`tar -tv`). The file's `ROOT` and `QEMU_HUBS` (which picks the QEMU hubs' ports from
+/// the Vagrantfile's folder) are left out: only its helpers run.
 fn archive(dir: &Path, root: &Path, outputs: &[&str], out: &str) -> Outcome<String> {
     let rb = dir.join("project.rb");
     std::fs::write(&rb, file(&example("hello-stack")?, Target::Vagrant, "vagrant/Vagrantfile")?)?;
     let script = format!(
-        "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, rules: ARGV[3]) }}"
+        "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\").sub(/^QEMU_HUBS = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, rules: ARGV[3]) }}"
     );
     let rules = isoloom_manifest::ignore::copy_rules(outputs);
     let st = Command::new("ruby")

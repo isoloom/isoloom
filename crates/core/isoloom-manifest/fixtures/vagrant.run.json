@@ -402,7 +402,7 @@
           "utm": "mini-ad - dc01",
           "vmware_esxi": "mini-ad-dc01"
         },
-        "boot_digest": "sha256:2d5a644df52a67920885158e170d87e1dd19af6f1086393a3a1d875d0a1fadba",
+        "boot_digest": "sha256:5d8ad607f93e09e9f0dedf91fc820fa405d053b62358bdd1b5f81292950c6f33",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -541,7 +541,7 @@
           "utm": "mini-ad - ws01",
           "vmware_esxi": "mini-ad-ws01"
         },
-        "boot_digest": "sha256:0bf5bd5ebf0c95ff51c5f7366ecd0ce7e5086db8bff001abd8e4bc0d0ae1d9fa",
+        "boot_digest": "sha256:1dd4b11fed7fa3aa81f7c5ee817d289b3473f93542b31e27758e5f9cfd58128a",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -664,7 +664,7 @@
           "utm": "mini-ad - isoloom-controller",
           "vmware_esxi": "mini-ad-isoloom-controller"
         },
-        "boot_digest": "sha256:cf7a450af3db3c5eddbb9fe7d61f724921f57a1cea53c43930cdde0150de7af2",
+        "boot_digest": "sha256:c68ef757c8108b36d3f46e7b3a65917d57c46aa0d51b27970fdec664a75faeaf",
         "boxes": [
           {
             "provider": "virtualbox",

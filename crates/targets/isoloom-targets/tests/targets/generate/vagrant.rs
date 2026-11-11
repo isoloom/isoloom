@@ -120,19 +120,22 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     assert!(ctl.contains("o.vm.box = \"cloud-image/debian-12\""), "{ctl}");
     assert!(!ctl.contains("v.arch"), "Isoloom's own VMs run on the host's CPU: {ctl}");
     // Both connect to the network's hub, each on its own port, in the order they are defined.
-    let port = |b: &str| {
-        b.split("v.socket_opts = \"connect=127.0.0.1:")
-            .nth(1)
-            .and_then(|r| r.get(..5))
-            .and_then(|p| p.parse::<u16>().ok())
-    };
-    let (dc_port, ctl_port) = (port(dc), port(ctl));
-    assert!(dc_port.is_some() && ctl_port == dc_port.map(|p| p + 1), "{dc}\n{ctl}");
+    let hubs = "QEMU_HUBS = IsoloomQemu.ports({ \"lab\" => [\"dc01\", \"isoloom-controller\"] })";
+    let linked = [(dc, "dc01"), (ctl, "isoloom-controller")];
+    assert!(
+        vf.contains(hubs) && linked.iter().all(|(b, vm)| b.contains(&hub_port("lab", vm))),
+        "{dc}\n{ctl}"
+    );
     assert!(!vf.contains("isoloom-access"), "no port kept for a VM the lab doesn't declare: {vf}");
 
     // Other providers are untouched.
     assert!(!provider_block(vf, "dc01", "virtualbox")?.contains("socket"));
     Ok(())
+}
+
+/// A VM's QEMU link to its port of network `net`'s hub, as the Vagrantfile picked it.
+fn hub_port(net: &str, vm: &str) -> String {
+    format!("v.socket_opts = \"connect=127.0.0.1:#{{QEMU_HUBS[\"{net}\"][\"{vm}\"]}}\"")
 }
 
 /// The block `config.vm.define "<name>"` of a Vagrantfile, up to its `end`.

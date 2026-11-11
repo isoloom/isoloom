@@ -24,11 +24,12 @@ fn provider_block<'a>(vf: &'a str, vm: &str, provider: &str) -> Outcome<&'a str>
     between(define(vf, vm)?, &format!("m.vm.provider \"{provider}\""), "\n    end\n")
 }
 
-/// The port a VM's QEMU link connects to.
-fn connects_to(block: &str) -> Outcome<u16> {
-    let rest = from(block, "v.socket_opts = \"connect=127.0.0.1:")?;
-    let digits = rest.trim_start_matches("v.socket_opts = \"connect=127.0.0.1:").get(..5).ok_or("a short port")?;
-    Ok(digits.parse()?)
+/// The hub port a VM's QEMU link connects to, as the Vagrantfile reads it: `QEMU_HUBS[<net>][<vm>]`,
+/// picked for the copy of the project when Vagrant reads the file.
+fn connects_to(block: &str) -> Outcome<String> {
+    let opts = "v.socket_opts = \"connect=127.0.0.1:#{";
+    let rest = from(block, opts)?.trim_start_matches(opts);
+    Ok(rest.split_once("}\"").ok_or("an unterminated port")?.0.to_owned())
 }
 
 #[test]
@@ -36,23 +37,18 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
     let spec = lab(THREE)?;
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
     let vf = vagrantfile(THREE)?;
-    // Every VM connects to its own port of the network's hub.
-    let ports: Vec<u16> = ["a", "b", "c"]
+    // Every VM connects to its own port of the network's hub, picked for the copy of the project.
+    let ports: Vec<String> = ["a", "b", "c"]
         .iter()
         .map(|vm| connects_to(provider_block(&vf, vm, "qemu")?))
         .collect::<Outcome<_>>()?;
-    assert_eq!(ports[1], ports[0] + 1, "{ports:?}");
-    assert_eq!(ports[2], ports[0] + 2, "{ports:?}");
-    let hubs = format!(
-        "QEMU_HUBS = {{\n  \"lab\" => {{ \"a\" => {}, \"b\" => {}, \"c\" => {} }},\n}}",
-        ports[0], ports[1], ports[2]
-    );
-    assert!(vf.contains(&hubs), "{vf}");
+    assert_eq!(ports, ["QEMU_HUBS[\"lab\"][\"a\"]", "QEMU_HUBS[\"lab\"][\"b\"]", "QEMU_HUBS[\"lab\"][\"c\"]"]);
+    assert!(vf.contains("QEMU_HUBS = IsoloomQemu.ports({ \"lab\" => [\"a\", \"b\", \"c\"] })"), "{vf}");
     assert!(vf.contains("module IsoloomQemu"));
-    // Every VM starts the hub before QEMU starts it, unless it runs (only QEMU runs this
+    // Every VM starts the hub before QEMU starts it, unless it runs on those ports (only QEMU runs this
     // action), and every VM's destroy releases it: the hub stops once the network's last VM
     // is destroyed, whichever that is, so `vagrant destroy <vm>` leaves it to the others.
-    let start = "m.trigger.before :\"VagrantPlugins::QEMU::Action::StartInstance\", type: :action do |t|\n      t.ruby { |_, _| IsoloomQemu.hub(\"lab\", QEMU_HUBS[\"lab\"].values) }";
+    let start = "m.trigger.before :\"VagrantPlugins::QEMU::Action::StartInstance\", type: :action do |t|\n      t.ruby { |_, _| IsoloomQemu.hub(\"lab\", QEMU_HUBS[\"lab\"]) }";
     let release = "m.trigger.after :\"VagrantPlugins::QEMU::Action::Destroy\", type: :action do |t|\n      t.ruby { |env, machine| IsoloomQemu.release(\"lab\", QEMU_HUBS[\"lab\"].keys, env, machine.name) }";
     for vm in ["a", "b", "c"] {
         let qemu = provider_block(&vf, vm, "qemu")?;
@@ -73,8 +69,8 @@ fn qemu_links_two_vms_through_a_hub_too_and_refuses_a_vm_on_two_networks() -> Ou
     // Two VMs link through a hub too, not a socket pair (one listening, the other connecting).
     let two = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n";
     let vf = vagrantfile(two)?;
-    let (a, b) = (connects_to(provider_block(&vf, "a", "qemu")?)?, connects_to(provider_block(&vf, "b", "qemu")?)?);
-    assert_eq!(b, a + 1);
+    assert_eq!(connects_to(provider_block(&vf, "a", "qemu")?)?, "QEMU_HUBS[\"lab\"][\"a\"]");
+    assert_eq!(connects_to(provider_block(&vf, "b", "qemu")?)?, "QEMU_HUBS[\"lab\"][\"b\"]");
     assert!(!vf.contains("v.socket_opts = \"listen="), "no socket pair: {vf}");
     assert!(!vf.contains("isoloom-access"), "no port kept for a VM the lab doesn't declare: {vf}");
     assert!(vf.contains("module IsoloomQemu"), "the hub needs the helper");

@@ -514,9 +514,10 @@ end
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
 # - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
 #   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
-#   one block of the environment's, one per VM, so no two hubs share one. A hub starts before a
-#   VM on its network does, unless it runs, and stops once the network's last VM is destroyed:
-#   destroying one VM leaves it to the others.
+#   picked when Vagrant reads this file (`ports`), for this copy of the project: free on this
+#   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
+#   VM on its network does, unless it runs with those ports, and stops once the network's last
+#   VM is destroyed: destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -536,28 +537,98 @@ module IsoloomQemu
     File.join(hubs_dir, "#{net}.pid")
   end
 
-  # The hub's process id, while it runs.
+  # The ports the network's hub listens on, by VM, written when it starts.
+  def self.ports_file(net)
+    File.join(hubs_dir, "#{net}.ports.json")
+  end
+
+  # The hub's process id, while it runs: a process whose command names the hub's pid file, so
+  # an id the system has given another process since is never taken for (or stopped as) a hub.
   def self.running(net)
     pid = Integer(File.read(pid_file(net)).strip)
-    Process.kill(0, pid)
-    pid
+    command = IO.popen(["ps", "-ww", "-o", "command=", "-p", pid.to_s], err: File::NULL, &:read)
+    pid if command.include?(pid_file(net))
   rescue ArgumentError, SystemCallError
     nil
   end
 
-  # Starts the network's hub unless it runs: QEMU returns once its ports listen.
+  # The hub ports: 20000-39999.
+  FIRST_PORT = 20_000
+  PORTS = 20_000
+
+  # Each network's hub ports, by VM (`vms`: each network's VMs, in the order they start), as
+  # QEMU_HUBS holds them. A network whose hub runs keeps the ports it listens on. Every other VM
+  # gets a port free on this host, looked for from a point of this folder's, not of the
+  # environment's name: two copies of one environment start far apart, and a port something else
+  # holds is passed over. One folder starts from the same point, so a copy gets the same ports
+  # from one run to the next while they stay free.
+  def self.ports(vms)
+    hubs = vms.map { |net, names| [net, kept(net, names)] }.to_h
+    taken = hubs.values.compact.flat_map(&:values)
+    at = start
+    hubs.each_key do |net|
+      next if hubs[net]
+      hubs[net] = vms[net].map do |vm|
+        at = free_from(at, taken)
+        taken << at
+        [vm, at]
+      end.to_h
+    end
+    hubs
+  end
+
+  # The ports the network's hub listens on, by VM, when it runs for exactly the VMs `names`.
+  def self.kept(net, names)
+    return nil unless running(net)
+    require "json"
+    ports = JSON.parse(File.read(ports_file(net)))
+    ports if ports.is_a?(Hash) && ports.keys == names
+  rescue SystemCallError, JSON::ParserError
+    nil
+  end
+
+  # This folder's first port to look from: FNV-1a of its path, in the range.
+  def self.start
+    hash = File.expand_path(__dir__).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+    FIRST_PORT + hash % PORTS
+  end
+
+  # The first port from `at` on, wrapping in the range, that is free here and not in `taken`.
+  def self.free_from(at, taken)
+    PORTS.times do |i|
+      port = FIRST_PORT + (at - FIRST_PORT + i) % PORTS
+      return port if !taken.include?(port) && free?(port)
+    end
+    fail!("no port of #{FIRST_PORT}-#{FIRST_PORT + PORTS - 1} is free for a network's hub")
+  end
+
+  # Whether a hub could listen on 127.0.0.1:`port` here.
+  def self.free?(port)
+    require "socket"
+    TCPServer.new("127.0.0.1", port).close
+    true
+  rescue SystemCallError
+    false
+  end
+
+  # Starts the network's hub on `ports` (by VM) unless it runs on them: QEMU returns once its
+  # ports listen. A hub of the network on other ones (its VMs have changed, or an older
+  # Vagrantfile started it) is stopped first: the VM about to start connects to its new port.
   def self.hub(net, ports)
-    return if running(net)
+    return if kept(net, ports.keys) == ports
+    stop(net)
     require "fileutils"
+    require "json"
     FileUtils.mkdir_p(hubs_dir)
     args = ["qemu-system-#{HOST_ARCH}", "-machine", "none", "-display", "none", "-nodefaults",
             "-daemonize", "-pidfile", pid_file(net)]
-    ports.each_with_index do |port, i|
+    ports.values.each_with_index do |port, i|
       args += ["-netdev", "socket,id=s#{i},listen=127.0.0.1:#{port}", "-netdev", "hubport,id=h#{i},hubid=0,netdev=s#{i}"]
     end
     log = File.join(hubs_dir, "#{net}.log")
     ok = system(*args, out: log, err: log)
     fail!("the hub of network `#{net}` didn't start (#{args.first}): see #{log}") unless ok
+    File.write(ports_file(net), JSON.generate(ports))
   end
 
   # Stops the network's hub once none of its VMs (`vms`, by define name) is left besides the
@@ -573,7 +644,7 @@ module IsoloomQemu
   def self.stop(net)
     pid = running(net)
     Process.kill("TERM", pid) if pid
-    File.delete(pid_file(net)) if File.exist?(pid_file(net))
+    [pid_file(net), ports_file(net)].each { |f| File.delete(f) if File.exist?(f) }
   end
 
   # `disk_resize` for a VM of `box` sized `gb` GB: the size when it is above the box's disk,
@@ -594,11 +665,9 @@ module IsoloomQemu
     gb * 1024**3 > sizes.max ? "#{gb}G" : nil
   end
 end
-# QEMU: each network's hub port of each of its VMs, in the order they start.
-QEMU_HUBS = {
-  "corp" => { "dc01" => 33047, "ws-01" => 33048, "ws-02" => 33049 },
-  "access" => { "user" => 33050 },
-}
+# QEMU: each network's VMs, in the order they start, and their ports on its hub: picked for this
+# copy of the project when Vagrant reads this file (see IsoloomQemu.ports).
+QEMU_HUBS = IsoloomQemu.ports({ "corp" => ["dc01", "ws-01", "ws-02"], "access" => ["user"] })
 
 Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/vagrant", disabled: true
@@ -800,10 +869,10 @@ Vagrant.configure("2") do |config|
       v.memory = "4096M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("gusztavvargadr/windows-server-2022-standard", 60)
-      # Port 33047 of network `corp`'s hub (see IsoloomQemu).
+      # Its port of network `corp`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:33047"
+      v.socket_opts = "connect=127.0.0.1:#{QEMU_HUBS["corp"]["dc01"]}"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -828,7 +897,7 @@ Vagrant.configure("2") do |config|
       v.extra_qemu_args = IsoloomConsole.qemu("x86_64")
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
+      t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"]) }
     end
     m.trigger.after :"VagrantPlugins::QEMU::Action::Destroy", type: :action do |t|
       t.ruby { |env, machine| IsoloomQemu.release("corp", QEMU_HUBS["corp"].keys, env, machine.name) }
@@ -942,10 +1011,10 @@ Vagrant.configure("2") do |config|
       v.memory = "4096M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("gusztavvargadr/windows-11", 60)
-      # Port 33048 of network `corp`'s hub (see IsoloomQemu).
+      # Its port of network `corp`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:33048"
+      v.socket_opts = "connect=127.0.0.1:#{QEMU_HUBS["corp"]["ws-01"]}"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -970,7 +1039,7 @@ Vagrant.configure("2") do |config|
       v.extra_qemu_args = IsoloomConsole.qemu("x86_64")
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
+      t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"]) }
     end
     m.trigger.after :"VagrantPlugins::QEMU::Action::Destroy", type: :action do |t|
       t.ruby { |env, machine| IsoloomQemu.release("corp", QEMU_HUBS["corp"].keys, env, machine.name) }
@@ -1088,10 +1157,10 @@ Vagrant.configure("2") do |config|
       v.memory = "4096M"
       v.ssh_auto_correct = true
       v.disk_resize = IsoloomQemu.disk("gusztavvargadr/windows-11", 60)
-      # Port 33049 of network `corp`'s hub (see IsoloomQemu).
+      # Its port of network `corp`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:33049"
+      v.socket_opts = "connect=127.0.0.1:#{QEMU_HUBS["corp"]["ws-02"]}"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1116,7 +1185,7 @@ Vagrant.configure("2") do |config|
       v.extra_qemu_args = IsoloomConsole.qemu("x86_64")
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"].values) }
+      t.ruby { |_, _| IsoloomQemu.hub("corp", QEMU_HUBS["corp"]) }
     end
     m.trigger.after :"VagrantPlugins::QEMU::Action::Destroy", type: :action do |t|
       t.ruby { |env, machine| IsoloomQemu.release("corp", QEMU_HUBS["corp"].keys, env, machine.name) }
@@ -1433,10 +1502,10 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.smp = "cpus=1"
       v.memory = "1024M"
       v.ssh_auto_correct = true
-      # Port 33050 of network `access`'s hub (see IsoloomQemu).
+      # Its port of network `access`'s hub (see IsoloomQemu).
       v.advanced_network = true
       v.net_mode = :socket
-      v.socket_opts = "connect=127.0.0.1:33050"
+      v.socket_opts = "connect=127.0.0.1:#{QEMU_HUBS["access"]["user"]}"
       if "x86_64" != HOST_ARCH
         v.smp = "cpus=1"
         o.vm.boot_timeout = 3600
@@ -1445,7 +1514,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.extra_qemu_args = IsoloomConsole.qemu("x86_64")
     end
     m.trigger.before :"VagrantPlugins::QEMU::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, _| IsoloomQemu.hub("access", QEMU_HUBS["access"].values) }
+      t.ruby { |_, _| IsoloomQemu.hub("access", QEMU_HUBS["access"]) }
     end
     m.trigger.after :"VagrantPlugins::QEMU::Action::Destroy", type: :action do |t|
       t.ruby { |env, machine| IsoloomQemu.release("access", QEMU_HUBS["access"].keys, env, machine.name) }
@@ -2551,7 +2620,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:df09ee104452cd7fb3a4b1ef1a01c2c5f7181eed56900bfc81082a71c09e14f4",
+        "boot_digest": "sha256:509d0f582d719b103238040dbfd1b1f663eec2f1f56ff63c869c5191593b5592",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2703,7 +2772,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:04e0e1804390792a3de083caf0e8f9f3e659ea9ea47af076c86f4fed310f5f52",
+        "boot_digest": "sha256:21c7c9cb74ecdfe038c1f627d15f7ff33cbb89aca00c8002c0bf383b1fbd3318",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2829,7 +2898,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:2d9d62c3ec564f8d07778f1a3d9644a0ef42e6e145f03e37818c991a0fc70df0",
+        "boot_digest": "sha256:a7b302be826aaee4f043a2a71991aa23a5e34421393d17c492ccb198e3c79e09",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3084,7 +3153,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - user",
           "vmware_esxi": "corp-ad-basics-user"
         },
-        "boot_digest": "sha256:8589f46a7b3aa8653e6c2804165b0e185a853be52c9546161055af4e912bba86",
+        "boot_digest": "sha256:cedde482fa838ffbb6b01c97c520f6913a0ac16bf27f23bbe43dbf58859687d0",
         "boxes": [
           {
             "provider": "virtualbox",

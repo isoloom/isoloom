@@ -243,11 +243,15 @@ fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu:
     r.text(qemu::QEMU_RB);
     let hubs = qemu::hubs(links);
     if !hubs.is_empty() {
-        r.comment("QEMU: each network's hub port of each of its VMs, in the order they start.");
-        r.hash(
+        r.comment("QEMU: each network's VMs, in the order they start, and their ports on its hub: picked for this");
+        r.comment("copy of the project when Vagrant reads this file (see IsoloomQemu.ports).");
+        let vms = |vms: &Vec<String>| Value::array(vms.iter().map(|vm| Value::str(vm)));
+        r.assign(
             "QEMU_HUBS",
-            hubs.iter()
-                .map(|(net, vms)| (Value::str(net), Value::hash(vms.iter().map(|(vm, p)| (Value::str(vm), Value::from(*p)))))),
+            Value::raw(format!(
+                "IsoloomQemu.ports({})",
+                Value::hash(hubs.iter().map(|(net, names)| (Value::str(net), vms(names))))
+            )),
         );
     }
     r.blank();

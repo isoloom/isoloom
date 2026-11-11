@@ -10,6 +10,21 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Two copies of one environment run side by side under QEMU.** Each network's hub listens on
+  host ports, and those were one block from a hash of the environment's name, the same for every
+  copy: with one `solo-web` running, a second one's start failed (`QEMU: the hub of network app
+  didn't start`, its log `can't bind ip=127.0.0.1 to socket: Address already in use` on 39761). The
+  Vagrantfile now picks the ports when Vagrant reads it (`IsoloomQemu.ports`), for its own folder:
+  each one free on the host, looked for from a point of the folder's path, so two copies start far
+  apart and a port something else holds is passed over. A hub records its ports
+  (`.vagrant/isoloom-qemu-hubs/<network>.ports.json`) and keeps them while it runs; one folder
+  gets the same ports from one run to the next while they stay free. A hub running on other ports
+  (its VMs changed, or an older Vagrantfile started it) is restarted on the new ones before a VM
+  of its network starts, and a hub is only taken to run (and stopped) when the process its pid
+  file names is that hub. `QEMU_HUBS` holds the picked ports, by network and VM, as before.
+
 ## [2.1.0] — 2026-11-11
 
 ### Changed

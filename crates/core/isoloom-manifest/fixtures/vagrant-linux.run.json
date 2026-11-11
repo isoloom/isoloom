@@ -418,7 +418,7 @@
           "utm": "web-vm - web",
           "vmware_esxi": "web-vm-web"
         },
-        "boot_digest": "sha256:3c9c85001389ea1b9c2f855d99043eac2dcf39637096bdbceccb5b6e44acce59",
+        "boot_digest": "sha256:dbb3d276503993ba8001af816624d7fafd5e2c83cbd060155282b90d17e4d205",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -549,7 +549,7 @@
           "utm": "web-vm - isoloom-controller",
           "vmware_esxi": "web-vm-isoloom-controller"
         },
-        "boot_digest": "sha256:9a2d2597769fbc1fc933793840c265672a6c91ba9aed4ab85a4d15247700e1f7",
+        "boot_digest": "sha256:4cd6da6eed84f1c26b562bb05e16e43ef6020264b98e900db622f1ec57c00816",
         "boxes": [
           {
             "provider": "virtualbox",

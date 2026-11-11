@@ -4,13 +4,18 @@
 //! QEMU process with no machine, a `listen` port per VM on one emulated hub, each VM connecting
 //! to its own ([`QEMU_RB`]). vmnet, TAP and `socket_vmnet` would need root (or a daemon running
 //! as root): Isoloom uses none of them.
+//!
+//! The hub ports are the host's, so they belong to the copy of the project that runs, not to the
+//! spec: two copies of one environment (two folders, one name) run side by side. The Vagrantfile
+//! picks them when Vagrant reads it (`IsoloomQemu.ports`), free on the host and kept while a hub
+//! runs on them; what Isoloom writes is which VM has which network's port.
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::router;
 
 use super::{CONTROLLER, TOOL_SHELL};
-use isoloom_render::stable_hash;
+use crate::ruby::Value;
 
 /// The Ruby the QEMU provider's hubs and disk sizes use (`vagrant_qemu.rb`): the
 /// `IsoloomQemu` module, in the preamble of a Vagrantfile that needs it ([`needs_ruby`]).
@@ -27,20 +32,25 @@ pub(crate) enum Link {
     Refused(String),
 }
 
-/// A VM's port on its network's hub.
+/// A VM's port on its network's hub: `QEMU_HUBS[net][vm]`, picked when Vagrant reads the file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HubPort {
     /// The network, as `QEMU_HUBS` keys it.
     pub(crate) net: String,
-    /// The host port the VM connects to.
-    pub(crate) port: u16,
+    /// The VM, by its define name, as `QEMU_HUBS[net]` keys it.
+    pub(crate) vm: String,
 }
 
 impl Link {
-    /// The `socket` netdev options the VM runs with, when it has a link.
-    pub(crate) fn socket_opts(&self) -> Option<String> {
+    /// The `socket` netdev options the VM runs with, when it has a link: a Ruby string, its port
+    /// read from `QEMU_HUBS`.
+    pub(crate) fn socket_opts(&self) -> Option<Value> {
         match self {
-            Link::Hub(h) => Some(format!("connect=127.0.0.1:{}", h.port)),
+            Link::Hub(h) => Some(Value::raw(format!(
+                "\"connect=127.0.0.1:#{{QEMU_HUBS[{}][{}]}}\"",
+                Value::str(&h.net),
+                Value::str(&h.vm)
+            ))),
             Link::None | Link::Refused(_) => None,
         }
     }
@@ -67,8 +77,8 @@ fn vms_and_networks(env: &Environment, with_controller: bool) -> Vec<(String, Ve
     vms
 }
 
-/// Each VM's link, by its define name: a VM on one network gets the environment's next hub
-/// port ([`hub_port`]), so no two of its VMs share one, whatever their networks are called.
+/// Each VM's link, by its define name: a VM on one network gets a port of its hub, one host port
+/// per linked VM, at most [`PORTS`] of them.
 pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String, Link> {
     let mut linked = 0;
     vms_and_networks(env, with_controller)
@@ -78,9 +88,13 @@ pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String
                 [] => Link::None,
                 [net] => {
                     linked += 1;
-                    match hub_port(&env.name, linked - 1) {
-                        Some(port) => Link::Hub(HubPort { net: (*net).to_owned(), port }),
-                        None => Link::Refused(format!("`{name}`: QEMU links at most {PORTS} VMs of an environment, a host port each")),
+                    if linked <= usize::from(PORTS) {
+                        Link::Hub(HubPort {
+                            net: (*net).to_owned(),
+                            vm: name.clone(),
+                        })
+                    } else {
+                        Link::Refused(format!("`{name}`: QEMU links at most {PORTS} VMs of an environment, a host port each"))
                     }
                 }
                 more => Link::Refused(format!("`{name}` is on {} networks, and QEMU gives a VM one", more.len())),
@@ -90,13 +104,13 @@ pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String
         .collect()
 }
 
-/// Each network with a hub, and its VMs with their ports, in the order the VMs are defined: the
-/// hub listens on every port, and stops once none of the VMs is left.
-pub(crate) fn hubs(links: &IndexMap<String, Link>) -> IndexMap<String, IndexMap<String, u16>> {
-    let mut out: IndexMap<String, IndexMap<String, u16>> = IndexMap::new();
-    for (vm, link) in links {
+/// Each network with a hub, and its VMs, in the order they are defined: the hub listens on a port
+/// for each, and stops once none of them is left.
+pub(crate) fn hubs(links: &IndexMap<String, Link>) -> IndexMap<String, Vec<String>> {
+    let mut out: IndexMap<String, Vec<String>> = IndexMap::new();
+    for link in links.values() {
         if let Link::Hub(h) = link {
-            out.entry(h.net.clone()).or_default().insert(vm.clone(), h.port);
+            out.entry(h.net.clone()).or_default().push(h.vm.clone());
         }
     }
     out
@@ -107,24 +121,8 @@ pub(crate) fn needs_ruby(links: &IndexMap<String, Link>, sized: bool) -> bool {
     sized || links.values().any(|l| matches!(l, Link::Hub(_)))
 }
 
-/// The first host port QEMU links use.
-const FIRST_PORT: u16 = 20_000;
-/// How many host ports they use, from [`FIRST_PORT`].
+/// How many host ports the hubs pick from (`IsoloomQemu::PORTS`, from 20000).
 const PORTS: u16 = 20_000;
-
-/// The first hub port of environment `env`: stable for it, in 20000-39999.
-fn first_port(env: &str) -> u16 {
-    let offset = stable_hash::of(env) % u32::from(PORTS);
-    FIRST_PORT + u16::try_from(offset).unwrap_or_default()
-}
-
-/// The environment's `n`-th hub port (its VMs in the order they are defined, whatever their
-/// network): its first port, then one more each, wrapping within the range. One block, so no two
-/// are the same; `None` past the range's [`PORTS`] ports.
-fn hub_port(env: &str, n: usize) -> Option<u16> {
-    let offset = u16::try_from(n).ok().filter(|n| *n < PORTS)?;
-    Some(FIRST_PORT + (first_port(env) - FIRST_PORT + offset) % PORTS)
-}
 
 /// The first VM that can't have its network, as the reason.
 pub(crate) fn refusal(links: IndexMap<String, Link>) -> Option<String> {
@@ -136,54 +134,29 @@ pub(crate) fn refusal(links: IndexMap<String, Link>) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-
     use super::{HubPort, Link};
 
-    #[test]
-    fn the_first_port_is_stable_and_in_range() {
-        let p = super::first_port("lab");
-        assert_eq!(p, super::first_port("lab"));
-        assert!((20000..40000).contains(&p));
-        assert_ne!(p, super::first_port("other"));
+    fn hub(net: &str, vm: &str) -> Link {
+        Link::Hub(HubPort {
+            net: net.into(),
+            vm: vm.into(),
+        })
     }
 
     #[test]
-    fn hub_ports_follow_the_first_port_and_stay_in_range() {
-        let base = super::first_port("lab");
-        assert_eq!(super::hub_port("lab", 0), Some(base));
-        let block: Vec<u16> = (0..20_000).filter_map(|n| super::hub_port("lab", n)).collect();
-        assert!(block.iter().all(|p| (20000..40000).contains(p)));
-        assert_eq!(
-            block.iter().collect::<BTreeSet<_>>().len(),
-            20_000,
-            "the block wraps within the range, each port once"
-        );
-        assert_eq!(super::hub_port("lab", 20_000), None, "past the range there is no port left");
-    }
-
-    #[test]
-    fn hubs_name_every_vm_of_the_network_with_its_port() {
-        let base = super::first_port("lab");
-        let hub = |at: u16| {
-            Link::Hub(HubPort {
-                net: "app".into(),
-                port: base + at,
-            })
-        };
+    fn hubs_name_every_vm_of_the_network() {
         let links: indexmap::IndexMap<String, Link> = [
-            ("r".to_owned(), hub(0)),
+            ("r".to_owned(), hub("app", "r")),
             ("lone".to_owned(), Link::None),
-            ("a".to_owned(), hub(1)),
+            ("a".to_owned(), hub("app", "a")),
             ("other".to_owned(), Link::Refused("on two networks".into())),
-            ("b".to_owned(), hub(2)),
+            ("b".to_owned(), hub("app", "b")),
         ]
         .into_iter()
         .collect();
         let hubs = super::hubs(&links);
         // Every VM is named, not only the first: the hub stops once none of them is left.
-        let app: Vec<(&str, u16)> = hubs["app"].iter().map(|(vm, p)| (vm.as_str(), *p)).collect();
-        assert_eq!(app, [("r", base), ("a", base + 1), ("b", base + 2)]);
+        assert_eq!(hubs["app"], ["r", "a", "b"]);
         assert_eq!(hubs.len(), 1);
     }
 
@@ -193,33 +166,21 @@ mod tests {
             "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 } }\n  b: { os: debian@12, networks: { lab: 11 } }\n",
         );
         let links = super::links(&env, false);
-        let base = super::first_port("t");
-        assert_eq!(links["a"], Link::Hub(HubPort { net: "lab".into(), port: base }));
-        assert_eq!(
-            links["b"],
-            Link::Hub(HubPort {
-                net: "lab".into(),
-                port: base + 1
-            })
-        );
-        assert_eq!(super::hubs(&links)["lab"].len(), 2);
+        assert_eq!(links["a"], hub("lab", "a"));
+        assert_eq!(links["b"], hub("lab", "b"));
+        assert_eq!(super::hubs(&links)["lab"], ["a", "b"]);
+    }
+
+    /// The port is the copy's, read when Vagrant reads the file: nothing of the spec's name.
+    #[test]
+    fn a_vm_connects_to_its_port_as_the_vagrantfile_picked_it() {
+        let opts = hub("app", "web").socket_opts().map(|v| v.to_string());
+        assert_eq!(opts.as_deref(), Some(r#""connect=127.0.0.1:#{QEMU_HUBS["app"]["web"]}""#));
+        assert_eq!(Link::None.socket_opts(), None);
     }
 
     #[test]
-    fn no_two_hub_ports_of_an_environment_are_the_same_whatever_its_networks() {
-        // `n9` and `n235` in `lab` hashed to ports one apart when each network had its own
-        // base: the first network's second VM took the second network's first port.
-        let env = crate::testing::environment(
-            "version: 1\nname: lab\nnetworks:\n  n9: { cidr: 10.9.0.0/24 }\n  n235: { cidr: 10.10.0.0/24 }\nmachines:\n  a: { os: debian@12, networks: { n9: 10 } }\n  b: { os: debian@12, networks: { n9: 11 } }\n  c: { os: debian@12, networks: { n235: 10 } }\n  d: { os: debian@12, networks: { n235: 11 } }\n",
-        );
-        let ports: Vec<u16> = super::links(&env, false)
-            .values()
-            .filter_map(|l| match l {
-                Link::Hub(h) => Some(h.port),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(ports.len(), 4);
-        assert_eq!(ports.iter().collect::<BTreeSet<_>>().len(), 4, "{ports:?}");
+    fn the_ruby_picks_from_as_many_ports_as_the_links_count() {
+        assert!(super::QEMU_RB.contains(&format!("PORTS = {}_{:03}\n", super::PORTS / 1000, super::PORTS % 1000)));
     }
 }
