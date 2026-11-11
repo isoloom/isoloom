@@ -116,8 +116,8 @@ jobs:
   # Spelling, in code and docs (.typos.toml lists the words that are right here).
   hooks:
     name: Git hooks
-    # The hooks (.githooks/, CONTRIBUTING.md "Git hooks"): shellcheck over them, then their test in
-    # a throwaway repository, with the gitleaks the pre-push runs.
+    # The hooks (.githooks/, .github/CONTRIBUTING.md "Git hooks"): shellcheck over them, then their
+    # test in a throwaway repository, with the gitleaks the pre-push runs.
     runs-on: ubuntu-24.04
     env:
       GITLEAKS_VERSION: "8.30.0"
