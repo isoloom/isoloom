@@ -402,7 +402,45 @@
           "utm": "mini-ad - dc01",
           "vmware_esxi": "mini-ad-dc01"
         },
-        "boot_digest": "sha256:2d5a644df52a67920885158e170d87e1dd19af6f1086393a3a1d875d0a1fadba"
+        "boot_digest": "sha256:2d5a644df52a67920885158e170d87e1dd19af6f1086393a3a1d875d0a1fadba",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "hyperv",
+            "box": "StefanScherer/windows_2019",
+            "version": "2020.02.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "libvirt",
+            "box": "peru/windows-server-2019-standard-x64-eval",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "peru/windows-server-2019-standard-x64-eval",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -503,7 +541,46 @@
           "utm": "mini-ad - ws01",
           "vmware_esxi": "mini-ad-ws01"
         },
-        "boot_digest": "sha256:0bf5bd5ebf0c95ff51c5f7366ecd0ce7e5086db8bff001abd8e4bc0d0ae1d9fa"
+        "boot_digest": "sha256:0bf5bd5ebf0c95ff51c5f7366ecd0ce7e5086db8bff001abd8e4bc0d0ae1d9fa",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0"
+          },
+          {
+            "provider": "hyperv",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0"
+          },
+          {
+            "provider": "parallels",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0"
+          },
+          {
+            "provider": "libvirt",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0"
+          },
+          {
+            "provider": "qemu",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "gusztavvargadr/windows-10",
+            "version": "2511.0.0",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {
@@ -587,7 +664,62 @@
           "utm": "mini-ad - isoloom-controller",
           "vmware_esxi": "mini-ad-isoloom-controller"
         },
-        "boot_digest": "sha256:cf7a450af3db3c5eddbb9fe7d61f724921f57a1cea53c43930cdde0150de7af2"
+        "boot_digest": "sha256:cf7a450af3db3c5eddbb9fe7d61f724921f57a1cea53c43930cdde0150de7af2",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "parallels",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/alpine319"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     }
   ],

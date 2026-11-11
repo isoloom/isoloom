@@ -95,10 +95,18 @@ fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
             target: isoloom_spec::model::Target::DockerVm,
             machine: DEFINE.to_owned(),
         })?;
+    let debian = crate::boxes::debian_12();
+    let choice = crate::docker_vm::host_boxes(&debian);
+    let offered = crate::vms::provider::Provider::ALL
+        .iter()
+        .map(|k| k.manifest)
+        .filter(|p| providers::docker_vm_offers(*p));
+    let boxes = offered.flat_map(|p| choice.on(p).into_iter().map(move |b| (p, b))).collect();
     Ok(Native::Vagrant {
         vagrant: Name::parse(DEFINE)?,
         vm_names,
         boot_digest: Some(boot_digest),
+        boxes: super::listed(boxes)?,
     })
 }
 

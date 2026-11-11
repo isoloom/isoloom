@@ -1516,7 +1516,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "private-names - web",
           "vmware_esxi": "private-names-web"
         },
-        "boot_digest": "sha256:0b4ad0bc31abafca6f7b08556c258b8acad036d2ce3e7c7d698f0d7e7ec617d6"
+        "boot_digest": "sha256:0b4ad0bc31abafca6f7b08556c258b8acad036d2ce3e7c7d698f0d7e7ec617d6",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -1610,7 +1644,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "private-names - client",
           "vmware_esxi": "private-names-client"
         },
-        "boot_digest": "sha256:04f18516c7d0364c81190d6d4199e77a50d3ae877143d16d7dfb4455be436c79"
+        "boot_digest": "sha256:04f18516c7d0364c81190d6d4199e77a50d3ae877143d16d7dfb4455be436c79",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {

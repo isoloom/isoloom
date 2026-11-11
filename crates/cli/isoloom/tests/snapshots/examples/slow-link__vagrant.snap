@@ -1842,7 +1842,39 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - isoloom-router",
           "vmware_esxi": "slow-link-isoloom-router"
         },
-        "boot_digest": "sha256:0248c3dbef0285a2c4d7a6ab455a3ff1fe4776dd8ef41ddc2c911fdd6fb2d0ff"
+        "boot_digest": "sha256:0248c3dbef0285a2c4d7a6ab455a3ff1fe4776dd8ef41ddc2c911fdd6fb2d0ff",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {
@@ -1868,7 +1900,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - web",
           "vmware_esxi": "slow-link-web"
         },
-        "boot_digest": "sha256:79e7adf1c0e6445cab117015e57fb3b6cf26e0cb416ad1a30ff2681c8b7a6110"
+        "boot_digest": "sha256:79e7adf1c0e6445cab117015e57fb3b6cf26e0cb416ad1a30ff2681c8b7a6110",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -1963,7 +2029,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - user",
           "vmware_esxi": "slow-link-user"
         },
-        "boot_digest": "sha256:d21c2ca2b626986a4f6436a366146893b7a7b933a4d62847ed5a5d9fecc7f978"
+        "boot_digest": "sha256:d21c2ca2b626986a4f6436a366146893b7a7b933a4d62847ed5a5d9fecc7f978",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {
@@ -2048,7 +2148,39 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "slow-link - isoloom-tool-shell",
           "vmware_esxi": "slow-link-isoloom-tool-shell"
         },
-        "boot_digest": "sha256:291df059f62345b8d40b0f9de4d8f5676dece99d3de5eecb1cc64a9e1675e312"
+        "boot_digest": "sha256:291df059f62345b8d40b0f9de4d8f5676dece99d3de5eecb1cc64a9e1675e312",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     }
   ],

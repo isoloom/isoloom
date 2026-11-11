@@ -100,6 +100,29 @@ download is given), and reports the stall and the failure as a download's, so a 
 connection isn't taken for a broken environment. The step after it then runs under its own limit
 with nothing left to fetch.
 
+### The boxes a VM boots
+
+Each Vagrant machine's `native.boxes` lists the box its VM boots under each provider, so a runner
+can download them in a step of its own, with a download's rule, before `vagrant up` (which would
+otherwise download a box inside its own time limit): `vagrant box add <box> --provider <provider>
+[--box-version <version>] [--architecture <architecture>]`, skipping a box already there.
+
+```json
+"boxes": [
+  { "provider": "virtualbox", "box": "bento/debian-12" },
+  { "provider": "libvirt", "box": "generic/debian12", "architecture": "amd64" },
+  { "provider": "virtualbox", "box": "generic/alpine319", "host_architecture": "amd64" },
+  { "provider": "virtualbox", "box": "bento/debian-12", "host_architecture": "arm64" }
+]
+```
+
+`version` is absent when the box isn't pinned (Vagrant takes the newest version with the build);
+`architecture` is absent when the build is the computer's, which Vagrant picks itself;
+`host_architecture` says the entry is only for a computer of that architecture (the controller's
+Alpine box has no arm64 build for the desktop hypervisors, so an arm64 computer boots Debian's).
+On ESXi the build is the ESXi host's, `amd64`. The access machine's box is its default one: a
+runner that gives it another downloads that one instead.
+
 ### What a VM takes only when it boots
 
 Vagrant applies some of a VM's settings only when it boots it (`vagrant up` of a stopped VM,

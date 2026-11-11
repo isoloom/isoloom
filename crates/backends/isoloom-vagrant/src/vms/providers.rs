@@ -3,7 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use crate::boxes;
+use crate::boxes::{self, Choice, MainBox};
 use crate::console;
 use isoloom_spec::model::{Arch, Boot};
 use isoloom_spec::windows::Tpm;
@@ -122,6 +122,22 @@ pub(crate) struct Guest<'a> {
     /// Its machine's name, when it is one of the environment's: it gets a graphical console
     /// ([`crate::console`]) where the provider gives one. Isoloom's own VMs get none.
     pub(crate) console: Option<&'a str>,
+}
+
+impl Guest<'_> {
+    /// The boxes the VM boots, provider by provider: `main` ([`MainBox`]), then the box each
+    /// provider block of this guest boots instead, as [`blocks`] writes them.
+    pub(crate) fn choice<'b>(&'b self, main: MainBox<'b>) -> Choice<'b> {
+        Choice {
+            main,
+            libvirt: self.libvirt_box,
+            qemu: self.qemu.boxed,
+            cpu: self.qemu.arch,
+            hyperv: Some(&self.hyperv.boxed),
+            esxi: self.esxi_box,
+            utm: None,
+        }
+    }
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V

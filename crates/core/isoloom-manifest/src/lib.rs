@@ -85,10 +85,11 @@ pub use identity::{
 };
 pub use lifecycle::{Condition, Expiry, ExpiryUnit, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries, Seal};
 pub use list::{NonEmpty, StepSelection};
-pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, Volume};
+pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, VagrantBox, Volume};
 pub use manifest::{Manifest, parse, to_json};
 pub use names::{
-    EnvName, EnvironmentName, GoneText, Identifier, KEBAB_MAX, Name, OsName, PinnedImage, PortName, SnakeName, StepId, ToolName, Version, is_kebab,
+    BoxName, BoxVersion, EnvName, EnvironmentName, GoneText, Identifier, KEBAB_MAX, Name, OsName, PinnedImage, PortName, SnakeName, StepId, ToolName, Version,
+    is_kebab,
 };
 pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, OutputRole, OutputSource};
 pub use path::{GuestPath, PathTemplate, RelPath};

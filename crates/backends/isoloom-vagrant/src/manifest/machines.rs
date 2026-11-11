@@ -114,10 +114,16 @@ pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMa
 fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
     let (shown, plain) = (label(env, &d.name), vm_name(env, &d.name));
     let vm_names = vm_names(shown, plain, format!("{}_{}", env.name, d.name));
+    let offered: Vec<Provider> = crate::vms::provider::Provider::ALL
+        .iter()
+        .filter(|k| k.provider.runs_vms())
+        .map(|k| k.manifest)
+        .collect();
     Ok(Native::Vagrant {
         vagrant: Name::parse(&d.name)?,
         vm_names,
         boot_digest: Some(boot_digest.to_owned()),
+        boxes: super::listed(crate::vms::boxes(env, d, &offered))?,
     })
 }
 

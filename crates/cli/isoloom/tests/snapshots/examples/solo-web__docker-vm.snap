@@ -1842,7 +1842,38 @@ systemctl enable --now isoloom-published.service
           "utm": "solo-web - isoloom-docker-host",
           "vmware_esxi": "solo-web-isoloom-docker-host"
         },
-        "boot_digest": "sha256:7708345c864e768815c308e9d69e4cb69385bc41d8b7493838cbc47698aaca76"
+        "boot_digest": "sha256:7708345c864e768815c308e9d69e4cb69385bc41d8b7493838cbc47698aaca76",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {

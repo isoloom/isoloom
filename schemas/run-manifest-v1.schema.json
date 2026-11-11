@@ -1529,10 +1529,17 @@
             "null"
           ],
           "description": "A digest of the VM's Vagrantfile configuration but its provisioners: what Vagrant applies only when the VM boots or reloads. Opaque; a runner reloads a running VM whose digest changed since it booted. Absent from older manifests."
+        },
+        "boxes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/VagrantBox"
+          },
+          "description": "The box the VM boots under each provider, for a runner to download before `vagrant up`. Absent from older manifests."
         }
       },
       "title": "Native",
-      "description": "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly) and the digest of what Vagrant applies to it only at boot (`boot_digest`).",
+      "description": "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly), the digest of what Vagrant applies to it only at boot (`boot_digest`) and the box its VM boots under each provider (`boxes`).",
       "oneOf": [
         {
           "required": [
@@ -1551,8 +1558,73 @@
         ],
         "boot_digest": [
           "vagrant"
+        ],
+        "boxes": [
+          "vagrant"
         ]
       }
+    },
+    "VagrantBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "$ref": "#/$defs/Provider",
+          "description": "The provider that boots it."
+        },
+        "box": {
+          "$ref": "#/$defs/BoxName",
+          "description": "The box's name (`bento/debian-12`)."
+        },
+        "version": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoxVersion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Its version, when pinned (a version, or a constraint Vagrant reads); absent: the newest with the build."
+        },
+        "architecture": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Arch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The build, when pinned; absent: the one for the computer Vagrant runs on, which Vagrant picks itself."
+        },
+        "host_architecture": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Arch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only on a computer of this architecture; absent: on any (a machine whose box depends on the computer has one entry per architecture)."
+        }
+      },
+      "required": [
+        "provider",
+        "box"
+      ],
+      "description": "A Vagrant box a machine's VM boots under one provider, as a runner downloads it before `vagrant up`, in a step of its own with a download's rule: `vagrant box add <box> --provider <provider> [--box-version <version>] [--architecture <architecture>]`, skipped when that box, provider, version and build are there already."
+    },
+    "BoxName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+      "description": "`<name>` or `<org>/<name>`, each a letter or digit, then letters, digits, `.`, `_` or `-` (`bento/debian-12`)"
+    },
+    "BoxVersion": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z<>=~!][0-9A-Za-z<>=~!., _-]*$",
+      "description": "a letter, digit or `<>=~!`, then letters, digits, spaces or `.,<>=~!_-` (`202510.26.0`, `>= 1.2`)"
     },
     "Volume": {
       "type": "object",

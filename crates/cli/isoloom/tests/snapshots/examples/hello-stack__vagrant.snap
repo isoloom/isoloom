@@ -1926,7 +1926,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack - cache",
           "vmware_esxi": "hello-stack-cache"
         },
-        "boot_digest": "sha256:a809883c51228e353effa814892e8023d270c61fdb6f2e6831dbcbc3fcb52da8"
+        "boot_digest": "sha256:a809883c51228e353effa814892e8023d270c61fdb6f2e6831dbcbc3fcb52da8",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2020,7 +2054,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack - web",
           "vmware_esxi": "hello-stack-web"
         },
-        "boot_digest": "sha256:309dd37f37aabf2de2eeb689bac6f6abf08ee5818066f8c3e580b22763550d8b"
+        "boot_digest": "sha256:309dd37f37aabf2de2eeb689bac6f6abf08ee5818066f8c3e580b22763550d8b",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2117,7 +2185,62 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "hello-stack - isoloom-controller",
           "vmware_esxi": "hello-stack-isoloom-controller"
         },
-        "boot_digest": "sha256:c48b93d23fc4569b75cfb2b9fde194be1a54c0cfeac4bc0fbd1bda8a38f25c4e"
+        "boot_digest": "sha256:c48b93d23fc4569b75cfb2b9fde194be1a54c0cfeac4bc0fbd1bda8a38f25c4e",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "parallels",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/alpine319"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     }
   ],

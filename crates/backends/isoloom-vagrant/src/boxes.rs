@@ -7,7 +7,7 @@ mod choice;
 use isoloom_plan::Vm;
 use isoloom_spec::images::is_windows;
 
-pub(crate) use choice::{ARM_HOST, Choice, MainBox};
+pub(crate) use choice::{ARM_HOST, Choice, MainBox, ProviderBox};
 
 /// A Vagrant box: its name, a pinned version when known-good, and the libvirt, QEMU and Hyper-V
 /// boxes when the main one has no build for them.

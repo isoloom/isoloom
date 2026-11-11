@@ -2269,7 +2269,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall - fw",
           "vmware_esxi": "edge-firewall-fw"
         },
-        "boot_digest": "sha256:ddaae026761d2785f7abfecb3e8e772679bae733bc4c4f63d0b0a7d9e92ed319"
+        "boot_digest": "sha256:ddaae026761d2785f7abfecb3e8e772679bae733bc4c4f63d0b0a7d9e92ed319",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2363,7 +2397,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall - web",
           "vmware_esxi": "edge-firewall-web"
         },
-        "boot_digest": "sha256:ca69f4bf6b0d2263e11275a06b86a2161798c00974a7a0883f08e91c9cd2e684"
+        "boot_digest": "sha256:ca69f4bf6b0d2263e11275a06b86a2161798c00974a7a0883f08e91c9cd2e684",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2457,7 +2525,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall - cache",
           "vmware_esxi": "edge-firewall-cache"
         },
-        "boot_digest": "sha256:c111f4dc9faf01e32a22127c78d80043c857898321ab2023d36068557c325ee4"
+        "boot_digest": "sha256:c111f4dc9faf01e32a22127c78d80043c857898321ab2023d36068557c325ee4",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2552,7 +2654,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "edge-firewall - user",
           "vmware_esxi": "edge-firewall-user"
         },
-        "boot_digest": "sha256:71ecd20fccb80ead5b5300c10053a966acd03327f94730d4189ac295337fa27e"
+        "boot_digest": "sha256:71ecd20fccb80ead5b5300c10053a966acd03327f94730d4189ac295337fa27e",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {

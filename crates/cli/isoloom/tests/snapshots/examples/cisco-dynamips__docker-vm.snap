@@ -1946,7 +1946,38 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-dynamips - isoloom-docker-host",
           "vmware_esxi": "cisco-dynamips-isoloom-docker-host"
         },
-        "boot_digest": "sha256:3ebeb20c1e5c4f4ed4d48f72f350b0aab05f6cf6ef5914b33faf0a7aa2304f10"
+        "boot_digest": "sha256:3ebeb20c1e5c4f4ed4d48f72f350b0aab05f6cf6ef5914b33faf0a7aa2304f10",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {

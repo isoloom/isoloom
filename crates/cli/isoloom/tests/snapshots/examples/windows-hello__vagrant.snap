@@ -1573,7 +1573,44 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "windows-hello - web01",
           "vmware_esxi": "windows-hello-web01"
         },
-        "boot_digest": "sha256:f5582e06c8420d2a7fe1ad590e7148179e3fc2bab545367f8172e42b934d568d"
+        "boot_digest": "sha256:f5582e06c8420d2a7fe1ad590e7148179e3fc2bab545367f8172e42b934d568d",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "hyperv",
+            "box": "StefanScherer/windows_2019"
+          },
+          {
+            "provider": "parallels",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "libvirt",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15"
+          },
+          {
+            "provider": "qemu",
+            "box": "peru/windows-server-2019-standard-x64-eval",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "StefanScherer/windows_2019",
+            "version": "2021.05.15",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -1670,7 +1707,62 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "windows-hello - isoloom-controller",
           "vmware_esxi": "windows-hello-isoloom-controller"
         },
-        "boot_digest": "sha256:0d7d37ff3351291d3a28041279649b0b74f4e511f7234302d68f1973626e3aef"
+        "boot_digest": "sha256:0d7d37ff3351291d3a28041279649b0b74f4e511f7234302d68f1973626e3aef",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "parallels",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/alpine319"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     }
   ],

@@ -1840,7 +1840,39 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns - isoloom-router",
           "vmware_esxi": "udp-dns-isoloom-router"
         },
-        "boot_digest": "sha256:28e265594479bf5debd06e117de39b3b4df4f567044c3ba0bb00b5f9622f91de"
+        "boot_digest": "sha256:28e265594479bf5debd06e117de39b3b4df4f567044c3ba0bb00b5f9622f91de",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {
@@ -1866,7 +1898,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns - dns",
           "vmware_esxi": "udp-dns-dns"
         },
-        "boot_digest": "sha256:95ae1b614eda74e1d52ba91f81849553757e346b5dc77ebf6fd512242ad7f694"
+        "boot_digest": "sha256:95ae1b614eda74e1d52ba91f81849553757e346b5dc77ebf6fd512242ad7f694",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -1972,7 +2038,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "udp-dns - client",
           "vmware_esxi": "udp-dns-client"
         },
-        "boot_digest": "sha256:4960860607492221c33d27e24d4691b5cd7516063a18e2b9fcda26c33cedef48"
+        "boot_digest": "sha256:4960860607492221c33d27e24d4691b5cd7516063a18e2b9fcda26c33cedef48",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {

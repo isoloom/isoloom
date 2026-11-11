@@ -1597,7 +1597,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "air-gapped - store",
           "vmware_esxi": "air-gapped-store"
         },
-        "boot_digest": "sha256:8349fee723c986cbc858b546e32da8093009c22a69467a2e394539bee3926b32"
+        "boot_digest": "sha256:8349fee723c986cbc858b546e32da8093009c22a69467a2e394539bee3926b32",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -1691,7 +1725,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "air-gapped - app",
           "vmware_esxi": "air-gapped-app"
         },
-        "boot_digest": "sha256:b2ec32fc52c01157fe805e48d2bdcee0ee7d5930ad2930b208d5dcc790b915ac"
+        "boot_digest": "sha256:b2ec32fc52c01157fe805e48d2bdcee0ee7d5930ad2930b208d5dcc790b915ac",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {

@@ -318,6 +318,14 @@ pub(crate) enum Kind {
     Controller,
 }
 
+/// The boxes define `d`'s VM boots under each of `providers`, as the Vagrantfile writes them.
+pub(crate) fn boxes(env: &Environment, d: &Define, providers: &[isoloom_manifest::Provider]) -> Vec<(isoloom_manifest::Provider, crate::boxes::ProviderBox)> {
+    match d.kind {
+        Kind::Machine => machine::boxes(env, &d.name, providers),
+        kind => own::boxes(env, kind, providers),
+    }
+}
+
 /// One `config.vm.define` of the Vagrantfile, in its order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Define {

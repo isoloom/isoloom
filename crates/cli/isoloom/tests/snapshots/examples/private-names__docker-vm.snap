@@ -1914,7 +1914,38 @@ systemctl enable --now isoloom-published.service
           "utm": "private-names - isoloom-docker-host",
           "vmware_esxi": "private-names-isoloom-docker-host"
         },
-        "boot_digest": "sha256:b7741141b47c1c10164f621854e3c3c06cce2916cdd13dbd2f02c1d0fc4da4bf"
+        "boot_digest": "sha256:b7741141b47c1c10164f621854e3c3c06cce2916cdd13dbd2f02c1d0fc4da4bf",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {

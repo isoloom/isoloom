@@ -1842,7 +1842,38 @@ systemctl enable --now isoloom-published.service
           "utm": "arm-lab - isoloom-docker-host",
           "vmware_esxi": "arm-lab-isoloom-docker-host"
         },
-        "boot_digest": "sha256:dccd4d88fef3e6699504cd01143b2fb6af4b5c4a5b1465a1ef3a2fed5ad4e259"
+        "boot_digest": "sha256:dccd4d88fef3e6699504cd01143b2fb6af4b5c4a5b1465a1ef3a2fed5ad4e259",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {

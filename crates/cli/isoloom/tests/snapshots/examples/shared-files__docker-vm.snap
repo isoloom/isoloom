@@ -2005,7 +2005,38 @@ systemctl enable --now isoloom-published.service
           "utm": "shared-files - isoloom-docker-host",
           "vmware_esxi": "shared-files-isoloom-docker-host"
         },
-        "boot_digest": "sha256:b3c93cbd867fd4d42b2eb4c146a7f61c800b9fada2f6d5601a358bd0c1b147d9"
+        "boot_digest": "sha256:b3c93cbd867fd4d42b2eb4c146a7f61c800b9fada2f6d5601a358bd0c1b147d9",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {

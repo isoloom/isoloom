@@ -51,6 +51,23 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
     .manifest(env, isoloom_manifest::Target::Vagrant, None, Driver::Vagrant)?)
 }
 
+/// `boxes` as a run manifest lists them: each with its provider, version, build and the
+/// computer's architecture it is for.
+fn listed(boxes: Vec<(isoloom_manifest::Provider, crate::boxes::ProviderBox)>) -> Result<Vec<isoloom_manifest::VagrantBox>> {
+    boxes
+        .into_iter()
+        .map(|(provider, b)| {
+            Ok(isoloom_manifest::VagrantBox {
+                provider,
+                name: isoloom_manifest::BoxName::parse(&b.name)?,
+                version: b.version.as_deref().map(isoloom_manifest::BoxVersion::parse).transpose()?,
+                architecture: b.arch.map(run_manifest::arch),
+                host_architecture: b.host.map(run_manifest::arch),
+            })
+        })
+        .collect()
+}
+
 /// `vagrant <args>`.
 fn vagrant_argv(args: &[&str]) -> Result<HostArgv> {
     Ok(run_manifest::argv("vagrant", args)?)

@@ -1908,7 +1908,38 @@ systemctl enable --now isoloom-published.service
           "utm": "air-gapped - isoloom-docker-host",
           "vmware_esxi": "air-gapped-isoloom-docker-host"
         },
-        "boot_digest": "sha256:f8fbff8d368dcff912acf240dc3cea043646263c182a41cb51f53562b2402ae5"
+        "boot_digest": "sha256:f8fbff8d368dcff912acf240dc3cea043646263c182a41cb51f53562b2402ae5",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {

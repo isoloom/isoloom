@@ -258,6 +258,14 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Added
 
+- **The run manifest lists the boxes each Vagrant machine boots** (`machines[].native.boxes`):
+  for each provider, the box, its version when pinned, its build when pinned (else the
+  computer's), and the computer's architecture an entry is only for (the controller boots Debian
+  on an arm64 computer). A runner can download them in a step of its own, with a download's
+  rule, before `vagrant up` (`vagrant box add <box> --provider <p> [--box-version <v>]
+  [--architecture <a>]`), skipping a box already there. The Vagrantfile and the list are written
+  from one choice of boxes, and a test holds the list to the Vagrantfile and each of Isoloom's own
+  VMs' boxes to a build for every provider and architecture.
 - **A download is a step of its own, marked so in the run manifest** (`"download": true` on a
   step): a runner lets it run while it makes progress, with no ceiling, stops it once it shows none
   for its `timeout_s`, and reports that and its failure as a download's. Compose in a VM

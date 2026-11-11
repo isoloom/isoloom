@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::console::Console;
 use crate::identity::Provider;
-use crate::names::{Name, OsName};
+use crate::names::{BoxName, BoxVersion, Name, OsName};
 use crate::path::GuestPath;
 use crate::port::Port;
 use crate::template::Template;
@@ -188,7 +188,36 @@ pub enum Native {
         /// Opaque: a runner compares it with the one the VM was last booted with and reloads a
         /// running VM whose digest changed; `vagrant up --provision` alone would not apply it.
         boot_digest: Option<String>,
+        /// The box its VM boots under each provider: what a runner may download before `vagrant
+        /// up` ([`VagrantBox`]). Empty in a manifest written before the field existed.
+        boxes: Vec<VagrantBox>,
     },
+}
+
+/// A Vagrant box a machine's VM boots under one provider, as a runner downloads it before `vagrant
+/// up`, in a step of its own with a download's rule: `vagrant box add <box> --provider <provider>
+/// [--box-version <version>] [--architecture <architecture>]`, skipped when that box, provider,
+/// version and build are there already.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VagrantBox {
+    /// The provider that boots it.
+    pub provider: Provider,
+    /// The box's name (`bento/debian-12`).
+    #[serde(rename = "box")]
+    pub name: BoxName,
+    /// Its version, when pinned (a version, or a constraint Vagrant reads); absent: the newest
+    /// with the build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<BoxVersion>,
+    /// The build, when pinned; absent: the one for the computer Vagrant runs on, which Vagrant
+    /// picks itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub architecture: Option<Arch>,
+    /// Only on a computer of this architecture; absent: on any (a machine whose box depends on
+    /// the computer has one entry per architecture).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_architecture: Option<Arch>,
 }
 
 /// [`Native`] as written: one shape, told apart by its keys.
@@ -196,8 +225,8 @@ pub enum Native {
 #[serde(deny_unknown_fields)]
 #[schemars(
     title = "Native",
-    description = "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly) and the digest of what Vagrant applies to it only at boot (`boot_digest`).",
-    extend("oneOf" = [{ "required": ["service"] }, { "required": ["vagrant"] }], "dependentRequired" = { "vm_names": ["vagrant"], "boot_digest": ["vagrant"] })
+    description = "A machine's name where the target creates it: the Compose `service`, or the `vagrant` machine with its VM name per provider (what orphan clean-up matches, exactly), the digest of what Vagrant applies to it only at boot (`boot_digest`) and the box its VM boots under each provider (`boxes`).",
+    extend("oneOf" = [{ "required": ["service"] }, { "required": ["vagrant"] }], "dependentRequired" = { "vm_names": ["vagrant"], "boot_digest": ["vagrant"], "boxes": ["vagrant"] })
 )]
 struct NativeFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -211,6 +240,10 @@ struct NativeFields {
     /// changed since it booted. Absent from older manifests.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     boot_digest: Option<String>,
+    /// The box the VM boots under each provider, for a runner to download before `vagrant up`.
+    /// Absent from older manifests.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    boxes: Vec<VagrantBox>,
 }
 
 impl Serialize for Native {
@@ -221,16 +254,19 @@ impl Serialize for Native {
                 vagrant: None,
                 vm_names: None,
                 boot_digest: None,
+                boxes: Vec::new(),
             },
             Native::Vagrant {
                 vagrant,
                 vm_names,
                 boot_digest,
+                boxes,
             } => NativeFields {
                 service: None,
                 vagrant: Some(vagrant.clone()),
                 vm_names: Some(vm_names.clone()),
                 boot_digest: boot_digest.clone(),
+                boxes: boxes.clone(),
             },
         };
         fields.serialize(s)
@@ -245,16 +281,19 @@ impl<'de> Deserialize<'de> for Native {
                 vagrant: None,
                 vm_names: None,
                 boot_digest: None,
-            } => Ok(Native::Compose { service }),
+                boxes,
+            } if boxes.is_empty() => Ok(Native::Compose { service }),
             NativeFields {
                 service: None,
                 vagrant: Some(vagrant),
                 vm_names,
                 boot_digest,
+                boxes,
             } => Ok(Native::Vagrant {
                 vagrant,
                 vm_names: vm_names.unwrap_or_default(),
                 boot_digest,
+                boxes,
             }),
             _ => Err(serde::de::Error::custom(Error::NativeShape)),
         }
@@ -390,5 +429,28 @@ mod tests {
         assert_eq!(serde_json::to_string(&older).unwrap(), r#"{"vagrant":"default","vm_names":{}}"#);
         let service = serde_json::from_str::<Native>(r#"{"service": "db", "boot_digest": "sha256:ab"}"#);
         assert!(service.is_err());
+    }
+
+    #[test]
+    fn a_vagrant_machine_lists_the_boxes_it_boots_for_a_runner_to_download() {
+        let text = r#"{"vagrant":"default","vm_names":{},"boxes":[{"provider":"virtualbox","box":"bento/debian-12"},{"provider":"virtualbox","box":"generic/alpine319","version":"4.3.12","architecture":"amd64","host_architecture":"amd64"}]}"#;
+        let n: Native = serde_json::from_str(text).unwrap();
+        let Native::Vagrant { boxes, .. } = &n else { panic!("{n:?}") };
+        assert_eq!(boxes[0].name.as_str(), "bento/debian-12");
+        assert_eq!(
+            (boxes[0].version.as_ref(), boxes[0].architecture),
+            (None, None),
+            "the newest, the computer's build"
+        );
+        assert_eq!(boxes[1].version.as_ref().map(BoxVersion::as_str), Some("4.3.12"));
+        assert_eq!(serde_json::to_string(&n).unwrap(), text);
+        // A Compose service has none; a box is never read as an option.
+        assert!(serde_json::from_str::<Native>(r#"{"service":"db","boxes":[{"provider":"virtualbox","box":"x"}]}"#).is_err());
+        for bad in ["-x", "a/b/c", "", "a b", "/x"] {
+            assert!(BoxName::parse(bad).is_err(), "{bad}");
+        }
+        assert!(BoxVersion::parse("--force").is_err());
+        assert!(BoxVersion::parse(">= 1.2, < 2").is_ok_and(|v| !v.is_exact()));
+        assert!(BoxVersion::parse("202510.26.0").is_ok_and(|v| v.is_exact()));
     }
 }

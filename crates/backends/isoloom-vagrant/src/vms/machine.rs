@@ -3,7 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use crate::boxes::{self, VagrantBox};
+use crate::boxes::{self, MainBox, ProviderBox, VagrantBox};
 use isoloom_manifest as manifest;
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, PublishedPort, Vm};
@@ -95,24 +95,39 @@ pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnc
     r.define(name, !on_demand, body);
 }
 
+/// The main box of a machine booting `image` on CPU `arch`: its version, and its build pinned
+/// only for a non-default (arm64) machine. amd64 is Vagrant's default; setting it makes Vagrant
+/// strict-match the box's metadata, which older boxes (`mayfly/windows_server2019`) don't
+/// advertise, so they'd be rejected.
+pub(crate) fn main_box(image: &VagrantBox, arch: Arch) -> MainBox<'_> {
+    MainBox {
+        version: image.version.as_deref(),
+        arch: (arch != Arch::Amd64).then_some(arch),
+        ..MainBox::plain(&image.name)
+    }
+}
+
 /// The box and its version and architecture. The access box reads its box from the runner's
 /// `ISOLOOM_ACCESS_BOX` (its resolved box the fallback), so the runner can give another.
 fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
-    if access {
-        let fetch = format!("ENV.fetch({}, {})", Value::str(manifest::contract::ACCESS_BOX), Value::str(&image.name));
-        r.assign("m.vm.box", Value::raw(fetch));
-    } else {
-        r.assign("m.vm.box", Value::str(&image.name));
-    }
-    if let Some(v) = &image.version {
-        r.assign("m.vm.box_version", Value::str(v));
-    }
-    // Only pinned for non-default (arm64) boxes. amd64 is Vagrant's default; setting it makes
-    // Vagrant strict-match the box's metadata, which older boxes (mayfly/windows_server2019)
-    // don't advertise, so they'd be rejected.
-    if arch != Arch::Amd64 {
-        r.assign("m.vm.box_architecture", Value::str(arch.id()));
-    }
+    let fetched = access.then(|| {
+        Value::raw(format!(
+            "ENV.fetch({}, {})",
+            Value::str(manifest::contract::ACCESS_BOX),
+            Value::str(&image.name)
+        ))
+    });
+    main_box(image, arch).render(r, "m", fetched);
+}
+
+/// The boxes environment machine `name`'s VM boots, provider by provider (none when it has no
+/// Vagrant box), as [`vm`] writes them.
+pub(crate) fn boxes(env: &Environment, name: &str, providers: &[manifest::Provider]) -> Vec<(manifest::Provider, ProviderBox)> {
+    let Some(planned) = env.vm(name) else { return Vec::new() };
+    let Some(image) = boxes::vagrant(planned) else { return Vec::new() };
+    let guest = guest(env, planned, &image, &Link::None);
+    let choice = guest.choice(main_box(&image, planned.plan.arch));
+    providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
 }
 
 /// The guest's hostname, set from `name` on Linux. Windows: no hostname here — Vagrant renames

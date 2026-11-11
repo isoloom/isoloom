@@ -1479,7 +1479,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "tuned-web - web",
           "vmware_esxi": "tuned-web-web"
         },
-        "boot_digest": "sha256:6a172efde5169ea442c923c50e3bdfd4f4bf24b44aa21cdce948e415d4de9396"
+        "boot_digest": "sha256:6a172efde5169ea442c923c50e3bdfd4f4bf24b44aa21cdce948e415d4de9396",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {

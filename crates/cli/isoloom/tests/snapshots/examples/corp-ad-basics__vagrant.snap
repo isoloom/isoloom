@@ -2492,7 +2492,39 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - isoloom-router",
           "vmware_esxi": "corp-ad-basics-isoloom-router"
         },
-        "boot_digest": "sha256:e2c0e53863f88a0381e63e5b6c260a7fa42ab988fdfaf8bb0b2cbc5d6da81245"
+        "boot_digest": "sha256:e2c0e53863f88a0381e63e5b6c260a7fa42ab988fdfaf8bb0b2cbc5d6da81245",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     },
     {
@@ -2519,7 +2551,46 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - dc01",
           "vmware_esxi": "corp-ad-basics-dc01"
         },
-        "boot_digest": "sha256:df09ee104452cd7fb3a4b1ef1a01c2c5f7181eed56900bfc81082a71c09e14f4"
+        "boot_digest": "sha256:df09ee104452cd7fb3a4b1ef1a01c2c5f7181eed56900bfc81082a71c09e14f4",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0"
+          },
+          {
+            "provider": "hyperv",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0"
+          },
+          {
+            "provider": "parallels",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0"
+          },
+          {
+            "provider": "libvirt",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0"
+          },
+          {
+            "provider": "qemu",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "gusztavvargadr/windows-server-2022-standard",
+            "version": "2607.0.0",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2632,7 +2703,46 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-01",
           "vmware_esxi": "corp-ad-basics-ws-01"
         },
-        "boot_digest": "sha256:04e0e1804390792a3de083caf0e8f9f3e659ea9ea47af076c86f4fed310f5f52"
+        "boot_digest": "sha256:04e0e1804390792a3de083caf0e8f9f3e659ea9ea47af076c86f4fed310f5f52",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "hyperv",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "parallels",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "libvirt",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "qemu",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {
@@ -2719,7 +2829,46 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - ws-02",
           "vmware_esxi": "corp-ad-basics-ws-02"
         },
-        "boot_digest": "sha256:2d9d62c3ec564f8d07778f1a3d9644a0ef42e6e145f03e37818c991a0fc70df0"
+        "boot_digest": "sha256:2d9d62c3ec564f8d07778f1a3d9644a0ef42e6e145f03e37818c991a0fc70df0",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "hyperv",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "parallels",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "libvirt",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0"
+          },
+          {
+            "provider": "qemu",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "gusztavvargadr/windows-11",
+            "version": "2607.1.0",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {
@@ -2806,7 +2955,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - web01",
           "vmware_esxi": "corp-ad-basics-web01"
         },
-        "boot_digest": "sha256:b2f9a4b40cb6527e5e92bff791195f92d8bd9cb2f8de4ab97506152e41ec9933"
+        "boot_digest": "sha256:b2f9a4b40cb6527e5e92bff791195f92d8bd9cb2f8de4ab97506152e41ec9933",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {
@@ -2901,7 +3084,41 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - user",
           "vmware_esxi": "corp-ad-basics-user"
         },
-        "boot_digest": "sha256:8589f46a7b3aa8653e6c2804165b0e185a853be52c9546161055af4e912bba86"
+        "boot_digest": "sha256:8589f46a7b3aa8653e6c2804165b0e185a853be52c9546161055af4e912bba86",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/debian12",
+            "version": "4.3.12"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/debian12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12",
+            "architecture": "amd64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       },
       "consoles": [
         {
@@ -2987,7 +3204,62 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "corp-ad-basics - isoloom-controller",
           "vmware_esxi": "corp-ad-basics-isoloom-controller"
         },
-        "boot_digest": "sha256:bc14afafc0935ea8032d18b4989ea5a0772b48743cbc2bbdce9496ab19e7919a"
+        "boot_digest": "sha256:bc14afafc0935ea8032d18b4989ea5a0772b48743cbc2bbdce9496ab19e7919a",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "virtualbox",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "parallels",
+            "box": "generic/alpine319",
+            "host_architecture": "amd64"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/debian-12",
+            "host_architecture": "arm64"
+          },
+          {
+            "provider": "libvirt",
+            "box": "generic/alpine319"
+          },
+          {
+            "provider": "qemu",
+            "box": "cloud-image/debian-12"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/debian-12",
+            "architecture": "amd64"
+          }
+        ]
       }
     }
   ],

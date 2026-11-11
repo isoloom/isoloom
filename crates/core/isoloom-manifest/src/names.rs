@@ -232,6 +232,41 @@ pattern_type!(
 );
 
 pattern_type!(
+    /// A Vagrant box's name: `<name>` or `<org>/<name>` (`bento/debian-12`), each part letters,
+    /// digits, `.`, `_` and `-`, starting with a letter or a digit (so it is never read as an
+    /// option).
+    BoxName,
+    "box name",
+    "^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+    "`<name>` or `<org>/<name>`, each a letter or digit, then letters, digits, `.`, `_` or `-` (`bento/debian-12`)",
+    |v| {
+        let part = |p: &str| first_then(p, |c| c.is_ascii_alphanumeric(), |c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+        match v.split_once('/') {
+            Some((org, name)) => part(org) && part(name),
+            None => part(v),
+        }
+    }
+);
+
+pattern_type!(
+    /// A Vagrant box's version, or a constraint on it as Vagrant reads one (`202510.26.0`,
+    /// `>= 1.2, < 2`): never starting with `-` (so it is never read as an option).
+    BoxVersion,
+    "box version",
+    "^[0-9A-Za-z<>=~!][0-9A-Za-z<>=~!., _-]*$",
+    "a letter, digit or `<>=~!`, then letters, digits, spaces or `.,<>=~!_-` (`202510.26.0`, `>= 1.2`)",
+    |v| first_then(v, |c| c.is_ascii_alphanumeric() || "<>=~!".contains(c), |c| c.is_ascii_alphanumeric() || "<>=~!., _-".contains(c))
+);
+
+impl BoxVersion {
+    /// Whether it names one version (digits and dots: `202510.26.0`), not a constraint.
+    #[must_use]
+    pub fn is_exact(&self) -> bool {
+        self.0.split('.').all(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+    }
+}
+
+pattern_type!(
     custom_ord
     /// A version: `major.minor.patch`, with an optional pre-release (`0.10.1`, `2.17.0`). Its
     /// order is semantic, not textual: it sorts by the numbers (`2.9.0 < 2.14.0`), and a

@@ -1379,7 +1379,45 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "utm": "arm-vm - box",
           "vmware_esxi": "arm-vm-box"
         },
-        "boot_digest": "sha256:153a01e898a082cc7b4392247c97088df82cb6557e6932e84e73c64b263541b7"
+        "boot_digest": "sha256:153a01e898a082cc7b4392247c97088df82cb6557e6932e84e73c64b263541b7",
+        "boxes": [
+          {
+            "provider": "virtualbox",
+            "box": "bento/ubuntu-24.04",
+            "architecture": "arm64"
+          },
+          {
+            "provider": "vmware_desktop",
+            "box": "bento/ubuntu-24.04",
+            "architecture": "arm64"
+          },
+          {
+            "provider": "hyperv",
+            "box": "gusztavvargadr/ubuntu-server-2404-lts",
+            "version": "2607.0.0",
+            "architecture": "arm64"
+          },
+          {
+            "provider": "parallels",
+            "box": "bento/ubuntu-24.04",
+            "architecture": "arm64"
+          },
+          {
+            "provider": "libvirt",
+            "box": "bento/ubuntu-24.04",
+            "architecture": "arm64"
+          },
+          {
+            "provider": "qemu",
+            "box": "bento/ubuntu-24.04",
+            "architecture": "arm64"
+          },
+          {
+            "provider": "vmware_esxi",
+            "box": "bento/ubuntu-24.04",
+            "architecture": "amd64"
+          }
+        ]
       },
       "ports": [
         {

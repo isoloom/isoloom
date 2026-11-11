@@ -6,7 +6,8 @@ use isoloom_manifest::contract::HALTING;
 use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
-use crate::boxes::HyperVBox;
+use crate::boxes::{HyperVBox, MainBox, ProviderBox};
+use isoloom_manifest::Provider;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
@@ -23,7 +24,7 @@ use super::machine::{define, private_network};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
-use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
+use super::{CONTROLLER, Ctx, Kind, TOOL_SHELL, checks};
 use crate::ruby::{Ruby, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
@@ -128,7 +129,7 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
         router::nftables(spec),
     );
     define(r, router::NAME, false, |r| {
-        r.assign("m.vm.box", Value::str(HELPER_BOX));
+        MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(router::NAME));
         for (net, ip) in routed {
             private_network(r, env, net, *ip);
@@ -158,7 +159,7 @@ fn tool_shell(r: &mut Ruby, ctx: &Ctx, tool: &ToolPlan) {
     let env = ctx.env;
     let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
     r.define(TOOL_SHELL, true, |r| {
-        r.assign("m.vm.box", Value::str(HELPER_BOX));
+        MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str("shell"));
         for (net, ip) in &tool.addresses {
             private_network(r, env, net, *ip);
@@ -182,11 +183,10 @@ const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add
 /// started after every machine. It writes the inventory, runs the environment's playbooks, then
 /// halts unless the spec keeps it running; it runs the checks standing on every network on
 /// demand (their runner is returned).
-pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
-    let env = ctx.env;
+/// The controller as its providers see it (on `link`), and its main box.
+fn controller_guest<'a>(env: &'a Environment, link: &'a Link) -> (Guest<'a>, MainBox<'a>) {
     let (bx, version) = controller_box(env.spec());
     let size = Size::controller(env.controller.as_ref());
-    let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
     let mut guest = helper(env, CONTROLLER, size, addresses(env, |c| Some(c.controller())), link);
     // The default box (Alpine) has arm64 only for libvirt and QEMU: an arm64 host on the other
     // providers gets Debian's instead.
@@ -196,13 +196,38 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     guest.hyperv.keeps_hostname = bx == CONTROLLER_BOX;
     // On ESXi, the default box's VMware Tools never report an address: Debian's instead.
     guest.esxi_box = (bx == CONTROLLER_BOX).then_some(HELPER_BOX);
+    // The default box (Alpine) unless the spec picks one; Debian's on an arm64 host.
+    let main = MainBox {
+        version,
+        on_arm: (bx == CONTROLLER_BOX && version.is_none()).then_some(HELPER_BOX),
+        ..MainBox::plain(bx)
+    };
+    (guest, main)
+}
+
+/// The boxes Isoloom's own VM `kind` boots, provider by provider, as this file writes them.
+pub(crate) fn boxes(env: &Environment, kind: Kind, providers: &[Provider]) -> Vec<(Provider, ProviderBox)> {
+    let (guest, main) = match kind {
+        Kind::Controller => controller_guest(env, &Link::None),
+        Kind::Router | Kind::ToolShell => (helper(env, router::NAME, Size::HELPER, Vec::new(), &Link::None), MainBox::plain(HELPER_BOX)),
+        Kind::Machine => return Vec::new(),
+    };
+    let choice = guest.choice(main);
+    providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
+}
+
+pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
+    let env = ctx.env;
+    let size = Size::controller(env.controller.as_ref());
+    let link = ctx.links.get(CONTROLLER).unwrap_or(&Link::None);
+    let (guest, main) = controller_guest(env, link);
     let mut steps = vec![Step::Prelude];
     steps.extend(size.disk.map(|_| Step::DiskGrow));
     steps.extend([every_machine(env), Step::Project]);
     steps.extend(isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()));
     let on_controller = &ctx.checks.controller;
     define(r, CONTROLLER, false, |r| {
-        controller_box_line(r, bx, version);
+        main.render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
         networks(r, env, |c| Some(c.controller()));
         providers::blocks(r, &guest);
@@ -213,19 +238,6 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
         }
     });
     (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller))
-}
-
-/// The default box (Alpine) unless the spec picks one; Debian's on an arm64 host.
-fn controller_box_line(r: &mut Ruby, bx: &str, version: Option<&str>) {
-    if bx == CONTROLLER_BOX && version.is_none() {
-        let debian = Value::str(HELPER_BOX);
-        r.assign("m.vm.box", Value::raw(format!("{} ? {debian} : {}", super::ARM_HOST, Value::str(bx))));
-    } else {
-        r.assign("m.vm.box", Value::str(bx));
-    }
-    if let Some(v) = version {
-        r.assign("m.vm.box_version", Value::str(v));
-    }
 }
 
 /// How the controller reaches the VMs: the boxes' own `vagrant` account (password auth); WinRM
