@@ -76,7 +76,11 @@ fn a_missing_script_fails_with_the_read_error() -> Outcome {
         next = cause.source();
     }
     let chain = chain.join(": ");
-    assert!(chain.contains("checks/") && chain.contains("No such file"), "{chain}");
+    // The system's own words for a file in a folder that isn't there: "No such file or
+    // directory" on Unix, "The system cannot find the path specified." on Windows.
+    let missing = std::fs::read(elsewhere.join("checks").join("any.sh")).map_or_else(|read| read.to_string(), |_| String::new());
+    assert!(missing.contains("os error"), "the folder is missing: {missing}");
+    assert!(chain.contains("checks/") && chain.contains(&missing), "{chain}");
     Ok(())
 }
 
