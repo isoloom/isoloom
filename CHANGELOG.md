@@ -10,7 +10,9 @@ stable spec format.
 
 ## [Unreleased]
 
-The next release is **2.0.0**: it removes library API and refuses a few specs 1.x took.
+## [2.0.0] — 2026-11-11
+
+**2.0.0** removes library API and refuses a few specs 1.x took.
 [Migrating to 2.0](docs/guide/migrating-to-2.0.md) says what to change.
 
 ### Highlights

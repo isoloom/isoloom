@@ -221,7 +221,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-catalogue"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "indexmap",
  "isoloom-manifest",
@@ -249,7 +249,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-manifest"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "schemars",
  "serde",
@@ -260,7 +260,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-plan"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "indexmap",
  "isoloom-catalogue",
@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-render"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "flate2",
  "indexmap",
@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-spec"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "indexmap",
  "isoloom-manifest",
@@ -300,7 +300,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-terraform"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-vagrant"
-version = "1.0.9"
+version = "2.0.0"
 dependencies = [
  "indexmap",
  "isoloom-manifest",

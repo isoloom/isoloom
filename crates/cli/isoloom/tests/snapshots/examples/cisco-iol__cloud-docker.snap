@@ -242,7 +242,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.9"
+    "version": "2.0.0"
   },
   "environment": {
     "name": "cisco-iol",
@@ -1058,7 +1058,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.9"
+    "version": "2.0.0"
   },
   "environment": {
     "name": "cisco-iol",
@@ -1809,7 +1809,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.9"
+    "version": "2.0.0"
   },
   "environment": {
     "name": "cisco-iol",
@@ -2559,7 +2559,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.9"
+    "version": "2.0.0"
   },
   "environment": {
     "name": "cisco-iol",
@@ -3294,7 +3294,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.9"
+    "version": "2.0.0"
   },
   "environment": {
     "name": "cisco-iol",
@@ -4048,7 +4048,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "1.0.9"
+    "version": "2.0.0"
   },
   "environment": {
     "name": "cisco-iol",
