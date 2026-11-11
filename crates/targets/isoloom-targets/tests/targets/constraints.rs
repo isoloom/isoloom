@@ -104,11 +104,13 @@ fn every_linux_vm_runs_the_preamble_first() -> Outcome {
     // cache, web, user and the router: each VM's first provisioner.
     assert_eq!(vf.matches("name: \"constraints\"").count(), 4, "{vf}");
     for block in vf.split("config.vm.define").skip(1) {
-        // After UTM's default-route provisioner (a no-op elsewhere), which comes first everywhere.
+        // After UTM's default-route provisioner (a no-op elsewhere), which comes first everywhere,
+        // and the addresses' (NetworkManager made to keep them before its DHCP times out): neither
+        // downloads anything.
         let first = block
             .lines()
             .filter(|l| l.contains(".vm.provision"))
-            .find(|l| !l.contains("\"nat-route\""))
+            .find(|l| !l.contains("\"nat-route\"") && !l.contains("\"addresses\""))
             .unwrap();
         assert!(first.contains("name: \"constraints\""), "first provisioner: {first}");
     }

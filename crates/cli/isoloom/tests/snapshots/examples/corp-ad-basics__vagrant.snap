@@ -1334,6 +1334,27 @@ Vagrant.configure("2") do |config|
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp"]) }
     end
+    m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
+cards=\"\"
+for address in \"$@\"; do
+  ip=${address%/*}
+  card=$(ip -o -4 addr show | awk -v ip=\"$ip\" '{ split($4, a, \"/\"); if (a[1] == ip) { print $2; exit } }')
+  if [ -z \"$card\" ]; then
+    # Dropped already: the card NetworkManager is configuring that has no IPv4 address.
+    for c in $(nmcli -t -f DEVICE,STATE device | awk -F: '$2 ~ /^connecting/ { print $1 }'); do
+      [ -n \"$(ip -o -4 addr show dev \"$c\")\" ] || { card=$c; break; }
+    done
+  fi
+  [ -n \"$card\" ] || { echo \"addresses: no card for $address\" >&2; exit 1; }
+  nmcli device set \"$card\" managed no
+  ip -o -4 addr show dev \"$card\" | grep -q \" $ip/\" || ip addr add \"$address\" dev \"$card\"
+  ip link set \"$card\" up
+  case \";$cards;\" in *\";interface-name:$card;\"*) ;; *) cards=\"$cards${cards:+;}interface-name:$card\" ;; esac
+done
+mkdir -p /etc/NetworkManager/conf.d
+printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
+", args: ["10.40.10.10/24", "10.40.20.10/24"]
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.40.10.10 web01' '10.40.99.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -1524,6 +1545,27 @@ Vagrant.configure("2") do |config|
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-access"]) }
     end
+    m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
+cards=\"\"
+for address in \"$@\"; do
+  ip=${address%/*}
+  card=$(ip -o -4 addr show | awk -v ip=\"$ip\" '{ split($4, a, \"/\"); if (a[1] == ip) { print $2; exit } }')
+  if [ -z \"$card\" ]; then
+    # Dropped already: the card NetworkManager is configuring that has no IPv4 address.
+    for c in $(nmcli -t -f DEVICE,STATE device | awk -F: '$2 ~ /^connecting/ { print $1 }'); do
+      [ -n \"$(ip -o -4 addr show dev \"$c\")\" ] || { card=$c; break; }
+    done
+  fi
+  [ -n \"$card\" ] || { echo \"addresses: no card for $address\" >&2; exit 1; }
+  nmcli device set \"$card\" managed no
+  ip -o -4 addr show dev \"$card\" | grep -q \" $ip/\" || ip addr add \"$address\" dev \"$card\"
+  ip link set \"$card\" up
+  case \";$cards;\" in *\";interface-name:$card;\"*) ;; *) cards=\"$cards${cards:+;}interface-name:$card\" ;; esac
+done
+mkdir -p /etc/NetworkManager/conf.d
+printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
+", args: ["10.40.99.10/24"]
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.40.10.10 web01' '10.40.99.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'

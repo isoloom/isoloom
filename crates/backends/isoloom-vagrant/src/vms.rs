@@ -28,6 +28,7 @@
 //!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
 //!   Hyper-V box.
 
+mod addresses;
 mod boot;
 mod bridged;
 mod checks;

@@ -499,6 +499,11 @@ The next release is **2.0.0**: it removes library API and refuses a few specs 1.
 
 ### Fixed
 
+- **A Linux VM keeps its addresses where NetworkManager runs** (Kali, Fedora, desktop Ubuntu):
+  NetworkManager took each environment card Vagrant had given a static address, asked DHCP (the
+  networks have none) and dropped the address when that timed out, so nothing on the network
+  reached the VM. A new `addresses` provisioner, at every `vagrant up`, leaves those cards to
+  Vagrant (now and at NetworkManager's later starts) and puts back an address already dropped.
 - **`docker-vm` on libvirt takes a machine with host folders added while it runs**: the host VM's
   memory is shared from the start (memfd), which virtiofs needs and libvirt can't add to a running
   VM; adding one used to fail its reload with "'virtiofs' requires shared memory".
