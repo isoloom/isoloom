@@ -130,6 +130,7 @@ fn a_runner_reports_each_check_and_fails_when_one_failed() {
 }
 
 /// An `exec` check named `n` running `command`.
+#[cfg(unix)]
 fn exec(n: &str, command: &str) -> Resolved {
     check(
         n,

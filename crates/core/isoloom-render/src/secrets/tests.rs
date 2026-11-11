@@ -194,5 +194,9 @@ fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() 
 
 #[test]
 fn the_secrets_are_kept_in_isoloom_s_own_linux_folder() {
-    assert!(KEPT_DIR.starts_with(&format!("{}/", isoloom_spec::linux::STATE_DIR)), "{KEPT_DIR}");
+    assert!(
+        super::KEPT_DIR.starts_with(&format!("{}/", isoloom_spec::linux::STATE_DIR)),
+        "{}",
+        super::KEPT_DIR
+    );
 }
