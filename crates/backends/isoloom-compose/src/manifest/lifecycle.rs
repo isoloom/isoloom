@@ -155,6 +155,19 @@ fn down(env: &Environment) -> Result<Vec<Step>> {
     let disks = containers().flat_map(|m| &m.disks).filter(|d| d.mount.is_some()).map(|d| d.key.as_str());
     let removable: Vec<&str> = volumes.chain(disks).collect();
     let kept = containers().flat_map(|m| &m.volumes).any(|v| matches!(v.lifetime, Lifetime::Persistent));
+    let mut steps = Vec::new();
+    if kept {
+        // `down` keeps every volume then, so the containers go first with their anonymous volumes
+        // (an image's own `VOLUME`, MySQL's data directory): `rm --volumes` removes those, never a
+        // named one. Without it each start and stop left one behind.
+        let mut rm = run(
+            "anonymous-volumes",
+            compose(&["--profile", "check", "rm", "--stop", "--force", "--volumes"])?,
+            300,
+        )?;
+        rm.when = When::Always;
+        steps.push(rm);
+    }
     let mut args = vec!["--profile", "check", "down"];
     if !kept {
         args.push("--volumes");
@@ -162,7 +175,7 @@ fn down(env: &Environment) -> Result<Vec<Step>> {
     args.push("--remove-orphans");
     let mut down = run("down", compose(&args)?, 300)?;
     down.when = When::Always;
-    let mut steps = vec![down];
+    steps.push(down);
     if kept && !removable.is_empty() {
         let mut rm: Vec<Template> = ["volume", "rm", "--force"].map(Template::text).into();
         rm.extend(dedup(removable).into_iter().map(|v| Project::Run.prefixed(v)));

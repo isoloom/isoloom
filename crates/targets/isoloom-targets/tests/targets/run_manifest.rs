@@ -312,11 +312,15 @@ fn secrets_project_files_kept_volumes_and_tools_reach_the_manifest() -> Outcome 
         json["secrets"][1]["source"],
         serde_json::json!({ "store": "file", "reference": "conf/key.pem" })
     );
-    // A kept volume survives `down`; the others are removed by name.
+    // A kept volume survives `down`; the containers' anonymous volumes go with them first
+    // (`rm --volumes`, never a named one); the others are removed by name.
     let down = &json["lifecycle"]["down"];
-    assert!(!down[0]["argv"].as_array().unwrap().contains(&"--volumes".into()), "{down:#}");
+    assert_eq!(down[0]["id"], "anonymous-volumes", "{down:#}");
+    assert!(down[0]["argv"].as_array().unwrap().contains(&"--volumes".into()), "{down:#}");
+    assert_eq!(down[1]["id"], "down", "{down:#}");
+    assert!(!down[1]["argv"].as_array().unwrap().contains(&"--volumes".into()), "{down:#}");
     assert_eq!(
-        down[1]["argv"],
+        down[2]["argv"],
         serde_json::json!(["docker", "volume", "rm", "--force", "${run.name}_app-cache"])
     );
     // An HTTPS port is the entry; a tool's port is information. Both are fixed, so ISOLOOM_PUBLISH_FIXED

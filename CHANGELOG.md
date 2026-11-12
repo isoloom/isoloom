@@ -10,6 +10,17 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Compose lab that keeps a volume no longer leaves its containers' anonymous volumes behind.**
+  A lab with a `persistent: true` volume went `down` without `--volumes`, so the persistent one
+  survived, but so did each container's anonymous volume (an image's own `VOLUME`, such as
+  MySQL's data directory), one more at every start and stop. The Cyber CTF launcher's rig counted
+  six after one lab's tests. The run now removes the containers first with their anonymous
+  volumes (`rm --stop --force --volumes`, a new `anonymous-volumes` step of `lifecycle.down`),
+  which never takes a named one. The persistent volume is still kept, and the environment's other
+  named volumes still go by name. A lab that keeps no volume goes `down --volumes` as before.
+
 ## [2.1.4] — 2026-11-12
 
 ### Fixed

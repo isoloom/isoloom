@@ -47,6 +47,52 @@ fn up_lifecycle_text(env: &Environment) -> Outcome<String> {
     Ok(format!("{:?}", manifest.lifecycle.up))
 }
 
+/// The argv of each `down` step of `env`'s Docker run manifest, by step id, as text.
+fn down_steps(env: &Environment) -> Outcome<Vec<(String, String)>> {
+    let backend = isoloom_compose::ComposeBackend::DOCKER;
+    let manifest = isoloom_render::backend::Backend::run_manifest(&backend, env)?.ok_or("no run manifest")?;
+    Ok(manifest.lifecycle.down.iter().map(|s| (s.id.to_string(), format!("{s:?}"))).collect())
+}
+
+/// Regression (the Cyber CTF rig's ubuntu2404 e2e:lab, six anonymous volumes left): an
+/// environment that keeps a volume (`persistent: true`) went down without `--volumes`, so the
+/// persistent one survived, and so did every container's anonymous volume (an image's own
+/// `VOLUME`, MySQL's data directory), one more each start and stop. The containers now go first
+/// with their anonymous volumes (`rm --volumes`, which never takes a named one), the persistent
+/// volume is named by no step, and an environment that keeps nothing still goes `down --volumes`
+/// in one step.
+#[test]
+fn a_lab_that_keeps_a_volume_removes_its_containers_anonymous_volumes_but_never_the_kept_one() -> Outcome {
+    let kept = plan_of(
+        "version: 1\nname: case-file\nnetworks: { app: { cidr: 10.70.0.0/24 } }\nvolumes:\n  evidence: { owner: database, persistent: true }\n  scratch: { owner: database }\nmachines:\n  database: { networks: { app: 5 }, app: { image: mysql }, volumes: { evidence: /srv/evidence, scratch: /srv/scratch } }\n",
+    )?;
+    let steps = down_steps(&kept)?;
+    let ids: Vec<&str> = steps.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(ids[..2], ["anonymous-volumes", "down"], "{steps:?}");
+    let (_, rm) = &steps[0];
+    assert!(
+        rm.contains("\"rm\"") && rm.contains("\"--stop\"") && rm.contains("\"--force\"") && rm.contains("\"--volumes\""),
+        "{rm}"
+    );
+    let (_, down) = &steps[1];
+    assert!(!down.contains("\"--volumes\""), "the kept volume survives the down: {down}");
+    let named: Vec<&String> = steps.iter().map(|(_, s)| s).filter(|s| s.contains("evidence")).collect();
+    assert!(named.is_empty(), "no step names the kept volume: {named:?}");
+    assert!(
+        steps.iter().any(|(id, s)| id == "volumes" && s.contains("scratch")),
+        "the environment's own still goes: {steps:?}"
+    );
+
+    let plain = plan_of(
+        "version: 1\nname: plain\nnetworks: { app: { cidr: 10.70.0.0/24 } }\nmachines:\n  database: { networks: { app: 5 }, app: { image: mysql } }\n",
+    )?;
+    let once = down_steps(&plain)?;
+    assert_eq!(once[0].0, "down", "{once:?}");
+    assert!(once[0].1.contains("\"--volumes\""), "{once:?}");
+    assert!(!once.iter().any(|(id, _)| id == "anonymous-volumes"), "{once:?}");
+    Ok(())
+}
+
 /// The text of the file at `path` among `files`.
 fn file<'a>(files: &'a [GeneratedFile], path: &str) -> Outcome<&'a str> {
     let found = files.iter().find(|f| f.path == path).ok_or_else(|| format!("no {path}"))?;
