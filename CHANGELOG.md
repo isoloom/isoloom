@@ -10,6 +10,20 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `vagrant` run manifest's tool check asks for `mkisofs` where QEMU needs it.**
+  vagrant-qemu gives a VM on a network its settings in a cloud-init seed, an ISO that Vagrant
+  builds with `mkisofs` on Linux. The check listed only `qemu-img` for QEMU, so on a Linux host
+  without `mkisofs` it passed, and `vagrant up` then failed at the first VM ("The executable
+  'mkisofs' Vagrant is trying to run was not found in the PATH variable"). The Cyber CTF
+  launcher's rig hit this on Ubuntu 24.04 (#251).
+
+  The manifest now lists `mkisofs` (`mkisofs -version`) for the `qemu` provider on Linux hosts
+  whenever a VM is on a network, so a run without it is refused before anything is created. Debian
+  and Ubuntu ship it in `genisoimage`. On macOS, Vagrant uses `hdiutil`. `docker-vm`'s VM has no
+  private network on QEMU, so it needs no seed.
+
 ## [2.1.5] — 2026-11-12
 
 ### Fixed

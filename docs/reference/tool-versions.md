@@ -29,6 +29,11 @@ Vagrant providers other than VirtualBox and Hyper-V need their Vagrant plugin: `
 `vagrant-qemu`, `vagrant_utm`, `vagrant-parallels`, `vagrant-vmware-desktop` (with the VMware
 Utility), or `vagrant-vmware-esxi` for a remote ESXi host ([Vagrant guide](../guide/targets/vagrant.md)).
 
+On a Linux host, the `vagrant` target on QEMU also needs `mkisofs` (Debian's and Ubuntu's
+`genisoimage` package) as soon as a VM is on a network. vagrant-qemu gives such a VM its network
+settings in a cloud-init seed, an ISO Vagrant builds with `mkisofs`. On macOS, Vagrant builds it
+with `hdiutil`.
+
 ## Terraform providers
 
 The generated modules pin each provider to a patch range (`~>`): a new minor version of a provider

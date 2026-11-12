@@ -1670,6 +1670,19 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "providers": [
         "qemu"
       ]
+    },
+    {
+      "name": "mkisofs",
+      "probe": [
+        "mkisofs",
+        "-version"
+      ],
+      "hosts": [
+        "linux"
+      ],
+      "providers": [
+        "qemu"
+      ]
     }
   ],
   "identity": {

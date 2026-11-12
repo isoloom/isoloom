@@ -70,9 +70,12 @@ pub(super) fn docker_vm_offers(provider: Provider) -> bool {
 const VAGRANT_MIN_VERSION: &str = "2.4.0";
 
 /// Vagrant itself (at [`VAGRANT_MIN_VERSION`] or later), and each local hypervisor's own tool
-/// where it has one, for its providers.
-pub(super) fn tools() -> Result<Vec<Tool>> {
-    let hypervisor = |name: &str, probe: &[&str], provider: Provider, hosts: &[HostOs]| -> Result<Tool> {
+/// where it has one, for its providers. With `qemu_seeds` (a VM on a network under QEMU,
+/// [`crate::vms::qemu_seeds`]), `mkisofs` for QEMU on Linux: vagrant-qemu gives such a VM its
+/// network settings in a cloud-init seed, an ISO Vagrant builds with `mkisofs` there (`hdiutil` on
+/// macOS, which every Mac has), and without it `vagrant up` fails at the first VM.
+pub(super) fn tools(qemu_seeds: bool) -> Result<Vec<Tool>> {
+    let tool_for = |name: &str, probe: &[&str], provider: Provider, hosts: &[HostOs]| -> Result<Tool> {
         let (program, args) = probe.split_first().unwrap_or((&"", &[]));
         let mut t = run_manifest::tool(name, run_manifest::argv(program, args)?)?;
         t.providers = BTreeSet::from([provider]);
@@ -81,14 +84,18 @@ pub(super) fn tools() -> Result<Vec<Tool>> {
     };
     let mut vagrant = run_manifest::tool("vagrant", vagrant_argv(&["--version"])?)?;
     vagrant.min_version = Some(Version::parse(VAGRANT_MIN_VERSION)?);
-    Ok(vec![
+    let mut tools = vec![
         vagrant,
-        hypervisor("virtualbox", &["VBoxManage", "--version"], Provider::Virtualbox, &[])?,
-        hypervisor("vmware", &["vmrun", "list"], Provider::VmwareDesktop, &[])?,
-        hypervisor("parallels", &["prlctl", "--version"], Provider::Parallels, &[HostOs::Macos])?,
-        hypervisor("libvirt", &["virsh", "--version"], Provider::Libvirt, &[HostOs::Linux])?,
-        hypervisor("qemu", &["qemu-img", "--version"], Provider::Qemu, &[])?,
-    ])
+        tool_for("virtualbox", &["VBoxManage", "--version"], Provider::Virtualbox, &[])?,
+        tool_for("vmware", &["vmrun", "list"], Provider::VmwareDesktop, &[])?,
+        tool_for("parallels", &["prlctl", "--version"], Provider::Parallels, &[HostOs::Macos])?,
+        tool_for("libvirt", &["virsh", "--version"], Provider::Libvirt, &[HostOs::Linux])?,
+        tool_for("qemu", &["qemu-img", "--version"], Provider::Qemu, &[])?,
+    ];
+    if qemu_seeds {
+        tools.push(tool_for("mkisofs", &["mkisofs", "-version"], Provider::Qemu, &[HostOs::Linux])?);
+    }
+    Ok(tools)
 }
 
 #[cfg(test)]
@@ -98,10 +105,34 @@ mod tests {
 
     #[test]
     fn vagrant_is_needed_at_2_4_the_first_to_pick_a_box_by_architecture() {
-        let tools = tools().unwrap();
+        let tools = tools(true).unwrap();
         let vagrant = tools.iter().find(|t| t.name.to_string() == "vagrant").unwrap();
         assert_eq!(vagrant.min_version.as_ref().map(Version::as_str), Some("2.4.0"));
         assert!(tools.iter().filter(|t| t.name.to_string() != "vagrant").all(|t| t.min_version.is_none()));
+    }
+
+    #[test]
+    fn a_qemu_vm_on_a_network_needs_mkisofs_on_linux() {
+        // Regression (#251, the launcher's rig on Ubuntu 24.04): `vagrant up` on QEMU failed at
+        // the first VM, "The executable 'mkisofs' Vagrant is trying to run was not found in the
+        // PATH variable", after the tool check had passed: vagrant-qemu builds the VM's
+        // cloud-init network seed with Vagrant's `create_iso`, `mkisofs` on Linux.
+        let on_a_network = environment(
+            "version: 1
+name: t
+networks: { a: { cidr: 10.9.0.0/24 } }
+machines:
+  web: { networks: { a: 10 }, os: debian@12, app: { steps: [{ run: a.sh }] } }
+",
+        );
+        assert!(crate::vms::qemu_seeds(&on_a_network));
+        let manifest = super::super::vagrant(&on_a_network).unwrap();
+        let mkisofs = manifest.tools.iter().find(|t| t.name.as_str() == "mkisofs").expect("mkisofs is probed");
+        assert_eq!(mkisofs.providers, BTreeSet::from([Provider::Qemu]));
+        assert_eq!(mkisofs.hosts, BTreeSet::from([HostOs::Linux]), "macOS builds it with hdiutil");
+        assert_eq!(mkisofs.probe, run_manifest::argv("mkisofs", &["-version"]).unwrap());
+        // No VM on a network, no seed to build.
+        assert!(tools(false).unwrap().iter().all(|t| t.name.as_str() != "mkisofs"));
     }
 
     #[test]

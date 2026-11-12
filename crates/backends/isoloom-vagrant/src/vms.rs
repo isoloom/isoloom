@@ -412,3 +412,10 @@ fn qemu_links(env: &Environment) -> IndexMap<String, qemu::Link> {
     let checks = checks::Checks::of(env, &in_their_place);
     qemu::links(env, with_controller(env, &checks))
 }
+
+/// Whether a VM of `env` is on a network's hub under QEMU: vagrant-qemu then gives it its network
+/// settings in a cloud-init seed, an ISO Vagrant builds on the host (with `mkisofs` on Linux,
+/// `hdiutil` on macOS).
+pub(crate) fn qemu_seeds(env: &Environment) -> bool {
+    qemu_links(env).values().any(|l| matches!(l, qemu::Link::Hub(_)))
+}

@@ -26,7 +26,9 @@ no UTM provider. The [target matrix](../../matrix.md) lists what each provider r
 
 ## Prerequisites
 
-- Vagrant 2.4.0 or later, the provider's hypervisor and its plugin (above).
+- Vagrant 2.4.0 or later, the provider's hypervisor and its plugin (above). QEMU on Linux also
+  needs `mkisofs` (`genisoimage` on Debian and Ubuntu): vagrant-qemu gives a VM its network
+  settings on an ISO that Vagrant builds with it.
 - Enough memory and disk for every VM at once: a machine's VM defaults to 1 CPU, 1024 MB and
   20 GB (`machines.<name>.resources`). `isoloom resources` adds them up.
 - Network access to the boxes (Vagrant Cloud by default), or your own box server

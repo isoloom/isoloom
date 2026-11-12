@@ -45,7 +45,8 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
     let mut secrets = guest.slots.clone();
     secrets.push(slots::esxi_password()?);
     Ok(run_manifest::Body {
-        tools: providers::tools()?,
+        // Its one VM is on no private network under QEMU: no cloud-init seed, no `mkisofs`.
+        tools: providers::tools(false)?,
         identity: providers::docker_vm_identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params,
         secrets,

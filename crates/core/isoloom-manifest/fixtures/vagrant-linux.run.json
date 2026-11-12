@@ -81,6 +81,19 @@
       "providers": [
         "qemu"
       ]
+    },
+    {
+      "name": "mkisofs",
+      "probe": [
+        "mkisofs",
+        "-version"
+      ],
+      "hosts": [
+        "linux"
+      ],
+      "providers": [
+        "qemu"
+      ]
     }
   ],
   "identity": {

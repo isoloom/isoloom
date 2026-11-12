@@ -29,7 +29,7 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
     let runners = checks::runners(&shape)?;
     let lifecycle = lifecycle::lifecycle(env, &shape)?;
     Ok(run_manifest::Body {
-        tools: providers::tools()?,
+        tools: providers::tools(crate::vms::qemu_seeds(env))?,
         identity: providers::identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params: slots::params(&machines, &runners)?,
         secrets: slots::slots(env, &lifecycle)?,
