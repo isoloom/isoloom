@@ -726,8 +726,9 @@ end
 #   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
 #   picked when Vagrant reads this file (`ports`), for this copy of the project: free on this
 #   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
-#   VM on its network does, unless it runs with those ports, and stops once the network's last
-#   VM is destroyed: destroying one VM leaves it to the others.
+#   VM on its network does, unless one runs, with `SPARE` ports more for VMs that join the network
+#   while it runs; it is never restarted under the VMs connected to it, and stops once the
+#   network's last VM is destroyed: destroying one VM leaves it to the others.
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -747,7 +748,7 @@ module IsoloomQemu
     File.join(hubs_dir, "#{net}.pid")
   end
 
-  # The ports the network's hub listens on, by VM, written when it starts.
+  # The hub's record: the ports it listens on, by VM, and its spare ones (`record`).
   def self.ports_file(net)
     File.join(hubs_dir, "#{net}.ports.json")
   end
@@ -765,13 +766,17 @@ module IsoloomQemu
   # The hub ports: 20000-39999.
   FIRST_PORT = 20_000
   PORTS = 20_000
+  # The ports a hub listens on beyond its VMs', for VMs that join its network while it runs (an
+  # attack box added to a running environment): QEMU's socket netdev doesn't reconnect, so a hub
+  # restarted for one more port would leave the VMs connected to it off the network for good.
+  SPARE = 4
 
   # Each network's hub ports, by VM (`vms`: each network's VMs, in the order they start), as
-  # QEMU_HUBS holds them. A network whose hub runs keeps the ports it listens on. Every other VM
-  # gets a port free on this host, looked for from a point of this folder's, not of the
-  # environment's name: two copies of one environment start far apart, and a port something else
-  # holds is passed over. One folder starts from the same point, so a copy gets the same ports
-  # from one run to the next while they stay free.
+  # QEMU_HUBS holds them. A network whose hub runs keeps the ports it listens on, a VM that joins
+  # it taking a spare one (`kept`). Every other VM gets a port free on this host, looked for from a
+  # point of this folder's, not of the environment's name: two copies of one environment start far
+  # apart, and a port something else holds is passed over. One folder starts from the same point,
+  # so a copy gets the same ports from one run to the next while they stay free.
   def self.ports(vms)
     hubs = vms.map { |net, names| [net, kept(net, names)] }.to_h
     taken = hubs.values.compact.flat_map(&:values)
@@ -787,14 +792,40 @@ module IsoloomQemu
     hubs
   end
 
-  # The ports the network's hub listens on, by VM, when it runs for exactly the VMs `names`.
+  # The network's running hub's ports for its VMs `names`: each VM's own, and a spare one, in
+  # order, for a VM that joins the network while the hub runs. None when no hub runs, or when its
+  # spare ports don't go round the VMs that join.
   def self.kept(net, names)
+    rec = record(net)
+    return nil unless rec
+    spare = rec[:spare].dup
+    ports = {}
+    names.each do |vm|
+      port = rec[:vms][vm] || spare.shift
+      return nil unless port
+      ports[vm] = port
+    end
+    ports
+  end
+
+  # The running hub's record: its ports by VM (`vms`) and those no VM has taken yet (`spare`).
+  # None while no hub runs, or for a record Isoloom doesn't read; one an earlier Isoloom wrote
+  # (the ports by VM alone) has no spare port.
+  def self.record(net)
     return nil unless running(net)
     require "json"
-    ports = JSON.parse(File.read(ports_file(net)))
-    ports if ports.is_a?(Hash) && ports.keys == names
+    rec = JSON.parse(File.read(ports_file(net)))
+    return nil unless rec.is_a?(Hash)
+    vms, spare = rec["vms"].is_a?(Hash) ? [rec["vms"], rec["spare"]] : [rec, []]
+    return nil unless vms.values.all?(Integer) && spare.is_a?(Array) && spare.all?(Integer)
+    { vms: vms, spare: spare }
   rescue SystemCallError, JSON::ParserError
     nil
+  end
+
+  def self.write_record(net, vms, spare)
+    require "json"
+    File.write(ports_file(net), JSON.generate("vms" => vms, "spare" => spare))
   end
 
   # This folder's first port to look from: FNV-1a of its path, in the range.
@@ -821,31 +852,50 @@ module IsoloomQemu
     false
   end
 
-  # Starts the network's hub on `ports` (by VM) unless it runs on them: QEMU returns once its
-  # ports listen. A hub of the network on other ones (its VMs have changed, or an older
-  # Vagrantfile started it) is stopped first: the VM about to start connects to its new port.
+  # Starts the network's hub on `ports` (by VM), with `SPARE` ports more, unless one runs: QEMU
+  # returns once its ports listen. A running hub is kept: a VM that joins its network takes one of
+  # its spare ports (`kept`), recorded here. One with no spare port left for it is refused rather
+  # than restarted under the VMs connected to it. A hub without a record Isoloom reads (an older
+  # Isoloom started it) is replaced: the VM about to start connects to its new port.
   def self.hub(net, ports)
-    return if kept(net, ports.keys) == ports
+    rec = record(net)
+    if rec
+      joined = ports.reject { |vm, port| rec[:vms][vm] == port }
+      unless joined.values.all? { |port| rec[:spare].include?(port) }
+        fail!("the hub of network `#{net}` runs for #{rec[:vms].keys.join(', ')}, with no spare port left " \
+              "for #{joined.keys.join(', ')}: started again it would leave them off the network. " \
+              "Destroy the environment, then bring it up again")
+      end
+      write_record(net, rec[:vms].merge(joined), rec[:spare] - joined.values) unless joined.empty?
+      return
+    end
     stop(net)
     require "fileutils"
-    require "json"
     FileUtils.mkdir_p(hubs_dir)
+    taken = ports.values.dup
+    at = taken.max || start
+    spare = Array.new(SPARE) do
+      at = free_from(at, taken)
+      taken << at
+      at
+    end
     args = ["qemu-system-#{HOST_ARCH}", "-machine", "none", "-display", "none", "-nodefaults",
             "-daemonize", "-pidfile", pid_file(net)]
-    ports.values.each_with_index do |port, i|
+    (ports.values + spare).each_with_index do |port, i|
       args += ["-netdev", "socket,id=s#{i},listen=127.0.0.1:#{port}", "-netdev", "hubport,id=h#{i},hubid=0,netdev=s#{i}"]
     end
     log = File.join(hubs_dir, "#{net}.log")
     ok = system(*args, out: log, err: log)
     fail!("the hub of network `#{net}` didn't start (#{args.first}): see #{log}") unless ok
-    File.write(ports_file(net), JSON.generate(ports))
+    write_record(net, ports, spare)
   end
 
-  # Stops the network's hub once none of its VMs (`vms`, by define name) is left besides the
-  # one just destroyed. A VM is left while Vagrant keeps its id: a halted one still holds its
-  # port, and the hub starts again for it anyway if stopped.
+  # Stops the network's hub once none of its VMs (`vms`, by define name, and those its record
+  # holds) is left besides the one just destroyed. A VM is left while Vagrant keeps its id: a
+  # halted one still holds its port, and the hub starts again for it anyway if stopped.
   def self.release(net, vms, env, gone)
-    left = vms.reject { |vm| vm == gone.to_s }
+    rec = record(net)
+    left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
     return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
     stop(net)
   end

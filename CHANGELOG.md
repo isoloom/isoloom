@@ -10,6 +10,21 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A VM that joins a running environment on QEMU no longer cuts the others off its network.**
+  2.1.1 kept a network's running hub only for exactly the VMs it started with. One VM more (the
+  Cyber CTF launcher's attack box, added to a running lab) gave every VM of the network new ports,
+  and the hub was restarted on them. A VM already running stayed connected to the old hub, since
+  QEMU's socket netdev doesn't reconnect, so it was off the network for good: the attack box
+  reached nothing ("No route to host" to `web`). A hub now starts with 4 spare ports beyond its
+  VMs'. A VM that joins its network while it runs takes one, the others keep theirs, and the hub
+  runs on. A hub with no spare port left for a VM that joins, such as one 2.1.1 or 2.1.2 started,
+  is never restarted under its VMs: the VM's start is refused, saying to destroy the environment
+  and bring it up again. The hub's record (`.vagrant/isoloom-qemu-hubs/<network>.ports.json`) now
+  holds its ports by VM (`vms`) and its spare ones (`spare`). A hub stops once the last of the VMs
+  it has served is destroyed, those its record holds included (#247).
+
 ## [2.1.2] — 2026-11-12
 
 ### Fixed

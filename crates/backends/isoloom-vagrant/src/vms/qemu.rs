@@ -8,7 +8,9 @@
 //! The hub ports are the host's, so they belong to the copy of the project that runs, not to the
 //! spec: two copies of one environment (two folders, one name) run side by side. The Vagrantfile
 //! picks them when Vagrant reads it (`IsoloomQemu.ports`), free on the host and kept while a hub
-//! runs on them; what Isoloom writes is which VM has which network's port.
+//! runs on them; a hub listens on spare ones too, which a VM joining its network while it runs
+//! takes, so it is never restarted under the VMs connected to it. What Isoloom writes is which VM
+//! has which network's port.
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachineShape};

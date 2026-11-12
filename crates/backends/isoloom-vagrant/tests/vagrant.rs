@@ -403,6 +403,143 @@ fn a_running_hub_keeps_its_ports_and_a_held_port_is_passed_over() -> Outcome {
     Ok(())
 }
 
+/// Loads a generated Vagrantfile (`ARGV[0]`) as [`QEMU_PORTS_RB`] does, then starts network
+/// `ARGV[1]`'s hub as the trigger before a VM's start does, on a stand-in for QEMU: it prints each
+/// VM's port (`port <vm> <port>`), then what happened to the hub (`stop`, `start <ports>`), then
+/// its record (`record <json>`) or the refusal (`refused <why>`). `HUB=running` takes the hub to
+/// run, on the record the test wrote.
+const QEMU_HUB_RB: &str = r#"
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); end
+end
+module IsoloomQemu; end
+IsoloomQemu.singleton_class.prepend(Module.new {
+  def running(_net); ENV["HUB"] == "running" ? 4242 : nil; end
+  def stop(net); puts "stop #{net}"; end
+  def system(*args, **_opts)
+    puts "start #{args.map { |a| a[/listen=127\.0\.0\.1:(\d+)/, 1] }.compact.join(' ')}"
+    true
+  end
+})
+load ARGV[0]
+net = ARGV[1]
+QEMU_HUBS[net].each { |vm, port| puts "port #{vm} #{port}" }
+begin
+  IsoloomQemu.hub(net, QEMU_HUBS[net])
+  puts "record #{File.read(IsoloomQemu.ports_file(net))}"
+rescue Vagrant::Errors::VagrantError => e
+  puts "refused #{e.error_message}"
+end
+"#;
+
+/// What [`QEMU_HUB_RB`] prints for `example`'s network `net`, from the copy at `dir`, the hub
+/// running when `running`: its lines, and the hub's record file.
+fn qemu_hub(example: &str, dir: &Path, net: &str, running: bool) -> Outcome<(String, std::path::PathBuf)> {
+    let (vagrantfile, mut ruby) = loadable(example, dir)?;
+    ruby.arg("-e").arg(QEMU_HUB_RB).arg(&vagrantfile).arg(net);
+    if running {
+        ruby.env("HUB", "running");
+    } else {
+        ruby.env_remove("HUB");
+    }
+    let record = vagrantfile
+        .parent()
+        .ok_or("a folder")?
+        .join(format!(".vagrant/isoloom-qemu-hubs/{net}.ports.json"));
+    Ok((printed(ruby)?, record))
+}
+
+/// The `port <vm> <port>` lines of [`QEMU_HUB_RB`]'s output, in order.
+fn vm_ports(out: &str) -> Vec<(String, u16)> {
+    out.lines()
+        .filter_map(|l| l.strip_prefix("port "))
+        .filter_map(|l| l.split_once(' ').and_then(|(vm, p)| Some((vm.to_owned(), p.parse().ok()?))))
+        .collect()
+}
+
+/// A VM that joins a running environment's network on QEMU (the attack box the Cyber CTF launcher
+/// adds) must leave the VMs already there on it. 2.1.1 kept a running hub only for exactly the VMs
+/// it started with: one more gave every VM new ports and restarted the hub, and a running VM,
+/// whose socket netdev doesn't reconnect, was off the network for good ("No route to host" from
+/// the attack box to `web`). A hub starts with spare ports; a VM that joins takes one, the others
+/// keep theirs, and the hub runs on.
+#[test]
+fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-join-").tempdir()?;
+    // A first start: the VMs' ports and spare ones beyond them, all listened on, all recorded.
+    let (out, record) = qemu_hub("solo-web", scratch.path(), "app", false)?;
+    let ports = vm_ports(&out);
+    assert!(ports.len() >= 2, "{out}");
+    let started: Vec<u16> = out
+        .lines()
+        .find_map(|l| l.strip_prefix("start "))
+        .ok_or("no start")?
+        .split(' ')
+        .map(str::parse)
+        .collect::<Result<_, _>>()?;
+    assert_eq!(started.len(), ports.len() + 4, "the VMs' ports and 4 spare ones: {out}");
+    assert_eq!(&started[..ports.len()], ports.iter().map(|(_, p)| *p).collect::<Vec<_>>(), "{out}");
+    let spare = started[ports.len()..].to_vec();
+    let distinct: std::collections::BTreeSet<u16> = started.iter().copied().collect();
+    assert_eq!(distinct.len(), started.len(), "a port twice: {out}");
+
+    // The last VM joins once the others run: the hub's record holds the others and the spares.
+    let (joined, others) = ports.split_last().ok_or("a VM")?;
+    let vms: Vec<String> = others.iter().map(|(vm, p)| format!("\"{vm}\":{p}")).collect();
+    let spares: Vec<String> = spare.iter().map(ToString::to_string).collect();
+    std::fs::write(&record, format!("{{\"vms\":{{{}}},\"spare\":[{}]}}", vms.join(","), spares.join(",")))?;
+    let (joining, _) = qemu_hub("solo-web", scratch.path(), "app", true)?;
+    let now = vm_ports(&joining);
+    assert_eq!(&now[..others.len()], others, "the running VMs keep their ports: {joining}");
+    assert_eq!(
+        now[others.len()],
+        (joined.0.clone(), spare[0]),
+        "the joining VM takes the first spare port: {joining}"
+    );
+    assert!(
+        !joining.contains("\nstop ") && !joining.contains("\nstart "),
+        "the hub was restarted under the running VMs: {joining}"
+    );
+    let kept = std::fs::read_to_string(&record)?;
+    assert!(kept.contains(&format!("\"{}\":{}", joined.0, spare[0])), "{kept}");
+    assert!(kept.contains(&format!("\"spare\":[{}]", spares[1..].join(","))), "{kept}");
+    Ok(())
+}
+
+/// A hub with no spare port left for a VM that joins (one an earlier Isoloom started, whose record
+/// is the ports by VM alone) is not restarted under its VMs: the start is refused, with the way
+/// out.
+#[test]
+fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_restart() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-full-").tempdir()?;
+    let (out, record) = qemu_hub("solo-web", scratch.path(), "app", false)?;
+    let ports = vm_ports(&out);
+    let (_, others) = ports.split_last().ok_or("a VM")?;
+    let vms: Vec<String> = others.iter().map(|(vm, p)| format!("\"{vm}\":{p}")).collect();
+    std::fs::write(&record, format!("{{{}}}", vms.join(",")))?;
+    let (joining, _) = qemu_hub("solo-web", scratch.path(), "app", true)?;
+    assert!(
+        !joining.contains("\nstop ") && !joining.contains("\nstart "),
+        "the hub was restarted under the running VMs: {joining}"
+    );
+    let why = joining
+        .lines()
+        .find_map(|l| l.strip_prefix("refused "))
+        .ok_or_else(|| format!("not refused: {joining}"))?;
+    assert!(why.contains("no spare port left") && why.contains("Destroy the environment"), "{why}");
+    Ok(())
+}
+
 /// The run manifest names each network as the Vagrantfile makes it: VirtualBox's internal
 /// network and libvirt's network, both `isoloom-<environment>-<network>`.
 #[test]
