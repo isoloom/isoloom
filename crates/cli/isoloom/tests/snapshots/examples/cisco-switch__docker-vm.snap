@@ -705,7 +705,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "cisco-switch_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "cisco-switch - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2185,7 +2185,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-switch - isoloom-docker-host",
           "vmware_esxi": "cisco-switch-isoloom-docker-host"
         },
-        "boot_digest": "sha256:d550f49bfaea4ce7950193c8b060acf14651b2fd1368a3f0d20e67bdc1e1044d",
+        "boot_digest": "sha256:eda81556beccd24858e4658b552d0a29f5bc0b87cddb1de44b6966262322564a",
         "boxes": [
           {
             "provider": "virtualbox",

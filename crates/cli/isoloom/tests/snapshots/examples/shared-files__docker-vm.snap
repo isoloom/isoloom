@@ -701,7 +701,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "shared-files_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "shared-files - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -2167,7 +2167,7 @@ systemctl enable --now isoloom-published.service
           "utm": "shared-files - isoloom-docker-host",
           "vmware_esxi": "shared-files-isoloom-docker-host"
         },
-        "boot_digest": "sha256:b3c93cbd867fd4d42b2eb4c146a7f61c800b9fada2f6d5601a358bd0c1b147d9",
+        "boot_digest": "sha256:8e1a33afb18dfdbd99a5372acc855868fabdc51070f4991ef3ba9cd7a60f2483",
         "boxes": [
           {
             "provider": "virtualbox",

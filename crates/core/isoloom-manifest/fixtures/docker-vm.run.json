@@ -289,6 +289,23 @@
       ]
     },
     {
+      "name": "ISOLOOM_PUBLISH_FIXED",
+      "description": "Set: each published port takes its own `publish` number on the host, instead of a free one.",
+      "values": [
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_FIXED",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
       "name": "ISOLOOM_DERIVED",
       "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
       "default": "1",
@@ -378,7 +395,7 @@
           "utm": "web-portal - isoloom-docker-host",
           "vmware_esxi": "web-portal-isoloom-docker-host"
         },
-        "boot_digest": "sha256:5287ee9cf9a9dbf65c880529e7d490c7e0fb5036ee8fd50eb57f16502ef18e44",
+        "boot_digest": "sha256:b8e85d6bf3cb74dd17cce1868f3da617826c28f0c587438f84285a18114df18e",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -470,7 +487,7 @@
           "protocol": "tcp",
           "http": true,
           "publish": {
-            "mode": "fixed",
+            "mode": "ephemeral",
             "preferred": 8080,
             "address": "127.0.0.1"
           }

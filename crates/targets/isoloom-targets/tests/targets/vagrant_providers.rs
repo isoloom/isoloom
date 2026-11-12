@@ -120,6 +120,23 @@ fn docker_vm_boots_the_cloud_image_on_qemu_with_room_for_docker() -> Outcome {
     Ok(())
 }
 
+/// Regression (#253, the Cyber CTF launcher's rig on an Apple Silicon Mac, VirtualBox 7.2.20):
+/// the docker-vm VM never booted, "Failed to construct device 'vga' instance #0
+/// (`VERR_PGM_RAM_CONFLICT`)". Its block asked for `VBoxVGA` (whose saved state VirtualBox 7.2
+/// restores) on every host, and VirtualBox's Arm platform can't build it. An Arm host keeps
+/// VirtualBox's default controller, as the Vagrant target's VMs do.
+#[test]
+fn docker_vm_on_virtualbox_asks_for_vboxvga_on_an_x86_host_only() -> Outcome {
+    let vf = generated(&lab(CONTAINERS)?, Target::DockerVm, "Vagrantfile")?;
+    let vbox = between(&vf, "config.vm.provider \"virtualbox\"", "\n  end\n")?;
+    assert!(
+        vbox.contains("v.customize [\"modifyvm\", :id, \"--graphicscontroller\", \"vboxvga\"] unless RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/"),
+        "{vbox}"
+    );
+    assert_eq!(vbox.matches("graphicscontroller").count(), 1, "{vbox}");
+    Ok(())
+}
+
 #[test]
 fn the_vagrant_target_has_no_utm_provider() -> Outcome {
     // Every machine is on a network (validation asks it), and vagrant_utm gives a VM none: UTM

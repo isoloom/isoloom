@@ -701,7 +701,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "edge-firewall_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "edge-firewall - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2351,7 +2351,7 @@ systemctl enable --now isoloom-published.service
           "utm": "edge-firewall - isoloom-docker-host",
           "vmware_esxi": "edge-firewall-isoloom-docker-host"
         },
-        "boot_digest": "sha256:b0e4da0595fba4cc069e038e024a3ad7b416b1203f3ff2513985bd68895b8c4f",
+        "boot_digest": "sha256:3fc01abc84bc6609118ef9081f1b3dcbfebf16457bf4ee6d0b648e0e185fd852",
         "boxes": [
           {
             "provider": "virtualbox",

@@ -699,7 +699,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "segmented_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "segmented - isoloom-docker-host"
     v.cpus = 3
     v.memory = 3072
@@ -2277,7 +2277,7 @@ systemctl enable --now isoloom-published.service
           "utm": "segmented - isoloom-docker-host",
           "vmware_esxi": "segmented-isoloom-docker-host"
         },
-        "boot_digest": "sha256:f39d070cc2ca4cbb25227dd14e9b1dad20d42ec7ca8ff724aa3671000f5bc60f",
+        "boot_digest": "sha256:1abb9278e6be5af7d90f79f8e64b3e04980f70f6f81923679689cb8a500a6f5f",
         "boxes": [
           {
             "provider": "virtualbox",

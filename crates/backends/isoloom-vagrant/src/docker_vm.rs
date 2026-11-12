@@ -26,7 +26,7 @@
 //! `docker` target's Compose file (first) and the Proxmox module, and refuses what the Compose
 //! file can't run: its capabilities are Compose's.
 
-use crate::boxes::{self, Choice, VagrantBox};
+use crate::boxes::{self, ARM_HOST, Choice, VagrantBox};
 use crate::error::Result;
 use crate::settings;
 use isoloom_manifest::contract::OUTPUT_DIR;
@@ -221,10 +221,13 @@ fn desktop_providers(r: &mut Ruby, choice: &Choice, label: &str, (cpus, mem): (u
     r.block(provider("virtualbox"), "v", |r| {
         // VirtualBox 7.2 can't restore its own VMSVGA saved state (`Failed to load unit 'vga'`),
         // so a suspended VM would come back cold, its containers' memory lost: this headless VM
-        // has the older VBoxVGA, whose saved state it restores.
-        r.call(Call::new("v.customize").arg(Value::array(
+        // has the older VBoxVGA, whose saved state it restores. Not on an Arm host: VirtualBox's
+        // Arm platform can't build VBoxVGA (`Failed to construct device 'vga'`,
+        // VERR_PGM_RAM_CONFLICT), so the VM keeps VirtualBox's default there.
+        let vboxvga = Call::new("v.customize").arg(Value::array(
             ["modifyvm", ":id", "--graphicscontroller", "vboxvga"].map(|w| if w == ":id" { Value::raw(w) } else { Value::str(w) }),
-        )));
+        ));
+        r.line(format_args!("{vboxvga} unless {ARM_HOST}"));
         named(r);
     });
     r.block(provider("vmware_desktop"), "v", |r| {

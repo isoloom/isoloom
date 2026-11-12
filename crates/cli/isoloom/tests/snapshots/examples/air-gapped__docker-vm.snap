@@ -697,7 +697,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "air-gapped_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "air-gapped - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -2070,7 +2070,7 @@ systemctl enable --now isoloom-published.service
           "utm": "air-gapped - isoloom-docker-host",
           "vmware_esxi": "air-gapped-isoloom-docker-host"
         },
-        "boot_digest": "sha256:f8fbff8d368dcff912acf240dc3cea043646263c182a41cb51f53562b2402ae5",
+        "boot_digest": "sha256:6a886f1d0cfb892a9dda2e86d4d8055328c4442d8a4d8656524be88bc853e3c1",
         "boxes": [
           {
             "provider": "virtualbox",

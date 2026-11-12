@@ -697,7 +697,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "dual-stack_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "dual-stack - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -2148,7 +2148,7 @@ systemctl enable --now isoloom-published.service
           "utm": "dual-stack - isoloom-docker-host",
           "vmware_esxi": "dual-stack-isoloom-docker-host"
         },
-        "boot_digest": "sha256:1653dd4d49197ef1a8d9c5037589c68f53c36b879bb3d0bb751b8d45615ab1f7",
+        "boot_digest": "sha256:82c33e535ade27d3542ff5e5b3605d25eb6e3b8726ec15b72084849520ada55c",
         "boxes": [
           {
             "provider": "virtualbox",

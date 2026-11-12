@@ -696,7 +696,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.network "forwarded_port", guest: 8080, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "solo-web - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -1939,6 +1939,23 @@ systemctl enable --now isoloom-published.service
       ]
     },
     {
+      "name": "ISOLOOM_PUBLISH_FIXED",
+      "description": "Set: each published port takes its own `publish` number on the host, instead of a free one.",
+      "values": [
+        "1"
+      ],
+      "set_by": "embedder",
+      "deliver": [
+        {
+          "via": "env",
+          "var": "ISOLOOM_PUBLISH_FIXED",
+          "steps": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
       "name": "ISOLOOM_DERIVED",
       "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
       "default": "1",
@@ -2005,7 +2022,7 @@ systemctl enable --now isoloom-published.service
           "utm": "solo-web - isoloom-docker-host",
           "vmware_esxi": "solo-web-isoloom-docker-host"
         },
-        "boot_digest": "sha256:7708345c864e768815c308e9d69e4cb69385bc41d8b7493838cbc47698aaca76",
+        "boot_digest": "sha256:71abd0480ed98c078b0f4e0a4dc3c537dee14cbf5cc28c6ad212cb7bb490cc89",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2059,7 +2076,7 @@ systemctl enable --now isoloom-published.service
           "protocol": "tcp",
           "http": true,
           "publish": {
-            "mode": "fixed",
+            "mode": "ephemeral",
             "preferred": 8080,
             "address": "127.0.0.1"
           }

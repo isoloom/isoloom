@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
 use isoloom_manifest::{
-    Action, Argv, Driver, Error as ManifestError, HostArgv, Lifecycle, Manifest, Name, Native, NonEmpty, Park, PathTemplate, Provider, RelPath, Run, Step,
-    Template,
+    Action, Argv, Driver, Error as ManifestError, HostArgv, Lifecycle, Manifest, Name, Native, NonEmpty, Park, PathTemplate, Provider, PublishMode, RelPath,
+    Run, Step, Template,
 };
 use isoloom_plan::Environment;
 use isoloom_render::container::DOCKER_HOST as VM;
@@ -32,6 +32,28 @@ const UP_TIMEOUT_S: u32 = 3600;
 /// How long reading the VM's state may take on ESXi, which asks the host (one VM).
 const ESXI_STATUS_S: u32 = 90;
 
+/// The containers' machines of `env`, each published port answering on this computer's loopback:
+/// the VM forwards it from the host port the runner picks for it (the Vagrantfile's
+/// `ISOLOOM_HOSTPORTS`, by `<machine>/<port>`), as the `vagrant` target's VMs do. Each port takes
+/// the mode the plan gave it (`fixed` only when the spec fixed it), so a preferred one that another
+/// environment's VM or any program holds moves to a free port instead of refusing the start.
+/// Compose in the VM publishes every port at its own number, fixed (`guest`'s ports), and
+/// `machines_at` fixes them all, for a VM whose own address serves them (Proxmox, the clouds).
+fn forwarded_here(env: &Environment, guest: &GuestCompose) -> Vec<isoloom_manifest::Machine> {
+    let mut machines = guest.machines.clone();
+    for m in &mut machines {
+        let planned = env.machines.get(m.name.as_str()).map(|mp| mp.ports.as_slice()).unwrap_or_default();
+        for p in &mut m.ports {
+            let fixed = planned.iter().find(|x| x.name == p.name.as_str()).is_none_or(|x| x.fixed);
+            if let Some(publish) = &mut p.publish {
+                publish.mode = if fixed { PublishMode::Fixed } else { PublishMode::Ephemeral };
+                publish.address = Some(Template::text(LOOPBACK));
+            }
+        }
+    }
+    machines
+}
+
 /// The `docker-vm` manifest of `env` on Vagrant, Compose running in the VM as `guest` says; its
 /// message is left empty.
 pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manifest> {
@@ -39,8 +61,12 @@ pub(crate) fn manifest(env: &Environment, guest: &GuestCompose) -> Result<Manife
     let mut host = guest.docker_host(env, (UP, "the VM booted with Docker and the project in it"), None, &way_in)?;
     host.machine.native = Some(native(env, guest)?);
     let mut machines = vec![host.machine];
-    machines.extend(guest.machines_at(&Template::text(LOOPBACK)));
+    let forwarded = forwarded_here(env, guest);
     let mut params = slots::remote_params()?;
+    // Set, a published port keeps its own `publish` number when it is free, as on the `vagrant`
+    // target; unset, the runner picks a free one.
+    params.extend(run_manifest::publish_fixed(&forwarded)?);
+    machines.extend(forwarded);
     params.extend(guest.params.iter().cloned());
     let mut secrets = guest.slots.clone();
     secrets.push(slots::esxi_password()?);

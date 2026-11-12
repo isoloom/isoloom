@@ -703,7 +703,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "cisco-dynamips_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "cisco-dynamips - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2106,7 +2106,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-dynamips - isoloom-docker-host",
           "vmware_esxi": "cisco-dynamips-isoloom-docker-host"
         },
-        "boot_digest": "sha256:3ebeb20c1e5c4f4ed4d48f72f350b0aab05f6cf6ef5914b33faf0a7aa2304f10",
+        "boot_digest": "sha256:3ceb8db86d1e7b40e567c4a9d3ce8c0cd40d81219f10b9930df814accb3e02a1",
         "boxes": [
           {
             "provider": "virtualbox",

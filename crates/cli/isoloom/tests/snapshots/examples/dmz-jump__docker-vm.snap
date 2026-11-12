@@ -701,7 +701,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "dmz-jump_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "dmz-jump - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2392,7 +2392,7 @@ systemctl enable --now isoloom-published.service
           "utm": "dmz-jump - isoloom-docker-host",
           "vmware_esxi": "dmz-jump-isoloom-docker-host"
         },
-        "boot_digest": "sha256:735e35a6847da8fc3a4174b607f730fdb62df920ba7db6853fa80ff433a6beb2",
+        "boot_digest": "sha256:3293659dc3c6fb81e39e6485848d123bacd22d648a83d0dd95eec98e4d7dfac3",
         "boxes": [
           {
             "provider": "virtualbox",

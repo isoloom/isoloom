@@ -207,19 +207,39 @@ fn the_flag_reaches_the_start_steps_and_is_accepted_in_the_vm_never_written() ->
     Ok(())
 }
 
+/// The published port of `m`'s machine `web`: its mode and preferred number.
+fn web_publish(m: &Manifest) -> Outcome<(isoloom_manifest::PublishMode, Option<u16>)> {
+    let web = m.machines.iter().find(|x| x.name.as_str() == "web").ok_or("no machine `web`")?;
+    let publish = web.ports.first().and_then(|p| p.publish.as_ref()).ok_or("`web` publishes no port")?;
+    Ok((publish.mode, publish.preferred.map(u16::from)))
+}
+
+/// Whether `m` declares `ISOLOOM_PUBLISH_FIXED`, which keeps each published port's own number.
+fn takes_publish_fixed(m: &Manifest) -> bool {
+    m.params.iter().any(|p| p.name.as_str() == isoloom_manifest::contract::PUBLISH_FIXED)
+}
+
+/// The containers' ports answer at the VM's own address on Proxmox, at their own numbers (fixed).
+/// Locally the VM forwards each from this computer, from the host port the runner picks: the
+/// spec's `publish` is preferred there, as on the `vagrant` target. Regression (#254, the Cyber CTF
+/// launcher's rig on macOS): every port was fixed in the local manifest too, so the runner picked
+/// none, and a start whose 8080 another environment's VM held was refused `port_in_use` instead of
+/// moving to a free port.
 #[test]
 fn the_containers_published_ports_answer_where_the_driver_says_the_vm_does() -> Outcome {
     let (_, local, server) = manifests()?;
     for m in [&local, &server] {
         let site = m.outputs.iter().find(|o| o.name.as_str() == "web__site").unwrap();
         assert_eq!(site.format.as_ref().map(ToString::to_string).as_deref(), Some("http://${host.web}:${value}/"));
-        let web = m.machines.iter().find(|x| x.name.as_str() == "web").unwrap();
-        let publish = web.ports[0].publish.as_ref().unwrap();
-        assert_eq!(
-            (publish.mode, publish.preferred.map(u16::from)),
-            (isoloom_manifest::PublishMode::Fixed, Some(8080))
-        );
     }
+    assert_eq!(web_publish(&server)?, (isoloom_manifest::PublishMode::Fixed, Some(8080)));
+    assert_eq!(web_publish(&local)?, (isoloom_manifest::PublishMode::Ephemeral, Some(8080)));
+    assert!(takes_publish_fixed(&local), "the embedder may keep the port's own number when it is free");
+    // A port the spec fixed stays fixed.
+    let fixed = WITH_SECRET.replace("publish: 8080", "publish: { host: 8080, fixed: true }");
+    let files = generate(&lab(&fixed)?, Target::DockerVm)?;
+    let pinned = isoloom_manifest::parse(file(&files, ".isoloom/docker-vm/run.json")?)?;
+    assert_eq!(web_publish(&pinned)?, (isoloom_manifest::PublishMode::Fixed, Some(8080)));
     Ok(())
 }
 

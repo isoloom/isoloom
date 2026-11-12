@@ -701,7 +701,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "private-names_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "private-names - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -2076,7 +2076,7 @@ systemctl enable --now isoloom-published.service
           "utm": "private-names - isoloom-docker-host",
           "vmware_esxi": "private-names-isoloom-docker-host"
         },
-        "boot_digest": "sha256:b7741141b47c1c10164f621854e3c3c06cce2916cdd13dbd2f02c1d0fc4da4bf",
+        "boot_digest": "sha256:4026e5eb55e7cfdd0e5f088670f6c5bd2526cd3f0a4fe1efd8eb257b27620986",
         "boxes": [
           {
             "provider": "virtualbox",

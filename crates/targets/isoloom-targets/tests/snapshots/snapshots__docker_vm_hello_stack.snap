@@ -668,7 +668,7 @@ Vagrant.configure("2") do |config|
   end
   config.vm.network "forwarded_port", guest: 8080, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "hello-stack - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048

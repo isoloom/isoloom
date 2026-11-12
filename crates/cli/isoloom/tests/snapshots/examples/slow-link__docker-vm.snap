@@ -695,7 +695,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "slow-link_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "slow-link - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -2108,7 +2108,7 @@ systemctl enable --now isoloom-published.service
           "utm": "slow-link - isoloom-docker-host",
           "vmware_esxi": "slow-link-isoloom-docker-host"
         },
-        "boot_digest": "sha256:4750e4c94acfeddedcfeccc63cb8c3a7ffb10300ce9b5825583b38a27481ffe2",
+        "boot_digest": "sha256:94b43b1c399f3ab82e651f5ac6043b465dd046ddf8c5c8eccf8511bf94d7758c",
         "boxes": [
           {
             "provider": "virtualbox",

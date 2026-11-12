@@ -707,7 +707,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "cisco-iol_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "cisco-iol - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2110,7 +2110,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-iol - isoloom-docker-host",
           "vmware_esxi": "cisco-iol-isoloom-docker-host"
         },
-        "boot_digest": "sha256:5ae0293c8044bcc5097f1c56e32efd62a0380b07393d4cb0016bba4c10d21f26",
+        "boot_digest": "sha256:f68cab808f8e58f551e689986f0c66a22232c1008a751c144898b9fc2307d1ee",
         "boxes": [
           {
             "provider": "virtualbox",

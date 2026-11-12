@@ -10,6 +10,25 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A local `docker-vm` start moves a preferred port that is already taken, as the other
+  targets do.** The VM forwards each published port from a host port the runner picks, but the
+  run manifest marked every port `fixed`, so the runner picked none. A start whose `publish`
+  number another environment's VM or any program held was then refused `port_in_use`. The Cyber
+  CTF launcher's rig hit this on macOS with QEMU (#254).
+
+  The local manifest now keeps each port's planned mode (`ephemeral` unless the spec fixes it)
+  and declares `ISOLOOM_PUBLISH_FIXED`, which keeps a port's own number when it is free. On
+  Proxmox and the clouds, where the ports answer at the VM's own address, they stay fixed.
+- **`docker-vm` boots on VirtualBox on an Apple Silicon Mac.** Its VM asked for the VBoxVGA
+  graphics controller on every host, for its saved state. VirtualBox's Arm platform can't build
+  that controller ("Failed to construct device 'vga' instance #0 (VERR_PGM_RAM_CONFLICT)"), so
+  the VM never started there (#253).
+
+  The Vagrantfile now asks for it on an x86 host only. An Arm host keeps VirtualBox's default
+  controller, as the `vagrant` target's VMs do.
+
 ## [2.1.7] — 2026-11-12
 
 ### Fixed

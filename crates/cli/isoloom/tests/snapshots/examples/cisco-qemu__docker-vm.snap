@@ -699,7 +699,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "cisco-qemu_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "cisco-qemu - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2102,7 +2102,7 @@ systemctl enable --now isoloom-published.service
           "utm": "cisco-qemu - isoloom-docker-host",
           "vmware_esxi": "cisco-qemu-isoloom-docker-host"
         },
-        "boot_digest": "sha256:efe80a328e57c867fd66605825da99a3f8fb79f776bdcf768a9dab7570b3812b",
+        "boot_digest": "sha256:5efb5d51ea4eff9beb6122d87c7858396ad2e1bc60a36a24a46304d2ffadd303",
         "boxes": [
           {
             "provider": "virtualbox",

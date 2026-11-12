@@ -701,7 +701,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "vlan-office_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "vlan-office - isoloom-docker-host"
     v.cpus = 4
     v.memory = 3072
@@ -2330,7 +2330,7 @@ systemctl enable --now isoloom-published.service
           "utm": "vlan-office - isoloom-docker-host",
           "vmware_esxi": "vlan-office-isoloom-docker-host"
         },
-        "boot_digest": "sha256:0a111c4a9c0ff8b67c856c42d8412ba2b9f6b4ed1da334718c1dc5225543cdd2",
+        "boot_digest": "sha256:606bf11fd7655f5454b0fcc5b1a61c84924b120582c3690dca27111eb0c56268",
         "boxes": [
           {
             "provider": "virtualbox",

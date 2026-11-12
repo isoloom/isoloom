@@ -695,7 +695,7 @@ Vagrant.configure("2") do |config|
     v.default_prefix = "workbench_"
   end
   config.vm.provider "virtualbox" do |v|
-    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"]
+    v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
     v.name = "workbench - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
@@ -2002,7 +2002,7 @@ systemctl enable --now isoloom-published.service
           "utm": "workbench - isoloom-docker-host",
           "vmware_esxi": "workbench-isoloom-docker-host"
         },
-        "boot_digest": "sha256:7e54025de385f1fed208620b22ebba258c361fa72c71104cc6788974422624cf",
+        "boot_digest": "sha256:fa91f2dac96d5683c3d92edd3763fe170ab057b2d631cbaf4be4c03a2e87bf66",
         "boxes": [
           {
             "provider": "virtualbox",
