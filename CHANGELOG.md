@@ -10,6 +10,15 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Windows binary starts on a Windows without the Visual C++ Redistributable.** The release's
+  `isoloom.exe` imported `VCRUNTIME140.dll`, so a Windows that never installed it (a fresh install,
+  a clean virtual machine) couldn't start it: exit `0xC0000135`, a DLL not found. GitHub's Windows runners have the redistributable, so the release's install checks
+  passed. The release now links the C runtime in (`-C target-feature=+crt-static`), and the build
+  fails when the executable still imports `VCRUNTIME*.dll` or `MSVCP*.dll`; CI checks the same on
+  every push.
+
 ## [2.1.1] — 2026-11-12
 
 ### Fixed

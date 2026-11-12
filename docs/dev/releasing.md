@@ -20,7 +20,11 @@ the tests, the API docs, the quality ratchet). A tag that fails it publishes not
    CHANGELOG's `## [X.Y.Z]` section (it fails when there is none);
 2. builds `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`,
    `aarch64-apple-darwin` and `x86_64-pc-windows-msvc`, each archive holding the binary,
-   `LICENSE`, `NOTICE`, `README.md` and `THIRD-PARTY-LICENSES.md` (cargo-about);
+   `LICENSE`, `NOTICE`, `README.md` and `THIRD-PARTY-LICENSES.md` (cargo-about). The Windows one
+   links the C runtime in (`-C target-feature=+crt-static`), so a Windows without the Visual C++
+   Redistributable starts it, and the build fails when `isoloom.exe` still imports
+   `VCRUNTIME*.dll` or `MSVCP*.dll` (`.github/scripts/no-vc-runtime.sh`; CI's `windows-binary` job
+   checks the same on every push);
 3. writes the CycloneDX SBOM (`isoloom.cdx.json`) and `SHA256SUMS`, signs `SHA256SUMS` keylessly
    with cosign and attests the provenance of every file;
 4. creates the GitHub release, in the `release` environment (where approvals can be required);

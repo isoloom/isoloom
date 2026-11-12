@@ -309,6 +309,34 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo run -p xtask --locked -- tf-test
 
+  # The Windows executable as the release builds it (release.yml: the C runtime linked in) needs no
+  # Visual C++ runtime DLL, so a Windows without the redistributable starts it. GitHub's runners
+  # have the redistributable: only the imports tell. On every push, so a tag never finds out.
+  windows-binary:
+    name: Windows binary needs no Visual C++ runtime
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          rustup toolchain install --profile minimal
+          rustup component add llvm-tools
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo build --release --locked -p isoloom --target x86_64-pc-windows-msvc
+      - run: |
+          set -euo pipefail
+          sysroot="$(cygpath -u "$(rustc --print sysroot)")"
+          .github/scripts/no-vc-runtime.sh "${sysroot}/lib/rustlib/x86_64-pc-windows-msvc/bin/llvm-objdump.exe" \
+            target/x86_64-pc-windows-msvc/release/isoloom.exe
+
   # The binaries the real-run jobs below share: isoloom, and the Isothrum runner built from its
   # repository at ISOTHRUM_REF (a repository variable: a release tag or a commit, never a branch,
   # so a run is reproducible), so each job doesn't build both again. Without ISOTHRUM_REF the
