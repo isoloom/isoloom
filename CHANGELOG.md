@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.5] — 2026-11-12
+
 ### Fixed
 
 - **A Compose lab that keeps a volume no longer leaves its containers' anonymous volumes behind.**

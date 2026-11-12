@@ -814,7 +814,7 @@ locals {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.4"
+    "version": "2.1.5"
   },
   "environment": {
     "name": "dual-stack",
