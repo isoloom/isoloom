@@ -251,7 +251,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.6"
+    "version": "2.1.7"
   },
   "environment": {
     "name": "tuned-web",
@@ -941,7 +941,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.6"
+    "version": "2.1.7"
   },
   "environment": {
     "name": "tuned-web",
@@ -1697,7 +1697,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.6"
+    "version": "2.1.7"
   },
   "environment": {
     "name": "tuned-web",
@@ -2537,7 +2537,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.6"
+    "version": "2.1.7"
   },
   "environment": {
     "name": "tuned-web",

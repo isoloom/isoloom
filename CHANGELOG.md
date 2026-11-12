@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.7] — 2026-11-12
+
 ### Fixed
 
 - **An environment on QEMU is destroyed even when its network's hub goes first.** The hub's

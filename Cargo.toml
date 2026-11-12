@@ -12,7 +12,7 @@ members = [
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "2.1.6"
+version = "2.1.7"
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/isoloom/isoloom"
@@ -22,18 +22,18 @@ license = "Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-isoloom-spec = { path = "crates/core/isoloom-spec", version = "2.1.6" }
-isoloom-catalogue = { path = "crates/core/isoloom-catalogue", version = "2.1.6" }
-isoloom-plan = { path = "crates/core/isoloom-plan", version = "2.1.6" }
-isoloom-render = { path = "crates/core/isoloom-render", version = "2.1.6" }
-isoloom-compose = { path = "crates/backends/isoloom-compose", version = "2.1.6" }
-isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes", version = "2.1.6" }
-isoloom-terraform = { path = "crates/backends/isoloom-terraform", version = "2.1.6" }
-isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "2.1.6" }
-isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "2.1.6" }
-isoloom-targets = { path = "crates/targets/isoloom-targets", version = "2.1.6" }
-isoloom-import = { path = "crates/tools/isoloom-import", version = "2.1.6" }
-isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "2.1.6" }
+isoloom-spec = { path = "crates/core/isoloom-spec", version = "2.1.7" }
+isoloom-catalogue = { path = "crates/core/isoloom-catalogue", version = "2.1.7" }
+isoloom-plan = { path = "crates/core/isoloom-plan", version = "2.1.7" }
+isoloom-render = { path = "crates/core/isoloom-render", version = "2.1.7" }
+isoloom-compose = { path = "crates/backends/isoloom-compose", version = "2.1.7" }
+isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes", version = "2.1.7" }
+isoloom-terraform = { path = "crates/backends/isoloom-terraform", version = "2.1.7" }
+isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "2.1.7" }
+isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "2.1.7" }
+isoloom-targets = { path = "crates/targets/isoloom-targets", version = "2.1.7" }
+isoloom-import = { path = "crates/tools/isoloom-import", version = "2.1.7" }
+isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "2.1.7" }
 xtask-quality = { path = "crates/tools/xtask-quality" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
