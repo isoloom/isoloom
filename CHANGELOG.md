@@ -10,6 +10,19 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An environment on QEMU is destroyed even when its network's hub goes first.** The hub's
+  stop read the hub's pid, signalled it, then deleted its pid file and record if they were still
+  there. QEMU removes its own pid file as it exits, and Vagrant destroys QEMU's VMs in parallel,
+  so the hub or its pid file could be gone between those steps. The destroy then failed with
+  "No such file or directory @ apply2files - …/isoloom-qemu-hubs/app.pid (Errno::ENOENT)". The
+  Cyber CTF launcher's rig hit this on Debian 13, destroying an environment after an attack box
+  had joined its network and left it again (#252).
+
+  Now a hub that has already exited is no error, and its files are removed if they are still
+  there.
+
 ## [2.1.6] — 2026-11-12
 
 ### Fixed

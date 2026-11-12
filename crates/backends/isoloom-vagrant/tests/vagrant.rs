@@ -540,6 +540,107 @@ fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_rest
     Ok(())
 }
 
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and plays a VM's visit to
+/// network `app` on QEMU, Vagrant's machine folders under `ARGV[1]`:
+/// 1. The environment's VMs start, and their hub with them.
+/// 2. A VM joins the running network (the attack box the Cyber CTF launcher adds), then is
+///    destroyed again.
+/// 3. The environment is destroyed.
+///
+/// QEMU's hub is stood in for by a process that names its pid file (as `running` checks for),
+/// writes its pid there (`-daemonize -pidfile`), and removes it as it exits on TERM, as QEMU does.
+/// Vagrant destroys QEMU's VMs in parallel: as the last VM's trigger stops the hub, the other VM's
+/// destroy ends it, pid file and all, between the stop's check and its signal. It prints what it
+/// sees after each step.
+#[cfg(unix)]
+const QEMU_HUB_VISIT_RB: &str = r##"
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); end
+end
+module IsoloomQemu; end
+$hub = nil
+$racing = false
+$stopping = false
+at_exit { Process.kill("KILL", $hub) rescue nil if $hub }
+IsoloomQemu.singleton_class.prepend(Module.new {
+  def system(*args, **_opts)
+    pidfile = args[args.index("-pidfile") + 1]
+    $hub = Process.spawn("sh", "-c", 'trap "rm -f \"$0\"; exit 0" TERM; while :; do sleep 0.1; done', pidfile)
+    File.write(pidfile, "#{$hub}\n")
+    true
+  end
+  def stop(net)
+    $stopping = true
+    super
+  ensure
+    $stopping = false
+  end
+  def running(net)
+    pid = super
+    if pid && $racing && $stopping
+      # The other VM's destroy stops the hub now: it removes its pid file and exits.
+      $racing = false
+      Process.kill("TERM", pid)
+      Process.wait(pid)
+    end
+    pid
+  end
+})
+load ARGV[0]
+require "fileutils"
+require "pathname"
+net = "app"
+data = Pathname.new(ARGV[1])
+env = Struct.new(:local_data_path).new(data)
+up = ->(vm) { FileUtils.mkdir_p(data.join("machines", vm, "qemu")); File.write(data.join("machines", vm, "qemu", "id"), vm) }
+destroyed = ->(vm) { FileUtils.rm_rf(data.join("machines", vm)) }
+vms = QEMU_HUBS[net]
+vms.each_key(&up)
+IsoloomQemu.hub(net, vms)
+hub = $hub
+puts "up #{IsoloomQemu.running(net) == hub}"
+with_box = IsoloomQemu.ports(net => vms.keys + ["attackbox"])[net]
+IsoloomQemu.hub(net, with_box)
+up.("attackbox")
+puts "joined #{$hub == hub}"
+destroyed.("attackbox")
+IsoloomQemu.release(net, with_box.keys, env, "attackbox")
+puts "left #{IsoloomQemu.running(net) == hub}"
+vms.each_key(&destroyed)
+$racing = true
+vms.each_key.reverse_each { |vm| IsoloomQemu.release(net, vms.keys, env, vm) }
+puts "destroyed #{IsoloomQemu.running(net).inspect} #{Dir.children(IsoloomQemu.hubs_dir).sort.inspect}"
+"##;
+
+/// An environment on QEMU is destroyed after a VM joined its running network and left it again
+/// (the attack box the Cyber CTF launcher adds and removes). Regression (2.1.5, the launcher's rig
+/// on Debian 13): the destroy failed in the hub's stop, "No such file or directory @ apply2files -
+/// …/isoloom-qemu-hubs/app.pid (`Errno::ENOENT`)". The stop checked the hub and its
+/// files, then signalled it and deleted them, and the hub (QEMU removes its pid file as it exits,
+/// and Vagrant destroys QEMU's VMs in parallel) could be gone in between. Now a hub or a file
+/// already gone is no error, and the hub runs on until the last VM is destroyed.
+#[cfg(unix)]
+#[test]
+fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-visit-").tempdir()?;
+    let (vagrantfile, mut ruby) = loadable("solo-web", &scratch.path().join("project"))?;
+    ruby.arg("-e").arg(QEMU_HUB_VISIT_RB).arg(&vagrantfile).arg(scratch.path().join("machines"));
+    let out = printed(ruby)?;
+    let said: Vec<&str> = out.lines().collect();
+    assert_eq!(
+        said,
+        ["up true", "joined true", "left true", "destroyed nil []"],
+        "the hub runs on through the visit and goes, files and all, with the environment"
+    );
+    Ok(())
+}
+
 /// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and prints this user's uid
 /// and gid, then the arguments QEMU's share hands virtiofsd (`IsoloomQemu.virtiofs_squash`), one a
 /// line.

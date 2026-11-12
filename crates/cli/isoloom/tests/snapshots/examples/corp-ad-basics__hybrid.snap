@@ -698,11 +698,19 @@ module IsoloomQemu
     stop(net)
   end
 
-  # Stops the network's hub, if it runs.
+  # Stops the network's hub, if it runs, and forgets it. The hub can be gone, pid file and all, by
+  # the time this signals it or deletes its files: QEMU removes its pid file as it exits, and
+  # Vagrant destroys QEMU's VMs in parallel, so two destroys can stop one hub at once. Neither is
+  # an error.
   def self.stop(net)
     pid = running(net)
-    Process.kill("TERM", pid) if pid
-    [pid_file(net), ports_file(net)].each { |f| File.delete(f) if File.exist?(f) }
+    begin
+      Process.kill("TERM", pid) if pid
+    rescue Errno::ESRCH
+      nil
+    end
+    require "fileutils"
+    FileUtils.rm_f([pid_file(net), ports_file(net)])
   end
 
   # `disk_resize` for a VM of `box` sized `gb` GB: the size when it is above the box's disk,
