@@ -2118,6 +2118,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       ],
       "timeout_s": 25,
       "provider_timeout_s": {
+        "virtualbox": 80,
+        "hyperv": 120,
         "vmware_esxi": 120
       }
     }

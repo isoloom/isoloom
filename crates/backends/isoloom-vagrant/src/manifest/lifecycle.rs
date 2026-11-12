@@ -35,6 +35,18 @@ const STATUS_TIMEOUT_S: u32 = 25;
 const ESXI_STATUS_BASE_S: u32 = 60;
 /// What each VM adds to a status read on ESXi.
 const ESXI_STATUS_PER_VM_S: u32 = 30;
+/// On Hyper-V, `vagrant status` runs a PowerShell script per VM, whose cmdlets take seconds each
+/// and tens of seconds on a loaded or nested host (a Windows 11 VM on a busy test machine,
+/// 2026-11-12: a two-VM lab's status printed nothing for 25 s, and the lab was stopped): this
+/// much for the read, plus [`HYPERV_STATUS_PER_VM_S`] a VM.
+const HYPERV_STATUS_BASE_S: u32 = 60;
+/// What each VM adds to a status read on Hyper-V.
+const HYPERV_STATUS_PER_VM_S: u32 = 30;
+/// On VirtualBox, `vagrant status` asks `VBoxManage showvminfo` once per VM, which the same
+/// loaded host stretched past 25 s for two VMs: this much, plus [`VIRTUALBOX_STATUS_PER_VM_S`] a VM.
+const VIRTUALBOX_STATUS_BASE_S: u32 = 40;
+/// What each VM adds to a status read on VirtualBox.
+const VIRTUALBOX_STATUS_PER_VM_S: u32 = 20;
 
 /// What a failed start's output says when it tripped over a previous run's leftovers, not over
 /// the environment (VirtualBox's names taken, a lock, a record on another provider).
@@ -87,13 +99,19 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
     })
 }
 
-/// `vagrant status --machine-readable`, with more time on ESXi for each of the environment's VMs.
+/// `vagrant status --machine-readable`, with more time on ESXi, Hyper-V and VirtualBox for each
+/// of the environment's VMs: the providers whose status asks the hypervisor once per VM.
 fn status(shape: &Shape) -> Result<Step> {
     let mut s = run("status", vagrant_argv(&["status", "--machine-readable"])?, STATUS_TIMEOUT_S)?;
     let vms = u32::try_from(shape.defines.len()).unwrap_or(u32::MAX);
-    let esxi = ESXI_STATUS_PER_VM_S.saturating_mul(vms).saturating_add(ESXI_STATUS_BASE_S);
-    s.provider_timeout_s
-        .insert(Provider::VmwareEsxi, NonZeroU32::new(esxi).unwrap_or(NonZeroU32::MIN));
+    for (provider, base, per_vm) in [
+        (Provider::VmwareEsxi, ESXI_STATUS_BASE_S, ESXI_STATUS_PER_VM_S),
+        (Provider::Hyperv, HYPERV_STATUS_BASE_S, HYPERV_STATUS_PER_VM_S),
+        (Provider::Virtualbox, VIRTUALBOX_STATUS_BASE_S, VIRTUALBOX_STATUS_PER_VM_S),
+    ] {
+        let limit = per_vm.saturating_mul(vms).saturating_add(base);
+        s.provider_timeout_s.insert(provider, NonZeroU32::new(limit).unwrap_or(NonZeroU32::MIN));
+    }
     Ok(s)
 }
 

@@ -10,6 +10,13 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- The vagrant run manifest's `status` step gets more time on Hyper-V (60 s plus 30 s a VM) and
+  VirtualBox (40 s plus 20 s a VM), as on ESXi, where each asks the hypervisor once per VM: on a
+  loaded or nested Windows host a two-VM lab's `vagrant status` printed nothing for the 25 s the
+  local providers get, and the runner stopped the lab as stuck.
+
 ## [2.1.8] — 2026-11-12
 
 ### Fixed
