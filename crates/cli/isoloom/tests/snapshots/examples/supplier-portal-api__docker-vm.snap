@@ -988,7 +988,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -1752,7 +1752,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "supplier-portal-api",

@@ -317,7 +317,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "shared-files",
@@ -1189,7 +1189,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "shared-files",
@@ -2158,7 +2158,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "shared-files",
@@ -2921,7 +2921,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "shared-files",
@@ -3805,7 +3805,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.1"
+    "version": "2.1.2"
   },
   "environment": {
     "name": "shared-files",
