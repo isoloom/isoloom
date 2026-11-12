@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.3] — 2026-11-12
+
 ### Fixed
 
 - **A VM that joins a running environment on QEMU no longer cuts the others off its network.**

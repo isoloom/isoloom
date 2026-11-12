@@ -238,7 +238,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.2"
+    "version": "2.1.3"
   },
   "environment": {
     "name": "cisco-dynamips",
@@ -1051,7 +1051,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.2"
+    "version": "2.1.3"
   },
   "environment": {
     "name": "cisco-dynamips",
@@ -1799,7 +1799,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.2"
+    "version": "2.1.3"
   },
   "environment": {
     "name": "cisco-dynamips",
@@ -2546,7 +2546,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.2"
+    "version": "2.1.3"
   },
   "environment": {
     "name": "cisco-dynamips",
@@ -3278,7 +3278,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.2"
+    "version": "2.1.3"
   },
   "environment": {
     "name": "cisco-dynamips",
@@ -4029,7 +4029,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.2"
+    "version": "2.1.3"
   },
   "environment": {
     "name": "cisco-dynamips",
