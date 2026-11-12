@@ -2,7 +2,8 @@
 //! (`-p`), a test target it names (`--test`) is one of that package's, every `isoloom`
 //! subcommand it calls is one the command line has, a crate list it compares is the
 //! workspace's, no generation is let fail quietly, every document the workflows point to is
-//! there, and the Isothrum runner is built only at a pinned ref.
+//! there, the Isothrum runner is built only at a pinned ref, and the Windows binary's gate
+//! refuses one that needs the Visual C++ runtime.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -249,5 +250,43 @@ fn the_isothrum_runner_is_built_only_at_a_release_tag_or_a_commit() -> Outcome {
             assert!(check < checkout && !text.contains("ISOTHRUM_REF ||"), "{text}");
         }
     }
+    Ok(())
+}
+
+/// What `.github/scripts/no-vc-runtime.sh` says of an executable whose imports (an
+/// `llvm-objdump -p` standing in, listing `dlls`) are those: its exit code and what it printed.
+#[cfg(unix)]
+fn imports(dlls: &[&str]) -> Outcome<(Option<i32>, String)> {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = scratch("no-vc-runtime")?;
+    let objdump = dir.join("llvm-objdump");
+    let mut script = String::from("#!/bin/sh\necho 'isoloom.exe: file format coff-x86-64'\n");
+    for dll in dlls {
+        script.push_str("echo '    DLL Name: ");
+        script.push_str(dll);
+        script.push_str("'\n");
+    }
+    std::fs::write(&objdump, script)?;
+    std::fs::set_permissions(&objdump, std::fs::Permissions::from_mode(0o755))?;
+    let out = Command::new("bash")
+        .arg(root().join(".github/scripts/no-vc-runtime.sh"))
+        .arg(&objdump)
+        .arg("isoloom.exe")
+        .output()?;
+    Ok((out.status.code(), String::from_utf8_lossy(&out.stdout).into_owned()))
+}
+
+/// v2.1.1's isoloom.exe imported VCRUNTIME140.dll, and a Windows without the redistributable
+/// couldn't start it: the release's gate refuses that, and passes one with the C runtime linked in.
+#[cfg(unix)]
+#[test]
+fn the_windows_binary_gate_refuses_one_that_needs_the_visual_cpp_runtime() -> Outcome {
+    let windows = ["kernel32.dll", "ntdll.dll", "bcryptprimitives.dll", "api-ms-win-core-synch-l1-2-0.dll"];
+    for runtime in ["VCRUNTIME140.dll", "vcruntime140_1.dll", "MSVCP140.dll"] {
+        let (code, said) = imports(&[&windows[..], &[runtime, "api-ms-win-crt-heap-l1-1-0.dll"]].concat())?;
+        assert_eq!(code, Some(1), "{runtime}: {said}");
+        assert!(said.contains(&format!("imports {runtime}")), "{said}");
+    }
+    assert_eq!(imports(&windows)?.0, Some(0), "the C runtime linked in");
     Ok(())
 }
