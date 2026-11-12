@@ -12,7 +12,10 @@
 //! - Parallels: `parallels` (the box's Parallels Tools).
 //! - UTM (`vagrant_utm` 0.1.3 or later): `utm` (QEMU's 9p shares).
 //! - QEMU (vagrant-qemu 0.7.0 or later): `qemu_virtiofs`, from `virtiofsd` on the host; it mounts
-//!   every share read-write, so a read-only folder is refused there.
+//!   every share read-write, so a read-only folder is refused there. virtiofsd works as the
+//!   computer's user for the guest's user 1000 and, where it translates ids, for every other
+//!   account of the VM too (`IsoloomQemu.virtiofs_squash`), so another account writes there as on
+//!   the other providers.
 //! - libvirt: `virtiofs` (libvirt 6.2 or later), the VM's memory shared with `virtiofsd`.
 //! - Hyper-V: none Isoloom uses: its two-way folder is SMB, which asks for a Windows account's
 //!   password at every `vagrant up`.
@@ -101,10 +104,13 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: Libvir
     let read_only = shares.iter().any(|s| s.read_only);
     for (p, kind) in sharing(read_only) {
         let head = Call::new(format!("{scope}.vm.provider")).arg(Value::str(p.id()));
-        let params = if p == Provider::Libvirt { "v, o" } else { "_, o" };
+        let params = if matches!(p, Provider::Libvirt | Provider::Qemu) { "v, o" } else { "_, o" };
         r.block(head, params, |r| {
             if p == Provider::Libvirt && memory == LibvirtMemory::WithShares {
                 libvirt_shared_memory(r);
+            }
+            if p == Provider::Qemu {
+                virtiofs_every_account(r);
             }
             for s in shares {
                 r.call(synced_folder(p, kind, s));
@@ -112,6 +118,16 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: Libvir
         });
     }
     refuse_elsewhere(r, scope, read_only);
+}
+
+/// QEMU's `VirtioFS` share open to every account of the VM, as the other providers' are:
+/// vagrant-qemu's virtiofsd maps its guest user and group (set here to the ids it defaults to)
+/// to this computer's, and refuses any other id, so every other one is squashed to them
+/// (`IsoloomQemu.virtiofs_squash`, nothing where virtiofsd translates no ids).
+fn virtiofs_every_account(r: &mut Ruby) {
+    r.assign("v.virtiofs_guest_uid", Value::raw("IsoloomQemu::GUEST_ID"));
+    r.assign("v.virtiofs_guest_gid", Value::raw("IsoloomQemu::GUEST_ID"));
+    r.assign("v.extra_virtiofsd_args", Value::raw("IsoloomQemu.virtiofs_squash"));
 }
 
 /// VirtualBox's mount of a read-write folder: its group writes too ([`synced_folder`]).
@@ -198,6 +214,29 @@ mod tests {
             guest: guest.into(),
             read_only,
         }
+    }
+
+    /// Regression (#248, the Cyber CTF rig's attack box on QEMU): `/shared` was `drwxrwxr-x
+    /// 1000:1000` and the box's `player` (uid 1001) in group 1000, yet its writes failed with EPERM:
+    /// vagrant-qemu's virtiofsd mapped uid and gid 1000 alone. QEMU's block sets the ids it maps
+    /// and squashes every other one to this computer's user (`IsoloomQemu.virtiofs_squash`).
+    #[test]
+    fn qemus_share_lets_every_account_of_the_vm_write_as_the_others_do() {
+        let out = ruby(&[share("shared", "/srv/shared", false)]);
+        let (_, from_qemu) = out.split_once("m.vm.provider \"qemu\" do |v, o|").expect("QEMU's block");
+        let (block, _) = from_qemu.split_once("\n  end\n").expect("its end");
+        for line in [
+            "v.virtiofs_guest_uid = IsoloomQemu::GUEST_ID",
+            "v.virtiofs_guest_gid = IsoloomQemu::GUEST_ID",
+            "v.extra_virtiofsd_args = IsoloomQemu.virtiofs_squash",
+            "type: \"qemu_virtiofs\"",
+        ] {
+            assert!(block.contains(line), "{line}: {block}");
+        }
+        assert!(
+            !out.contains("m.vm.provider \"virtualbox\" do |v, o|"),
+            "only QEMU's block takes its config: {out}"
+        );
     }
 
     #[test]

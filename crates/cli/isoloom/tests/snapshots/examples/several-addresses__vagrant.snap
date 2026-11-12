@@ -1041,6 +1041,39 @@ module IsoloomQemu
     return nil if sizes.include?(nil)
     gb * 1024**3 > sizes.max ? "#{gb}G" : nil
   end
+
+  # The guest account and group vagrant-qemu maps to this computer's user in a VirtioFS share
+  # (`virtiofs_guest_uid` and `_gid`, its default, set so).
+  GUEST_ID = 1000
+  # The ids a squash covers end below u32::MAX, -1 to chown ("no change"), which no one owns.
+  ID_END = 4_294_967_295
+
+  # virtiofsd's arguments for a host folder (`host_folders`) every account of the VM writes, as
+  # on the other providers: vagrant-qemu maps only its guest user and group to this computer's
+  # (`--translate-uid map:1000:<uid>:1`), and an unprivileged virtiofsd refuses any other id
+  # (EPERM: the attack box's player, root in docker-vm's VM), whatever the folder's permissions
+  # say. Every other guest uid and gid is squashed to this computer's user and group, in two
+  # ranges either side of the mapped one, so no two rules overlap. Only where the virtiofsd
+  # vagrant-qemu starts translates ids (1.13 or later, `--translate-uid` in its `--help`, as
+  # vagrant-qemu checks before its own map): an older one would refuse the arguments.
+  def self.virtiofs_squash
+    return [] unless virtiofsd_translates?
+    [["--translate-uid", Process.uid], ["--translate-gid", Process.gid]].flat_map do |flag, host|
+      [flag, "squash-guest:0:#{host}:#{GUEST_ID}", flag, "squash-guest:#{GUEST_ID + 1}:#{host}:#{ID_END - GUEST_ID - 1}"]
+    end
+  end
+
+  # Whether the virtiofsd vagrant-qemu would start translates ids: the one it finds (on the PATH,
+  # then /usr/libexec and /usr/lib/qemu), its `--help` naming `--translate-uid`.
+  def self.virtiofsd_translates?
+    return @translates unless @translates.nil?
+    dirs = ENV.fetch("PATH", "").split(File::PATH_SEPARATOR)
+    found = (dirs.map { |d| File.join(d, "virtiofsd") } + %w[/usr/libexec/virtiofsd /usr/lib/qemu/virtiofsd])
+            .find { |f| File.file?(f) && File.executable?(f) }
+    @translates = !found.nil? && IO.popen([found, "--help"], err: %i[child out], &:read).include?("--translate-uid")
+  rescue SystemCallError
+    @translates = false
+  end
 end
 # QEMU: each network's VMs, in the order they start, and their ports on its hub: picked for this
 # copy of the project when Vagrant reads this file (see IsoloomQemu.ports).

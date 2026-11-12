@@ -237,7 +237,9 @@ fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu:
     let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.resources.disk_gb.is_some());
     let controller = links.contains_key(CONTROLLER) && env.controller.as_ref().is_some_and(|c| c.disk_gb.is_some());
     let sized = machines || controller;
-    if !qemu::needs_ruby(links, sized) {
+    // A VM's host folders read `IsoloomQemu.virtiofs_squash` in its QEMU block.
+    let shares = env.machines.values().any(|m| m.shape == MachineShape::Vm && !m.host_folders.is_empty());
+    if !qemu::needs_ruby(links, sized) && !shares {
         return;
     }
     r.text(qemu::QEMU_RB);

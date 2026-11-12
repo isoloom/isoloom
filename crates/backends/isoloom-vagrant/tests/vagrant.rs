@@ -540,6 +540,84 @@ fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_rest
     Ok(())
 }
 
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and prints this user's uid
+/// and gid, then the arguments QEMU's share hands virtiofsd (`IsoloomQemu.virtiofs_squash`), one a
+/// line.
+#[cfg(unix)]
+const VIRTIOFS_RB: &str = r##"
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); end
+end
+load ARGV[0]
+puts "#{Process.uid} #{Process.gid}"
+IsoloomQemu.virtiofs_squash.each { |a| puts a }
+"##;
+
+/// What [`VIRTIOFS_RB`] prints with `virtiofsd` on the PATH answering `--help` with `help`.
+#[cfg(unix)]
+fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
+    use std::os::unix::fs::PermissionsExt;
+    let scratch = tempfile::Builder::new().prefix("isoloom-virtiofs-").tempdir()?;
+    let yaml = "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /shared }] }\n";
+    let mut vagrantfile = None;
+    for f in VagrantBackend.render(&parsed(yaml)?)? {
+        let path = scratch.path().join(&f.path);
+        std::fs::create_dir_all(path.parent().ok_or("a file at the root")?)?;
+        std::fs::write(&path, &f.contents)?;
+        if f.path.ends_with("/Vagrantfile") {
+            vagrantfile = Some(path);
+        }
+    }
+    std::fs::create_dir_all(scratch.path().join("vagrant/util"))?;
+    std::fs::write(scratch.path().join("vagrant/util/is_port_open.rb"), "")?;
+    let bin = scratch.path().join("bin");
+    std::fs::create_dir_all(&bin)?;
+    let virtiofsd = bin.join("virtiofsd");
+    std::fs::write(&virtiofsd, format!("#!/bin/sh\nprintf '%s\\n' '{help}'\n"))?;
+    std::fs::set_permissions(&virtiofsd, std::fs::Permissions::from_mode(0o755))?;
+    let mut ruby = Command::new("ruby");
+    ruby.arg("-I")
+        .arg(scratch.path())
+        .arg("-e")
+        .arg(VIRTIOFS_RB)
+        .arg(vagrantfile.ok_or("no Vagrantfile")?);
+    ruby.env("PATH", format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default()));
+    Ok(printed(ruby)?.lines().map(str::to_owned).collect())
+}
+
+/// Regression (#248, the Cyber CTF rig's attack box on QEMU): a guest account other than the
+/// SSH user (the box's `player`, uid 1001 in group 1000 of a `drwxrwxr-x 1000:1000` share) got
+/// EPERM writing the host folder, vagrant-qemu's virtiofsd mapping uid and gid 1000 alone. With a
+/// virtiofsd that translates ids, every other guest uid and gid is squashed to this computer's
+/// user and group, in two ranges either side of 1000 that never overlap vagrant-qemu's map; with
+/// one that doesn't, no argument is added, so it still starts.
+#[cfg(unix)]
+#[test]
+fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let translating = virtiofs_args("    --translate-uid <type>:<source base>:<target base>:<count>")?;
+    let (ids, args) = translating.split_first().ok_or("no output")?;
+    let (uid, gid) = ids.split_once(' ').ok_or("no ids")?;
+    let squash = |flag: &str, host: &str| {
+        [
+            flag.to_owned(),
+            format!("squash-guest:0:{host}:1000"),
+            flag.to_owned(),
+            format!("squash-guest:1001:{host}:4294966294"),
+        ]
+    };
+    let expected: Vec<String> = squash("--translate-uid", uid).into_iter().chain(squash("--translate-gid", gid)).collect();
+    assert_eq!(args, expected);
+    let older = virtiofs_args("Usage: virtiofsd [OPTIONS] --shared-dir <shared_dir>")?;
+    assert_eq!(older.len(), 1, "a virtiofsd translating no ids gets no argument: {older:?}");
+    Ok(())
+}
+
 /// The run manifest names each network as the Vagrantfile makes it: VirtualBox's internal
 /// network and libvirt's network, both `isoloom-<environment>-<network>`.
 #[test]

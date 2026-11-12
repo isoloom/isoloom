@@ -10,6 +10,21 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every account of a VM on QEMU writes its read-write host folders, as on the other
+  providers.** vagrant-qemu's virtiofsd maps only its guest user and group, 1000
+  (`--translate-uid map:1000:<your uid>:1`, and the same for the gid). An unprivileged virtiofsd
+  refuses every other id, so another account of the VM got `Operation not permitted` writing the
+  folder whatever its permissions said. The Cyber CTF launcher's attack box `player` (uid 1001,
+  in group 1000 of a `drwxrwxr-x 1000:1000` share) couldn't write `/shared`, and root in
+  `docker-vm`'s VM was refused the same way. QEMU's block now sets the ids vagrant-qemu maps
+  (`virtiofs_guest_uid` and `_gid`, 1000) and, where the virtiofsd vagrant-qemu starts translates
+  ids (1.13 or later, `--translate-uid` in its `--help`, as vagrant-qemu checks), squashes every
+  other guest uid and gid to your user and group (`squash-guest`, in two ranges either side of
+  1000, so they never overlap vagrant-qemu's map). An older virtiofsd gets no new argument and
+  starts as before. Files another account creates there are yours on this computer (#248).
+
 ## [2.1.3] — 2026-11-12
 
 ### Fixed

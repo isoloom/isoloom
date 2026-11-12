@@ -19,7 +19,10 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
     o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "virtiofs", create: true
     o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "virtiofs", create: true
   end
-  config.vm.provider "qemu" do |_, o|
+  config.vm.provider "qemu" do |v, o|
+    v.virtiofs_guest_uid = IsoloomQemu::GUEST_ID
+    v.virtiofs_guest_gid = IsoloomQemu::GUEST_ID
+    v.extra_virtiofsd_args = IsoloomQemu.virtiofs_squash
     o.vm.synced_folder File.expand_path("shared", ROOT), "/mnt/isoloom/desk/0", type: "qemu_virtiofs", create: true
     o.vm.synced_folder File.expand_path("~/notes", ROOT), "/mnt/isoloom/desk/1", type: "qemu_virtiofs", create: true
   end
