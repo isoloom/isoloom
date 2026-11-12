@@ -339,7 +339,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "configured-app",
@@ -1283,7 +1283,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "configured-app",
@@ -2421,7 +2421,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "configured-app",
@@ -3261,7 +3261,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "configured-app",
@@ -4237,7 +4237,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "configured-app",

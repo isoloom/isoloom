@@ -963,7 +963,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "slow-link",
@@ -1659,7 +1659,7 @@ systemctl enable --now isoloom-published.service
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.0"
+    "version": "2.1.1"
   },
   "environment": {
     "name": "slow-link",

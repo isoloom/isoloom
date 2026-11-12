@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.1] — 2026-11-12
+
 ### Fixed
 
 - **Two copies of one environment run side by side under QEMU.** Each network's hub listens on
@@ -24,6 +26,14 @@ stable spec format.
   (its VMs changed, or an older Vagrantfile started it) is restarted on the new ones before a VM
   of its network starts, and a hub is only taken to run (and stopped) when the process its pid
   file names is that hub. `QEMU_HUBS` holds the picked ports, by network and VM, as before.
+  Their links read the port from it, so a QEMU VM's boot digest changes once: a runner reloads a
+  running one after the upgrade.
+- **The run manifest says which format a runner downloads a box in.** The step before `vagrant up`
+  is `vagrant box add <box> --provider <format>`, the format the provider boots: its own name, but
+  `libvirt` for `qemu` (vagrant-qemu boots libvirt-format boxes). It said the provider, and a
+  runner following it downloaded a QEMU environment's box twice (Isothrum/isothrum#71). The type's
+  doc, the committed schema and [the run manifest](docs/reference/run-manifest.md) say so; the
+  manifest itself is unchanged.
 
 ## [2.1.0] — 2026-11-11
 
