@@ -37,7 +37,7 @@ const ESXI_STATUS_BASE_S: u32 = 60;
 const ESXI_STATUS_PER_VM_S: u32 = 30;
 /// On Hyper-V, `vagrant status` runs a PowerShell script per VM, whose cmdlets take seconds each
 /// and tens of seconds on a loaded or nested host (a Windows 11 VM on a busy test machine,
-/// 2026-11-12: a two-VM lab's status printed nothing for 25 s, and the lab was stopped): this
+/// 2026-11-12: a two-VM environment's status printed nothing for 25 s, and it was stopped): this
 /// much for the read, plus [`HYPERV_STATUS_PER_VM_S`] a VM.
 const HYPERV_STATUS_BASE_S: u32 = 60;
 /// What each VM adds to a status read on Hyper-V.

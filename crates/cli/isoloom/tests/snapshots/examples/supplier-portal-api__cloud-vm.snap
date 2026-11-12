@@ -331,7 +331,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.8"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -1298,7 +1298,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.8"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -2454,7 +2454,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.8"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -3317,7 +3317,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.8"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "supplier-portal-api",
@@ -4316,7 +4316,7 @@ output "published" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.8"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "supplier-portal-api",
