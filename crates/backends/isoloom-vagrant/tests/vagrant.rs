@@ -481,7 +481,7 @@ fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() 
         .find_map(|l| l.strip_prefix("start "))
         .ok_or("no start")?
         .split(' ')
-        .map(str::parse)
+        .map(str::parse::<u16>)
         .collect::<Result<_, _>>()?;
     assert_eq!(started.len(), ports.len() + 4, "the VMs' ports and 4 spare ones: {out}");
     assert_eq!(&started[..ports.len()], ports.iter().map(|(_, p)| *p).collect::<Vec<_>>(), "{out}");
