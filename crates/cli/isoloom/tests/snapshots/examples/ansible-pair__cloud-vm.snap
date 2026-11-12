@@ -389,7 +389,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.5"
+    "version": "2.1.6"
   },
   "environment": {
     "name": "ansible-pair",
@@ -1464,7 +1464,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.5"
+    "version": "2.1.6"
   },
   "environment": {
     "name": "ansible-pair",
@@ -2677,7 +2677,7 @@ output "checks" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.5"
+    "version": "2.1.6"
   },
   "environment": {
     "name": "ansible-pair",

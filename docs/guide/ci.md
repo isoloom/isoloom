@@ -11,15 +11,15 @@ The repository is a GitHub Action that installs a release binary, checks it agai
 ```yaml
 steps:
   - uses: actions/checkout@<commit sha>  # v7
-  - uses: isoloom/isoloom@<commit sha>   # v2.1.5
+  - uses: isoloom/isoloom@<commit sha>   # v2.1.6
     with:
-      version: v2.1.5
+      version: v2.1.6
   - run: isoloom check
 ```
 
 | Input | Default | Meaning |
 |---|---|---|
-| `version` | `latest` | The release to install (`v2.1.5`), or `latest` |
+| `version` | `latest` | The release to install (`v2.1.6`), or `latest` |
 
 ### Pinning
 
@@ -31,7 +31,7 @@ steps:
   every new release of the binary.
 - Never pin to `main`.
 
-Without the Action: `curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/<ref>/packaging/install.sh | ISOLOOM_VERSION=v2.1.5 sh`,
+Without the Action: `curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/<ref>/packaging/install.sh | ISOLOOM_VERSION=v2.1.6 sh`,
 or `cargo install --locked isoloom`.
 
 ## Check the generated files

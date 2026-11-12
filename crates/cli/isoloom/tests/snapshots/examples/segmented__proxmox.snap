@@ -1046,7 +1046,7 @@ locals {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.5"
+    "version": "2.1.6"
   },
   "environment": {
     "name": "segmented",

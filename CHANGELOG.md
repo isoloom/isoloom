@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.6] — 2026-11-12
+
 ### Fixed
 
 - **The `vagrant` run manifest's tool check asks for `mkisofs` where QEMU needs it.**
