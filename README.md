@@ -57,7 +57,7 @@ from 2.0.0, with checksums, a Sigstore signature, build provenance and an SBOM
 curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh | sh
 # a given release, elsewhere
 curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh \
-  | ISOLOOM_VERSION=v2.1.3 ISOLOOM_INSTALL_DIR=/usr/local/bin sh
+  | ISOLOOM_VERSION=v2.1.4 ISOLOOM_INSTALL_DIR=/usr/local/bin sh
 ```
 
 On Windows, download `isoloom-x86_64-pc-windows-msvc.zip` from the
@@ -74,9 +74,9 @@ cargo install --locked isoloom
 In GitHub Actions, pinned to a commit ([CI guide](docs/guide/ci.md#pinning)):
 
 ```yaml
-- uses: isoloom/isoloom@<commit sha>   # v2.1.3
+- uses: isoloom/isoloom@<commit sha>   # v2.1.4
   with:
-    version: v2.1.3
+    version: v2.1.4
 ```
 
 ## Quickstart

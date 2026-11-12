@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.4] — 2026-11-12
+
 ### Fixed
 
 - **Every account of a VM on QEMU writes its read-write host folders, as on the other

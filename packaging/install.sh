@@ -2,7 +2,7 @@
 # Installs the isoloom binary from a GitHub release (macOS, Linux), after checking the archive
 # against the release's SHA256SUMS.
 #   curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/install.sh | sh
-# ISOLOOM_VERSION picks a release (`v2.1.3` or `2.0.0`; default: the latest); ISOLOOM_INSTALL_DIR
+# ISOLOOM_VERSION picks a release (`v2.1.4` or `2.0.0`; default: the latest); ISOLOOM_INSTALL_DIR
 # the folder (default: ~/.local/bin). The signature of SHA256SUMS and the build provenance are
 # checked by hand: docs/guide/verify-a-release.md.
 set -eu
