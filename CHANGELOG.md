@@ -10,6 +10,8 @@ stable spec format.
 
 ## [Unreleased]
 
+## [2.1.8] — 2026-11-12
+
 ### Fixed
 
 - **A local `docker-vm` start moves a preferred port that is already taken, as the other

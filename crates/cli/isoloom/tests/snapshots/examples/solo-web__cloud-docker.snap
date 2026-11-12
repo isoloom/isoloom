@@ -237,7 +237,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.7"
+    "version": "2.1.8"
   },
   "environment": {
     "name": "solo-web",
@@ -968,7 +968,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.7"
+    "version": "2.1.8"
   },
   "environment": {
     "name": "solo-web",
@@ -1639,7 +1639,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.7"
+    "version": "2.1.8"
   },
   "environment": {
     "name": "solo-web",
@@ -2304,7 +2304,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.7"
+    "version": "2.1.8"
   },
   "environment": {
     "name": "solo-web",
@@ -2954,7 +2954,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.7"
+    "version": "2.1.8"
   },
   "environment": {
     "name": "solo-web",
@@ -3631,7 +3631,7 @@ output "ssh_user" {
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.7"
+    "version": "2.1.8"
   },
   "environment": {
     "name": "solo-web",
