@@ -71,7 +71,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
 fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
     let size = HostSize::of(env);
     r.block(Call::new("m.vm.provider").arg(Value::str("virtualbox")), "v", |r| {
-        r.assign("v.name", Value::str(&crate::vms::label(env, HOST)));
+        r.assign("v.name", Value::str(&env.names().vm_label(HOST)));
         r.assign("v.cpus", size.cpus);
         r.assign("v.memory", size.memory_mb);
         for i in 0..nics {
@@ -96,7 +96,7 @@ fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
     Ok(Nic {
         ip: c.controller().to_string(),
         // The index's low byte: the MAC's last octet.
-        mac: format!("0A15{:06X}{:02X}", stable_hash::of(&env.name) & 0xFF_FFFF, index % 0x100),
+        mac: format!("0A15{:06X}{:02X}", stable_hash::of(env.names().environment()) & 0xFF_FFFF, index % 0x100),
         cidr: c.to_string(),
         gateway: gateway.to_string(),
         name: docker_net(env, net),

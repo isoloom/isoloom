@@ -53,10 +53,11 @@ pub(crate) fn ssh_proxy(r: &mut Ruby, var: &str) {
 }
 
 /// libvirt names a domain `<prefix><machine>`, the prefix defaulting to the folder's name: the
-/// environment's name keeps two environments' domains apart.
-pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
+/// environment's own ([`isoloom_plan::Names::libvirt_prefix`]) keeps two environments', and two
+/// instances', domains apart.
+pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, prefix: &str) {
     r.block(Call::new(format!("{var}.vm.provider")).arg(Value::str("libvirt")), "v", |r| {
-        r.assign("v.default_prefix", Value::str(&format!("{env}_")));
+        r.assign("v.default_prefix", Value::str(prefix));
     });
 }
 

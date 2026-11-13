@@ -157,7 +157,7 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
         r.comment("`vagrant ssh` carries the values given at launch into the VM (SSH's SendEnv).");
         r.assign("config.ssh.forward_env", Value::array(forwarded.iter().map(|v| Value::str(v))));
     }
-    vagrantfile::libvirt_prefix(r, "config", &env.name);
+    vagrantfile::libvirt_prefix(r, "config", &env.names().libvirt_prefix());
     // Each container's published port is served inside the VM at its own number; the VM forwards
     // it from a host port the runner picks (looked up by `<machine>/<port>`, defaulting to publish).
     for (name, m) in env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container) {
@@ -167,8 +167,8 @@ fn configure(r: &mut Ruby, env: &Environment, guest: &GuestCompose, scripts: &Sc
         }
     }
     let size = host_size(env);
-    desktop_providers(r, &choice, &crate::vms::label(env, VM), size, docker::HostSize::of(env).disk_gb);
-    esxi(r, &crate::vms::vm_name(env, VM), size);
+    desktop_providers(r, &choice, &env.names().vm_label(VM), size, docker::HostSize::of(env).disk_gb);
+    esxi(r, &env.names().vm_name(VM), size);
     // The containers' host folders, shared read-write where Compose finds them (a read-only one
     // is bound read-only into its container).
     let shares: Vec<Share> = docker::host_folders::of_containers(env)

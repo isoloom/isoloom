@@ -18,6 +18,18 @@ stable spec format.
   ran again, and the command's task, working in that folder, made its removal fail. Both now live
   in the state folder (`C:\ProgramData\isoloom`), and the unpack stops Isoloom's scheduled tasks
   before it replaces the project (the command's step starts its task again).
+### Added
+
+- **`isoloom_plan::Names` (`Environment::names`): every name an environment takes on the host,
+  built in one place.** A VM's display name (VirtualBox, VMware Desktop, Parallels, UTM), its
+  Hyper-V and ESXi name, its libvirt domain and the environment's libvirt prefix, and each
+  network's host name (VirtualBox internal network, libvirt network, Hyper-V private switch, the
+  hybrid Docker host's network) all come from the environment's name, which carries its
+  instance's suffix. The Vagrantfiles and the run manifests of the `vagrant`, `docker-vm` and
+  `hybrid` targets now read them there, so the two can't drift apart, and a test holds two
+  instances of the VM examples to disjoint VM, network and prefix names (#285). An environment
+  generated without an instance keeps every name it had; to run two copies of one environment
+  side by side, give each its own instance number (`isoloom_targets::generate_instance`).
 
 ## [2.1.9] — 2026-11-12
 

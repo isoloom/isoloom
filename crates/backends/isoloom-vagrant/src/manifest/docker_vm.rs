@@ -21,7 +21,6 @@ use super::lifecycle::{back_up, down, recovery};
 use super::{DOTFILE, on_provider, providers, slots, vagrant_argv};
 use crate::docker_vm::{DEFINE, prepares};
 use crate::error::{Error, Result};
-use crate::vms::{label, vm_name};
 
 /// Where forwarded ports listen on this computer.
 const LOOPBACK: &str = "127.0.0.1";
@@ -114,7 +113,7 @@ fn vagrant_ssh(command: &Template) -> Result<Run, ManifestError> {
 /// the digest of what Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in
 /// it).
 fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
-    let mut vm_names = super::machines::vm_names(label(env, VM), vm_name(env, VM), format!("{}_{DEFINE}", env.name));
+    let mut vm_names = super::machines::vm_names(env.names(), VM, DEFINE);
     vm_names.retain(|p, _| providers::docker_vm_offers(*p));
     let boot_digest = crate::boot_digest::of(&crate::docker_vm::boot(env, guest)?)
         .remove(DEFINE)

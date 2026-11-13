@@ -22,9 +22,9 @@ pub struct HybridContainers {
     pub networks: Vec<String>,
 }
 
-/// The Docker network a hybrid environment's container network is on the host: named after the
-/// environment.
+/// The Docker network a hybrid environment's container network is on the host: the network's
+/// host name ([`isoloom_plan::Names::network`]), the one its VMs' internal network has.
 #[must_use]
 pub fn docker_net(env: &Environment, net: &str) -> String {
-    format!("isoloom-{}-{net}", env.name)
+    env.names().network(net)
 }

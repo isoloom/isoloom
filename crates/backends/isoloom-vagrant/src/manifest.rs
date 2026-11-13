@@ -33,7 +33,7 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         identity: providers::identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params: slots::params(&machines, &runners)?,
         secrets: slots::slots(env, &lifecycle)?,
-        networks: run_manifest::networks(env, |n| Template::text(&crate::vms::network_name(&env.name, n)))?,
+        networks: run_manifest::networks(env, |n| Template::text(&env.names().network(n)))?,
         outputs: run_manifest::outputs_on_their_hosts(&machines)?,
         machines,
         ready: lifecycle::ready(&shape)?,

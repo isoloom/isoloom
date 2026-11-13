@@ -49,6 +49,7 @@ pub mod links;
 pub mod lower;
 pub mod machine_files;
 pub mod more_addresses;
+mod names;
 mod outside;
 pub mod private_dns;
 pub mod process;
@@ -67,6 +68,7 @@ pub use environment::{
 pub use error::{Error, Result};
 pub use lab::{Lab, NotPossible};
 pub use lifecycle::{MachineLifecycle, Step};
+pub use names::Names;
 pub use outside::{Join, OutsideAddress, OutsideNetwork};
 pub use private_dns::PrivateDns;
 pub use process::{Health, HealthTest, Process};
