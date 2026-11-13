@@ -162,10 +162,11 @@ impl Table {
     }
 }
 
-/// Whether an OS name is a Windows one (WinRM and PowerShell instead of SSH and sh).
+/// Whether an OS name is a Windows one (WinRM and PowerShell instead of SSH and sh): the rule
+/// is [`crate::os::Kind`]'s.
 #[must_use]
 pub fn is_windows(os: &str) -> bool {
-    os.starts_with("windows")
+    crate::os::Kind::of(os).is_windows()
 }
 
 /// How a machine's Windows box answers WinRM: what its image declares, else plain HTTP (every

@@ -185,7 +185,7 @@ impl<'a> Import<'a> {
         let boxname = text(self.pick(vm, "box")).unwrap_or_default();
         let windows_hint = text(self.pick(vm, "communicator")).as_deref() == Some("winrm") || text(self.pick(vm, "guest")).as_deref() == Some("windows");
         let read = boxes::os_of(&boxname);
-        let os = if windows_hint && !read.os.starts_with("windows") {
+        let os = if windows_hint && !isoloom_spec::os::Kind::of(read.os).is_windows() {
             "windows-server@2019"
         } else {
             read.os

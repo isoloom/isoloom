@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn every_windows_os_has_an_esxi_guest_os_and_any_other_keeps_its_own() {
-        for os in KNOWN_OS.iter().filter(|o| o.starts_with("windows")) {
+        for os in KNOWN_OS.iter().filter(|o| isoloom_spec::os::Kind::of(o).is_windows()) {
             assert!(guest_os(os).is_some(), "{os}");
         }
         assert_eq!(guest_os("windows-server-2019"), Some("windows2019srv-64"));
