@@ -191,10 +191,10 @@ mod tests {
         }
     }
 
-    /// Regression (#248, the Cyber CTF rig's attack box on QEMU): `/shared` was `drwxrwxr-x
-    /// 1000:1000` and the box's `player` (uid 1001) in group 1000, yet its writes failed with EPERM:
-    /// vagrant-qemu's virtiofsd mapped uid and gid 1000 alone. QEMU's block sets the ids it maps
-    /// and squashes every other one to this computer's user (`IsoloomQemu.virtiofs_squash`).
+    /// A share that is `drwxrwxr-x 1000:1000` must let another account of the VM in group 1000
+    /// (uid 1001) write, but vagrant-qemu's virtiofsd maps uid and gid 1000 alone, so its writes
+    /// would fail with EPERM. QEMU's block sets the ids it maps and squashes every other one to
+    /// this computer's user (`IsoloomQemu.virtiofs_squash`).
     #[test]
     fn qemus_share_lets_every_account_of_the_vm_write_as_the_others_do() {
         let out = ruby(&[share("shared", "/srv/shared", false)]);

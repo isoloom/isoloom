@@ -12,7 +12,7 @@ use crate::module::ident;
 use crate::server::PinnedImage;
 
 /// The arm64 cloud image of an OS, where one is published: pinned to a dated release with its
-/// publisher's checksum (resolved 2026-10-17; see [`PinnedImage`]).
+/// publisher's checksum (see [`PinnedImage`]).
 pub(super) fn pinned(os: &str) -> Option<PinnedImage> {
     Some(match os {
         "debian-11" => PinnedImage::sha512(

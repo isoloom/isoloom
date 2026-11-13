@@ -98,9 +98,9 @@ fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outc
 }
 
 /// A machine that publishes an image it also builds (the Compose build+image combo) makes the run
-/// pull the published image first; `up` then drops `--build`, so a user runs the published
-/// image and only an image that could not be pulled is built. An environment that only builds locally keeps
-/// `--build` and gains no pull step, so an author's edits always rebuild.
+/// pull the published image first; `up` then drops `--build`, so a user runs the published image
+/// and only an image that could not be pulled is built. An environment that only builds locally
+/// keeps `--build` and gains no pull step, so an author's edits always rebuild.
 #[test]
 fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() -> Outcome {
     let start = |spec: &str| -> Outcome<String> { Ok(isoloom_compose::vm_start(&plan_of(spec)?)?.start.join("\n")) };

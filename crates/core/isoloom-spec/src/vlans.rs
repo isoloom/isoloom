@@ -13,8 +13,7 @@ use crate::model::{Network, Reach, Spec, Vlan};
 use crate::net::Cidr;
 use crate::syntax::{Code, FieldPath, Problem};
 
-/// The VLAN ids 802.1Q allows (0 and 4095 are reserved): one range where three places wrote
-/// its bounds (Clean Code G25, 2026-11-13).
+/// The VLAN ids 802.1Q allows (0 and 4095 are reserved).
 pub(crate) const VLAN_IDS: std::ops::RangeInclusive<u16> = 1..=4094;
 
 /// The network a VLAN becomes: `office` + 10 -> `office-vlan10`.

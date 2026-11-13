@@ -34,8 +34,8 @@ pub(crate) struct Args {
 type Medians = BTreeMap<String, f64>;
 
 /// The benchmarks held to an absolute budget, in nanoseconds, on every host. Generating every
-/// example on every target, parsing included, stays under 8 s: the budget set on 2026-10-15 as
-/// about four times what a debug build took on the Intel Mac. The benchmarks are a release
+/// example on every target, parsing included, stays under 8 s, about four
+/// times what a debug build takes on an Intel Mac. The benchmarks are a release
 /// build, measured as a median, so only a gross regression reaches it; the baseline comparison
 /// catches the smaller ones. Raise it only with the reason in the commit.
 const BUDGETS: [(&str, f64); 1] = [("generate/every-example", 8e9)];

@@ -549,12 +549,12 @@ fn vm_ports(out: &str) -> Vec<(String, u16)> {
         .collect()
 }
 
-/// A VM that joins a running environment's network on QEMU (the attack box the Cyber CTF launcher
-/// adds) must leave the VMs already there on it. 2.1.1 kept a running hub only for exactly the VMs
-/// it started with: one more gave every VM new ports and restarted the hub, and a running VM,
-/// whose socket netdev doesn't reconnect, was off the network for good ("No route to host" from
-/// the attack box to `web`). A hub starts with spare ports; a VM that joins takes one, the others
-/// keep theirs, and the hub runs on.
+/// A VM that joins a running environment's network on QEMU (an access machine an embedder adds)
+/// must leave the VMs already there on it. A hub sized for exactly the VMs it started with would
+/// give every VM new ports and restart for one more, and a running VM, whose socket netdev
+/// doesn't reconnect, would be off the network for good ("No route to host" to `web`). A hub
+/// starts with spare ports; a VM that joins takes one, the others keep theirs, and the hub runs
+/// on.
 #[test]
 fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() -> Outcome {
     if !ruby_runs() {
@@ -633,7 +633,7 @@ fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_rest
 /// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and plays a VM's visit to
 /// network `app` on QEMU, Vagrant's machine folders under `ARGV[1]`:
 /// 1. The environment's VMs start, and their hub with them.
-/// 2. A VM joins the running network (the attack box the Cyber CTF launcher adds), then is
+/// 2. A VM joins the running network (an access machine an embedder adds), then is
 ///    destroyed again.
 /// 3. The environment is destroyed.
 ///
@@ -707,12 +707,12 @@ puts "destroyed #{IsoloomQemu.running(net).inspect} #{Dir.children(IsoloomQemu.h
 "##;
 
 /// An environment on QEMU is destroyed after a VM joined its running network and left it again
-/// (the attack box the Cyber CTF launcher adds and removes). Regression (2.1.5, the launcher's rig
-/// on Debian 13): the destroy failed in the hub's stop, "No such file or directory @ apply2files -
-/// …/isoloom-qemu-hubs/app.pid (`Errno::ENOENT`)". The stop checked the hub and its
-/// files, then signalled it and deleted them, and the hub (QEMU removes its pid file as it exits,
-/// and Vagrant destroys QEMU's VMs in parallel) could be gone in between. Now a hub or a file
-/// already gone is no error, and the hub runs on until the last VM is destroyed.
+/// (an access machine an embedder adds and removes). The hub's stop checks the hub and its files,
+/// then signals it and deletes them, and the hub (QEMU removes its pid file as it exits, and
+/// Vagrant destroys QEMU's VMs in parallel) can be gone in between, which must not fail the
+/// destroy ("No such file or directory @ apply2files - …/isoloom-qemu-hubs/app.pid
+/// (`Errno::ENOENT`)"): a hub or a file already gone is no error, and the hub runs on until the
+/// last VM is destroyed.
 #[cfg(unix)]
 #[test]
 fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() -> Outcome {
@@ -833,12 +833,11 @@ fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
     Ok(printed(ruby)?.lines().map(str::to_owned).collect())
 }
 
-/// Regression (#248, the Cyber CTF rig's attack box on QEMU): a guest account other than the
-/// SSH user (the box's `player`, uid 1001 in group 1000 of a `drwxrwxr-x 1000:1000` share) got
-/// EPERM writing the host folder, vagrant-qemu's virtiofsd mapping uid and gid 1000 alone. With a
-/// virtiofsd that translates ids, every other guest uid and gid is squashed to this computer's
-/// user and group, in two ranges either side of 1000 that never overlap vagrant-qemu's map; with
-/// one that doesn't, no argument is added, so it still starts.
+/// A guest account other than the SSH user (uid 1001 in group 1000 of a `drwxrwxr-x 1000:1000`
+/// share) gets EPERM writing the host folder when vagrant-qemu's virtiofsd maps uid and gid 1000
+/// alone. With a virtiofsd that translates ids, every other guest uid and gid is squashed to this
+/// computer's user and group, in two ranges either side of 1000 that never overlap vagrant-qemu's
+/// map; with one that doesn't, no argument is added, so it still starts.
 #[cfg(unix)]
 #[test]
 fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() -> Outcome {

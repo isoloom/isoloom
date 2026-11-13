@@ -1,5 +1,6 @@
-//! The one placeholder grammar of the whole spec: `{{ path }}`, in the message, in an app's
-//! templates and in a catalogue entry's recipe and files. Isoloom fills every placeholder in when
+//! The placeholder grammar of the spec: `{{ path }}`, in the message, in an app's templates and
+//! in a catalogue entry's recipe and files (a cloud variable's `{{ inputs.NAME }}` is matched on
+//! its own, in `model/cloud.rs`). Isoloom fills every placeholder in when
 //! it generates (never Jinja2 or envsubst), so every CM tool installs the same bytes.
 //!
 //! | Path | Where |

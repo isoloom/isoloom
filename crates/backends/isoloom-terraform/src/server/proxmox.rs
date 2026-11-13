@@ -71,7 +71,7 @@ pub(super) const DEBIAN_12_AMD64: PinnedImage = PinnedImage::sha512(
 );
 
 /// Pinned amd64 cloud images by OS name (Linux ones: a Windows image is the user's), each at a dated release with the
-/// checksum its publisher lists (resolved 2026-10-17; see [`PinnedImage`]).
+/// checksum its publisher lists (see [`PinnedImage`]).
 fn pinned(os: &str) -> Option<PinnedImage> {
     Some(match os {
         "debian-11" => PinnedImage::sha512(

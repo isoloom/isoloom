@@ -219,8 +219,8 @@ fn every_example_on_every_target() -> Outcome {
     let dirs = examples()?;
     assert!(!dirs.is_empty(), "no example found");
     // The examples in batches of as many threads as the host has cores (each runs the binary
-    // once per target): one thread per example was a fan-out the host couldn't bound, on top of
-    // the test runner's own parallelism (Clean Code ch.13); `ISOLOOM_TEST_JOBS` caps
+    // once per target): one thread per example would be a fan-out the host couldn't bound, on top
+    // of the test runner's own parallelism; `ISOLOOM_TEST_JOBS` caps
     // it lower on a shared host. Snapshots are asserted in order afterwards.
     let jobs = std::env::var("ISOLOOM_TEST_JOBS")
         .ok()

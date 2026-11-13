@@ -390,7 +390,7 @@ impl fmt::Display for Requirement {
             Requirement::VmDependsOnContainer { vm, container } => {
                 write!(f, "VM `{vm}` depends on container `{container}`: VMs start before the containers beside them")
             }
-            // Only Kubernetes lacks these today: the messages say so in its terms.
+            // Kubernetes is the target that lacks these: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
             Requirement::Tools { tool } => write!(
                 f,
