@@ -13,9 +13,12 @@ format_staged() {
   fi
 }
 
-# gate: CI's rustfmt and typos jobs (.github/CONTRIBUTING.md, "Gates"), a few seconds.
+# gate: CI's rustfmt, typos and clippy jobs (.github/CONTRIBUTING.md, "Gates"): seconds, then clippy's minute.
 gate() {
   cargo fmt --all --check || refuse "cargo fmt --all --check fails: cargo fmt --all, commit that, push again"
   command -v typos >/dev/null 2>&1 || refuse "typos isn't installed, and CI's spelling gate runs it: cargo install typos-cli"
   typos || refuse "typos finds a misspelling: fix it, or list the word in .typos.toml"
+  # CI's clippy, as it runs it (-D warnings over every target): a minute when the build is warm,
+  # and the refusal CI would give an hour later (main's gate was red for a day, 2026-11-13).
+  cargo clippy --workspace --all-targets --locked -- -D warnings || refuse "cargo clippy --workspace --all-targets -- -D warnings fails: fix it, commit that, push again"
 }

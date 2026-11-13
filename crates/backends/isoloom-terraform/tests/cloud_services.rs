@@ -71,6 +71,10 @@ fn the_runner_copies_the_module_applies_it_with_the_launch_values_and_reads_the_
     let [json] = all.as_slice() else { return Err("one manifest".into()) };
     let m = isoloom_manifest::parse(json)?;
     m.validate()?;
+    // A release changes the generator's version, not the contract: the snapshot holds a
+    // placeholder for it (2.1.9 was released without this snapshot, and the gate was red
+    // until it was accepted).
+    let json = json.replace(&format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION")), "\"version\": \"[version]\"");
     insta::assert_snapshot!(json);
     Ok(())
 }
