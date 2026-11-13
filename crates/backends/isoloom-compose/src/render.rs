@@ -2,8 +2,10 @@
 //! `init:` jobs and network sidecar), Isoloom's router, VLAN switches, probes, check runners and
 //! tools, then the networks and volumes; every resource labelled as the environment's.
 
+mod appliance;
 mod configs;
 mod hardware;
+mod init_jobs;
 mod process;
 mod secrets;
 mod service;
