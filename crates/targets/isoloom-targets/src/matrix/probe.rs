@@ -187,10 +187,10 @@ fn os_rows() -> Vec<Probe> {
     isoloom_spec::os::DISTROS
         .iter()
         .flat_map(|family| {
-            family.versions.iter().map(move |(version, _)| {
-                let id = format!("{}@{version}", family.name);
+            family.releases.iter().map(move |release| {
+                let id = format!("{}@{}", family.name, release.version);
                 let mut values = vec![id.clone()];
-                if *version == family.default {
+                if release.version == family.default {
                     values.push(family.name.to_owned());
                 }
                 let mut m = Mapping::new();
@@ -291,7 +291,7 @@ mod tests {
     fn the_rows_read_and_each_os_of_the_table_has_one() {
         let probes = probes().unwrap();
         let os = probes.rows.iter().filter(|r| r.field == "machines.*.os").count();
-        let versions: usize = isoloom_spec::os::DISTROS.iter().map(|f| f.versions.len()).sum();
+        let versions: usize = isoloom_spec::os::DISTROS.iter().map(|f| f.releases.len()).sum();
         assert_eq!(os, versions);
         assert!(probes.rows.iter().any(|r| r.value.as_deref() == Some("windows-server@2022")));
     }

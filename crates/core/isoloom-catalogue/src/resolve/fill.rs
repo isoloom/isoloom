@@ -10,7 +10,6 @@ use isoloom_spec::syntax::placeholder::{self, OsField, Part, Place, Reference, S
 use serde_json::Value;
 
 use crate::entry::Release;
-use crate::family::codename;
 use crate::names::SettingName;
 use crate::settings::{NotText, SettingValue, Settings};
 
@@ -133,7 +132,7 @@ impl Values<'_> {
             Reference::Version => Ok(self.release.version.to_string()),
             Reference::Os(OsField::Family) => Ok(self.os.family.to_owned()),
             Reference::Os(OsField::Version) => Ok(self.os.version.to_owned()),
-            Reference::Os(OsField::Codename) => codename(self.os).map(str::to_owned).ok_or_else(|| Unfilled::Misplaced {
+            Reference::Os(OsField::Codename) => self.os.codename().map(str::to_owned).ok_or_else(|| Unfilled::Misplaced {
                 reference: r.to_string(),
                 why: "the OS has no codename (only apt's releases have one)",
             }),

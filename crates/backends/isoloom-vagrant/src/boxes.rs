@@ -217,13 +217,11 @@ pub(crate) fn vagrant(vm: Vm) -> Option<VagrantBox> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::KNOWN_OS;
-
     use super::*;
 
     #[test]
     fn every_os_name_has_a_vagrant_box() {
-        for os in KNOWN_OS {
+        for os in isoloom_spec::os::all().map(|o| o.name) {
             assert!(builtin_vagrant(os).is_some(), "no built-in Vagrant box for `{os}`");
         }
     }
