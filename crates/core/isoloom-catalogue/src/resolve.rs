@@ -73,8 +73,10 @@ impl Catalogue {
         let Kind::Service(services) = &m.kind else { return Ok(Vec::new()) };
         let at = FieldPath::new("machines").key(machine);
         let Some(os) = m.os else {
-            // The spec's own check reports the missing `os`.
-            return Err(Vec::new());
+            // The spec's own check reports the missing `os` at the same field, so a caller that
+            // gathers both shows it once; an empty error would read as no problem at all.
+            let missing = Problem::new(Code::MissingField, at.key("os"), "a catalogue service runs on the OS the machine names");
+            return Err(vec![missing.fix("`os: debian@12`")]);
         };
         let mut problems = Vec::new();
         let mut out = Vec::new();

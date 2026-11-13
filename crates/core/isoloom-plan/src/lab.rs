@@ -507,6 +507,17 @@ mod tests {
     }
 
     #[test]
+    fn every_vlan_problem_is_reported_not_only_the_first() {
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks:\n  office: { cidr: 10.10.0.0/16, gateway: pc, vlans: { 5000: { cidr: 10.10.50.0/24 }, 20: { cidr: 10.99.0.0/24 } } }\nmachines:\n  pc: { networks: { office.vlan20: 10 }, app: { image: alpine } }\n",
+        );
+        let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
+        for at in ["networks.office", "networks.office.vlans.5000", "networks.office.vlans.20.cidr"] {
+            assert!(paths.contains(&at.to_owned()), "{at} in {paths:?}");
+        }
+    }
+
+    #[test]
     fn an_existing_network_is_checked_under_the_override_that_names_it() {
         let lab = testing::lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\noverrides:\n  proxmox: { networks: { lan: { external: 'vmbr 1' } } }\n  docker: { networks: { lan: { external: 'corp net' } } }\n",

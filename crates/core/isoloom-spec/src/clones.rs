@@ -40,9 +40,9 @@ type Clones = IndexMap<String, Vec<String>>;
 ///
 /// # Errors
 ///
-/// An `invalid-value` [`Problem`] at the field: a `count` that isn't 2 to [`MAX`], a count on
-/// the access machine, or a network's `gateway` or `switch` naming a counted machine.
-pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Problem> {
+/// Every `invalid-value` [`Problem`], each at its field: a `count` that isn't 2 to [`MAX`], a
+/// count on the access machine, or a network's `gateway` or `switch` naming a counted machine.
+pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Vec<Problem>> {
     let Value::Mapping(top) = doc else { return Ok(Clones::new()) };
     let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
         return Ok(Clones::new());
@@ -54,22 +54,30 @@ pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Problem> {
     top.insert(key("machines"), Value::Mapping(expanded));
     expand_members(top, &clones);
     expand_checks(top, &clones);
-    one_machine_fields(top, &clones)?;
-    Ok(clones)
+    let refused = one_machine_fields(top, &clones);
+    if refused.is_empty() { Ok(clones) } else { Err(refused) }
 }
 
 /// The machines with each counted one replaced by its clones, and the clones of each.
-fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Problem> {
+fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Vec<Problem>> {
     let mut clones = Clones::new();
     let mut expanded = Mapping::new();
+    let mut refused = Vec::new();
     for (k, v) in machines {
         let (Some(base), Value::Mapping(m)) = (k.as_str(), v) else {
             expanded.insert(k.clone(), v.clone());
             continue;
         };
-        let Some(count) = count_of(base, m)? else {
-            expanded.insert(k.clone(), v.clone());
-            continue;
+        let count = match count_of(base, m) {
+            Ok(Some(count)) => count,
+            Ok(None) => {
+                expanded.insert(k.clone(), v.clone());
+                continue;
+            }
+            Err(problem) => {
+                refused.push(problem);
+                continue;
+            }
         };
         let mut names = Vec::new();
         for i in 1..=count {
@@ -79,7 +87,7 @@ fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Problem> {
         }
         clones.insert(base.to_owned(), names);
     }
-    Ok((expanded, clones))
+    if refused.is_empty() { Ok((expanded, clones)) } else { Err(refused) }
 }
 
 /// A machine's `count` (None without one), checked.
@@ -192,30 +200,31 @@ fn expand_checks(top: &mut Mapping, clones: &Clones) {
     *checks = out;
 }
 
-/// A gateway, or a LAN's switch, is one machine.
-fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), Problem> {
+/// A gateway, or a LAN's switch, is one machine: every network's field that names a counted one.
+fn one_machine_fields(top: &Mapping, clones: &Clones) -> Vec<Problem> {
     let Some(Value::Mapping(nets)) = top.get(key("networks")) else {
-        return Ok(());
+        return Vec::new();
     };
+    let mut refused = Vec::new();
     for (n, net) in nets {
+        let (Some(n), Value::Mapping(net)) = (n.as_str(), net) else { continue };
         for field in ["gateway", "switch"] {
-            if let Value::Mapping(net) = net
-                && let Some(m) = net.get(key(field)).and_then(Value::as_str)
+            if let Some(m) = net.get(key(field)).and_then(Value::as_str)
                 && clones.contains_key(m)
             {
-                let at = FieldPath::new("networks").key(n.as_str().unwrap_or_default()).key(field);
-                return Err(Problem::new(Code::InvalidValue, at, format!("`{m}` has a count; a {field} is one machine")));
+                let at = FieldPath::new("networks").key(n).key(field);
+                refused.push(Problem::new(Code::InvalidValue, at, format!("`{m}` has a count; a {field} is one machine")));
             }
         }
     }
-    Ok(())
+    refused
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn expanded(yaml: &str) -> (Value, Result<Clones, Problem>) {
+    fn expanded(yaml: &str) -> (Value, Result<Clones, Vec<Problem>>) {
         let mut doc: Value = serde_yaml_ng::from_str(yaml).unwrap();
         let clones = expand(&mut doc);
         (doc, clones)
@@ -266,7 +275,7 @@ mod tests {
     fn a_gateway_or_a_switch_is_one_machine() {
         for field in ["gateway", "switch"] {
             let (_, refused) = expanded(&format!("networks:\n  lan: {{ {field}: rt }}\nmachines:\n  rt: {{ count: 2 }}\n"));
-            let p = refused.unwrap_err();
+            let [p] = &refused.unwrap_err()[..] else { panic!("one problem") };
             assert_eq!((p.code, p.path.as_str()), (Code::InvalidValue, format!("networks.lan.{field}").as_str()));
             assert_eq!(p.reason, format!("`rt` has a count; a {field} is one machine"));
         }
@@ -275,8 +284,22 @@ mod tests {
     }
 
     #[test]
+    fn every_network_naming_a_counted_machine_is_reported() {
+        let (_, refused) = expanded("networks:\n  a: { gateway: rt, switch: sw }\n  b: { gateway: rt }\nmachines:\n  rt: { count: 2 }\n  sw: { count: 2 }\n");
+        let paths: Vec<String> = refused.unwrap_err().iter().map(|p| p.path.to_string()).collect();
+        assert_eq!(paths, ["networks.a.gateway", "networks.a.switch", "networks.b.gateway"]);
+    }
+
+    #[test]
+    fn every_wrong_count_is_reported() {
+        let (_, refused) = expanded("machines:\n  ws: { count: 1 }\n  db: { count: two }\n  me: { count: 2, access: true }\n");
+        let paths: Vec<String> = refused.unwrap_err().iter().map(|p| p.path.to_string()).collect();
+        assert_eq!(paths, ["machines.ws.count", "machines.db.count", "machines.me.count"]);
+    }
+
+    #[test]
     fn a_count_is_2_to_99_on_a_machine_that_isnt_the_access_one() {
-        let refused = |yaml: &str| expanded(yaml).1.unwrap_err().reason;
+        let refused = |yaml: &str| expanded(yaml).1.unwrap_err().remove(0).reason;
         assert_eq!(refused("machines:\n  ws: { count: 1 }\n"), "2 to 99 (one machine needs no count)");
         assert_eq!(refused("machines:\n  ws: { count: 100 }\n"), "2 to 99 (one machine needs no count)");
         assert_eq!(refused("machines:\n  ws: { count: two }\n"), "a number of machines, 2 to 99");

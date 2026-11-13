@@ -228,7 +228,9 @@ fn groups_of(top: &Mapping) -> Result<Groups, Problem> {
         Some(Value::Mapping(m)) => m
             .iter()
             .map(|(k, v)| {
-                let name = k.as_str().unwrap_or_default();
+                let Some(name) = k.as_str() else {
+                    return Err(Problem::new(Code::InvalidValue, FieldPath::new("groups"), "a group's name is a text"));
+                };
                 match v {
                     Value::Mapping(g) => Ok((name.to_owned(), g.clone())),
                     _ => Err(Problem::new(

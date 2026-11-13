@@ -21,7 +21,7 @@ pub fn parse(yaml: &str) -> Result<Spec, Problems> {
     let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| vec![yaml_problem(&e)])?;
     let mut problems = old_keys::scan(&doc);
     let clones = crate::clones::expand(&mut doc).unwrap_or_else(|refused| {
-        problems.push(refused);
+        problems.extend(refused);
         indexmap::IndexMap::new()
     });
     if let Err(refused) = crate::groups::expand(&mut doc) {
@@ -94,9 +94,12 @@ impl Reader {
     fn spec(&mut self, mut top: Mapping) -> Spec {
         let mut spec = Spec::default();
         for (k, _) in &top {
-            let key = k.as_str().unwrap_or_default();
-            if !FIELDS.contains(&key) {
-                self.problems.push(unknown(&FieldPath::default(), key, FIELDS));
+            match k.as_str() {
+                Some(key) if FIELDS.contains(&key) => {}
+                Some(key) => self.problems.push(unknown(&FieldPath::default(), key, FIELDS)),
+                None => self
+                    .problems
+                    .push(Problem::new(Code::InvalidValue, FieldPath::default(), "a field's name is a text")),
             }
         }
         if !self.set(&mut top, "version", &mut spec.version) {
@@ -177,7 +180,8 @@ impl Reader {
     }
 }
 
-/// A typed read's error as a problem: the path down to the field, the code its message says.
+/// A typed read's error as a problem: the path down to the field, the code its mistake carries
+/// (serde's unknown and missing fields read from its wording).
 fn typed_problem(at: &FieldPath, e: &serde_path_to_error::Error<serde_yaml_ng::Error>) -> Problem {
     let mut path = at.clone();
     for segment in e.path() {
@@ -207,12 +211,8 @@ fn typed_problem(at: &FieldPath, e: &serde_path_to_error::Error<serde_yaml_ng::E
         let field = rest.split('`').next().unwrap_or(rest);
         return Problem::new(Code::MissingField, path.key(field), format!("`{field}` is required here"));
     }
-    let code = if message.contains("both given") || message.contains("are all given") {
-        Code::Conflict
-    } else {
-        Code::InvalidValue
-    };
-    Problem::new(code, path, message)
+    // Our own reads raise coded mistakes (decoded above); what is left is serde's own wording.
+    Problem::new(Code::InvalidValue, path, message)
 }
 
 /// An unknown field, with the closest known one as the fix.

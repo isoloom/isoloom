@@ -12,6 +12,7 @@ use serde::de::{self, SeqAccess, Visitor};
 use super::app::App;
 use super::files::File;
 use super::hardware::Hardware;
+use super::mistake::Mistake;
 use super::names::{PortName, ServiceRef};
 use super::os::OsRef;
 use super::ports::Port;
@@ -275,13 +276,13 @@ fn services<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Vec<Service
 }
 
 impl TryFrom<MachineInput> for Machine {
-    type Error = Error;
+    type Error = Mistake;
 
-    fn try_from(m: MachineInput) -> Result<Machine, Error> {
+    fn try_from(m: MachineInput) -> Result<Machine, Mistake> {
         let kind = match (m.service, m.app) {
-            (Some(_), Some(_)) => return Err(Error::ServiceAndApp),
+            (Some(_), Some(_)) => return Err(Error::ServiceAndApp.into()),
             (Some(services), None) => Kind::Service(Services { services, with: m.with }),
-            (None, _) if !m.with.is_empty() => return Err(Error::WithWithoutService),
+            (None, _) if !m.with.is_empty() => return Err(Error::WithWithoutService.into()),
             (None, Some(app)) => Kind::App(app),
             (None, None) => Kind::Bare,
         };
