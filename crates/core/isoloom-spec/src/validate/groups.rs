@@ -5,8 +5,8 @@ use super::Problems;
 use crate::model::Spec;
 
 /// Groups: names and members.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
-    p.0.extend(crate::groups::problems(spec));
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
+    problems.0.extend(crate::groups::problems(spec));
 }
 
 #[cfg(test)]

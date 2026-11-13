@@ -20,12 +20,12 @@ const RESERVED: &[&str] = &[
 ];
 
 /// Each host folder of the machine: a Linux machine, a usable `from`, and a path of its own.
-pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
+pub(super) fn of_machine(s: &Subject, problems: &mut Problems) {
     if s.m.host_folders.is_empty() {
         return;
     }
     if s.m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)) {
-        p.add(
+        problems.add(
             format!("{}.host_folders", s.at),
             "a Windows machine has no host folders: they are mounted in Linux machines",
         );
@@ -36,10 +36,10 @@ pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
     taken.extend(s.m.disks.values().filter_map(|d| d.mount.as_deref()).map(|m| m.trim_end_matches('/')));
     for (i, f) in s.m.host_folders.iter().enumerate() {
         let at = format!("{}.host_folders[{i}]", s.at);
-        from(&at, f, p);
+        from(&at, f, problems);
         let path = f.path.as_str();
         if !safe_path(path) {
-            p.add(
+            problems.add(
                 format!("{at}.path"),
                 format!("`{path}` isn't a safe absolute path inside the machine (no spaces or ':'), like /srv/shared"),
             );
@@ -47,12 +47,12 @@ pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
             .iter()
             .find(|r| path == **r || path.strip_prefix(**r).is_some_and(|rest| rest.starts_with('/')))
         {
-            p.add(
+            problems.add(
                 format!("{at}.path"),
                 format!("`{path}` is inside `{own}`, Isoloom's own or the kernel's: mount the folder elsewhere"),
             );
         } else if !taken.insert(path.trim_end_matches('/')) {
-            p.add(
+            problems.add(
                 format!("{at}.path"),
                 format!("`{path}` is already a volume, a disk, a tmpfs or a host folder of this machine"),
             );
@@ -62,21 +62,21 @@ pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
 
 /// A folder named the way every tool reads it the same: relative to the project, `~` or `~/...`
 /// (not another user's `~name`), or absolute; nothing Compose would read as a reference.
-fn from(at: &str, f: &HostFolder, p: &mut Problems) {
+fn from(at: &str, f: &HostFolder, problems: &mut Problems) {
     let from = f.from.as_str();
     let at = format!("{at}.from");
     if from.trim().is_empty() {
-        p.add(
+        problems.add(
             at,
             "name the folder of the computer: relative to the project folder, `~/...` or an absolute path",
         );
     } else if from.contains(['$', '{', '}']) || from.chars().any(char::is_control) {
-        p.add(
+        problems.add(
             at,
             format!("`{from}`: no `$`, `{{`, `}}` or control characters (Compose would read them as its own)"),
         );
     } else if matches!(f.host(), HostPath::Project(_)) && from.starts_with('~') {
-        p.add(
+        problems.add(
             at,
             format!("`{from}`: `~` or `~/...` is the home folder of the user running the environment; another user's (`~name`) isn't one"),
         );

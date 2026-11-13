@@ -18,77 +18,77 @@ pub(super) struct Subject<'a> {
 }
 
 /// At least one machine (unless the environment is cloud services), and one access machine at most.
-pub(super) fn declared(spec: &Spec, p: &mut Problems) {
+pub(super) fn declared(spec: &Spec, problems: &mut Problems) {
     if spec.machines.is_empty() && spec.cloud.is_none() {
-        p.add("machines", "declare at least one machine");
+        problems.add("machines", "declare at least one machine");
     }
     let access = spec.machines.values().filter(|m| m.access).count();
     if access > 1 {
-        p.add("machines", format!("only one machine can be the access machine (found {access})"));
+        problems.add("machines", format!("only one machine can be the access machine (found {access})"));
     }
 }
 
 /// Network appliances (`docker.appliance`): Docker machines Isoloom wires as their image expects.
-pub(super) fn appliances(spec: &Spec, p: &mut Problems) {
+pub(super) fn appliances(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let Some(d) = m.docker.as_ref().filter(|d| d.appliance.is_some()) else {
             continue;
         };
         let at = format!("machines.{name}");
         if m.vm.is_some() {
-            p.add(format!("{at}.vm"), "a network appliance runs on the Docker targets only: leave `vm` out");
+            problems.add(format!("{at}.vm"), "a network appliance runs on the Docker targets only: leave `vm` out");
         }
         if m.access {
-            p.add(format!("{at}.access"), "a network appliance can't be the access machine");
+            problems.add(format!("{at}.access"), "a network appliance can't be the access machine");
         }
         if d.idle || !d.init.is_empty() {
-            p.add(format!("{at}.docker"), "a network appliance runs its own OS: no `idle` or `init`");
+            problems.add(format!("{at}.docker"), "a network appliance runs its own OS: no `idle` or `init`");
         }
         if let Some(c) = &d.config
             && (c.starts_with('/') || c.split('/').any(|segment| segment == ".."))
         {
-            p.add(format!("{at}.docker.config"), "a path in the project");
+            problems.add(format!("{at}.docker.config"), "a path in the project");
         }
     }
 }
 
 /// Every machine, in order; addresses and published ports must be unique across machines.
-pub(super) fn each(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
+pub(super) fn each(spec: &Spec, blocks: &Blocks, problems: &mut Problems) {
     let mut taken: HashMap<(String, u8), String> = HashMap::new();
     let mut published: HashMap<(u16, Protocol), String> = HashMap::new();
     for (name, m) in &spec.machines {
-        super::settings::machine(name, m, p);
-        super::hardware::machine(name, m, p);
-        super::hardware::offline_privilege(spec, name, m, p);
+        super::settings::machine(name, m, problems);
+        super::hardware::machine(name, m, problems);
+        super::hardware::offline_privilege(spec, name, m, problems);
         let s = Subject {
             spec,
             name,
             m,
             at: format!("machines.{name}"),
         };
-        name_and_networks(&s, p);
-        addresses(&s, blocks, &mut taken, p);
-        more_addresses(&s, blocks, &mut taken, p);
-        super::volumes::of_machine(&s, p);
-        super::host_folders::of_machine(&s, p);
-        super::ports::of_machine(&s, &mut published, p);
+        name_and_networks(&s, problems);
+        addresses(&s, blocks, &mut taken, problems);
+        more_addresses(&s, blocks, &mut taken, problems);
+        super::volumes::of_machine(&s, problems);
+        super::host_folders::of_machine(&s, problems);
+        super::ports::of_machine(&s, &mut published, problems);
         for (i, input) in m.inputs.iter().enumerate() {
             if !spec.declares_input(input) {
-                p.unknown(format!("{}.inputs[{i}]", s.at), format!("`{input}` isn't declared in the spec's `inputs`"));
+                problems.unknown(format!("{}.inputs[{i}]", s.at), format!("`{input}` isn't declared in the spec's `inputs`"));
             }
         }
-        super::ports::depends_on(&s, p);
-        super::os::of_machine(&s, p);
-        resources(&s, p);
-        aliases(&s, p);
+        super::ports::depends_on(&s, problems);
+        super::os::of_machine(&s, problems);
+        resources(&s, problems);
+        aliases(&s, problems);
         if m.docker.is_none() && m.vm.is_none() && !m.access {
-            p.add(&s.at, "give the machine a form: its `os`, plus an `app:` (or nothing more, the OS alone)");
+            problems.add(&s.at, "give the machine a form: its `os`, plus an `app:` (or nothing more, the OS alone)");
         }
         if let Some(d) = &m.docker {
-            docker(&s.at, d, p);
+            docker(&s.at, d, problems);
         }
         if let Some(v) = &m.vm {
-            vm(&s, v, p);
+            vm(&s, v, problems);
         }
     }
 }
@@ -106,34 +106,34 @@ const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (i
 
 /// The machine's name (a DNS label short enough for Kubernetes, its length checked first), and a
 /// network to be on.
-fn name_and_networks(s: &Subject, p: &mut Problems) {
+fn name_and_networks(s: &Subject, problems: &mut Problems) {
     if s.name.len() > MACHINE_NAME_MAX {
-        p.add(
+        problems.add(
             &s.at,
             format!("at most {MACHINE_NAME_MAX} characters: its published ports are the Kubernetes Service `isoloom-<name>`"),
         );
     } else if !dns_label(s.name) {
-        p.add(&s.at, "machine names are DNS names: kebab-case, starting with a letter");
+        problems.add(&s.at, "machine names are DNS names: kebab-case, starting with a letter");
     } else if s.name.starts_with(RESERVED_PREFIX) {
-        p.add(&s.at, RESERVED_NAME);
+        problems.add(&s.at, RESERVED_NAME);
     }
     // A LAN's switch takes its ports from the LAN (checked with the networks).
     if s.m.networks.is_empty() && crate::vlans::switched_by(s.spec, s.name).is_none() {
-        p.add(format!("{}.networks", s.at), "attach the machine to at least one network");
+        problems.add(format!("{}.networks", s.at), "attach the machine to at least one network");
     }
 }
 
 /// The machine's address on each of its networks: usable, the gateway's own when it is one,
 /// and not another machine's.
-fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), String>, p: &mut Problems) {
+fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), String>, problems: &mut Problems) {
     let name = s.name;
     for (net, octet) in &s.m.networks {
         let nat = format!("{}.networks.{net}", s.at);
         let Some(c) = block(blocks, net) else {
-            p.unknown(nat, format!("no network named `{net}`"));
+            problems.unknown(nat, format!("no network named `{net}`"));
             continue;
         };
-        if super::outside::dhcp_address(s.spec, net, *octet, &nat, p) {
+        if super::outside::dhcp_address(s.spec, net, *octet, &nat, problems) {
             continue;
         }
         let network = s.spec.networks.get(net);
@@ -142,7 +142,7 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
         let c = NetworkBlock::new(c);
         if is_gateway {
             match c.map(NetworkBlock::gateway_octet) {
-                Some(gateway) if gateway != *octet => p.add(
+                Some(gateway) if gateway != *octet => problems.add(
                     nat,
                     format!("`{name}` is this network's gateway, so it takes the gateway address: use {gateway}"),
                 ),
@@ -151,9 +151,9 @@ fn addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), Str
                 }
             }
         } else if c.and_then(|c| c.host(*octet)).is_none() {
-            p.add(nat, unusable(*octet, network.map_or("", |n| n.cidr.as_str())));
+            problems.add(nat, unusable(*octet, network.map_or("", |n| n.cidr.as_str())));
         } else if let Some(other) = taken.insert((net.clone(), *octet), name.to_owned()) {
-            p.add(nat, format!("address .{octet} is already used by `{other}`"));
+            problems.add(nat, format!("address .{octet} is already used by `{other}`"));
         }
     }
 }
@@ -168,12 +168,12 @@ fn unusable(octet: u8, cidr: &str) -> String {
 /// The machine's further addresses on a network (`lan: [10, 11]`): each usable in the
 /// network's block, written once, and not another machine's. Only on the environment's own
 /// networks: an outside network's addresses are its own LAN's or its DHCP server's.
-fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), String>, p: &mut Problems) {
+fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8), String>, problems: &mut Problems) {
     for (net, octets) in &s.m.more_addresses {
         let nat = format!("{}.networks.{net}", s.at);
         let Some(c) = block(blocks, net) else { continue };
         if s.spec.networks.get(net).is_some_and(crate::model::Network::is_outside) {
-            p.add(
+            problems.add(
                 nat,
                 "several addresses only on the environment's own networks: an outside network's addresses are its LAN's",
             );
@@ -182,11 +182,11 @@ fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8)
         let mut seen = vec![s.m.networks.get(net).copied().unwrap_or_default()];
         for octet in octets {
             if seen.contains(octet) {
-                p.add(&nat, format!("address .{octet} is written twice"));
+                problems.add(&nat, format!("address .{octet} is written twice"));
             } else if NetworkBlock::new(c).and_then(|c| c.host(*octet)).is_none() {
-                p.add(&nat, unusable(*octet, s.spec.networks.get(net).map_or("", |n| n.cidr.as_str())));
+                problems.add(&nat, unusable(*octet, s.spec.networks.get(net).map_or("", |n| n.cidr.as_str())));
             } else if let Some(other) = taken.insert((net.clone(), *octet), s.name.to_owned()) {
-                p.add(&nat, format!("address .{octet} is already used by `{other}`"));
+                problems.add(&nat, format!("address .{octet} is already used by `{other}`"));
             }
             seen.push(*octet);
         }
@@ -195,17 +195,17 @@ fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8)
 
 /// A VM needs room to boot; a container only what its process uses (a Go service capped at
 /// 64 MB is common), so the VM floor applies to machines that can be VMs.
-fn resources(s: &Subject, p: &mut Problems) {
+fn resources(s: &Subject, problems: &mut Problems) {
     let Some(r) = s.m.resources else { return };
     if s.m.vm.is_some() {
         if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < MIN_VM_MEMORY_MB) || r.disk_gb.is_some_and(|v| v < MIN_VM_DISK_GB) {
-            p.add(
+            problems.add(
                 format!("{}.resources", s.at),
                 format!("too small for a VM: at least 1 cpu, {MIN_VM_MEMORY_MB} MB and {MIN_VM_DISK_GB} GB"),
             );
         }
     } else if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < MIN_CONTAINER_MEMORY_MB) {
-        p.add(
+        problems.add(
             format!("{}.resources", s.at),
             format!("too small: at least 1 cpu and {MIN_CONTAINER_MEMORY_MB} MB"),
         );
@@ -227,38 +227,38 @@ pub fn dns_name(a: &str) -> bool {
 }
 
 /// The other names a machine answers to: DNS names, no other machine's, not on clones.
-fn aliases(s: &Subject, p: &mut Problems) {
+fn aliases(s: &Subject, problems: &mut Problems) {
     let (spec, name, at) = (s.spec, s.name, &s.at);
     for (i, a) in s.m.aliases.iter().enumerate() {
         if !dns_name(a) {
-            p.add(format!("{at}.aliases[{i}]"), format!("`{a}` isn't a DNS name like api.example.com (lowercase)"));
+            problems.add(format!("{at}.aliases[{i}]"), format!("`{a}` isn't a DNS name like api.example.com (lowercase)"));
         } else if a.starts_with(RESERVED_PREFIX) {
-            p.add(format!("{at}.aliases[{i}]"), RESERVED_NAME);
+            problems.add(format!("{at}.aliases[{i}]"), RESERVED_NAME);
         } else if spec.machines.contains_key(a) || spec.machines.iter().any(|(o, om)| o != name && om.aliases.contains(a)) {
-            p.add(format!("{at}.aliases[{i}]"), format!("`{a}` already names another machine"));
+            problems.add(format!("{at}.aliases[{i}]"), format!("`{a}` already names another machine"));
         }
     }
     if !s.m.aliases.is_empty() && s.m.count.is_some() {
-        p.add(format!("{at}.aliases"), "clones (`count`) can't share names: give aliases to single machines");
+        problems.add(format!("{at}.aliases"), "clones (`count`) can't share names: give aliases to single machines");
     }
 }
 
 /// The `docker:` implementation: an image or a build (a Dynamips router: its firmware).
-fn docker(at: &str, d: &DockerImpl, p: &mut Problems) {
+fn docker(at: &str, d: &DockerImpl, problems: &mut Problems) {
     // A Dynamips router: Isoloom builds the emulator; the IOS image is the firmware.
     let emulated = d.appliance == Some(Appliance::CiscoDynamips);
     if emulated {
         if d.image.is_some() || d.build.is_some() {
-            p.add(
+            problems.add(
                 format!("{at}.docker"),
                 "a Dynamips router's container is Isoloom's: give its IOS image as `firmware`, not `image` or `build`",
             );
         }
         if d.firmware.is_none() {
-            p.add(format!("{at}.docker.firmware"), "the IOS image (.bin) to boot, a file in the project");
+            problems.add(format!("{at}.docker.firmware"), "the IOS image (.bin) to boot, a file in the project");
         }
     } else if d.firmware.is_some() {
-        p.add(
+        problems.add(
             format!("{at}.docker.firmware"),
             "only a Dynamips router (`appliance: cisco-dynamips`) boots a firmware",
         );
@@ -268,14 +268,14 @@ fn docker(at: &str, d: &DockerImpl, p: &mut Problems) {
         _ if emulated || d.generated.is_some() => {}
         // `image` with `build` is the Compose combo: the build is tagged as that published name
         // (built in development, pulled in production).
-        (None, None) => p.add(format!("{at}.docker"), "set `image` (a published image) or `build` (a folder in the project)"),
+        (None, None) => problems.add(format!("{at}.docker"), "set `image` (a published image) or `build` (a folder in the project)"),
         _ => {}
     }
     if d.build.is_none() && (d.dockerfile.is_some() || d.target.is_some() || !d.args.is_empty()) {
-        p.add(format!("{at}.docker"), "`dockerfile`, `target` and `args` go with `build` (the context)");
+        problems.add(format!("{at}.docker"), "`dockerfile`, `target` and `args` go with `build` (the context)");
     }
     if let Some(t) = d.target.as_deref().filter(|t| !stage_name(t)) {
-        p.add(
+        problems.add(
             format!("{at}.docker.target"),
             format!("`{t}` isn't a Dockerfile stage name (`FROM ... AS <name>`: letters, digits, `-`, `_` and `.`, starting with a letter)"),
         );
@@ -288,10 +288,10 @@ fn stage_name(t: &str) -> bool {
 }
 
 /// The `vm:` implementation: a known OS, Linux-only steps on Linux, and steps to run.
-fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
+fn vm(s: &Subject, v: &VmImpl, problems: &mut Problems) {
     let at = &s.at;
     if v.os.is_empty() {
-        p.add(
+        problems.add(
             format!("{at}.vm.os"),
             "name the machine's OS with `os: <family>@<version>` (`debian@12`), here or on the machine (or share one through `common:` or a group)",
         );
@@ -302,7 +302,7 @@ fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
     if crate::images::is_windows(&v.os) {
         for (i, step) in v.provision.iter().enumerate() {
             if crate::model::is_reboot(step) {
-                p.add(
+                problems.add(
                     format!("{at}.vm.provision[{i}]"),
                     "`reboot` is a Linux step: restart a Windows machine from the environment's playbooks (`ansible.windows.win_reboot`)",
                 );
@@ -312,32 +312,32 @@ fn vm(s: &Subject, v: &VmImpl, p: &mut Problems) {
 }
 
 /// The start order has no cycle (`depends_on`, gateways, shared volumes).
-pub(super) fn cycle(spec: &Spec, p: &mut Problems) {
+pub(super) fn cycle(spec: &Spec, problems: &mut Problems) {
     let Some(cycle) = super::dependency_cycle(spec) else { return };
     let hint = if spec.networks.values().any(|n| n.gateway.is_some()) {
         " (machines on a gateway's network also start after it)"
     } else {
         ""
     };
-    p.add("machines", format!("depends_on forms a cycle: {}{hint}", cycle.join(" -> ")));
+    problems.add("machines", format!("depends_on forms a cycle: {}{hint}", cycle.join(" -> ")));
 }
 
 /// External machines: an address, a sane port, a user name.
-pub(super) fn external(spec: &Spec, p: &mut Problems) {
+pub(super) fn external(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let Some(e) = &m.external else { continue };
         let at = format!("machines.{name}.external");
         if e.address.trim().is_empty() || e.address.chars().any(|c| c.is_whitespace() || c == '@' || c == '\'' || c == '"') {
-            p.add(
+            problems.add(
                 format!("{at}.address"),
                 "an address or hostname reachable from here, like 192.168.1.20 or dc01.lab.local",
             );
         }
         if e.port == Some(0) {
-            p.add(format!("{at}.port"), "1 to 65535");
+            problems.add(format!("{at}.port"), "1 to 65535");
         }
         if e.user.as_deref().is_some_and(|u| u.trim().is_empty() || u.contains(['@', ' '])) {
-            p.add(format!("{at}.user"), "a user name");
+            problems.add(format!("{at}.user"), "a user name");
         }
     }
 }

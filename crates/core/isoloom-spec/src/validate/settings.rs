@@ -16,26 +16,26 @@ pub(crate) const CONTAINER_SYSCTLS: &[&str] = &[
 ];
 
 /// The machine's settings, each checked in turn; a Windows machine has neither sysctls nor ulimits.
-pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
+pub(super) fn machine(name: &str, m: &Machine, problems: &mut Problems) {
     let at = |field: &str, key: &str| format!("machines.{name}.{field}.{key}");
     for k in m.environment.keys() {
         if !is_variable(k) {
-            p.add(at("environment", k), "a variable name: letters, digits and _, not starting with a digit");
+            problems.add(at("environment", k), "a variable name: letters, digits and _, not starting with a digit");
         }
     }
-    sysctls(m, &|k| at("sysctls", k), p);
+    sysctls(m, &|k| at("sysctls", k), problems);
     for (k, u) in &m.ulimits {
         if !crate::model::ULIMITS.contains(&k.as_str()) {
-            p.add(at("ulimits", k), format!("one of {}", crate::model::ULIMITS.join(", ")));
+            problems.add(at("ulimits", k), format!("one of {}", crate::model::ULIMITS.join(", ")));
         }
         if u.soft() > u.hard() {
-            p.add(at("ulimits", k), "the soft limit can't be above the hard one");
+            problems.add(at("ulimits", k), "the soft limit can't be above the hard one");
         }
     }
     if m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)) {
         for (field, set) in [("sysctls", !m.sysctls.is_empty()), ("ulimits", !m.ulimits.is_empty())] {
             if set {
-                p.add(format!("machines.{name}.{field}"), "Linux only: a Windows machine has none");
+                problems.add(format!("machines.{name}.{field}"), "Linux only: a Windows machine has none");
             }
         }
     }
@@ -49,18 +49,18 @@ fn kernel_parameter(k: &str) -> bool {
 }
 
 /// Kernel parameters, namespaced ones only on a container, each with a one-line value.
-fn sysctls(m: &Machine, at: &dyn Fn(&str) -> String, p: &mut Problems) {
+fn sysctls(m: &Machine, at: &dyn Fn(&str) -> String, problems: &mut Problems) {
     for (k, v) in &m.sysctls {
         if !kernel_parameter(k) {
-            p.add(at(k), "a kernel parameter, e.g. net.core.somaxconn");
+            problems.add(at(k), "a kernel parameter, e.g. net.core.somaxconn");
         } else if m.docker.is_some() && !CONTAINER_SYSCTLS.iter().any(|pre| k.starts_with(pre)) {
-            p.add(
+            problems.add(
                 at(k),
                 "a container can only set the namespaced ones (net.*, kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*): run it on a VM target, which sets any",
             );
         }
         if v.trim().is_empty() || v.contains('\n') {
-            p.add(at(k), "a value on one line");
+            problems.add(at(k), "a value on one line");
         }
     }
 }
