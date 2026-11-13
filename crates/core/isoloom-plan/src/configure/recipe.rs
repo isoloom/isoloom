@@ -145,7 +145,7 @@ fn unportable(i: usize, step: &Step, family: Family) -> Option<Unportable> {
     let acl = |field| Unportable {
         step: i,
         field: Some(field),
-        reason: format!("a Windows file's `{field}` is an ACL, which the model sets in 1.x"),
+        reason: format!("a Windows file's `{field}` is an ACL, which the model doesn't set"),
         fix: format!("leave `{field}` out, or set the ACL from a `.ps1` step"),
     };
     match step {

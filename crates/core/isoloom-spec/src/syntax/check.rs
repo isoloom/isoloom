@@ -1,8 +1,8 @@
 //! The checks a parsed spec needs beyond its types: what a machine is (its `os`, its recipe, a
 //! catalogue service's fields the spec alone rules on), where its values come from (inputs, secrets, sensitive values), and what
-//! its names refer to (ports, overrides, the message's placeholders). The checks on the parts
-//! this format keeps from the earlier one (networks, addresses, reach, volumes, checks) run on
-//! the lowered spec ([`crate::validate()`]).
+//! its names refer to (ports, overrides, the message's placeholders): what the syntax alone
+//! decides. The checks that need the lowered spec (networks, addresses, reach, volumes, checks)
+//! run there ([`crate::validate()`]).
 
 mod messages;
 mod overrides;
