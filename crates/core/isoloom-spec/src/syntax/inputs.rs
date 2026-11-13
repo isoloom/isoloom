@@ -143,6 +143,7 @@ mod tests {
                 .to_string()
                 .contains("twice")
         );
-        assert!(serde_yaml_ng::from_str::<Inputs>("[1SECRET]").is_err());
+        let e = serde_yaml_ng::from_str::<Inputs>("[1SECRET]").unwrap_err().to_string();
+        assert!(e.contains("named like an environment variable"), "{e}");
     }
 }
