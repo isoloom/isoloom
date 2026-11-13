@@ -47,16 +47,6 @@ mod utm;
 pub(crate) mod values;
 mod windows;
 
-/// The name of a network on the host as a report shows it, `isoloom-<environment>-<key>-<network>`
-/// (after the contract's [`RESERVED_PREFIX`](isoloom_spec::contract::RESERVED_PREFIX)), the
-/// copy's key written `<key>`: its VirtualBox internal network, its libvirt network and its
-/// Hyper-V private switch, as the Vagrantfile makes them with the key it reads
-/// ([`isoloom_plan::Names::network`]).
-#[must_use]
-pub fn network_name(environment: &str, network: &str) -> String {
-    isoloom_plan::Names::new(environment).network(network).with_key("<key>")
-}
-
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::backend::Files;
@@ -70,6 +60,16 @@ use crate::error::{Error, Result};
 use crate::ruby::{Call, Ruby, Value};
 use crate::settings;
 use crate::vagrantfile;
+
+/// The name of a network on the host as a report shows it, `isoloom-<environment>-<key>-<network>`
+/// (after the contract's [`RESERVED_PREFIX`](isoloom_spec::contract::RESERVED_PREFIX)), the
+/// copy's key written `<key>`: its VirtualBox internal network, its libvirt network and its
+/// Hyper-V private switch, as the Vagrantfile makes them with the key it reads
+/// ([`isoloom_plan::Names::network`]).
+#[must_use]
+pub fn network_name(environment: &str, network: &str) -> String {
+    isoloom_plan::Names::new(environment).network(network).with_key("<key>")
+}
 
 /// The folder of the target's files, under [`OUTPUT_DIR`].
 const DIR: &str = "vagrant";
