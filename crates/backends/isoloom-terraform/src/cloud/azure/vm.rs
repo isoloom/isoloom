@@ -151,12 +151,12 @@ pub(crate) const DRIVER: VmDriver = VmDriver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
-    network::blocks(env, m);
-    routing::blocks(env, m);
-    private_dns::write(env, m);
-    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
+    network::blocks(env, module);
+    routing::blocks(env, module);
+    private_dns::write(env, module);
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, module)
 }
 
 /// The address Terraform reaches a machine at (`id`: its resource name).

@@ -119,16 +119,16 @@ impl Machines {
     /// # Errors
     ///
     /// The first machine that can't be written ([`crate::Error::Refused`]).
-    pub(crate) fn write(&self, env: &Environment, m: &mut Module) -> Result<()> {
+    pub(crate) fn write(&self, env: &Environment, module: &mut Module) -> Result<()> {
         for vm in env.vms() {
             match (vm.plan.is_windows(), self.windows) {
-                (true, Some(windows)) => windows(env, vm, m),
+                (true, Some(windows)) => windows(env, vm, module),
                 (true, None) => {}
-                (false, _) => (self.linux)(env, vm, m)?,
+                (false, _) => (self.linux)(env, vm, module)?,
             }
         }
         if controller::needed(env) {
-            (self.controller)(env, m)?;
+            (self.controller)(env, module)?;
         }
         Ok(())
     }
@@ -144,11 +144,11 @@ impl Machines {
         env: &Environment,
         user: fn(&str) -> &'static str,
         public_ip: fn(&str) -> Expression,
-        m: &mut Module,
+        module: &mut Module,
     ) -> Result<()> {
-        crate::machine::credentials(env, m);
-        self.write(env, m)?;
-        outputs::write_named(env, user, public_ip, m);
+        crate::machine::credentials(env, module);
+        self.write(env, module)?;
+        outputs::write_named(env, user, public_ip, module);
         Ok(())
     }
 }

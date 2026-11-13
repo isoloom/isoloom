@@ -26,11 +26,11 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
 
 /// The cloud's resources, after the module's head, `custom_data` in the VM (read by
 /// cloud-init); the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Expression {
-    m.blocks(network());
-    m.block(security_group(env));
-    m.blocks(interface());
-    m.block(host(HostSize::of(env), custom_data));
+fn resources(env: &Environment, module: &mut Module, custom_data: Expression) -> Expression {
+    module.blocks(network());
+    module.block(security_group(env));
+    module.blocks(interface());
+    module.block(host(HostSize::of(env), custom_data));
     reference("azurerm_public_ip.env.ip_address")
 }
 

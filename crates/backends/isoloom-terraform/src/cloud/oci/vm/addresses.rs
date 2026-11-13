@@ -14,19 +14,19 @@ use crate::module::ident;
 
 /// The secondary private IPs of machine `name`, and the lookup of its first VNIC when they are on
 /// it.
-pub(super) fn blocks((name, mp): (&str, &MachinePlan), m: &mut Module) {
+pub(super) fn blocks((name, mp): (&str, &MachinePlan), module: &mut Module) {
     let id = ident(name);
     let first = mp.addresses.first();
     for (net, more) in &mp.more_addresses {
         let nic = format!("{id}_{}", ident(net));
         let vnic = if let Some((_, address)) = first.filter(|(n, _)| *n == net) {
-            m.block(first_vnic(name, (net, *address), &nic));
+            module.block(first_vnic(name, (net, *address), &nic));
             attr(index(reference(&format!("data.oci_core_private_ips.{nic}_first.private_ips")), 0), "vnic_id")
         } else {
             reference(&format!("oci_core_vnic_attachment.{nic}.vnic_id"))
         };
         for address in more {
-            m.block(private_ip(
+            module.block(private_ip(
                 &format!("{nic}_{}", address.octets()[3]),
                 vnic.clone(),
                 &address.to_string(),

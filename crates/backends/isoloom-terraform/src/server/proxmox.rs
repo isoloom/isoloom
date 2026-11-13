@@ -211,12 +211,12 @@ const PARTS: Parts = Parts {
 };
 
 /// The VMs, the LXC containers, then the controller.
-fn guests(env: &Environment, m: &mut Module) {
+fn guests(env: &Environment, module: &mut Module) {
     for vm in env.vms() {
-        machine::blocks(env, vm, m);
+        machine::blocks(env, vm, module);
     }
-    lxc::blocks(env, m);
+    lxc::blocks(env, module);
     if core_controller::needed(env) {
-        controller::blocks(env, m);
+        controller::blocks(env, module);
     }
 }

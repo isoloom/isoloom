@@ -25,9 +25,9 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
 
 /// The cloud's resources, after the module's head, `setup` as the instance's startup script;
 /// the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Expression {
-    m.blocks(network(env));
-    m.block(host(env, HostSize::of(env), setup));
+fn resources(env: &Environment, module: &mut Module, setup: Expression) -> Expression {
+    module.blocks(network(env));
+    module.block(host(env, HostSize::of(env), setup));
     public_ip("env")
 }
 

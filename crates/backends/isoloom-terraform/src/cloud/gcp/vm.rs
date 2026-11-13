@@ -172,9 +172,9 @@ pub(crate) const DRIVER: VmDriver = VmDriver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
-    network::blocks(env, m);
-    private_dns::write(env, own_project(), m);
-    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
+    network::blocks(env, module);
+    private_dns::write(env, own_project(), module);
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, module)
 }

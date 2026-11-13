@@ -24,11 +24,11 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
 
 /// The cloud's resources, after the module's head, `user_data` in the droplet; the Docker
 /// host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(vpc(crate::cloud::docker::HOST_SUBNET));
-    m.block(ssh_key());
-    m.block(droplet(env, user_data));
-    m.block(firewall(env));
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(vpc(crate::cloud::docker::HOST_SUBNET));
+    module.block(ssh_key());
+    module.block(droplet(env, user_data));
+    module.block(firewall(env));
     reference("digitalocean_droplet.env.ipv4_address")
 }
 

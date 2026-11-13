@@ -27,13 +27,13 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
 
 /// The cloud's resources, after the module's head, `user_data` in the instance; the Docker
 /// host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
     let size = HostSize::of(env);
-    m.block(zones());
-    m.blocks(vm::ami_lookup(HOST_OS));
-    m.blocks(network());
-    m.block(security_group(env));
-    m.block(host(size, user_data));
+    module.block(zones());
+    module.blocks(vm::ami_lookup(HOST_OS));
+    module.blocks(network());
+    module.block(security_group(env));
+    module.block(host(size, user_data));
     reference("aws_instance.env.public_ip")
 }
 

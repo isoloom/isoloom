@@ -46,10 +46,10 @@ fn ami(vm: Vm<'_>) -> Expression {
 }
 
 /// A Linux machine: its security group, its instance, set up from its user data.
-pub(super) fn linux(env: &Environment, vm: Vm<'_>, m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, vm: Vm<'_>, module: &mut Module) -> Result<()> {
     let Vm { name, plan: mp, os } = vm;
     let id = ident(name);
-    m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
+    module.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
     let instance = ec2_instance(&id)
         .add_attribute(("ami", ami(vm)))
         .add_attribute(("instance_type", string(machine_type(mp))))
@@ -62,9 +62,9 @@ pub(super) fn linux(env: &Environment, vm: Vm<'_>, m: &mut Module) -> Result<()>
         .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot, CAP)?))
         .add_block(lifecycle("user_data_base64", tpm_ami.as_deref()));
     if addresses::needs_interfaces(mp) {
-        m.blocks(several_networks(vm, instance));
+        module.blocks(several_networks(vm, instance));
     } else {
-        m.block(one_network(vm, instance));
+        module.block(one_network(vm, instance));
     }
     Ok(())
 }
@@ -194,10 +194,10 @@ fn mac(nic: &str) -> Expression {
 
 /// A Windows machine: its security group, its instance (the administrator and WinRM at first
 /// boot), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, vm: Vm<'_>, m: &mut Module) {
+pub(super) fn windows(env: &Environment, vm: Vm<'_>, module: &mut Module) {
     let Vm { name, plan: mp, .. } = vm;
     let id = ident(name);
-    m.commented(
+    module.commented(
         &format!("Machine `{name}` (Windows): what may reach it."),
         security_group(env, (name, mp), true),
     );
@@ -215,11 +215,11 @@ pub(super) fn windows(env: &Environment, vm: Vm<'_>, m: &mut Module) {
         .add_blocks(disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
     let instance = nesting(addresses::on_instance(instance, mp, net), mp).build();
-    m.commented(
+    module.commented(
         "No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.",
         instance,
     );
-    m.blocks(windows::blocks(windows::Machine {
+    module.blocks(windows::blocks(windows::Machine {
         remote: Remote {
             env,
             name,
@@ -252,15 +252,15 @@ fn windows_user_data() -> Expression {
 /// The controller: its security group, an interface on every network at the controller
 /// address, its instance and Elastic IP, set up from its user data (it waits for every machine's
 /// own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
-    m.commented(
+pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
+    module.commented(
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
         controller_group(env),
     );
     let nic = |n: &str| format!("isoloom_controller_{}", ident(n));
     let addresses = controller::addresses(env);
     for (n, at) in &addresses {
-        m.block(interface(&nic(n), n, &at.to_string(), reference("aws_security_group.isoloom_controller.id"), None).build());
+        module.block(interface(&nic(n), n, &at.to_string(), reference("aws_security_group.isoloom_controller.id"), None).build());
     }
     let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
     let (_, _, disk) = controller::size(env);
@@ -268,7 +268,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
     let user = |os: &str| image_user(os).to_owned();
     let setup = controller_setup::set_up(env, &user, inventory, &at_boot);
-    m.block(
+    module.block(
         ec2_instance("isoloom_controller")
             .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(controller::OS)))))
             .add_attribute(("instance_type", string(RULES.controller_size(env))))
@@ -280,8 +280,8 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
             .add_attribute(("tags", object([("Name", name_with(&format!("-{}", controller::NAME)))])))
             .build(),
     );
-    m.block(eip("isoloom_controller", &first));
-    m.blocks(attachments("isoloom_controller", env.networks.keys().map(|n| nic(n))));
+    module.block(eip("isoloom_controller", &first));
+    module.blocks(attachments("isoloom_controller", env.networks.keys().map(|n| nic(n))));
     Ok(())
 }
 

@@ -16,8 +16,8 @@ use crate::machine::{Shell, controller};
 use crate::module::ident;
 
 /// The controller's snippet and VM.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    m.commented(
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    module.commented(
         "The controller: runs the environment's playbooks once every machine is up.",
         snippet(&ident(controller::NAME), controller::NAME, cloud_config(env).document()),
     );
@@ -53,7 +53,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         data_disks: Vec::new(),
         folders: Vec::new(),
     };
-    m.block(vm.block(env));
+    module.block(vm.block(env));
 }
 
 /// Its cloud-init: the packages, the constraints, the project, its key and the inventory, then

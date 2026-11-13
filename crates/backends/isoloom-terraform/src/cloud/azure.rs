@@ -35,8 +35,8 @@ pub(crate) fn variables(region: &str) -> [Variable; 2] {
 }
 
 /// The provider, and the tags every resource carries (`local.tags`).
-pub(crate) fn provider(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
-    m.block(
+pub(crate) fn provider(env: &Environment, module: &mut Module) -> Vec<(&'static str, Expression)> {
+    module.block(
         Block::builder("provider")
             .add_label("azurerm")
             .add_block(Block::builder("features").build())

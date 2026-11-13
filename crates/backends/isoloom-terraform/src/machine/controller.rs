@@ -70,9 +70,9 @@ pub(crate) fn size(env: &Environment) -> (u32, u32, u32) {
 }
 
 /// Its key, `tls_private_key.controller`, when the environment needs a controller.
-pub(crate) fn write_key(env: &Environment, m: &mut Module) {
+pub(crate) fn write_key(env: &Environment, module: &mut Module) {
     if needed(env) {
-        m.commented(
+        module.commented(
             "The controller's own key: it runs the playbooks over SSH on every machine.",
             resource("tls_private_key", "controller")
                 .add_attribute(("algorithm", string("ED25519")))

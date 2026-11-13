@@ -71,7 +71,7 @@ fn table(env: &Environment, net: &str) -> Block {
 
 /// A route table per network when a machine routes one, else none (`None`: every subnet shares
 /// the environment's table).
-pub(super) fn blocks(env: &Environment, m: &mut Module) -> bool {
+pub(super) fn blocks(env: &Environment, module: &mut Module) -> bool {
     if routed(env).is_empty() {
         return false;
     }
@@ -79,9 +79,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) -> bool {
     for net in env.networks.keys() {
         let t = table(env, net);
         if std::mem::take(&mut first) {
-            m.commented("A route table per network: the networks a machine routes go through its interface.", t);
+            module.commented("A route table per network: the networks a machine routes go through its interface.", t);
         } else {
-            m.block(t);
+            module.block(t);
         }
     }
     true

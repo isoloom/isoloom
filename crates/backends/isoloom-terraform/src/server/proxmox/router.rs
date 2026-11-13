@@ -14,7 +14,7 @@ use crate::module::ident;
 use crate::server::router::{NAME, Platform};
 
 /// The router's snippet and VM.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let mut config = crate::server::router::cloud_config(
         env,
         Platform {
@@ -31,7 +31,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         config.files.extend(files);
         config.runcmd.push(start.to_owned());
     }
-    m.commented(
+    module.commented(
         "The router: forwards between networks with the reach rules, and to the internet.",
         snippet(&ident(NAME), NAME, config.document()),
     );
@@ -59,7 +59,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         data_disks: Vec::new(),
         folders: Vec::new(),
     };
-    m.commented("The guest agent reports its uplink address (DHCP), for the published ports.", vm.block(env));
+    module.commented("The guest agent reports its uplink address (DHCP), for the published ports.", vm.block(env));
 }
 
 /// The router's MAC on its uplink (`None`) or on network `i`: unique per slot.
@@ -105,8 +105,8 @@ fn own_addresses(env: &Environment) -> Vec<String> {
 
 /// The outputs, from `local.router_address`: the router's address that is none of its
 /// environment addresses.
-pub(super) fn outputs(env: &Environment, m: &mut Module) {
+pub(super) fn outputs(env: &Environment, module: &mut Module) {
     let first = super::uplink::first_address("proxmox_virtual_environment_vm.isoloom_router", &own_addresses(env));
-    m.block(Block::builder("locals").add_attribute(("router_address", first)).build());
-    crate::server::router::outputs(env, Target::Proxmox, m);
+    module.block(Block::builder("locals").add_attribute(("router_address", first)).build());
+    crate::server::router::outputs(env, Target::Proxmox, module);
 }

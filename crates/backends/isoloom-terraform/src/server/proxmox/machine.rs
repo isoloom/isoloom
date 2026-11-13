@@ -14,10 +14,10 @@ use crate::server::{router as server_router, slotted};
 
 /// A machine's snippet and VM: a cloud-init document on a cloud image, or on Windows a
 /// cloudbase-init script on a clone of the OS's template (see `windows`).
-pub(super) fn blocks(env: &Environment, planned: isoloom_plan::Vm<'_>, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, planned: isoloom_plan::Vm<'_>, module: &mut Module) {
     let isoloom_plan::Vm { name, plan: mp, .. } = planned;
     let boot = if mp.is_windows() {
-        m.commented(
+        module.commented(
             &format!("Machine `{name}`: its set-up, run by cloudbase-init."),
             snippet_file(&ident(name), &format!("{name}.ps1"), cloudbase_init::user_data(env, (name, mp))),
         );
@@ -32,11 +32,11 @@ pub(super) fn blocks(env: &Environment, planned: isoloom_plan::Vm<'_>, m: &mut M
         }
         config.files.extend(super::virtiofs::tag_files(env, name));
         cloud_init::machine(env, (name, mp), &mut config);
-        m.commented(&format!("Machine `{name}`."), snippet(&ident(name), name, config.document()));
+        module.commented(&format!("Machine `{name}`."), snippet(&ident(name), name, config.document()));
         super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(super::arch::image_res(planned)))
     };
-    m.block(vm(env, name, mp, boot).block(env));
-    super::firewall::guest(env, name, super::firewall::Guest::Vm, m);
+    module.block(vm(env, name, mp, boot).block(env));
+    super::firewall::guest(env, name, super::firewall::Guest::Vm, module);
 }
 
 /// The VM of machine `name`, booting from `boot`: an interface and an address per network, the

@@ -24,8 +24,8 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
 /// by cloud-init); the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(
         resource("linode_instance")
             .add_attribute(("region", reference("var.region")))
             .add_attribute(("type", reference("var.type")))
@@ -36,7 +36,7 @@ fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expres
             .add_block(super::set_up_once())
             .build(),
     );
-    m.block(firewall(env));
+    module.block(firewall(env));
     call("one", [reference("linode_instance.env.ipv4")])
 }
 

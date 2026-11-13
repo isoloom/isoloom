@@ -23,12 +23,12 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
 /// by cloud-init); the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(availability_domains());
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(availability_domains());
     let version = vm::ubuntu(HOST_OS);
-    m.block(ubuntu_images(&vm::image_source(version), version));
-    m.blocks(network(env));
-    m.block(host(env, user_data));
+    module.block(ubuntu_images(&vm::image_source(version), version));
+    module.blocks(network(env));
+    module.block(host(env, user_data));
     reference("oci_core_instance.env.public_ip")
 }
 
