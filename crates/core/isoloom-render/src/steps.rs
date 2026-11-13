@@ -280,15 +280,15 @@ pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -
     )
 }
 
-/// Installs packages with the machine's own package manager (Debian and Ubuntu, or the RHEL
-/// family: Rocky, AlmaLinux, CentOS, Fedora).
-const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; else yum install -y -q \"$@\"; fi; }";
+/// Installs packages with the machine's own package manager: Debian and Ubuntu's apt, the RHEL
+/// family's dnf (Rocky, AlmaLinux, CentOS, Fedora) or yum, Alpine's apk.
+const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; elif command -v apk >/dev/null; then apk add -q --no-cache \"$@\"; else yum install -y -q \"$@\"; fi; }";
 
-/// `nft`, installed unless it is there, with the machine's own package manager (Alpine's `apk`
-/// too), as root script lines.
+/// `nft`, installed unless it is there, with the machine's own package manager, as root script
+/// lines.
 #[must_use]
 pub fn nftables() -> String {
-    format!("{PKG}\ncommand -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi\n")
+    format!("{PKG}\ncommand -v nft >/dev/null || pkg nftables\n")
 }
 
 /// This boot's id: it changes at each boot.

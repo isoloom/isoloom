@@ -1203,8 +1203,8 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     SH
     m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
-      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
-      command -v nft >/dev/null || if command -v apk >/dev/null; then apk add -q --no-cache nftables; else pkg nftables; fi
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
+      command -v nft >/dev/null || pkg nftables
       printf '%s\n' 'table inet isoloom-egress' 'delete table inet isoloom-egress' 'table inet isoloom-egress {' '  chain output {' '    type filter hook output priority 0; policy accept;' '    oifname "lo" accept' '    ip daddr != { 10.67.10.0/24, 10.67.20.0/24 } ct state new drop' '    ip6 daddr != { fd00:67:10::/64, fd00:67:20::/64 } ct state new drop' '  }' '}' > /etc/isoloom-egress.nft
       mkdir -p /etc/isoloom
       cat > /etc/isoloom/egress.sh <<'EGRESS'

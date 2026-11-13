@@ -1550,7 +1550,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     SH
     m.vm.provision "shell", name: "provision/web01.yml", inline: <<~'SH'
       set -e
-      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
       command -v ansible-playbook >/dev/null || pkg ansible-core
       cd /opt/isoloom && sh -c 'ansible-playbook -c local -i web01, '\''provision/web01.yml'\'''
     SH
