@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use isoloom_catalogue::{Catalogue, schema};
 use serde_json::Value;
 
-const WRITE: &str = "cargo test -p isoloom-catalogue --test catalogue -- --ignored write_the_generated_schemas";
+const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
@@ -23,20 +23,18 @@ fn generated() -> Result<Vec<(&'static str, String)>, Box<dyn std::error::Error>
     ])
 }
 
+/// The committed schemas are the generated ones; `ISOLOOM_WRITE_FIXTURES=1` writes them instead,
+/// as it writes the other fixtures.
 #[test]
 fn the_generated_schemas_are_current() {
+    let write = std::env::var_os("ISOLOOM_WRITE_FIXTURES").is_some();
     for (file, content) in generated().unwrap() {
+        if write {
+            std::fs::write(root().join(file), content).unwrap();
+            continue;
+        }
         let on_disk = std::fs::read_to_string(root().join(file)).unwrap_or_default();
         assert!(on_disk == content, "{file} is out of date: run `{WRITE}`");
-    }
-}
-
-/// Writes the generated schemas.
-#[test]
-#[ignore = "writes the generated schemas; run it after changing the types or the entries"]
-fn write_the_generated_schemas() {
-    for (file, content) in generated().unwrap() {
-        std::fs::write(root().join(file), content).unwrap();
     }
 }
 

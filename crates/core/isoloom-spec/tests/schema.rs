@@ -11,7 +11,7 @@ use isoloom_spec::schema::{MODELINE, schema};
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
 /// The committed schema is written by the catalogue, which adds each entry's `with:` rule.
-const WRITE: &str = "cargo test -p isoloom-catalogue --test catalogue -- --ignored write_the_generated_schemas";
+const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
 
 /// The committed copy of the schema.
 fn committed() -> std::path::PathBuf {

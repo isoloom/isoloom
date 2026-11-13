@@ -81,6 +81,7 @@ mod tests {
         let h: Hardware = serde_yaml_ng::from_str("{ arch: arm64, tpm: required }").unwrap();
         assert_eq!((h.arch, h.tpm, h.vm_only()), (Arch::Arm64, Tpm::Required, Some("tpm")));
         assert_eq!(Hardware::default().vm_only(), None);
-        assert!(serde_yaml_ng::from_str::<Hardware>("{ tpm: true }").is_err());
+        let e = serde_yaml_ng::from_str::<Hardware>("{ tpm: true }").unwrap_err().to_string();
+        assert!(e.contains("tpm"), "{e}");
     }
 }

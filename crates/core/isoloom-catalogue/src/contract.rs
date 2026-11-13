@@ -203,7 +203,9 @@ mod tests {
         .unwrap();
         let site: CaseName = "site".parse().unwrap();
         let default: CaseName = "default".parse().unwrap();
-        assert!(c.checks[0].runs_in(&site) && !c.checks[0].runs_in(&default) && c.checks[1].runs_in(&default));
+        assert!(c.checks[0].runs_in(&site), "a check of the case runs in it");
+        assert!(!c.checks[0].runs_in(&default), "a check of a case runs in no other");
+        assert!(c.checks[1].runs_in(&default), "a check of no case runs in the default");
         assert_eq!(c.checks[0].check, serde_json::json!({ "name": "a", "http": "http://{{ machine }}/" }));
         assert_eq!(c.checks[1].name(), "b");
     }

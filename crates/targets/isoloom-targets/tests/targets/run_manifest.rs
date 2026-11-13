@@ -258,7 +258,7 @@ fn every_examples_manifest_parses_and_matches_the_schema() -> Outcome {
 fn hosted_and_kubernetes_write_no_run_manifest_for_now() -> Outcome {
     let spec = lab(WEB_PORTAL)?;
     for target in [Target::Hosted, Target::Kubernetes] {
-        let files = generate(&spec, target).unwrap_or_default();
+        let files = generate(&spec, target)?;
         assert!(!files.iter().any(|f| f.path.ends_with("run.json")), "{}", target.id());
     }
     Ok(())

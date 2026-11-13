@@ -53,9 +53,10 @@ fn shown(path: &Path) -> String {
 }
 
 #[test]
-fn docs_spec_is_up_to_date() {
-    let on_disk = std::fs::read_to_string(root().join("docs/spec.md")).unwrap_or_default();
+fn docs_spec_is_up_to_date() -> Outcome {
+    let on_disk = std::fs::read_to_string(root().join("docs/spec.md"))?;
     assert!(on_disk == markdown(), "docs/spec.md is stale; run `cargo run -q -- docs --spec > docs/spec.md`");
+    Ok(())
 }
 
 /// The fenced code blocks of a page: (info string, first line number, body).

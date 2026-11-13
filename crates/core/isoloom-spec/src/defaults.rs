@@ -518,7 +518,8 @@ mod tests {
         assert_eq!(tags, [("cost", "12"), ("billable", "true"), ("team", "ops")]);
         let file: Defaults = serde_yaml_ng::from_str("tags: { cost-center: 1234, ratio: 1.5 }").unwrap();
         assert_eq!((file.tags["cost-center"].as_str(), file.tags["ratio"].as_str()), ("1234", "1.5"));
-        assert!(serde_yaml_ng::from_str::<Defaults>("tags: { team: [a, b] }").is_err(), "a list is no tag");
+        let e = serde_yaml_ng::from_str::<Defaults>("tags: { team: [a, b] }").unwrap_err().to_string();
+        assert!(e.contains("a tag's value: text, a number or true/false"), "a list is no tag: {e}");
     }
 
     /// The defaults of one layer from `source` setting each tag of `tags`.
