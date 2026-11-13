@@ -6,13 +6,13 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, rule, vm};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::tag_list;
-use crate::docker_host::{published, tcp_ports};
+use crate::docker_host::{container_ports, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::LINODE,
     size: Some(SizeVariable {
@@ -59,7 +59,7 @@ fn inbound(label: &str, protocol: &str, ports: &[u16]) -> Block {
 
 /// SSH and the published ports in from `allowed_cidr`, the rest dropped; everything out.
 fn firewall(env: &Environment) -> Block {
-    let udp = published(env, Protocol::Udp);
+    let udp = container_ports(env, Protocol::Udp);
     let mut b = resource("linode_firewall")
         .add_attribute(("tags", tag_list(env)))
         .add_attribute(("inbound_policy", string("DROP")))

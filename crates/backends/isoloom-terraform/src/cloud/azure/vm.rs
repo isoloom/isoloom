@@ -30,7 +30,7 @@ use isoloom_plan::{Environment, Vm};
 
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
-use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image, windows};
+use crate::cloud::vm::{self, VmDriver, gateways, gpus::GpuSizes, own_image, windows};
 use crate::limits::Limits;
 use crate::module::providers;
 
@@ -143,7 +143,7 @@ fn refusal(env: &Environment) -> Option<String> {
 }
 
 /// Its `cloud-vm` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::AZURERM], &[providers::RANDOM, providers::LOCAL]),
     refusal,

@@ -33,7 +33,7 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
             if windows {
                 on_windows(&at, s, p);
             } else {
-                safe_path(&at, &s.path(), p);
+                check_secret_path(&at, &s.path(), p);
             }
             if !paths.insert(s.path()) {
                 p.add(at, format!("`{}` already holds another secret of this machine", s.path()));
@@ -91,7 +91,7 @@ fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, p: &mut Problems) {
 
 /// A path a Compose mount target and a Kubernetes mount path can be: no spaces or ':' (the
 /// short syntaxes split on them), no `..`, not a directory.
-fn safe_path(at: &str, path: &str, p: &mut Problems) {
+fn check_secret_path(at: &str, path: &str, p: &mut Problems) {
     if path.split('/').any(|c| c == "..") || path.contains([':', ' ', '\t']) || path.ends_with('/') {
         p.add(
             format!("{at}.target"),

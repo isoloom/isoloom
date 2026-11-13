@@ -32,7 +32,7 @@ use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with};
 use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
-use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
+use crate::cloud::vm::{self, VmDriver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::user_data::Capped;
 use crate::module::{ident, providers, resource};
@@ -170,7 +170,7 @@ const CAP: Capped = Capped {
 
 /// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
 /// the OCI CLI's configuration.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::OCI], &[]),
     refusal,

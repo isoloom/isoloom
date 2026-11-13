@@ -78,7 +78,7 @@ pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
             checks,
         );
     }
-    let published = crate::module::published(env.vms().map(|vm| (vm.name, vm.plan)), |n| (reach.public_ip)(n));
+    let published = crate::module::published_output_entries(env.vms().map(|vm| (vm.name, vm.plan)), |n| (reach.public_ip)(n));
     if !published.is_empty() {
         m.block(output("published", object(published)));
     }

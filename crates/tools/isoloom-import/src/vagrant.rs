@@ -14,6 +14,7 @@ use serde_json::Value;
 
 pub use recording::Recording;
 
+use crate::draft::writer::Port;
 use crate::draft::{Draft, NoteKind, Notes};
 use crate::naming::{label, unique};
 use crate::{Error, Result};
@@ -28,10 +29,10 @@ struct Machine {
     image: Option<(String, Option<String>)>,
     /// Each private network's block and the machine's last octet on it.
     networks: Vec<(String, u8)>,
-    /// (guest port, host port, UDP).
-    publish: Vec<(u16, u16, bool)>,
-    /// Folders of the computer shared into it: (from, path, read only).
-    host_folders: Vec<(String, String, bool)>,
+    /// Its forwarded ports, each a guest port published on a host port.
+    publish: Vec<Port>,
+    /// Folders of the computer shared into it.
+    host_folders: Vec<HostFolder>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
     /// Its provisioning steps: scripts, playbooks and reboots, in order.
@@ -56,6 +57,16 @@ fn is_shell_default(key: &str, v: &Value) -> bool {
         "run" => v.as_str() == Some("once"),
         _ => false,
     }
+}
+
+/// A folder of the computer shared into a machine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostFolder {
+    /// The folder on the computer.
+    from: String,
+    /// Where the machine sees it.
+    path: String,
+    read_only: bool,
 }
 
 /// The step a shell provisioner's `reboot: true` becomes.
@@ -346,7 +357,7 @@ impl<'a> Import<'a> {
                 format!("`{from}`: each target shares a host folder its own way; not kept: {}", ignored.join(", ")),
             );
         }
-        m.host_folders.push((from, path, read_only));
+        m.host_folders.push(HostFolder { from, path, read_only });
     }
 
     /// A private network with a fixed address: the machine joins its block (said when it isn't
@@ -396,7 +407,11 @@ impl<'a> Import<'a> {
         match (port("guest"), port("host")) {
             (Some(g), Some(h)) => {
                 let udp = text(c.opt("protocol")).is_some_and(|p| p.eq_ignore_ascii_case("udp"));
-                m.publish.push((g, h, udp));
+                m.publish.push(Port {
+                    number: g,
+                    udp,
+                    publish: Some(h),
+                });
             }
             _ => self.notes.add(
                 format!("{at}.vm.network"),

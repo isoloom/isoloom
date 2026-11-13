@@ -16,7 +16,7 @@ use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Volumes};
-use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
+use crate::cloud::vm::{self, VmDriver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::user_data::Capped;
 use crate::module::{self, ident, providers, resource};
@@ -100,7 +100,7 @@ const CAP: Capped = Capped {
 };
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::LINODE, providers::RANDOM], &[]),
     refusal,

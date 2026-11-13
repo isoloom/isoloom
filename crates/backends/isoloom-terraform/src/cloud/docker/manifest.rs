@@ -23,7 +23,7 @@ use super::super::manifest::{self, connection, steps};
 const IP: &str = "ip";
 
 /// The way into `driver`'s host: its address output ([`IP`]), as the user its image signs in as.
-pub(crate) fn login(driver: &super::Driver) -> Result<Login, ManifestError> {
+pub(crate) fn login(driver: &super::DockerDriver) -> Result<Login, ManifestError> {
     Ok(Login::new(Template::from(Placeholder::Output(SnakeName::parse(IP)?)), driver.user()))
 }
 
@@ -33,7 +33,7 @@ const SSH_BOOT_WAIT_S: u32 = 300;
 /// The run manifest of `env`'s containers on `cloud`, run in one VM whose module `driver` writes,
 /// entered as `login` (the host's address and user); `guest` is the Compose-in-a-VM plan
 /// (`isoloom_compose::guest`) as that user gets root. Its message is left to the caller.
-pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, login: &Login, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
+pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::DockerDriver, login: &Login, guest: &GuestCompose) -> Result<Manifest, ManifestError> {
     let ip = login.host.clone();
     let way_in = login.way_in();
     let up = up_steps(login, guest)?;
@@ -110,7 +110,7 @@ fn boot_wait(steps: &mut [isoloom_manifest::Step]) -> Result<(), ManifestError> 
 /// (who may reach the host, the runner's key, the expiry). The launch's values reach the
 /// containers over SSH, not a module variable, so `inputs` is left out; a cloud-docker host has
 /// internet, so there is no seal.
-fn driver_variables(env: &Environment, driver: &super::Driver) -> Vec<crate::module::variable::Variable> {
+fn driver_variables(env: &Environment, driver: &super::DockerDriver) -> Vec<crate::module::variable::Variable> {
     let mut v = driver.variables(env);
     v.extend(super::super::operator::host_reaching());
     v

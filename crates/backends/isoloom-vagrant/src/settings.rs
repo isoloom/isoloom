@@ -28,8 +28,8 @@ pub(crate) enum Fallback {
 }
 
 impl Setting {
-    /// Its default as the run manifest's param gives it.
-    pub(crate) fn default(self) -> Option<String> {
+    /// Its fallback text, the default as the run manifest's param gives it.
+    pub(crate) fn fallback_text(self) -> Option<String> {
         match self.fallback {
             Fallback::None => None,
             Fallback::Text(text) => Some(text.to_owned()),
@@ -40,7 +40,11 @@ impl Setting {
     /// The Ruby reading it: `ENV.fetch("<name>", "<default>")`, the default empty when it has
     /// none.
     pub(crate) fn fetch(self) -> String {
-        format!("ENV.fetch({}, {})", Value::str(self.name), Value::str(&self.default().unwrap_or_default()))
+        format!(
+            "ENV.fetch({}, {})",
+            Value::str(self.name),
+            Value::str(&self.fallback_text().unwrap_or_default())
+        )
     }
 
     /// The Ruby reading it as it is, `nil` when unset: `ENV["<name>"]`.
@@ -111,9 +115,9 @@ mod tests {
     #[test]
     fn a_setting_reads_with_its_default_or_as_it_is() {
         assert_eq!(ESXI_HOSTPORT.fetch(), "ENV.fetch(\"ESXI_HOSTPORT\", \"22\")");
-        assert_eq!(ESXI_HOSTPORT.default().as_deref(), Some("22"));
+        assert_eq!(ESXI_HOSTPORT.fallback_text().as_deref(), Some("22"));
         assert_eq!(ESXI_HOSTNAME.fetch(), "ENV.fetch(\"ESXI_HOSTNAME\", \"\")");
-        assert_eq!(ESXI_HOSTNAME.default(), None);
+        assert_eq!(ESXI_HOSTNAME.fallback_text(), None);
         assert_eq!(ESXI_DATASTORE.raw(), "ENV[\"ESXI_DATASTORE\"]");
     }
 }

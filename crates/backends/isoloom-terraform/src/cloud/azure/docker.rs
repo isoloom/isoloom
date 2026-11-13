@@ -8,13 +8,13 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::vm::{self, USER};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::set_up_once;
-use crate::docker_host::{port_strings, published, tcp_ports};
+use crate::docker_host::{container_ports, port_strings, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::AZURERM,
     size: Some(SizeVariable {
@@ -91,7 +91,7 @@ fn rule(name: &str, priority: u64, protocol: &str, ports: Expression) -> Block {
 fn security_group(env: &Environment) -> Block {
     let tcp = tcp_ports(env);
     let mut b = placed("azurerm_network_security_group").add_block(rule("ssh-and-published", 100, "Tcp", port_strings(&tcp)));
-    let udp = published(env, Protocol::Udp);
+    let udp = container_ports(env, Protocol::Udp);
     if !udp.is_empty() {
         b = b.add_block(rule("published-udp", 110, "Udp", port_strings(&udp)));
     }

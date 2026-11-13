@@ -38,7 +38,7 @@ pub(crate) fn output(name: &str, value: Expression) -> Block {
 /// `machines` publish (the plan's [`isoloom_plan::PublishedPort`]s, named as the run manifest and
 /// the message name them), `at` giving the expression of the address a machine is reached at:
 /// the one rule of the servers' and the clouds' `published` outputs.
-pub(crate) fn published<'a>(
+pub(crate) fn published_output_entries<'a>(
     machines: impl IntoIterator<Item = (&'a str, &'a isoloom_plan::MachinePlan)>,
     at: impl Fn(&str) -> Expression,
 ) -> Vec<(String, Expression)> {

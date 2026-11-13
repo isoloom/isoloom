@@ -192,7 +192,7 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         output("ready_file", string(isoloom_render::steps::READY_FILE)),
     );
     let on_networks = env.machines.iter().filter(|(_, mp)| !mp.addresses.is_empty()).map(|(n, mp)| (n.as_str(), mp));
-    let published = crate::module::published(on_networks, |_| reference("local.router_address"));
+    let published = crate::module::published_output_entries(on_networks, |_| reference("local.router_address"));
     if !published.is_empty() {
         m.commented("Published services, from the router's uplink address.", output("published", object(published)));
     }

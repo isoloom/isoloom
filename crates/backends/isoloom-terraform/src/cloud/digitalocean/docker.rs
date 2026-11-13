@@ -6,13 +6,13 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Protocol;
 
 use super::{Way, rule, ssh_key, vm, vpc};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::{self, tag_list};
-use crate::docker_host::published;
+use crate::docker_host::container_ports;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::DIGITALOCEAN,
     size: Some(SizeVariable {
@@ -59,10 +59,10 @@ fn firewall(env: &Environment) -> Block {
     let mut b = resource("digitalocean_firewall")
         .add_attribute(("droplet_ids", list([reference("digitalocean_droplet.env.id")])))
         .add_block(rule(Way::In, "tcp", Some("22"), allowed()));
-    for (protocol, p) in published(env, Protocol::Tcp)
+    for (protocol, p) in container_ports(env, Protocol::Tcp)
         .into_iter()
         .map(|p| ("tcp", p))
-        .chain(published(env, Protocol::Udp).into_iter().map(|p| ("udp", p)))
+        .chain(container_ports(env, Protocol::Udp).into_iter().map(|p| ("udp", p)))
     {
         b = b.add_block(rule(Way::In, protocol, Some(&p.to_string()), allowed()));
     }

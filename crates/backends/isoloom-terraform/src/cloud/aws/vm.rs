@@ -32,7 +32,7 @@ use isoloom_spec::windows::Tpm;
 use super::{INSTANCE_TYPES, ami, ami_filter, zones};
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
-use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
+use crate::cloud::vm::{self, VmDriver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::limits::Limits;
 use crate::machine::controller;
 use crate::module::ident;
@@ -241,7 +241,7 @@ fn machines_refusal(env: &Environment) -> Option<String> {
 }
 
 /// Its `cloud-vm` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::AWS], &[providers::RANDOM, providers::TIME, providers::LOCAL]),
     write,

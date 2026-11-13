@@ -8,13 +8,13 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, owned, route_out, ubuntu_images, vm};
-use crate::cloud::docker::{Driver, HOST_OS};
+use crate::cloud::docker::{DockerDriver, HOST_OS};
 use crate::cloud::instance;
-use crate::docker_host::published;
+use crate::docker_host::container_ports;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver: no size variable, its shape's OCPUs and memory follow the sizing.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::OCI,
     size: None,
@@ -67,10 +67,10 @@ fn security_list(env: &Environment) -> Block {
                 .build(),
         )
         .add_block(ingress("6", "tcp_options", 22));
-    for p in published(env, Protocol::Tcp) {
+    for p in container_ports(env, Protocol::Tcp) {
         b = b.add_block(ingress("6", "tcp_options", p));
     }
-    for p in published(env, Protocol::Udp) {
+    for p in container_ports(env, Protocol::Udp) {
         b = b.add_block(ingress("17", "udp_options", p));
     }
     b.build()

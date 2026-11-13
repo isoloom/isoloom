@@ -12,7 +12,7 @@
 //! lacks, its GPU types, nesting, MTU, volumes and images), its machines' set-up hooks, their
 //! interfaces after the first, their data disks, their own images, the networks routed through
 //! a machine, the private DNS zone's records, the `reach` rules, the Windows limits, the outputs,
-//! and a module's frame around a cloud's own part (its [`Driver`]: its first lines, its
+//! and a module's frame around a cloud's own part (its [`VmDriver`]: its first lines, its
 //! providers, its credentials).
 
 pub(crate) mod console;
@@ -54,7 +54,7 @@ use crate::{Result, checks, target};
 /// its folder, its first lines, the `terraform` block, the module's head (`cloud::head`), the
 /// file.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Driver {
+pub(crate) struct VmDriver {
     /// What the cloud's modules share with its `cloud-docker` module: the usage, the variables,
     /// the provider, the images' users.
     pub(crate) base: Base,
@@ -82,7 +82,7 @@ fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<P
 
 /// A cloud's own variables for `env`: the driver's, then the seal's switch when a machine has
 /// anything to seal.
-pub(crate) fn own_variables(env: &Environment, driver: &Driver) -> Vec<Variable> {
+pub(crate) fn own_variables(env: &Environment, driver: &VmDriver) -> Vec<Variable> {
     let mut v = driver.base.variables(env);
     v.extend(seal::variable(env));
     // cloud-vm reads the launch-time inputs in its machines' user data (the plain ones); the
@@ -196,7 +196,7 @@ impl CloudVmModule {
     }
 
     /// Its cloud's own part.
-    const fn driver(self) -> Driver {
+    const fn driver(self) -> VmDriver {
         match self.0 {
             Cloud::Aws => aws::vm::DRIVER,
             Cloud::Azure => azure::vm::DRIVER,
