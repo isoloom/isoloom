@@ -51,6 +51,10 @@ pub(crate) use top::NAME_MAX;
 /// and a machine's host name.
 pub(crate) const DNS_LABEL_MAX: usize = 63;
 
+/// The longest name Isoloom prefixes with `isoloom-` to make a Kubernetes name (the environment's
+/// namespace, a machine's published Service): what is left of a DNS label after the prefix.
+const PREFIXED_NAME_MAX: usize = DNS_LABEL_MAX - crate::contract::RESERVED_PREFIX.len();
+
 /// One thing wrong with a lowered spec: the field's path and what to do about it. The plan
 /// places it at the field the author wrote, as a [`crate::syntax::Problem`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,6 +173,12 @@ pub fn dns_label(s: &str) -> bool {
 #[must_use]
 pub fn is_variable(s: &str) -> bool {
     s.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Whether `s` is a URL: a scheme of letters, then `://` (`https://`, `file://`).
+fn is_url(s: &str) -> bool {
+    s.split_once("://")
+        .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphabetic()))
 }
 
 /// The machines a machine starts after: its `depends_on`, then the gateways of its networks.

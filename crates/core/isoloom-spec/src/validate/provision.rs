@@ -27,7 +27,7 @@ pub(super) fn steps(spec: &Spec, problems: &mut Problems) {
             problems.add(format!("provision[{i}].ansible"), "an Ansible playbook: a .yml or .yaml file");
         }
         for (group, members) in &step.groups {
-            if matches!(group.as_str(), "all" | "linux" | "windows") {
+            if crate::groups::RESERVED.contains(&group.as_str()) {
                 problems.add(format!("provision[{i}].groups.{group}"), "Isoloom fills this group itself");
             }
             for (j, member) in members.iter().enumerate() {

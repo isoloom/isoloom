@@ -86,8 +86,9 @@ impl Url {
     }
 }
 
-/// `host[:port]`, or `[ipv6]` with an optional `:port` after the bracket.
-fn host_and_port(hostport: &str) -> Option<(&str, Option<u16>)> {
+/// `host[:port]`, or `[ipv6]` with an optional `:port` after the bracket: the one reading of a
+/// probe's host and port, for a URL and for a `tcp` check's target.
+pub(crate) fn host_and_port(hostport: &str) -> Option<(&str, Option<u16>)> {
     let port = |p: &str| p.parse::<u16>().ok().filter(|p| *p > 0);
     if let Some(rest) = hostport.strip_prefix('[') {
         let (host, after) = rest.split_once(']')?;

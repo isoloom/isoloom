@@ -44,15 +44,18 @@ fn removed(path: FieldPath, reason: &str) -> Problem {
     Problem::new(Code::RemovedField, path, reason.to_owned())
 }
 
+/// Why a machine's old platform block (`docker:`, `vm:`) is refused.
+fn platform_block_gone(key: &str) -> String {
+    format!("a machine says what it runs, never how a platform runs it, so `{key}:` is gone")
+}
+
 /// A machine's old keys.
 fn machine(at: &FieldPath, name: &str, m: &Mapping, out: &mut Vec<Problem>) {
     if let Some(Value::Mapping(d)) = m.get("docker") {
-        let reason = "a machine says what it runs, never how a platform runs it, so `docker:` is gone";
-        out.push(removed(at.key("docker"), reason).fix(docker_fix(name, d)));
+        out.push(removed(at.key("docker"), &platform_block_gone("docker")).fix(docker_fix(name, d)));
     }
     if let Some(Value::Mapping(v)) = m.get("vm") {
-        let reason = "a machine says what it runs, never how a platform runs it, so `vm:` is gone";
-        out.push(removed(at.key("vm"), reason).fix(vm_fix(name, v)));
+        out.push(removed(at.key("vm"), &platform_block_gone("vm")).fix(vm_fix(name, v)));
     }
     if m.contains_key("external") {
         let fix = format!("`overrides: {{ external: {{ machines: {{ {name}: {{ ssh: {{ address, user, port, key }} }} }} }} }}`");
@@ -108,8 +111,7 @@ fn shared(at: &FieldPath, m: &Mapping, out: &mut Vec<Problem>) {
     if !at.as_str().starts_with("machines.") {
         for key in ["docker", "vm"] {
             if m.contains_key(key) {
-                let reason = format!("a machine says what it runs, never how a platform runs it, so `{key}:` is gone");
-                out.push(removed(at.key(key), &reason).fix("`os: <family>@<version>` and `app: { image | build | steps }`"));
+                out.push(removed(at.key(key), &platform_block_gone(key)).fix("`os: <family>@<version>` and `app: { image | build | steps }`"));
             }
         }
     }

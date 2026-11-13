@@ -42,19 +42,15 @@ fn image(at: &str, i: &VmImage, problems: &mut Problems) {
         );
     }
     if let Some(u) = &i.box_url
-        && !is_url(u)
+        && !super::is_url(u)
         && crate::project_path::plain(u).is_err()
     {
         problems.add(format!("{at}.box_url"), "a URL (https://, file://) or a .box file inside the project folder");
     }
-    if let Some(u) = i.box_server_url.as_ref().filter(|u| !u.starts_with("http://") && !u.starts_with("https://")) {
+    if let Some(u) = i.box_server_url.as_ref().filter(|u| !is_http_url(u)) {
         problems.add(format!("{at}.box_server_url"), format!("`{u}` isn't an http(s) URL"));
     }
-    if let Some(x) = i
-        .proxmox
-        .as_ref()
-        .filter(|x| !template_id(x) && !x.starts_with("http://") && !x.starts_with("https://"))
-    {
+    if let Some(x) = i.proxmox.as_ref().filter(|x| !template_id(x) && !is_http_url(x)) {
         problems.add(
             format!("{at}.proxmox"),
             format!("`{x}` is neither a cloud image's http(s) URL nor a template VM's id (a number from 100)"),
@@ -85,9 +81,9 @@ fn boxes(at: &str, i: &VmImage, problems: &mut Problems) {
     }
 }
 
-fn is_url(s: &str) -> bool {
-    s.split_once("://")
-        .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphabetic()))
+/// Whether `s` is an `http://` or `https://` URL.
+fn is_http_url(s: &str) -> bool {
+    s.starts_with("http://") || s.starts_with("https://")
 }
 
 /// The VM ids Proxmox gives: 100 to 999999999 (below 100 are reserved).

@@ -132,9 +132,8 @@ fn http(at: &str, u: &str, d: &Declared, problems: &mut Problems) {
 
 /// A `tcp` probe: `host:port`, and `open` or `blocked`.
 fn tcp(at: &str, t: &str, d: &Declared, problems: &mut Problems) {
-    let ok = t
-        .rsplit_once(':')
-        .and_then(|(h, port)| port.parse::<u16>().ok().filter(|port| *port > 0).map(|_| h))
+    let ok = crate::probe::host_and_port(t)
+        .and_then(|(h, port)| port.map(|_| h))
         .is_some_and(|h| !h.is_empty() && !h.chars().any(|c| c.is_whitespace() || c == '\'' || c == '"'));
     if !ok {
         problems.add(format!("{at}.tcp"), format!("`{t}` isn't `host:port`, like cache:6379"));
