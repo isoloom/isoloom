@@ -35,16 +35,20 @@ fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<
 }
 
 /// One connection of [`serve`]: the line read when `wait_line`, the answer after `delay_ms`,
-/// then the connection held open as a service holds it.
+/// then the connection held open as a service holds it: until the client closes it, or a few
+/// seconds at most, so the thread ends with the check and not 8 s later (Clean Code T9, tests
+/// should be fast; 2026-11-13).
 fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> std::io::Result<()> {
-    use std::io::{BufRead, BufReader, Write};
+    use std::io::{BufRead, BufReader, Read, Write};
     let mut line = String::new();
     if wait_line {
         BufReader::new(c.try_clone()?).read_line(&mut line)?;
     }
     std::thread::sleep(std::time::Duration::from_millis(delay_ms));
     c.write_all(answer(line.trim_end_matches('\n')).as_bytes())?;
-    std::thread::sleep(std::time::Duration::from_secs(8));
+    c.set_read_timeout(Some(std::time::Duration::from_secs(3)))?;
+    let mut sink = [0_u8; 64];
+    while matches!(c.read(&mut sink), Ok(n) if n > 0) {}
     Ok(())
 }
 
