@@ -166,13 +166,16 @@ fn wiring(r: &Value) -> Table {
     (header, rows)
 }
 
-/// Each machine's CPUs, memory, disk, OS and forms, then the totals.
+/// Each machine's CPUs, memory, disk, OS and forms, then the totals. The snapshot sizes a
+/// machine per form (`resources.<shape>`, one entry a shape since its version 4; a container
+/// is sized smaller than the VM of the same machine): the row shows the largest form's size,
+/// what a host must afford, and the totals add those.
 fn resources(r: &Value) -> Table {
     let header = head(&["machine", "cpus", "memory (MB)", "disk (GB)", "os", "shapes"]);
     let mut rows = Vec::new();
     let mut totals = [0_u64; 3];
     for (name, v) in entries(r, "machines") {
-        let size = ["cpus", "memory_mb", "disk_gb"].map(|k| v.pointer(&format!("/resources/{k}")).and_then(Value::as_u64).unwrap_or(0));
+        let size = largest_form_size(v);
         for (total, n) in totals.iter_mut().zip(size) {
             *total += n;
         }
@@ -189,6 +192,21 @@ fn resources(r: &Value) -> Table {
     let [cpus, memory, disk] = totals.map(|n| n.to_string());
     rows.push(vec!["total".into(), cpus, memory, disk, String::new(), String::new()]);
     (header, rows)
+}
+
+/// The largest of a machine's per-form sizes, `[cpus, memory_mb, disk_gb]`, each the maximum
+/// over its forms; zeros for a machine with none (the reader of the snapshot's earlier shape,
+/// `resources.cpus`, read zeros for every machine from version 4 on: commit 703331d0 changed the
+/// writer and three backends, not this reader, 2026-11-13).
+fn largest_form_size(machine: &Value) -> [u64; 3] {
+    let forms = machine.get("resources").and_then(Value::as_object).into_iter().flat_map(|forms| forms.values());
+    let mut size = [0_u64; 3];
+    for form in forms {
+        for (largest, key) in size.iter_mut().zip(["cpus", "memory_mb", "disk_gb"]) {
+            *largest = (*largest).max(form.get(key).and_then(Value::as_u64).unwrap_or(0));
+        }
+    }
+    size
 }
 
 /// A Markdown table, `|` in a cell escaped.
@@ -240,6 +258,22 @@ mod tests {
     fn a_markdown_table_escapes_a_bar_in_a_cell() {
         let md = markdown_table(&cells(&["a", "b"]), &[cells(&["x|y", "z"])]);
         assert_eq!(md, "| a | b |\n| --- | --- |\n| x\\|y | z |\n");
+    }
+
+    /// The snapshot sizes a machine per form; the report shows the largest and adds those up.
+    #[test]
+    fn the_resources_report_reads_the_per_form_sizes() {
+        let snapshot = serde_json::json!({ "machines": {
+            "web": { "os": "debian-12", "shapes": ["docker", "vm"], "resources": {
+                "docker": { "cpus": 1, "memory_mb": 512, "disk_gb": 0 },
+                "vm": { "cpus": 2, "memory_mb": 2048, "disk_gb": 20 } } },
+            "db": { "os": "debian-12", "shapes": ["vm"], "resources": {
+                "vm": { "cpus": 2, "memory_mb": 4096, "disk_gb": 40 } } },
+        } });
+        let (_, rows) = resources(&snapshot);
+        assert_eq!(rows[0], cells(&["web", "2", "2048", "20", "debian-12", "docker, vm"]), "the largest form");
+        assert_eq!(rows[1], cells(&["db", "2", "4096", "40", "debian-12", "vm"]));
+        assert_eq!(rows[2], cells(&["total", "4", "6144", "60", "", ""]));
     }
 
     #[test]
