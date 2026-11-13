@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.0.0"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "mini-ad",
@@ -981,6 +981,8 @@
       ],
       "timeout_s": 25,
       "provider_timeout_s": {
+        "virtualbox": 100,
+        "hyperv": 150,
         "vmware_esxi": 150
       }
     }

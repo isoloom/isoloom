@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.0.0"
+    "version": "2.1.9"
   },
   "environment": {
     "name": "web-vm",
@@ -790,6 +790,8 @@
       ],
       "timeout_s": 25,
       "provider_timeout_s": {
+        "virtualbox": 80,
+        "hyperv": 120,
         "vmware_esxi": 120
       }
     }
