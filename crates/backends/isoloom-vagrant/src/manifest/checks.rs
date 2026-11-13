@@ -9,7 +9,7 @@ use isoloom_manifest::{Action, CheckRunner, Name, Step, StepId};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{act, check, noted, timeout_s};
 
-use super::lifecycle::park_controller;
+use super::lifecycle::{ParkAfter, park_controller};
 use super::vagrant_argv;
 use crate::error::Result;
 use crate::vms::{CONTROLLER, Shape};
@@ -67,7 +67,7 @@ pub(super) fn teardown(env: &Environment, shape: &Shape) -> Result<Vec<Step>> {
     if !controller_checks(shape) {
         return Ok(Vec::new());
     }
-    Ok(park_controller(env, shape, true)?.into_iter().collect())
+    Ok(park_controller(env, shape, ParkAfter::Use)?.into_iter().collect())
 }
 
 #[cfg(test)]

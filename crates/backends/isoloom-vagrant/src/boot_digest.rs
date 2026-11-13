@@ -50,7 +50,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use super::of;
-    use crate::ruby::{Call, Provision, Ruby, Value};
+    use crate::ruby::{Call, Provision, Ruby, Start, Value};
 
     /// The words a test varies in [`two`]'s Vagrantfile.
     struct Words {
@@ -78,7 +78,7 @@ mod tests {
         r.configure(|r| {
             r.assign("config.vm.boot_timeout", Value::raw(w.timeout.to_string()));
             r.provision(Provision::new("config", "shell").kw("inline", Value::str(w.shared_script)));
-            r.define("web", true, |r| {
+            r.define("web", Start::WithUp, |r| {
                 r.assign("m.vm.box", Value::str("debian"));
                 r.comment(w.comment);
                 if let Some(folder) = w.folder {
@@ -89,7 +89,7 @@ mod tests {
                 r.provision(Provision::new("m", "shell").kw("name", Value::str("one")).heredoc("inline", "SH", w.step));
                 r.provision(Provision::new("m", "shell").script("inline", w.step));
             });
-            r.define("db", true, |r| {
+            r.define("db", Start::WithUp, |r| {
                 r.assign("m.vm.box", Value::str("debian"));
             });
         });

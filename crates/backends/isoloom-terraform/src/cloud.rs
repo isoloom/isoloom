@@ -154,7 +154,7 @@ impl Base {
 pub(crate) fn head(env: &Environment, m: &mut Module, variables: Vec<Variable>, provider: ProviderConfig, copy: ProjectCopy) {
     m.blocks(variables.into_iter().chain(operator::host_reaching()).map(Variable::block));
     let locals = provider(env, m);
-    m.blocks(instance::id_and_locals(env, locals, copy != ProjectCopy::Runner));
+    m.blocks(instance::id_and_locals(env, locals, copy));
 }
 
 impl fmt::Display for Cloud {

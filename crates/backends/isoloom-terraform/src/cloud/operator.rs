@@ -30,7 +30,7 @@ pub(crate) fn bare_provider(m: &mut Module, name: &str) {
 pub(crate) fn host_reaching() -> Vec<Variable> {
     vec![
         Variable::new("allowed_cidr", "string").describe("Who may reach the machines (SSH and the published ports), e.g. your IP/32"),
-        variable::ssh_public_key(true),
+        variable::ssh_public_key(variable::SignsIn::Runner),
         expires_at(),
     ]
 }

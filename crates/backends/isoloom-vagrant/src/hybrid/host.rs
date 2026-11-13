@@ -10,7 +10,7 @@ use isoloom_spec::model::Target;
 
 use crate::docker_host;
 use crate::error::{Error, Result};
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Ruby, Start, Value};
 use crate::vagrantfile::{self, shell};
 
 /// One environment network on the host: its interface and the macvlan network on it.
@@ -36,7 +36,7 @@ pub(super) fn nics(env: &Environment, containers: &Containers) -> Result<Vec<Nic
 pub(super) fn write(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]) {
     r.blank();
     r.comment("The containers' host: on their networks, letting Docker give each its own address there.");
-    r.define(HOST, true, |r| define(r, env, containers, nics));
+    r.define(HOST, Start::WithUp, |r| define(r, env, containers, nics));
 }
 
 /// The host's VM: its box, published ports and environment interfaces, its size, then Docker, the

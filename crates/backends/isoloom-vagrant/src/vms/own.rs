@@ -25,7 +25,7 @@ use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
 use super::{CONTROLLER, Ctx, Kind, TOOL_SHELL, checks};
-use crate::ruby::{Ruby, Value};
+use crate::ruby::{Ruby, Start, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
 const HELPER_BOX: &str = crate::boxes::DEBIAN_12;
@@ -128,7 +128,7 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
         "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
         router::nftables(spec),
     );
-    define(r, router::NAME, false, |r| {
+    define(r, router::NAME, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(router::NAME));
         for (net, ip) in routed {
@@ -158,7 +158,7 @@ pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
 fn tool_shell(r: &mut Ruby, ctx: &Ctx, tool: &ToolPlan) {
     let env = ctx.env;
     let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
-    r.define(TOOL_SHELL, true, |r| {
+    r.define(TOOL_SHELL, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str("shell"));
         for (net, ip) in &tool.addresses {
@@ -226,7 +226,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     steps.extend([every_machine(env), Step::Project]);
     steps.extend(isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()));
     let on_controller = &ctx.checks.controller;
-    define(r, CONTROLLER, false, |r| {
+    define(r, CONTROLLER, Start::WithUp, |r| {
         main.render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
         networks(r, env, |c| Some(c.controller()));

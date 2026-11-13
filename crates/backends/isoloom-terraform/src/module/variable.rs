@@ -127,18 +127,25 @@ impl Variable {
     }
 }
 
-/// `ssh_public_key`, with the one description every module gives it, which says who signs in
-/// with its private key: the runner (`runner`, a target with a run manifest), else Terraform
-/// itself. Required as built: a cloud's machines are reachable only with a key (its key pair or
+/// Who signs in to a module's machines with the private key of its `ssh_public_key`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SignsIn {
+    /// The runner (a target with a run manifest).
+    Runner,
+    /// Terraform itself, to set the machines up.
+    Terraform,
+}
+
+/// `ssh_public_key`, with the one description every module gives it, which says who `signs_in`
+/// with its private key. Required as built: a cloud's machines are reachable only with a key (its key pair or
 /// instance metadata takes one), and ESXi's Terraform signs in with its private key
 /// (`ssh_private_key_file`) to set the machines up. A Proxmox module defaults it to empty
 /// instead: its machines are set up from cloud-init snippets, nobody needs to sign in for them to
 /// be made, and an empty key installs none.
-pub(crate) fn ssh_public_key(runner: bool) -> Variable {
-    let who = if runner {
-        format!("as {RUNNER} does to deliver the project and run the checks")
-    } else {
-        "as Terraform does to set them up (`ssh_private_key_file`), and the checks by hand".to_owned()
+pub(crate) fn ssh_public_key(signs_in: SignsIn) -> Variable {
+    let who = match signs_in {
+        SignsIn::Runner => format!("as {RUNNER} does to deliver the project and run the checks"),
+        SignsIn::Terraform => "as Terraform does to set them up (`ssh_private_key_file`), and the checks by hand".to_owned(),
     };
     Variable::new("ssh_public_key", "string").describe(&format!(
         "The SSH public key the machines let in: whoever holds its private key signs in, {who}"
