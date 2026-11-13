@@ -10,6 +10,13 @@ impl MachinePlan {
     /// sizes an environment machine by.
     #[must_use]
     pub fn size(&self) -> MachineSize {
-        MachineSize::of(Some(self.resources), self.shape == MachineShape::Container)
+        MachineSize::of(
+            Some(self.resources),
+            if self.shape == MachineShape::Container {
+                isoloom_spec::Form::Container
+            } else {
+                isoloom_spec::Form::Vm
+            },
+        )
     }
 }

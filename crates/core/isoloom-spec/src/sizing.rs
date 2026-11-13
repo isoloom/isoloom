@@ -43,19 +43,29 @@ pub struct MachineSize {
     pub disk_gb: u32,
 }
 
+/// The form a machine runs in, which decides its default size: a container reserves less than a
+/// VM (the flag it was, `container: bool`, read as a bare `true` at every call: Clean Code F3,
+/// 2026-11-13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Form {
+    /// A virtual machine: the heavier defaults.
+    Vm,
+    /// A container: lighter defaults, no disk of its own.
+    Container,
+}
+
 impl MachineSize {
-    /// The size of a machine whose `resources` are `r`, run as a container or as a VM.
+    /// The size of a machine whose `resources` are `r`, run in `form`.
     #[must_use]
-    pub fn of(r: Option<Resources>, container: bool) -> MachineSize {
+    pub fn of(r: Option<Resources>, form: Form) -> MachineSize {
         let r = r.unwrap_or(Resources {
             cpus: None,
             memory_mb: None,
             disk_gb: None,
         });
-        let (memory_default, disk_default) = if container {
-            (CONTAINER_MEMORY_MB, CONTAINER_DISK_GB)
-        } else {
-            (DEFAULT_MEMORY_MB, DEFAULT_DISK_GB)
+        let (memory_default, disk_default) = match form {
+            Form::Container => (CONTAINER_MEMORY_MB, CONTAINER_DISK_GB),
+            Form::Vm => (DEFAULT_MEMORY_MB, DEFAULT_DISK_GB),
         };
         MachineSize {
             cpus: r.cpus.unwrap_or(DEFAULT_CPUS),
@@ -66,22 +76,23 @@ impl MachineSize {
 }
 
 /// One machine's CPUs, memory and disk in a form ([`MachineSize::of`]).
-fn machine_size(m: &model::Machine, container: bool) -> (u32, u32, u32) {
-    let s = MachineSize::of(m.resources, container);
+fn machine_size(m: &model::Machine, form: Form) -> (u32, u32, u32) {
+    let s = MachineSize::of(m.resources, form);
     (s.cpus, s.memory_mb, s.disk_gb)
 }
 
 /// Whether `target` runs `m` as a container (lighter) rather than a VM. Hybrid and Proxmox
 /// decide machine by machine; the machine targets that aren't about a local footprint (external
 /// hosts, cloud services) count as VM-sized, the heavier guess.
-fn runs_as_container(target: model::Target, m: &model::Machine) -> bool {
+fn form_on(target: model::Target, m: &model::Machine) -> Form {
     use model::Shape;
-    match target.needs() {
+    let container = match target.needs() {
         Shape::Docker => true,
         Shape::Vm | Shape::External | Shape::Cloud => false,
         Shape::VmOrLxc => m.docker.as_ref().is_some_and(|d| d.lxc),
         Shape::Either => m.docker.is_some(),
-    }
+    };
+    if container { Form::Container } else { Form::Vm }
 }
 
 /// Add each machine's size, picked by `size`, into the running totals. Saturating: a spec with
@@ -103,7 +114,7 @@ fn add_up(spec: &model::Spec, size: impl Fn(&model::Machine) -> (u32, u32, u32))
 /// defaults: the heaviest a spec runs, and what `isoloom resources` reports before a run.
 #[must_use]
 pub fn totals(spec: &model::Spec) -> Totals {
-    add_up(spec, |m| machine_size(m, false))
+    add_up(spec, |m| machine_size(m, Form::Vm))
 }
 
 /// What the whole spec needs on `target`: every machine sized the way that target runs it (a
@@ -111,7 +122,7 @@ pub fn totals(spec: &model::Spec) -> Totals {
 /// environment there, so the Docker targets read lighter than the VM ones for the same spec.
 #[must_use]
 pub fn totals_for(spec: &model::Spec, target: model::Target) -> Totals {
-    add_up(spec, |m| machine_size(m, runs_as_container(target, m)))
+    add_up(spec, |m| machine_size(m, form_on(target, m)))
 }
 
 #[cfg(test)]
