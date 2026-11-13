@@ -275,7 +275,7 @@ fn resolved_probe(probe: Probe) -> Resolved {
 #[test]
 fn a_check_reports_its_kind_its_wait_and_whether_isoloom_derived_it() {
     let url = Url {
-        https: false,
+        scheme: isoloom_spec::probe::Scheme::Http,
         host: Host::Literal("web".into()),
         port: None,
         path: "/".into(),

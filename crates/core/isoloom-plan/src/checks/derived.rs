@@ -49,7 +49,7 @@ pub fn derived(spec: &Spec) -> Vec<Resolved> {
         if !ma.networks.keys().any(|n| spec.networks.get(n).is_some_and(|net| net.internet)) {
             let probe = Probe::Http {
                 url: Url {
-                    https: false,
+                    scheme: isoloom_spec::probe::Scheme::Http,
                     host: Host::Literal("1.1.1.1".into()),
                     port: None,
                     path: "/".into(),
@@ -150,7 +150,11 @@ fn answers(host: Host, svc: &Port) -> Probe {
     if svc.http {
         Probe::Http {
             url: Url {
-                https: svc.tls,
+                scheme: if svc.tls {
+                    isoloom_spec::probe::Scheme::Https
+                } else {
+                    isoloom_spec::probe::Scheme::Http
+                },
                 host,
                 port: Some(svc.port),
                 path: "/".into(),

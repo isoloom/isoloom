@@ -1,5 +1,6 @@
 use super::*;
 use crate::testing;
+use isoloom_spec::probe::Scheme;
 
 /// `user` (the access machine) and `web` on `front`, `cache` on the offline `back`, which
 /// `front` reaches on 6379 only; `web` also has two addresses on `side`.
@@ -57,7 +58,7 @@ fn an_answer_is_a_page_or_a_connection_waited_for_and_a_block_tried_once() {
     assert_eq!(page.wait, 30);
     let Probe::Http { url, expect, .. } = page.probe else { panic!("a page") };
     assert_eq!(
-        (url.host, url.port, url.https, expect),
+        (url.host, url.port, url.scheme == Scheme::Https, expect),
         (
             Host::Machine {
                 name: "web".into(),
@@ -132,5 +133,5 @@ fn with_no_machine_to_run_them_every_service_answers_from_the_networks() {
         ]
     );
     assert!(checks.iter().all(|c| c.position == Position::Networks && c.wait == 30));
-    assert!(matches!(&checks[2].probe, Probe::Http { url, .. } if url.https && url.port == Some(443)));
+    assert!(matches!(&checks[2].probe, Probe::Http { url, .. } if url.scheme == Scheme::Https && url.port == Some(443)));
 }

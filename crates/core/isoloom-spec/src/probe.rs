@@ -30,11 +30,31 @@ impl fmt::Display for Host {
     }
 }
 
+/// A URL's scheme (the flag it was, `https: bool`, read at every use: Clean Code F3, 2026-11-13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scheme {
+    /// Plain HTTP.
+    Http,
+    /// HTTP over TLS.
+    Https,
+}
+
+impl Scheme {
+    /// The scheme as the URL writes it.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Scheme::Http => "http",
+            Scheme::Https => "https",
+        }
+    }
+}
+
 /// An HTTP request's parts (the URL as parsed from the spec).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Url {
-    /// The scheme is `https` (else `http`).
-    pub https: bool,
+    /// `http` or `https`.
+    pub scheme: Scheme,
     /// The host the request goes to.
     pub host: Host,
     /// None: the scheme's default port.
@@ -47,9 +67,9 @@ impl Url {
     /// Parses `http://host[:port][/path]`; None when it isn't one.
     #[must_use]
     pub fn parse(s: &str) -> Option<Url> {
-        let (https, rest) = match s.strip_prefix("https://") {
-            Some(r) => (true, r),
-            None => (false, s.strip_prefix("http://")?),
+        let (scheme, rest) = match s.strip_prefix("https://") {
+            Some(r) => (Scheme::Https, r),
+            None => (Scheme::Http, s.strip_prefix("http://")?),
         };
         let (hostport, path) = match rest.split_once('/') {
             Some((hostport, path)) => (hostport, format!("/{path}")),
@@ -60,7 +80,7 @@ impl Url {
             return None;
         }
         Some(Url {
-            https,
+            scheme,
             host: Host::Literal(host.to_owned()),
             port,
             path,
@@ -71,7 +91,7 @@ impl Url {
     /// (`http://[fd00:20::10]:80/`).
     #[must_use]
     pub fn render(&self, host: &str) -> String {
-        let scheme = if self.https { "https" } else { "http" };
+        let scheme = self.scheme.as_str();
         let bracketed;
         let host = if host.contains(':') {
             bracketed = format!("[{host}]");
@@ -129,13 +149,16 @@ mod tests {
         assert_eq!(
             Url::parse("https://web:8443/health?x=1"),
             Some(Url {
-                https: true,
+                scheme: Scheme::Https,
                 host: Host::Literal("web".into()),
                 port: Some(8443),
                 path: "/health?x=1".into(),
             })
         );
-        assert_eq!(Url::parse("http://web").map(|u| (u.https, u.port, u.path)), Some((false, None, "/".to_owned())));
+        assert_eq!(
+            Url::parse("http://web").map(|u| (u.scheme, u.port, u.path)),
+            Some((Scheme::Http, None, "/".to_owned()))
+        );
     }
 
     #[test]

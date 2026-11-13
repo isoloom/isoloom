@@ -62,6 +62,6 @@ fn a_tls_service_is_probed_over_https() -> Outcome {
         .find(|c| c.derived && matches!(&c.probe, checks::Probe::Http { .. }))
         .expect("a derived http check");
     let checks::Probe::Http { url, .. } = &derived.probe else { unreachable!() };
-    assert!(url.https);
+    assert_eq!(url.scheme, isoloom_spec::probe::Scheme::Https);
     Ok(())
 }
