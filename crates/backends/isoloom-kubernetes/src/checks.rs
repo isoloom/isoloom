@@ -122,7 +122,7 @@ impl Check<'_> {
                 metadata,
                 spec: PodSpec {
                     restart_policy: Some("Never"),
-                    security_context: crate::security::pod(false, Vec::new()),
+                    security_context: crate::security::helper_pod(),
                     containers: vec![check],
                     volumes,
                     ..PodSpec::default()

@@ -99,6 +99,11 @@ pub(crate) fn pod(privileged: bool, sysctls: Vec<crate::objects::NameValue>) -> 
     (seccomp_profile.is_some() || !sysctls.is_empty()).then_some(PodSecurity { seccomp_profile, sysctls })
 }
 
+/// The settings of a pod Isoloom adds itself (a check runner): never privileged, no sysctls.
+pub(crate) fn helper_pod() -> Option<PodSecurity> {
+    pod(false, Vec::new())
+}
+
 /// The level the namespace enforces: `privileged` when a machine needs it, else `baseline`.
 pub(crate) fn level(machines: &[Machine]) -> &'static str {
     let needs_more = machines

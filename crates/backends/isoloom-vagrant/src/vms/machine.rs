@@ -16,7 +16,7 @@ use super::qemu::Link;
 use super::transport::{self, Os};
 use super::{Ctx, boot, checks, windows};
 use crate::host_folders::Share;
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Ruby, Start, Value};
 use crate::vagrantfile;
 
 /// Whether environment machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
@@ -37,7 +37,8 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     // The access machine is defined but not started by `vagrant up`: the runner hot-adds it,
     // overriding its box with one it is given.
     let access = mp.is_access();
-    define(r, name, access, |r| {
+    let start = if access { Start::OnDemand } else { Start::WithUp };
+    define(r, name, start, |r| {
         boxed(r, &image, mp.arch, access);
         hostname(r, name, os);
         boot::source(r, mp.vm_image.as_ref());
@@ -88,11 +89,12 @@ fn relays(published: &[(&PublishedPort, Value)]) -> Vec<(u16, Value)> {
         .collect()
 }
 
-/// `config.vm.define "<name>" do |m| ... end`, after a blank line. An `on_demand` machine (the
-/// access box) is defined `autostart: false`, so `vagrant up` skips it and the runner hot-adds it.
-pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnce(&mut Ruby)) {
+/// `config.vm.define "<name>" do |m| ... end`, after a blank line. A machine started
+/// [`Start::OnDemand`] (the access box) is defined `autostart: false`, so `vagrant up` skips it
+/// and the runner hot-adds it.
+pub(crate) fn define(r: &mut Ruby, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) {
     r.blank();
-    r.define(name, !on_demand, body);
+    r.define(name, start, body);
 }
 
 /// The main box of a machine booting `image` on CPU `arch`: its version, and its build pinned

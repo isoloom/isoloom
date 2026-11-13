@@ -75,7 +75,7 @@ pub(crate) fn forwarding(env: &Environment) -> String {
 /// (a changed snippet forces the VM to be recreated). The seal is applied live instead, from
 /// [`SEALED_NFT`], by the runner's seal-reload step ([`sealed_reload`]).
 pub(crate) fn ruleset_content(env: &Environment) -> Expression {
-    string(rules(env, false))
+    string(rules(env, Ruleset::Open))
 }
 
 /// Where the router keeps the sealed ruleset as a second, inert file. The runner's seal step
@@ -87,7 +87,7 @@ pub(crate) const SEALED_NFT: &str = "/etc/nftables.sealed.nft";
 /// out otherwise, so an unsealed environment's router is unchanged). Written from the first boot,
 /// so sealing never changes the snippet (and so never recreates the router).
 fn sealed_file(env: &Environment) -> Option<Expression> {
-    seal::any(env).then(|| file(SEALED_NFT, None, string(rules(env, true))))
+    seal::any(env).then(|| file(SEALED_NFT, None, string(rules(env, Ruleset::Sealed))))
 }
 
 /// The command the seal step runs on the router over SSH: apply the sealed ruleset (fail-closed —
@@ -97,24 +97,33 @@ pub(crate) fn sealed_reload() -> String {
     format!("sudo sh -c 'nft -f {SEALED_NFT} && cp {SEALED_NFT} /etc/nftables.conf'")
 }
 
+/// The router's ruleset before the seal, or after it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ruleset {
+    /// Every network keeps its internet.
+    Open,
+    /// The `internet: false` networks are closed.
+    Sealed,
+}
+
 /// The networks the router forwards and masquerades to the internet: every one, or, once
-/// `sealed`, only those with internet (`internet: false` networks lose their egress and NAT at
+/// [`Ruleset::Sealed`], only those with internet (`internet: false` networks lose their egress and NAT at
 /// the router). `None` leaves the forward and masquerade rules out (every network is offline).
-fn forwarded(env: &Environment, sealed: bool) -> Option<String> {
+fn forwarded(env: &Environment, ruleset: Ruleset) -> Option<String> {
     let cidrs: Vec<String> = env
         .networks
         .iter()
-        .filter(|(n, _)| !(sealed && seal::closed(env, n)))
+        .filter(|(n, _)| !(ruleset == Ruleset::Sealed && seal::closed(env, n)))
         .map(|(_, p)| p.cidr.to_string())
         .collect();
     (!cidrs.is_empty()).then(|| format!("{{ {} }}", cidrs.join(", ")))
 }
 
-/// The ruleset, sealed or not (see [`ruleset_content`]). The environment's whole set is
+/// The `ruleset`, sealed or not (see [`ruleset_content`]). The environment's whole set is
 /// the DNAT's source exclusion (published ports reach a machine whatever its network); once
 /// sealed, traffic to an `internet: false` network from elsewhere is dropped (so it keeps only
 /// its `reach` rules), and that network is dropped from the internet forward and masquerade.
-fn rules(env: &Environment, sealed: bool) -> String {
+fn rules(env: &Environment, ruleset: Ruleset) -> String {
     let blocks = format!("{{ {} }}", env.networks.values().map(|n| n.cidr.to_string()).collect::<Vec<_>>().join(", "));
     let mut forward: Vec<String> = router::forward_rules(env.spec());
     let mut dnat = Vec::new();
@@ -128,7 +137,7 @@ fn rules(env: &Environment, sealed: bool) -> String {
             dnat.push(format!("    ip saddr != {blocks} {proto} dport {host} dnat ip to {addr}:{port}\n"));
         }
     }
-    if sealed {
+    if ruleset == Ruleset::Sealed {
         let closed: Vec<String> = env
             .networks
             .iter()
@@ -139,7 +148,7 @@ fn rules(env: &Environment, sealed: bool) -> String {
             forward.push(format!("ip daddr {{ {} }} drop", closed.join(", ")));
         }
     }
-    let out = forwarded(env, sealed);
+    let out = forwarded(env, ruleset);
     if let Some(out) = &out {
         forward.push(format!("ip saddr {out} ip daddr != {out} accept"));
     }

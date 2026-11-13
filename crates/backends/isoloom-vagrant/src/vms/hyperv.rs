@@ -126,11 +126,15 @@ fn mac(vm: &str, net: &str) -> [u8; 6] {
     [0x02, 0x15, a, b, c, d]
 }
 
-/// A MAC address written with `sep` between its bytes, in capitals when `upper` (Hyper-V's
-/// cmdlets and WMI) or not (Linux's `/sys/class/net/*/address`).
-fn mac_text(mac: [u8; 6], sep: &str, upper: bool) -> String {
-    let s = mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(sep);
-    if upper { s.to_uppercase() } else { s }
+/// A MAC address as Hyper-V's cmdlets and WMI write it: in capitals, `sep` between its bytes.
+fn hyperv_mac_text(mac: [u8; 6], sep: &str) -> String {
+    mac.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(sep)
+}
+
+/// A MAC address as Linux writes it (`/sys/class/net/*/address`): lower case, `:` between its
+/// bytes.
+fn linux_mac_text(mac: [u8; 6]) -> String {
+    mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":")
 }
 
 /// The VM `vm_name`'s Hyper-V provider block, then the triggers that give it its networks there.
@@ -185,7 +189,7 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
     let nics = Value::array(
         hv.nics
             .iter()
-            .map(|n| Value::array([Value::str(&hv.switch(n.net)), Value::str(&mac_text(mac(vm_name, n.net), "", true))])),
+            .map(|n| Value::array([Value::str(&hv.switch(n.net)), Value::str(&hyperv_mac_text(mac(vm_name, n.net), ""))])),
     );
     let mut before_start = Vec::new();
     if !hv.nics.is_empty() {
@@ -257,7 +261,7 @@ fn env_net_at_boot() -> String {
 /// A Linux VM's addresses on its networks under Hyper-V: [`ENV_NET_SCRIPT`] written, run at
 /// every boot, and now.
 fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
-    let macs: Vec<String> = nics.iter().map(|n| mac_text(mac(vm_name, n.net), ":", false)).collect();
+    let macs: Vec<String> = nics.iter().map(|n| linux_mac_text(mac(vm_name, n.net))).collect();
     let lines: Vec<String> = nics
         .iter()
         .zip(&macs)
@@ -276,7 +280,7 @@ fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
 fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let nics: Vec<_> = nics
         .iter()
-        .map(|n| (Adapter::Mac(mac_text(mac(vm_name, n.net), ":", true)), n.ip, n.mask))
+        .map(|n| (Adapter::Mac(hyperv_mac_text(mac(vm_name, n.net), ":")), n.ip, n.mask))
         .collect();
     super::windows::static_addresses(&nics)
 }
@@ -297,7 +301,7 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{mac, mac_text};
+    use super::{hyperv_mac_text, linux_mac_text, mac};
 
     #[test]
     fn macs_are_local_stable_and_differ_by_vm_and_network() {
@@ -306,7 +310,7 @@ mod tests {
         assert_eq!(&a[..2], &[0x02, 0x15]);
         assert_ne!(a, mac("lab-web", "back"));
         assert_ne!(a, mac("lab-db", "front"));
-        assert_eq!(mac_text([0x02, 0x15, 0xab, 0, 1, 0xff], ":", false), "02:15:ab:00:01:ff");
-        assert_eq!(mac_text([0x02, 0x15, 0xab, 0, 1, 0xff], "", true), "0215AB0001FF");
+        assert_eq!(linux_mac_text([0x02, 0x15, 0xab, 0, 1, 0xff]), "02:15:ab:00:01:ff");
+        assert_eq!(hyperv_mac_text([0x02, 0x15, 0xab, 0, 1, 0xff], ""), "0215AB0001FF");
     }
 }

@@ -75,7 +75,7 @@ pub(super) fn lifecycle(env: &Environment, shape: &Shape) -> Result<Lifecycle> {
         virtualbox()?,
         up_step(shape)?,
     ];
-    up.extend(park_controller(env, shape, false)?);
+    up.extend(park_controller(env, shape, ParkAfter::Up)?);
     let resume = resume(env, shape)?;
     let park = |verb: &str, vms: &[&str]| -> Result<Option<Vec<Step>>> {
         let args: Vec<&str> = std::iter::once(verb).chain(vms.iter().copied()).collect();
@@ -162,17 +162,29 @@ fn running<'a>(env: &Environment, shape: &'a Shape) -> Vec<&'a str> {
         .collect()
 }
 
+/// When the controller is halted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ParkAfter {
+    /// After `up`: a failure is tolerated.
+    Up,
+    /// After a re-provision or the checks: it always runs, as a clean-up.
+    Use,
+}
+
 /// The controller halted (`vagrant.park_controller`): after `up` (tolerated), after a
-/// re-provision and after the checks (`always`). After `up` it powers itself off at the end of its
-/// play, and a `vagrant halt` racing that fails over SSH (libvirt): the action waits for it to be
-/// off instead. Not on QEMU, nor when the spec keeps it on.
-pub(super) fn park_controller(env: &Environment, shape: &Shape, always: bool) -> Result<Option<Step>> {
+/// re-provision and after the checks (always, [`ParkAfter`]). After `up` it powers itself off at
+/// the end of its play, and a `vagrant halt` racing that fails over SSH (libvirt): the action
+/// waits for it to be off instead. Not on QEMU, nor when the spec keeps it on.
+pub(super) fn park_controller(env: &Environment, shape: &Shape, after: ParkAfter) -> Result<Option<Step>> {
     if shape.controller().is_none() || keeps_controller(env) {
         return Ok(None);
     }
     let mut halt = act("park-controller", Action::VagrantParkController)?;
     halt.timeout_s = NonZeroU32::new(CONTROLLER_HALT_S);
-    let mut s = if always { cleanup(halt) } else { tolerated(halt) };
+    let mut s = match after {
+        ParkAfter::Use => cleanup(halt),
+        ParkAfter::Up => tolerated(halt),
+    };
     s.note = Some("Powering off the setup machine (it comes back for provisioning and checks)…".into());
     s.providers = [
         Provider::Virtualbox,
@@ -228,7 +240,7 @@ fn provision(env: &Environment, shape: &Shape) -> Result<Provision> {
         s.verdict = Some(ANSIBLE_VERDICT.into());
         Ok(noted(s, "Running the environment's setup play…"))
     };
-    let park = || park_controller(env, shape, true);
+    let park = || park_controller(env, shape, ParkAfter::Use);
     Ok(Provision {
         all: [Some(wake()?), Some(all), Some(play()?), park()?].into_iter().flatten().collect(),
         machine: [Some(wake()?), Some(one), Some(play()?), park()?].into_iter().flatten().collect(),
