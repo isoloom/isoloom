@@ -43,7 +43,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     let (healthcheck, unknown_port) = m.healthcheck.as_ref().map(|h| healthcheck(&at, m, h)).unzip();
     problems.extend(unknown_port.flatten());
     let docker = docker(l, name, m, service);
-    let official = docker.as_ref().and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry);
+    let image = ContainerImage::of(docker.as_ref());
     let (networks, more_addresses) = addresses(&m.networks);
     // Every field the spec's machine gives; the others (`count`, `supplied`) keep their default.
     let mut out = model::Machine::default();
@@ -52,7 +52,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.aliases.clone_from(&m.aliases);
     out.os = m.os.map(|o| o.to_string());
     out.arch = m.hardware.arch;
-    out.platform = platform(l.source, name, m, service, official);
+    out.platform = platform(l.source, name, m, service, image);
     out.rate_limit.clone_from(&m.rate_limit);
     out.privileged = m.privileged;
     out.seal = m.seal;
@@ -63,7 +63,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.tmpfs.clone_from(&m.tmpfs);
     out.shm_size.clone_from(&m.shm_size);
     out.dns.clone_from(&m.dns);
-    out.environment = environment(m, image_environment(l, official, service));
+    out.environment = environment(m, image_environment(l, image, service));
     out.sysctls.clone_from(&m.sysctls);
     out.ulimits.clone_from(&m.ulimits);
     out.ports = ports;
@@ -82,7 +82,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.vm = vm(l.source, name, m, service);
     out.docker = docker;
     out.external = overrides::external(l.source, name);
-    out.configuration = configuration(l, m, service, official);
+    out.configuration = configuration(l, m, service, image);
     problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service));
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
@@ -95,10 +95,32 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     }
 }
 
+/// Which image a machine's container is: the catalogue entry's own, or one built for it. A flag
+/// (`official: bool`) threaded through three functions before, one caller passing a bare
+/// `false` (Clean Code F3, 2026-11-13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContainerImage {
+    /// The entry's published image, as is: its platforms, variables and configuration are its.
+    Catalogue,
+    /// An image built for the machine (or no container at all).
+    Own,
+}
+
+impl ContainerImage {
+    /// Which image `docker`'s container is: the catalogue entry's when it is generated from it.
+    fn of(docker: Option<&DockerImpl>) -> ContainerImage {
+        if docker.and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry) {
+            ContainerImage::Catalogue
+        } else {
+            ContainerImage::Own
+        }
+    }
+}
+
 /// The architecture machine `name`'s container is pinned to: the one its spec asks for, else the
-/// only one its catalogue image is published for (`official`: its container is that image).
-/// `None`: it runs on the host's own.
-fn platform(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, official: bool) -> Option<model::Arch> {
+/// only one its catalogue image is published for (its container is that image). `None`: it runs
+/// on the host's own.
+fn platform(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, image: ContainerImage) -> Option<model::Arch> {
     // An architecture other than the default is asked for, wherever it was written (a spec
     // built in code has no spans).
     if m.hardware.arch != model::Arch::default() || source.writes(name, "hardware.arch") {
@@ -106,16 +128,16 @@ fn platform(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Ser
     }
     let Some(Ok(resolved)) = service else { return None };
     match resolved.first()?.image.as_ref()?.platforms.as_slice() {
-        [only] if official => Some(*only),
+        [only] if image == ContainerImage::Catalogue => Some(*only),
         _ => None,
     }
 }
 
 /// The variables an entry's official image reads, when the target runs the machine as that
-/// image (`official`: its container form is the image).
-fn image_environment(l: &Lowering<'_>, official: bool, service: Service<'_>) -> IndexMap<String, String> {
+/// image.
+fn image_environment(l: &Lowering<'_>, image: ContainerImage, service: Service<'_>) -> IndexMap<String, String> {
     match service {
-        Some(Ok(resolved)) if official && runs_containers(l) => super::service::image_environment(resolved),
+        Some(Ok(resolved)) if image == ContainerImage::Catalogue && runs_containers(l) => super::service::image_environment(resolved),
         _ => IndexMap::new(),
     }
 }
@@ -140,9 +162,9 @@ fn environment_inputs(m: &syntax::Machine) -> Vec<String> {
 /// What configures the machine: its services' phases (on a container target over its entry's
 /// official image, `configure` and the image's files alone), else its app's steps on its OS,
 /// when it has both.
-fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, official: bool) -> Option<model::Configuration> {
+fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, image: ContainerImage) -> Option<model::Configuration> {
     if let Some(Ok(resolved)) = service {
-        return if official && runs_containers(l) {
+        return if image == ContainerImage::Catalogue && runs_containers(l) {
             super::service::image_configuration(resolved)
         } else {
             super::service::configuration(resolved)
@@ -179,7 +201,9 @@ fn unresolved(at: &FieldPath, c: Option<&model::Configuration>, ports: &[model::
 
 /// Whether the machine's configuration starts a service (in a container, its supervisor runs it).
 fn serves(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>) -> bool {
-    let Some(c) = configuration(l, m, service, false) else { return false };
+    let Some(c) = configuration(l, m, service, ContainerImage::Own) else {
+        return false;
+    };
     crate::configure::Recipe::of(&c, &[], &crate::configure::DaemonTable::common()).is_ok_and(|r| !r.daemons.is_empty())
 }
 
