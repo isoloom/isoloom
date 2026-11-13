@@ -10,6 +10,7 @@ use isoloom_manifest::is_kebab;
 
 use super::Problems;
 use crate::model::{Disk, Filesystem};
+use crate::os::Kind;
 
 /// The largest data disk, in GB: what every cloud's block storage takes (16 TiB).
 const MAX_DISK_GB: u32 = 16_384;
@@ -41,10 +42,10 @@ pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, p: &mut Pro
         if d.size_gb == 0 || d.size_gb > MAX_DISK_GB {
             p.add(format!("{at}.size_gb"), format!("a data disk is 1 to {MAX_DISK_GB} GB"));
         }
-        let windows = s.m.vm.as_ref().is_some_and(|vm| crate::images::is_windows(&vm.os));
-        filesystem(d, windows, &at, p);
+        let os = s.m.vm.as_ref().map_or(Kind::Linux, |vm| Kind::of(&vm.os));
+        filesystem(d, os, &at, p);
         if let Some(m) = &d.mount {
-            mount(m, windows, &at, p);
+            mount(m, os, &at, p);
             if volume_paths.contains(m.trim_end_matches('/')) || !mounts.insert(m.trim_end_matches('/').to_ascii_uppercase()) {
                 p.add(format!("{at}.mount"), format!("`{m}` is already a volume or a disk of this machine"));
             }
@@ -70,10 +71,10 @@ fn disk_name_problem(s: &Subject, name: &str) -> Option<String> {
 }
 
 /// A filesystem the machine's OS formats: ext4 or XFS on Linux, NTFS on Windows, or none.
-fn filesystem(d: &Disk, windows: bool, at: &str, p: &mut Problems) {
-    match (d.fs, windows) {
-        (Some(Filesystem::Ntfs), false) => p.add(format!("{at}.fs"), "NTFS is a Windows machine's: use ext4 or xfs"),
-        (Some(Filesystem::Ext4 | Filesystem::Xfs), true) => p.add(format!("{at}.fs"), "a Windows machine formats NTFS: use ntfs, or leave it out"),
+fn filesystem(d: &Disk, os: Kind, at: &str, p: &mut Problems) {
+    match (d.fs, os) {
+        (Some(Filesystem::Ntfs), Kind::Linux) => p.add(format!("{at}.fs"), "NTFS is a Windows machine's: use ext4 or xfs"),
+        (Some(Filesystem::Ext4 | Filesystem::Xfs), Kind::Windows) => p.add(format!("{at}.fs"), "a Windows machine formats NTFS: use ntfs, or leave it out"),
         _ => {}
     }
     match (d.fs == Some(Filesystem::Raw), d.mount.is_some()) {
@@ -85,8 +86,8 @@ fn filesystem(d: &Disk, windows: bool, at: &str, p: &mut Problems) {
 
 /// A mount point: a safe absolute path on Linux, a drive letter other than the system's on
 /// Windows.
-fn mount(m: &str, windows: bool, at: &str, p: &mut Problems) {
-    if windows {
+fn mount(m: &str, os: Kind, at: &str, p: &mut Problems) {
+    if os.is_windows() {
         let drive_letter = matches!(m.as_bytes(), [letter, b':'] if (b'D'..=b'Z').contains(&letter.to_ascii_uppercase()));
         if !drive_letter {
             p.add(
