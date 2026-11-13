@@ -318,7 +318,7 @@ mod tests {
     fn a_field_another_target_has_is_refused() {
         let e = serde_yaml_ng::from_str::<Overrides>("{ docker: { machines: { web: { box: x } } } }").unwrap_err();
         assert!(e.to_string().contains("unknown field `machines`"));
-        let e = serde_yaml_ng::from_str::<Overrides>("{ podman: {} }").unwrap_err().to_string();
-        assert!(e.contains("unknown field `podman`"), "{e}");
+        let target = serde_yaml_ng::from_str::<Overrides>("{ podman: {} }").unwrap_err().to_string();
+        assert!(target.contains("unknown field `podman`"), "{target}");
     }
 }

@@ -183,7 +183,7 @@ mod tests {
                 .to_string()
                 .contains("unknown field `docker`")
         );
-        let e = serde_yaml_ng::from_str::<Group>("{ resources: { cpus: 2 } }").unwrap_err().to_string();
-        assert!(e.contains("unknown field `resources`"), "{e}");
+        let no_members = serde_yaml_ng::from_str::<Group>("{ resources: { cpus: 2 } }").unwrap_err().to_string();
+        assert!(no_members.contains("a group names its `members`"), "{no_members}");
     }
 }

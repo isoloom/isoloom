@@ -63,7 +63,7 @@ fn the_wiring_report_names_the_bridges_their_labels_and_gateways() -> Outcome {
 }
 
 /// The totals read the snapshot as its writer writes it: an all-zero total is the reader missing
-/// the sizes, not a lab of empty machines.
+/// the sizes, not an environment of empty machines.
 #[test]
 fn the_resources_report_totals_every_machines_size() -> Outcome {
     let resources = report("resources", &snapshot("segmented")?, false)?;
