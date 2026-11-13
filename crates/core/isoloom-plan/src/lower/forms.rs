@@ -168,8 +168,8 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved], daemons:
         if !image.platforms.contains(&m.hardware.arch) {
             return Err(NoForm {
                 field: "hardware.arch".to_owned(),
-                reason: format!("{} {} publishes no `{}` image", r.entry, r.release, arch(m.hardware.arch)),
-                fix: format!("another release, or `{}`", arch(isoloom_spec::model::Arch::Amd64)),
+                reason: format!("{} {} publishes no `{}` image", r.entry, r.release, m.hardware.arch.id()),
+                fix: format!("another release, or `{}`", isoloom_spec::model::Arch::Amd64.id()),
             });
         }
         let start = if image.start == ImageStart::Run { r.start.as_slice() } else { &[] };
@@ -189,14 +189,6 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved], daemons:
         });
     }
     Ok(Container::Steps { os, base })
-}
-
-/// How a spec writes an architecture.
-fn arch(a: isoloom_spec::model::Arch) -> &'static str {
-    match a {
-        isoloom_spec::model::Arch::Amd64 => "amd64",
-        isoloom_spec::model::Arch::Arm64 => "arm64",
-    }
 }
 
 #[cfg(test)]

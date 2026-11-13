@@ -32,10 +32,11 @@ fn dq(s: &str) -> String {
 #[must_use]
 pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
     let mut s = format!(
-        "#!/bin/sh\n{}# The environment's checks, {}: each prints a PASS or FAIL line.\n{}{RUNTIME}",
+        "#!/bin/sh\n{}# The environment's checks, {}: each prints a PASS or FAIL line.\n{}{}",
         crate::header("#"),
         position.label(),
         counters(),
+        runtime(),
     );
     for c in checks {
         s.push('\n');
@@ -245,16 +246,25 @@ fn project_file_lines(n: &str, wait: u32, path: &str, cmd: &str, failure: &str) 
     )
 }
 
-/// The helpers every runner starts with, after its [`counters`].
+/// The helpers every runner starts with, after its [`counters`]: [`RUNTIME`] with its redirect
+/// limit filled in from [`HTTP_MAX_REDIRECTS`], the one the curl arguments follow too.
+fn runtime() -> String {
+    RUNTIME
+        .replace("@MAX_REDIRS@", &HTTP_MAX_REDIRECTS.to_string())
+        .replace("@ANSWERS@", &(HTTP_MAX_REDIRECTS + 1).to_string())
+}
+
+/// The helpers' text; `@MAX_REDIRS@` is the redirect limit and `@ANSWERS@` the answers it
+/// allows (the first, then one per redirect), filled in by [`runtime`].
 const RUNTIME: &str = r#"# _http URL [follow] -> the status code, 000 when nothing answers (curl, else wget, else bash):
-# the first answer's, or with `follow` the last one's after at most 5 redirects (bash: the first).
+# the first answer's, or with `follow` the last one's after at most @MAX_REDIRS@ redirects (bash: the first).
 _http() {
   if command -v curl >/dev/null 2>&1; then
-    if [ -n "$2" ]; then set -- "$1" -L --max-redirs 5; else set -- "$1"; fi
+    if [ -n "$2" ]; then set -- "$1" -L --max-redirs @MAX_REDIRS@; else set -- "$1"; fi
     c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$@" 2>/dev/null)
   elif command -v wget >/dev/null 2>&1; then
     # wget follows redirects whatever it's told (busybox's can't be told): -S prints each answer.
-    if [ -n "$2" ]; then _n=6; else _n=1; fi
+    if [ -n "$2" ]; then _n=@ANSWERS@; else _n=1; fi
     c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | head -n $_n | tail -n 1)
   else
     u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
