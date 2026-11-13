@@ -22,7 +22,9 @@ pub(crate) fn key_refusal(key: &str) -> Option<String> {
     let allowed = |c: char| c.is_ascii_alphanumeric() || "_.:-".contains(c);
     let lower = key.to_ascii_lowercase();
     if key.len() > LABEL_MAX || !key.starts_with(|c: char| c.is_ascii_alphabetic()) || !key.chars().all(allowed) {
-        Some("a key of at most 63 letters, digits and `_ . : -`, starting with a letter, e.g. cost-center".to_owned())
+        Some(format!(
+            "a key of at most {LABEL_MAX} letters, digits and `_ . : -`, starting with a letter, e.g. cost-center"
+        ))
     } else if lower.starts_with("isoloom") || lower == "managed-by" {
         Some(format!("`{key}` is Isoloom's own tag: name yours otherwise"))
     } else {
