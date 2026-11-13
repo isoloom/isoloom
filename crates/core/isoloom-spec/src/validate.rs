@@ -20,12 +20,6 @@ mod ipv6;
 mod links;
 mod machine_files;
 mod machines;
-pub use machines::{MACHINE_NAME_MAX, dns_name};
-pub(crate) use top::NAME_MAX;
-
-/// The longest DNS label (RFC 1035), the limit of a Kubernetes name, a namespace, a cloud label
-/// and a machine's host name.
-pub(crate) const DNS_LABEL_MAX: usize = 63;
 mod networks;
 mod os;
 mod outside;
@@ -45,12 +39,17 @@ mod windows;
 mod tests;
 
 use crate::contract::is_kebab;
-
 use crate::model::{Machine, Spec};
 use crate::net::Cidr;
 use crate::syntax::Code;
 
 pub use files::validate_files;
+pub use machines::{MACHINE_NAME_MAX, dns_name};
+pub(crate) use top::NAME_MAX;
+
+/// The longest DNS label (RFC 1035), the limit of a Kubernetes name, a namespace, a cloud label
+/// and a machine's host name.
+pub(crate) const DNS_LABEL_MAX: usize = 63;
 
 /// One thing wrong with a lowered spec: the field's path and what to do about it. The plan
 /// places it at the field the author wrote, as a [`crate::syntax::Problem`].

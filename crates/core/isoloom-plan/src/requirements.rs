@@ -2,6 +2,8 @@
 //! environment when it lacks the capability one of its requirements needs: the refusal comes
 //! from the plan, without generating anything.
 
+mod feature;
+
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -597,6 +599,5 @@ pub(crate) fn container_checks(spec: &Spec) -> Option<Requirement> {
         .map(|c| Requirement::ExecWithoutContainer { check: c.name })
 }
 
-mod feature;
 #[cfg(test)]
 mod tests;
