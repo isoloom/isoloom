@@ -358,6 +358,13 @@ impl Environment {
         &self.spec
     }
 
+    /// The names it takes on the host (its VMs, networks and libvirt domains), keyed by its name
+    /// and so by its instance: the one place a backend builds them from.
+    #[must_use]
+    pub fn names(&self) -> crate::Names<'_> {
+        crate::Names::new(&self.name)
+    }
+
     /// The names of the launch values it reads, in spec order.
     #[must_use]
     pub fn input_names(&self) -> Vec<String> {

@@ -73,8 +73,8 @@ fn every_machine(env: &Environment) -> Step {
 /// of `at`, at its address there.
 fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
     Guest {
-        label: super::label(env, define),
-        vm_name: super::vm_name(env, define),
+        label: env.names().vm_label(define),
+        vm_name: env.names().vm_name(define),
         size,
         port_groups: super::port_groups(env, at.iter().map(|(net, _)| *net)),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),

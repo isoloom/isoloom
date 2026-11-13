@@ -49,10 +49,10 @@ mod windows;
 /// The name of a network on the host, `isoloom-<environment>-<network>` (after the contract's
 /// [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)): its VirtualBox internal
 /// network, its libvirt network and its Hyper-V private switch, as the Vagrantfile makes them and
-/// the run manifest names them.
+/// the run manifest names them ([`isoloom_plan::Names::network`]).
 #[must_use]
 pub fn network_name(environment: &str, network: &str) -> String {
-    format!("{}{environment}-{network}", isoloom_manifest::contract::RESERVED_PREFIX)
+    isoloom_plan::Names::new(environment).network(network)
 }
 
 use indexmap::IndexMap;
@@ -290,25 +290,12 @@ fn settings(r: &mut Ruby, env: &Environment) {
     );
     r.assign("config.vm.boot_timeout", 900u32);
     vagrantfile::ssh_proxy(r, "config");
-    vagrantfile::libvirt_prefix(r, "config", &env.name);
+    vagrantfile::libvirt_prefix(r, "config", &env.names().libvirt_prefix());
 }
 
 /// Whether the Vagrantfile has a controller: to run the environment's playbooks, or checks.
 fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
     env.controller.is_some() || !checks.controller.is_empty()
-}
-
-/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> - <define>`,
-/// after its define name (an environment machine's, or one of Isoloom's own under `isoloom-`). ASCII only:
-/// Vagrant interpolates it into its own messages, and a reload fails on a non-ASCII name
-/// (`incompatible character encodings: UTF-8 and ASCII-8BIT`).
-pub(crate) fn label(env: &Environment, define: &str) -> String {
-    format!("{} - {define}", env.name)
-}
-
-/// A VM's name on ESXi and Hyper-V, with no space: `<env>-<define>`.
-pub(crate) fn vm_name(env: &Environment, define: &str) -> String {
-    format!("{}-{define}", env.name)
 }
 
 /// What one `config.vm.define` of the Vagrantfile is.

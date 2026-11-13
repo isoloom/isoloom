@@ -144,7 +144,7 @@ fn hostname(r: &mut Ruby, name: &str, os: Os) {
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
 pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
-    let netname = super::network_name(&env.name, net);
+    let netname = env.names().network(net);
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
         .kw("ip", Value::str(&ip.to_string()))
@@ -174,7 +174,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         .filter(|_| os == Os::Windows)
         .map(|(net, ip)| (*ip, env.block(net).netmask()));
     let hyperv = HyperV {
-        env: &env.name,
+        names: env.names(),
         boxed: image.hyperv.clone(),
         nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
         windows: os == Os::Windows,
@@ -184,8 +184,8 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         keeps_hostname: false,
     };
     Guest {
-        label: super::label(env, name),
-        vm_name: super::vm_name(env, name),
+        label: env.names().vm_label(name),
+        vm_name: env.names().vm_name(name),
         size: Size::of(mp),
         port_groups: super::port_groups(env, mp.addresses.keys().map(String::as_str)),
         libvirt_box: image.libvirt.as_deref(),

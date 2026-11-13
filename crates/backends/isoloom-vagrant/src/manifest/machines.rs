@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Role, Template};
-use isoloom_plan::Environment;
+use isoloom_plan::{Environment, Names};
 use isoloom_render::run_manifest::{addresses, arch, port};
 use isoloom_spec::model::Target;
 use isoloom_spec::net::NetworkBlock;
@@ -16,7 +16,7 @@ use isoloom_spec::net::NetworkBlock;
 use super::keeps_controller;
 use crate::error::{Error, Result};
 use crate::vms::providers::Size;
-use crate::vms::{Define, Kind, Shape, label, vm_name};
+use crate::vms::{Define, Kind, Shape};
 
 /// Where a forwarded port listens on the host.
 const LOOPBACK: &str = "127.0.0.1";
@@ -96,10 +96,12 @@ fn on_every_network(env: &Environment, at: impl Fn(NetworkBlock) -> Option<std::
         .collect()
 }
 
-/// A VM's name under each provider that names one: the display name (`shown`) on the desktop
-/// hypervisors, `plain` (`<env>-<what>`) on Hyper-V and ESXi, `libvirt` (the domain, its prefix
-/// the environment's) on libvirt. QEMU names none.
-pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMap<Provider, String> {
+/// A VM's name under each provider that names one, as the environment's [`Names`] build them:
+/// the display name of `shown` on the desktop hypervisors, the plain name of `shown` on Hyper-V
+/// and ESXi, the libvirt domain of `define` on libvirt. QEMU names none.
+pub(super) fn vm_names(names: Names<'_>, shown: &str, define: &str) -> BTreeMap<Provider, String> {
+    let (plain, libvirt) = (names.vm_name(shown), names.libvirt_domain(define));
+    let shown = names.vm_label(shown);
     BTreeMap::from([
         (Provider::Virtualbox, shown.clone()),
         (Provider::VmwareDesktop, shown.clone()),
@@ -112,8 +114,7 @@ pub(super) fn vm_names(shown: String, plain: String, libvirt: String) -> BTreeMa
 }
 
 fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
-    let (shown, plain) = (label(env, &d.name), vm_name(env, &d.name));
-    let vm_names = vm_names(shown, plain, format!("{}_{}", env.name, d.name));
+    let vm_names = vm_names(env.names(), &d.name, &d.name);
     let offered: Vec<Provider> = crate::vms::provider::Provider::ALL
         .iter()
         .filter(|k| k.provider.runs_vms())

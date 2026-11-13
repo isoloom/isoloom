@@ -20,7 +20,7 @@
 use std::net::Ipv4Addr;
 
 use crate::boxes::{self, HyperVBox};
-use isoloom_plan::{Environment, Vm};
+use isoloom_plan::{Environment, Names, Vm};
 use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::windows::Tpm;
 
@@ -44,8 +44,8 @@ pub(crate) fn hyperv_rb() -> String {
 /// How a VM runs under Vagrant's Hyper-V provider.
 #[derive(Debug, Clone)]
 pub(crate) struct HyperV<'a> {
-    /// The environment's name (its networks' switches are named after it).
-    pub(crate) env: &'a str,
+    /// The environment's host names (its networks' switches among them).
+    pub(crate) names: Names<'a>,
     /// The box Hyper-V boots.
     pub(crate) boxed: HyperVBox,
     /// Its adapters on the networks, in order.
@@ -94,7 +94,7 @@ impl<'a> HyperV<'a> {
     /// Isoloom's own Debian VMs (router, tool shell) at these addresses: Debian 12's Hyper-V box.
     pub(crate) fn helper(env: &'a Environment, at: impl IntoIterator<Item = (&'a str, Ipv4Addr)>) -> Self {
         HyperV {
-            env: &env.name,
+            names: env.names(),
             boxed: HyperVBox::Other {
                 name: boxes::HYPERV_DEBIAN_12.0.into(),
                 version: Some(boxes::HYPERV_DEBIAN_12.1.into()),
@@ -110,7 +110,7 @@ impl<'a> HyperV<'a> {
 
     /// The private switch of a network.
     fn switch(&self, net: &str) -> String {
-        super::network_name(self.env, net)
+        self.names.network(net)
     }
 
     /// The networks' switches, as a Ruby array.
