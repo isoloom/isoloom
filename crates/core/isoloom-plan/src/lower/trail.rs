@@ -5,11 +5,16 @@
 
 use isoloom_spec::syntax::{self, FieldPath, Step};
 
+use super::overrides::keyed_for_machine;
+
 /// Lowered paths back to written ones.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Trail {
     /// (lowered prefix, written path), the longest prefix wins.
     entries: Vec<(String, String)>,
+    /// (section, machine, key): the `overrides.<section>.machines` key a machine took its entry
+    /// from when it isn't the machine's own name (a group's, its counted machine's).
+    keys: Vec<(String, String, String)>,
 }
 
 impl Trail {
@@ -47,6 +52,43 @@ impl Trail {
         }
     }
 
+    /// The `overrides.<section>.machines` entries machine `name` takes its images, its LXC flag
+    /// and its existing host from, when one is written under another key: a group's, its counted
+    /// machine's.
+    pub(super) fn overrides(&mut self, source: &syntax::Spec, name: &str) {
+        let o = &source.overrides;
+        let mut found: Vec<(&str, Option<&str>)> = vec![
+            (
+                "vagrant",
+                o.vagrant.as_ref().and_then(|v| keyed_for_machine(source, &v.machines, name)).map(|(k, _)| k),
+            ),
+            (
+                "proxmox",
+                o.proxmox.as_ref().and_then(|p| keyed_for_machine(source, &p.machines, name)).map(|(k, _)| k),
+            ),
+            (
+                "external",
+                o.external.as_ref().and_then(|x| keyed_for_machine(source, &x.machines, name)).map(|(k, _)| k),
+            ),
+        ];
+        for (cloud, c) in o.clouds() {
+            found.push((cloud, c.and_then(|c| keyed_for_machine(source, &c.machines, name)).map(|(k, _)| k)));
+        }
+        for (section, key) in found {
+            if let Some(key) = key.filter(|k| *k != name) {
+                self.keys.push((section.to_owned(), name.to_owned(), key.to_owned()));
+            }
+        }
+    }
+
+    /// The key of `overrides.<section>.machines` machine `machine`'s entry is written under.
+    fn key<'a>(&'a self, section: &str, machine: &'a str) -> &'a str {
+        self.keys
+            .iter()
+            .find(|(s, m, _)| s == section && m == machine)
+            .map_or(machine, |(_, _, k)| k.as_str())
+    }
+
     /// The spec's inputs, and the secrets lowering made of the files they fill.
     pub(super) fn inputs(&mut self, source: &syntax::Spec) {
         for (i, name) in source.inputs.0.keys().enumerate() {
@@ -66,7 +108,7 @@ impl Trail {
             .max_by_key(|(lowered, _)| lowered.len());
         match best {
             Some((lowered, written)) => FieldPath::new(format!("{written}{}", rename_inside(path.get(lowered.len()..).unwrap_or_default()))),
-            None => FieldPath::new(rename(path)),
+            None => FieldPath::new(rename(self, path)),
         }
     }
 }
@@ -83,10 +125,10 @@ fn rename_inside(rest: &str) -> String {
 }
 
 /// The written path of a lowered one with no recorded index: the fixed renames.
-fn rename(path: &str) -> String {
+fn rename(recorded: &Trail, path: &str) -> String {
     let parts: Vec<&str> = path.splitn(3, '.').collect();
     match parts.as_slice() {
-        ["machines", m, rest] => machine_field(m, rest),
+        ["machines", m, rest] => machine_field(recorded, m, rest),
         ["networks", n, rest] => match rest.split_once('.').map_or((*rest, ""), |(a, b)| (a, b)) {
             ("docker", "") => format!("overrides.docker.networks.{n}"),
             ("docker", inner) => format!("overrides.docker.networks.{n}.{inner}"),
@@ -100,21 +142,22 @@ fn rename(path: &str) -> String {
     }
 }
 
-/// A machine field's written path.
-fn machine_field(m: &str, rest: &str) -> String {
+/// A machine field's written path; an override's at the key the machine took it from.
+fn machine_field(recorded: &Trail, m: &str, rest: &str) -> String {
     let at = format!("machines.{m}");
     let (head, tail) = rest
         .split_once(['.', '['])
         .map_or((rest, ""), |(h, _)| (h, rest.get(h.len()..).unwrap_or_default()));
     let image = |key: &str| -> String {
+        let v = recorded.key("vagrant", m);
         match key {
-            "vagrant" => format!("overrides.vagrant.machines.{m}.box"),
-            "vagrant_version" => format!("overrides.vagrant.machines.{m}.box_version"),
-            "qemu" | "hyperv" => format!("overrides.vagrant.machines.{m}.boxes.{key}"),
-            "box_url" | "box_server_url" | "winrm" | "winssh" => format!("overrides.vagrant.machines.{m}.{key}"),
-            "proxmox" => format!("overrides.proxmox.machines.{m}.image"),
-            "" => format!("overrides.vagrant.machines.{m}"),
-            cloud => format!("overrides.{cloud}.machines.{m}.image"),
+            "vagrant" => format!("overrides.vagrant.machines.{v}.box"),
+            "vagrant_version" => format!("overrides.vagrant.machines.{v}.box_version"),
+            "qemu" | "hyperv" => format!("overrides.vagrant.machines.{v}.boxes.{key}"),
+            "box_url" | "box_server_url" | "winrm" | "winssh" => format!("overrides.vagrant.machines.{v}.{key}"),
+            "proxmox" => format!("overrides.proxmox.machines.{}.image", recorded.key("proxmox", m)),
+            "" => format!("overrides.vagrant.machines.{v}"),
+            cloud => format!("overrides.{cloud}.machines.{}.image", recorded.key(cloud, m)),
         }
     };
     match (head, tail) {
@@ -122,7 +165,7 @@ fn machine_field(m: &str, rest: &str) -> String {
             "image" | "appliance" | "config" | "firmware" => format!("{at}.app{t}"),
             "build" | "dockerfile" | "target" | "args" => format!("{at}.app.build"),
             "init" => format!("{at}.setup{}", t.trim_start_matches(".init")),
-            "lxc" => format!("overrides.proxmox.machines.{m}.lxc"),
+            "lxc" => format!("overrides.proxmox.machines.{}.lxc", recorded.key("proxmox", m)),
             "idle" => format!("{at}.os"),
             _ => format!("{at}.app"),
         },
@@ -141,7 +184,7 @@ fn machine_field(m: &str, rest: &str) -> String {
         },
         ("arch" | "gpus" | "devices" | "nested_virtualization", t) => format!("{at}.hardware.{head}{t}"),
         ("working_dir", _) => format!("{at}.command.cwd"),
-        ("external", _) => format!("overrides.external.machines.{m}.ssh"),
+        ("external", _) => format!("overrides.external.machines.{}.ssh", recorded.key("external", m)),
         ("more_addresses", t) => format!("{at}.networks{t}"),
         _ => format!("{at}.{rest}"),
     }
@@ -228,6 +271,30 @@ mod tests {
             ("machines.web.more_addresses.lan", "machines.web.networks.lan"),
             ("machines.web.environment.A", "machines.web.environment.A"),
             ("checks[2].from", "checks[2].from"),
+        ] {
+            assert_eq!(t.path(lowered).as_str(), written, "{lowered}");
+        }
+    }
+
+    #[test]
+    fn an_override_a_group_or_a_counted_machine_gives_points_at_its_own_key() {
+        let lab = crate::testing::lab(
+            "version: 1\nname: t\ngroups: { windows: { members: [dc1] } }\nmachines:\n  dc1: { os: debian@12 }\n  w: { os: debian@12, count: 2 }\noverrides:\n  vagrant: { machines: { windows: { box: a/b }, w: { box: a/w } } }\n  proxmox: { machines: { windows: { image: local:x, lxc: true } } }\n  aws: { machines: { w: { image: ami-1 } } }\n  external: { machines: { windows: { ssh: { address: 192.0.2.7, user: ops } } } }\n",
+        );
+        let mut t = Trail::default();
+        for m in ["dc1", "w-01"] {
+            t.overrides(lab.source(), m);
+        }
+        for (lowered, written) in [
+            ("machines.dc1.vm.image.vagrant", "overrides.vagrant.machines.windows.box"),
+            ("machines.dc1.vm.image.qemu", "overrides.vagrant.machines.windows.boxes.qemu"),
+            ("machines.dc1.vm.image.proxmox", "overrides.proxmox.machines.windows.image"),
+            ("machines.dc1.docker.lxc", "overrides.proxmox.machines.windows.lxc"),
+            ("machines.dc1.external.address", "overrides.external.machines.windows.ssh"),
+            ("machines.dc1.vm.image.aws", "overrides.aws.machines.dc1.image"),
+            ("machines.w-01.vm.image.vagrant", "overrides.vagrant.machines.w.box"),
+            ("machines.w-01.vm.image.aws", "overrides.aws.machines.w.image"),
+            ("machines.w-01.vm.image.proxmox", "overrides.proxmox.machines.w-01.image"),
         ] {
             assert_eq!(t.path(lowered).as_str(), written, "{lowered}");
         }
