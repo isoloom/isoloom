@@ -75,7 +75,7 @@ fn networks(s: &mut Value) {
     );
     set(s, &["$defs", "Vlan", "properties", "cidr"], "pattern", json!(network));
     set(s, &["$defs", "Bridged", "properties", "vlan"], "minimum", json!(1));
-    set(s, &["$defs", "Bridged", "properties", "vlan"], "maximum", json!(4094));
+    set(s, &["$defs", "Bridged", "properties", "vlan"], "maximum", json!(*crate::vlans::VLAN_IDS.end()));
     set(
         s,
         &["$defs", "DockerNetwork", "properties", "cidr"],
