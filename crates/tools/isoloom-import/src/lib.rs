@@ -4,9 +4,9 @@
 //! is a starting point, and every import also returns a [`Note`] for each thing the source said
 //! that the draft doesn't carry as it was.
 //!
-//! It sits with the tools, on the core alone (`isoloom-spec` for the format's rules), and is
-//! pure: the command line reads the files (and runs the Vagrantfile's recorder) and hands this
-//! crate their text.
+//! It sits with the tools, on the core (`isoloom-spec` for the format's rules, `isoloom-manifest`
+//! and `isoloom-plan` for what a draft resolves to), and is pure: the command line reads the files
+//! (and runs the Vagrantfile's recorder) and hands this crate their text.
 //!
 //! # Example
 //!

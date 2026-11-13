@@ -192,7 +192,7 @@ pub struct Machine {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub secrets: Vec<MachineSecret>,
     /// CPUs, memory and disk for the machine (a VM's size, a container's limits). Each left out
-    /// takes its form's default: 1 CPU; 1024 MB and 20 GB as a VM, 512 MB and 5 GB as a container.
+    /// takes its form's default ([`crate::MachineSize::of`]: the VM's or the container's).
     #[serde(default)]
     pub resources: Option<Resources>,
     /// The machine's own command, instead of its image's (`CMD`; the image's entrypoint still

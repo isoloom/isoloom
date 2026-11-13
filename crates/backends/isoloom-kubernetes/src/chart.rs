@@ -209,9 +209,8 @@ fn literal(text: &str) -> String {
     text.replace("{{", "{{ `{{` }}")
 }
 
-/// Chart templates, one file: every string as it is, but the Helm expressions.
 /// Several objects as chart templates, one document each, in one file, each labelled with
-/// `labels`.
+/// `labels`; every string as it is, but the Helm expressions.
 fn helm_documents(objects: &[Manifest], labels: &Labels) -> Result<String> {
     let docs: Vec<String> = objects.iter().map(|o| helm_document(&o.labelled(labels))).collect::<Result<_, _>>()?;
     Ok(docs.join("---\n"))

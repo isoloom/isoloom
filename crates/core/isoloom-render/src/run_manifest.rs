@@ -484,9 +484,9 @@ pub fn check(c: &Resolved) -> Check {
     }
 }
 
-/// The time limit of a runner of `checks`, the same on every target: their waits, plus 15 s
-/// each, plus 60 s. A runner never stops before its slowest check could pass; booting what the
-/// runner runs on is not check time (a setup step's).
+/// The time limit of a runner of `checks`, the same on every target: their waits, plus
+/// `PER_CHECK_S` each, plus `START_S`. A runner never stops before its slowest check could pass;
+/// booting what the runner runs on is not check time (a setup step's).
 #[must_use]
 pub fn timeout_s(checks: &[&Resolved]) -> u32 {
     let waits: u32 = checks.iter().map(|c| c.wait).sum();
