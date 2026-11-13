@@ -62,7 +62,12 @@ fn resolve(spec: &Spec, template_of: Option<&str>, r: &Reference) -> Result<(), 
         }
     };
     match r {
-        Reference::OwnAddress { network } => on(template_of.unwrap_or_default(), network),
+        // A machine's own address is a template's to name: elsewhere there is no machine to be
+        // "own" to (an empty name said "no machine named ``" before).
+        Reference::OwnAddress { network } => match template_of {
+            Some(machine) => on(machine, network),
+            None => Err(format!("`machine.addresses.{network}` names the machine a template is for; there is none here")),
+        },
         Reference::Address { machine, network } => on(machine, network),
         Reference::Port { machine, port, field } => {
             let m = spec.machines.get(machine).ok_or_else(|| format!("no machine named `{machine}`"))?;
