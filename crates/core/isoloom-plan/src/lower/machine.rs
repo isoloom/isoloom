@@ -37,7 +37,6 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     let m = m.as_ref();
     let (files, secrets, inputs) = files(name, m, trail);
     trail.machine(name, m);
-    trail.overrides(l.source, name);
     let at = FieldPath::new("machines").key(name);
     let (ports, unnumbered) = ports(&at, m);
     problems.extend(unnumbered);

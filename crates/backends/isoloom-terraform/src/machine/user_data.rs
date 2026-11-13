@@ -190,12 +190,23 @@ fn unit() -> String {
 /// the inventory): a fresh file, written under umask 077.
 #[must_use]
 pub(crate) fn script(s: &SetUp) -> Template {
+    let body = body(s);
+    // The set-up holds the spec's values: its terminator is no line of it. An interpolated value
+    // (an address, a key the module reads) is never a line of its own there.
+    let known: String = body
+        .pieces()
+        .map(|p| match p {
+            Piece::Text(t) => t,
+            Piece::Expr(_) => "\u{0}",
+        })
+        .collect();
+    let tag = isoloom_spec::shell::here_tag("ISOLOOM_SETUP", &known);
     let mut t = Template::text(format!(
-        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from {RUNNER}.\nmkdir -p {DIR}\nrm -f {DIR}/setup.sh.new\n(umask 077 && cat > {DIR}/setup.sh.new) <<'ISOLOOM_SETUP'\n"
+        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from {RUNNER}.\nmkdir -p {DIR}\nrm -f {DIR}/setup.sh.new\n(umask 077 && cat > {DIR}/setup.sh.new) <<'{tag}'\n"
     ));
-    t.append(body(s));
+    t.append(body);
     t.push_text(format!(
-        "ISOLOOM_SETUP\nmv -f {DIR}/setup.sh.new {DIR}/setup.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/{UNIT} <<'ISOLOOM_UNIT'\n{}ISOLOOM_UNIT\nsystemctl daemon-reload\nsystemctl enable {UNIT} >/dev/null 2>&1\nsystemctl start --no-block {UNIT}\nelse\nnohup sh {DIR}/setup.sh >> {SETUP_LOG} 2>&1 &\nfi\n",
+        "{tag}\nmv -f {DIR}/setup.sh.new {DIR}/setup.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/{UNIT} <<'ISOLOOM_UNIT'\n{}ISOLOOM_UNIT\nsystemctl daemon-reload\nsystemctl enable {UNIT} >/dev/null 2>&1\nsystemctl start --no-block {UNIT}\nelse\nnohup sh {DIR}/setup.sh >> {SETUP_LOG} 2>&1 &\nfi\n",
         unit()
     ));
     t

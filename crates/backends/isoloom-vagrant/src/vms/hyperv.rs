@@ -265,8 +265,9 @@ fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
         .collect();
     let lines = lines.concat();
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
+    let script = isoloom_spec::shell::heredoc(&format!("cat > {ENV_NET_SCRIPT}"), "NET", &format!("{ENV_NET}{lines}exit $rc\n"));
     format!(
-        "set -e\nmkdir -p {CONFIG_DIR}\ncat > {ENV_NET_SCRIPT} <<'NET'\n{ENV_NET}{lines}exit $rc\nNET\nchmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{ENV_NET_SCRIPT}\n",
+        "set -e\nmkdir -p {CONFIG_DIR}\n{script}chmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{ENV_NET_SCRIPT}\n",
         env_net_at_boot()
     )
 }

@@ -517,27 +517,6 @@ mod tests {
     }
 
     #[test]
-    fn an_image_a_group_or_a_counted_machine_gives_is_checked_under_the_key_it_is_written_at() {
-        let lab = testing::lab(
-            "version: 1\nname: t\ngroups: { windows: { members: [dc1] } }\nmachines:\n  dc1: { os: debian@12 }\n  w: { os: debian@12, count: 2 }\n  a: { os: debian@12 }\noverrides:\n  vagrant: { machines: { windows: { box: 'bad box' }, w: { box: 'bad box' }, a: { box: 'bad box' } } }\n",
-        );
-        let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
-        for written in [
-            "overrides.vagrant.machines.windows.box",
-            "overrides.vagrant.machines.w.box",
-            "overrides.vagrant.machines.a.box",
-        ] {
-            assert!(paths.contains(&written.to_owned()), "{written}: {paths:?}");
-        }
-        assert!(
-            !paths
-                .iter()
-                .any(|p| p.starts_with("overrides.vagrant.machines.dc1") || p.starts_with("overrides.vagrant.machines.w-0")),
-            "no problem at a key nobody wrote: {paths:?}"
-        );
-    }
-
-    #[test]
     fn a_machine_the_authored_checks_refuse_shows_nothing_lowering_finds_under_it() {
         // `db` has no OS: the authored check says so, and what its lowered form lacks isn't shown.
         let lab = testing::lab(

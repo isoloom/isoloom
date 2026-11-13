@@ -1400,7 +1400,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/slow-but-there.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/slow-but-there.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/user.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/slow-but-there.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/slow-but-there.sh'"]].map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); "mkdir -p #{folder} && cat > #{file} <<'#{tag}'\n#{body}\n#{tag}\n" }.join + File.read(File.join(__dir__, "checks/user.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 
   # Tool `shell`: a toolbox on every network (tcpdump, nmap, curl, dig, netcat).
