@@ -6,6 +6,7 @@
 use serde_yaml_ng::{Mapping, Value};
 
 use crate::model::Spec;
+use crate::syntax::Problem;
 use crate::{clones, groups, os, vlans};
 
 /// A spec named `t` with one network, `lan` (10.0.0.0/24), then `rest` (its machines, checks,
@@ -34,7 +35,7 @@ pub(crate) fn model(yaml: &str) -> Result<Spec, String> {
     // A machine's `os` reaches its `vm:` before clones copy the machine and before a shared
     // `vm:` could fill its OS.
     fill_vm(&mut doc);
-    let clones = clones::expand(&mut doc).map_err(|p| p.line())?;
+    let clones = clones::expand(&mut doc).map_err(|found| found.iter().map(Problem::line).collect::<Vec<_>>().join("; "))?;
     let own = implementations(&doc);
     groups::expand(&mut doc).map_err(|p| p.line())?;
     complete_only(&mut doc, &own);

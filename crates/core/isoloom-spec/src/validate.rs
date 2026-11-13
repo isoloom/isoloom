@@ -120,6 +120,7 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     let mut p = Problems::default();
     top::version_and_name(spec, &mut p);
     networks::declared(spec, &mut p);
+    networks::vlans(spec, &mut p);
     constraints::check(spec, &mut p);
     cloud::check(spec, &mut p);
     let blocks = networks::blocks(spec, &mut p);
