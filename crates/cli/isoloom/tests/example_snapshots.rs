@@ -93,7 +93,9 @@ fn normalize(text: &str, dir: &Path, home: &Path) -> String {
         }
         text = text.replace(&path.display().to_string(), placeholder);
     }
-    text
+    // A release changes the generator's version, not the files: the 142 snapshots that held
+    // the version broke at every release (2.1.9's gate, 2026-11-13).
+    text.replace(&format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION")), "\"version\": \"[version]\"")
 }
 
 /// The target's block in `isoloom targets`: its `✓`/`✗` line, and the lines indented under it
