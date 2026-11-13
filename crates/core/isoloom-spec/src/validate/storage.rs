@@ -85,7 +85,7 @@ fn filesystem(d: &Disk, os: Kind, at: &str, problems: &mut Problems) {
     match (d.fs, os) {
         (Some(Filesystem::Ntfs), Kind::Linux) => problems.add(format!("{at}.fs"), "NTFS is a Windows machine's: use ext4 or xfs"),
         (Some(Filesystem::Ext4 | Filesystem::Xfs), Kind::Windows) => {
-            problems.add(format!("{at}.fs"), "a Windows machine formats NTFS: use ntfs, or leave it out")
+            problems.add(format!("{at}.fs"), "a Windows machine formats NTFS: use ntfs, or leave it out");
         }
         _ => {}
     }
