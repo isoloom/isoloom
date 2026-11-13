@@ -35,8 +35,8 @@ services:
     - /isoloom/init/write.sh
     network_mode: service:writer
     volumes:
-    - ../../steps/write.sh:/isoloom/init/write.sh:ro
-    - ../..:/opt/isoloom:ro
+    - ../../steps/write.sh:/isoloom/init/write.sh:ro,z
+    - ../..:/opt/isoloom:ro,z
     - shared:/srv/shared
     - writer-data:/srv/data
     depends_on:
@@ -70,8 +70,8 @@ services:
     - /isoloom/init/look.sh
     network_mode: service:reader
     volumes:
-    - ../../steps/look.sh:/isoloom/init/look.sh:ro
-    - ../..:/opt/isoloom:ro
+    - ../../steps/look.sh:/isoloom/init/look.sh:ro,z
+    - ../..:/opt/isoloom:ro,z
     - shared:/data/shared
     depends_on:
       reader:
@@ -89,7 +89,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:writer
     volumes:
-    - ./checks/writer.sh:/isoloom/run.sh:ro
+    - ./checks/writer.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-init-writer-1:
         condition: service_completed_successfully
@@ -109,7 +109,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:reader
     volumes:
-    - ./checks/reader.sh:/isoloom/run.sh:ro
+    - ./checks/reader.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-init-writer-1:
         condition: service_completed_successfully

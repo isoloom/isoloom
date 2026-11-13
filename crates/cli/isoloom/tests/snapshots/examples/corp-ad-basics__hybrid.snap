@@ -2008,7 +2008,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:isoloom-access
     volumes:
-    - ./checks/user.sh:/isoloom/run.sh:ro
+    - ./checks/user.sh:/isoloom/run.sh:ro,z
     depends_on:
       web01:
         condition: service_healthy

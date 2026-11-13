@@ -70,8 +70,8 @@ services:
     - /isoloom/init/seed.sh
     network_mode: service:cache
     volumes:
-    - ../../build/cache/seed.sh:/isoloom/init/seed.sh:ro
-    - ../..:/opt/isoloom:ro
+    - ../../build/cache/seed.sh:/isoloom/init/seed.sh:ro,z
+    - ../..:/opt/isoloom:ro,z
     - cache-data:/data
     depends_on:
       cache:
@@ -160,8 +160,8 @@ services:
     cap_add:
     - NET_ADMIN
     volumes:
-    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       cache:
         condition: service_healthy
@@ -185,7 +185,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:cache
     volumes:
-    - ./checks/cache.sh:/isoloom/run.sh:ro
+    - ./checks/cache.sh:/isoloom/run.sh:ro,z
     depends_on:
       cache:
         condition: service_healthy
@@ -209,7 +209,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:web
     volumes:
-    - ./checks/web.sh:/isoloom/run.sh:ro
+    - ./checks/web.sh:/isoloom/run.sh:ro,z
     depends_on:
       cache:
         condition: service_healthy

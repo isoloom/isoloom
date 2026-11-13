@@ -234,9 +234,9 @@ services:
     environment:
       DYNAMIPS_ARGS: -P 7200 -r 512 -T 2000 -C /config/startup-config.cfg -p 1:PA-2FE-TX -s 0:0:linux_eth:eth1 -s 1:0:linux_eth:eth2
     volumes:
-    - ./appliances/r1/base.cfg:/config/base.cfg:ro
-    - ../../configs/r1.cfg:/config/own.cfg:ro
-    - ../../images/c7200.bin:/firmware/ios.bin:ro
+    - ./appliances/r1/base.cfg:/config/base.cfg:ro,z
+    - ../../configs/r1.cfg:/config/own.cfg:ro,z
+    - ../../images/c7200.bin:/firmware/ios.bin:ro,z
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
@@ -299,9 +299,9 @@ services:
     environment:
       DYNAMIPS_ARGS: -P 7200 -r 512 -T 2000 -C /config/startup-config.cfg -p 1:PA-2FE-TX -s 0:0:linux_eth:eth1 -s 1:0:linux_eth:eth2
     volumes:
-    - ./appliances/r2/base.cfg:/config/base.cfg:ro
-    - ../../configs/r2.cfg:/config/own.cfg:ro
-    - ../../images/c7200.bin:/firmware/ios.bin:ro
+    - ./appliances/r2/base.cfg:/config/base.cfg:ro,z
+    - ../../configs/r2.cfg:/config/own.cfg:ro,z
+    - ../../images/c7200.bin:/firmware/ios.bin:ro,z
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-dynamips
@@ -438,7 +438,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:host-a
     volumes:
-    - ./checks/host-a.sh:/isoloom/run.sh:ro
+    - ./checks/host-a.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-routes-r1:
         condition: service_healthy

@@ -78,11 +78,21 @@ pub(crate) struct VolumeOptions {
     pub(crate) subpath: String,
 }
 
+/// The mode of a read-only bind of a project file (the short form's `:ro,z`): relabelled for
+/// SELinux as shared (`z`), without which an enforcing host (Fedora, RHEL) denies the container
+/// every read of it; nothing where SELinux is off or absent (Debian, Docker Desktop's VM).
+pub(crate) const RO_BIND: &str = "ro,z";
+
+/// The SELinux label option of a bind ([`RO_BIND`]'s `z`, the long form).
+pub(crate) const SELINUX_SHARED: &str = "z";
+
 /// `volumes[].bind`.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct BindOptions {
     /// Create the folder when there is nothing at its path (the long form doesn't by default).
     pub(crate) create_host_path: bool,
+    /// The SELinux relabelling (`z`: shared between containers), [`SELINUX_SHARED`].
+    pub(crate) selinux: &'static str,
 }
 
 /// `volumes[].tmpfs`.

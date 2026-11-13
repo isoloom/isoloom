@@ -720,7 +720,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:isoloom-access
     volumes:
-    - ./checks/staff.sh:/isoloom/run.sh:ro
+    - ./checks/staff.sh:/isoloom/run.sh:ro,z
     depends_on:
       intranet:
         condition: service_healthy
@@ -746,7 +746,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:intranet
     volumes:
-    - ./checks/intranet.sh:/isoloom/run.sh:ro
+    - ./checks/intranet.sh:/isoloom/run.sh:ro,z
     depends_on:
       intranet:
         condition: service_healthy
@@ -768,7 +768,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:guest
     volumes:
-    - ./checks/guest.sh:/isoloom/run.sh:ro
+    - ./checks/guest.sh:/isoloom/run.sh:ro,z
     depends_on:
       intranet:
         condition: service_healthy
@@ -792,7 +792,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:admin
     volumes:
-    - ./checks/admin.sh:/isoloom/run.sh:ro
+    - ./checks/admin.sh:/isoloom/run.sh:ro,z
     depends_on:
       intranet:
         condition: service_healthy

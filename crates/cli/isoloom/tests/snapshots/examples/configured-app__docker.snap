@@ -1075,8 +1075,8 @@ services:
     networks:
       lab: null
     volumes:
-    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       web:
         condition: service_healthy
@@ -1094,7 +1094,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:web
     volumes:
-    - ./checks/web.sh:/isoloom/run.sh:ro
+    - ./checks/web.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy
@@ -1112,7 +1112,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:api
     volumes:
-    - ./checks/api.sh:/isoloom/run.sh:ro
+    - ./checks/api.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy

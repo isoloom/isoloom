@@ -26,17 +26,20 @@ services:
       target: /srv/shared
       bind:
         create_host_path: true
+        selinux: z
     - type: bind
       source: ${ISOLOOM_HOST_FOLDER_DESK_1:-~/notes}
       target: /home/notes
       read_only: true
       bind:
         create_host_path: true
+        selinux: z
     - type: bind
       source: ${ISOLOOM_HOST_FOLDER_DESK_2:-/srv/drop}
       target: /srv/drop
       bind:
         create_host_path: true
+        selinux: z
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shared-desk

@@ -216,8 +216,8 @@ services:
       CONNECTION_MODE: tc
       CLAB_MGMT_PASSTHROUGH: 'true'
     volumes:
-    - ./appliances/vios/base.cfg:/config/base.cfg:ro
-    - ../../configs/vios.cfg:/config/own.cfg:ro
+    - ./appliances/vios/base.cfg:/config/base.cfg:ro,z
+    - ../../configs/vios.cfg:/config/own.cfg:ro,z
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
@@ -277,8 +277,8 @@ services:
       CLAB_INTFS: '2'
       CONNECTION_MODE: tc
     volumes:
-    - ./appliances/csr/base.cfg:/config/base.cfg:ro
-    - ../../configs/csr.cfg:/config/own.cfg:ro
+    - ./appliances/csr/base.cfg:/config/base.cfg:ro,z
+    - ../../configs/csr.cfg:/config/own.cfg:ro,z
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-qemu
@@ -415,7 +415,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:host-a
     volumes:
-    - ./checks/host-a.sh:/isoloom/run.sh:ro
+    - ./checks/host-a.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-routes-vios:
         condition: service_healthy
