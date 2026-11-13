@@ -409,8 +409,10 @@ fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> Option<St
         RunKind::Shell => Some(format!("cd {PROJECT_DIR} && sh -c {}\n", quote(&format!("{inputs}sh {}", quote(path))))),
         // Installed with the machine's own package manager; its inventory is the machine, by
         // its name (a play may name it), run locally.
+        // `set -e`: an Ansible install that fails fails the step with the package manager's
+        // words, not with "ansible-playbook: not found" a line later.
         RunKind::Playbook => Some(format!(
-            "{PKG}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd {PROJECT_DIR} && sh -c {}\n",
+            "set -e\n{PKG}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd {PROJECT_DIR} && sh -c {}\n",
             quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {}", quote(path)))
         )),
     }
