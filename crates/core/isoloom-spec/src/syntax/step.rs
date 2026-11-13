@@ -10,20 +10,6 @@
 //! and fix.
 
 /// The JSON Schema of `$ty` is that of `$written`, the shape it is written in.
-macro_rules! schema_as {
-    ($ty:ident, $written:ident) => {
-        impl schemars::JsonSchema for $ty {
-            fn schema_name() -> std::borrow::Cow<'static, str> {
-                stringify!($ty).into()
-            }
-
-            fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
-                <$written as schemars::JsonSchema>::json_schema(g)
-            }
-        }
-    };
-}
-
 mod accounts;
 mod files;
 mod input;

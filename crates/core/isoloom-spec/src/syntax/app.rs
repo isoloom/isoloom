@@ -186,15 +186,7 @@ fn appliance(kind: Appliance, image: Option<String>, config: Option<String>, fir
     }
 }
 
-impl JsonSchema for App {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "App".into()
-    }
-
-    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        AppInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(App, AppInput);
 
 #[cfg(test)]
 mod tests;
