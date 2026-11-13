@@ -172,9 +172,7 @@ impl Entry {
             settings: &settings,
         };
         let mut files = BTreeMap::new();
-        let recipe = &self.definition().recipe;
-        let phases = [("install", &recipe.install), ("configure", &recipe.configure), ("start", &recipe.start)]
-            .map(|(name, steps)| context.phase(name, steps, &mut files));
+        let phases = self.definition().recipe.phases().map(|(name, steps)| context.phase(name, steps, &mut files));
         let [install, configure, start] = phases;
         let broken = |e: recipe::StepError| {
             vec![Problem::new(

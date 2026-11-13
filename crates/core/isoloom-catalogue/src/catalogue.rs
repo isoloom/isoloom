@@ -75,6 +75,12 @@ pub struct Catalogue {
 const DAEMONS: &str = "daemons.yml";
 const COLLECTIONS: &str = "collections.yml";
 
+/// The three files every entry's folder has: its definition, its lock and its contract (the
+/// message of [`Error::Missing`] names them too).
+pub(crate) const ENTRY_YML: &str = "entry.yml";
+pub(crate) const LOCK_YML: &str = "lock.yml";
+pub(crate) const CONTRACT_YML: &str = "contract.yml";
+
 impl Catalogue {
     /// The catalogue built into Isoloom (`catalogue/`, embedded when the crate is built), loaded
     /// and checked once.
@@ -110,9 +116,9 @@ impl Catalogue {
         for (dir, own) in by_entry {
             let read = |file: &'static str| own.get(file).ok_or(Error::Missing { entry: dir.to_owned(), file });
             let entry = Entry {
-                definition: parse(&format!("{dir}/entry.yml"), read("entry.yml")?)?,
-                lock: parse(&format!("{dir}/lock.yml"), read("lock.yml")?)?,
-                contract: parse(&format!("{dir}/contract.yml"), read("contract.yml")?)?,
+                definition: parse(&format!("{dir}/{ENTRY_YML}"), read(ENTRY_YML)?)?,
+                lock: parse(&format!("{dir}/{LOCK_YML}"), read(LOCK_YML)?)?,
+                contract: parse(&format!("{dir}/{CONTRACT_YML}"), read(CONTRACT_YML)?)?,
                 files: own.clone(),
             };
             let name = dir.parse::<EntryName>()?;
