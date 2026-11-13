@@ -100,16 +100,18 @@ impl Entry {
             version: &release.version,
             with: &with,
         };
+        let broken = |reason: String| LabError::Check {
+            case: case.to_string(),
+            reason,
+        };
         let mut checks = Vec::new();
         let mut names = Vec::new();
         for check in self.contract().checks.iter().filter(|k| k.runs_in(case)) {
-            let mut filled = check.filled(&values).map_err(|reason| LabError::Check {
-                case: case.to_string(),
-                reason,
-            })?;
+            let mut filled = check.filled(&values).map_err(broken)?;
             filled.from = Some(if filled.exec.is_some() { MACHINE } else { PROBE }.to_owned());
             names.push(filled.name.clone().unwrap_or_default());
-            checks.push(without_nulls(serde_json::to_value(&filled).unwrap_or_default()));
+            let written = serde_json::to_value(&filled).map_err(|e| broken(format!("a check doesn't write as JSON: {e}")))?;
+            checks.push(without_nulls(written));
         }
         let facts: Vec<String> = self.contract().facts.iter().map(|f| f.name.clone()).collect();
         checks.extend(self.contract().facts.iter().map(fact_check));
@@ -120,8 +122,9 @@ impl Entry {
             "machines": machines,
             "checks": checks,
         });
+        let spec = serde_yaml_ng::to_string(&spec).map_err(|e| broken(format!("the environment doesn't write as YAML: {e}")))?;
         Ok(ConformanceLab {
-            spec: serde_yaml_ng::to_string(&spec).unwrap_or_default(),
+            spec,
             project: c.project.clone(),
             checks: names,
             facts,

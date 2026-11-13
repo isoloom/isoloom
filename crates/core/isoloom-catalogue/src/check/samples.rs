@@ -37,7 +37,7 @@ pub(super) fn check(c: &Catalogue, entry: &Entry) -> Vec<Finding> {
 
 /// Resolves `entry`'s `release` on `os` with `with`: the problems' reasons when it fails.
 fn resolve(c: &Catalogue, entry: &Entry, release: &Release, os: OsRef, with: &IndexMap<String, Value>) -> Result<(), String> {
-    let yaml = lab(entry, release, os, with);
+    let yaml = lab(entry, release, os, with)?;
     let spec = syntax::parse(&yaml).map_err(|p| reasons(&p))?;
     c.resolve(&spec, MACHINE).map(|_| ()).map_err(|p| reasons(&p))
 }
@@ -48,13 +48,13 @@ fn reasons(problems: &[syntax::Problem]) -> String {
 }
 
 /// An environment of the service machine and its peer, written as a spec.
-fn lab(entry: &Entry, release: &Release, os: OsRef, with: &IndexMap<String, Value>) -> String {
-    let with = serde_json::to_string(with).unwrap_or_default();
-    format!(
+fn lab(entry: &Entry, release: &Release, os: OsRef, with: &IndexMap<String, Value>) -> Result<String, String> {
+    let with = serde_json::to_string(with).map_err(|e| format!("`with` doesn't write as JSON: {e}"))?;
+    Ok(format!(
         "version: 1\nname: entry-check\nnetworks: {{ lab: {{ cidr: 10.99.0.0/24 }} }}\nsecrets: {{ sample: {{ env: SAMPLE }} }}\ninputs: [SAMPLE]\nmachines:\n  {MACHINE}: {{ os: {os}, service: {}@{}, with: {with}, networks: {{ lab: 10 }} }}\n  {PEER}: {{ os: {os}, networks: {{ lab: 11 }} }}\n",
         entry.name(),
         release.version
-    )
+    ))
 }
 
 /// The settings to resolve with, each with what it is: the defaults (and a sample of each

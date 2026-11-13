@@ -207,7 +207,8 @@ fn repository(p: &RepositoryPlan) -> String {
     let kind = match p.kind {
         RepositoryKind::Rpm => "rpm",
         RepositoryKind::Apk => "apk",
-        _ => "apt",
+        RepositoryKind::Apt => "apt",
+        _ => return words("isoloom_fail", ["this Isoloom can't render that repository kind"]),
     };
     let mut args = vec![
         kind.to_owned(),
@@ -270,21 +271,30 @@ fn service(c: &Configured<'_>, s: &ServicePlan) -> String {
 
 /// A command behind its guard: the guard's kind, its word count and words, then the command's.
 fn command(cmd: &CommandPlan) -> String {
+    const UNKNOWN_COMMAND: &str = "this Isoloom can't render that command";
     let (kind, guard) = match &cmd.guard {
         Guard::Creates(path) => ("creates", vec![path.to_string()]),
-        Guard::Unless(check) => ("unless", argv(check)),
+        Guard::Unless(check) => match argv(check) {
+            Some(check) => ("unless", check),
+            None => return words("isoloom_fail", [UNKNOWN_COMMAND]),
+        },
         _ => return words("isoloom_fail", ["this Isoloom can't render that guard"]),
     };
-    let args = [kind.to_owned(), guard.len().to_string()].into_iter().chain(guard).chain(argv(&cmd.run));
+    // A command it can't render fails saying so, not as a bare `false` that says nothing.
+    let Some(run) = argv(&cmd.run) else {
+        return words("isoloom_fail", [UNKNOWN_COMMAND]);
+    };
+    let args = [kind.to_owned(), guard.len().to_string()].into_iter().chain(guard).chain(run);
     words("isoloom_command", args)
 }
 
-/// What runs an invocation: a text through `sh -c`, or the program and its arguments.
-fn argv(i: &Invocation) -> Vec<String> {
+/// What runs an invocation: a text through `sh -c`, or the program and its arguments. `None` for
+/// a kind of invocation this Isoloom doesn't know.
+fn argv(i: &Invocation) -> Option<Vec<String>> {
     match i {
-        Invocation::Exec(a) => a.args().to_vec(),
-        Invocation::Shell(text) => vec!["sh".into(), "-c".into(), text.clone()],
-        _ => vec!["false".into()],
+        Invocation::Exec(a) => Some(a.args().to_vec()),
+        Invocation::Shell(text) => Some(vec!["sh".into(), "-c".into(), text.clone()]),
+        _ => None,
     }
 }
 
