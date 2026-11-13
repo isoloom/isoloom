@@ -262,7 +262,7 @@ pub enum Error {
     #[error("an instance number is 1 to {}", crate::instance::MAX)]
     InstanceNumber(u8),
     /// An environment's name too long once it carries its instance.
-    #[error("`{0}` is too long for an instance name (at most 55 characters with the suffix)")]
+    #[error("`{0}` is too long for an instance name (at most {max} characters with the suffix)", max = crate::validate::NAME_MAX)]
     InstanceName(String),
     /// Text that isn't an IPv4 block.
     #[error("`{0}` isn't an IPv4 block: write the network's own address, `/` and the prefix length (`10.20.0.0/24`)")]

@@ -38,7 +38,8 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
     }
     let mut copy = spec.clone();
     copy.name = format!("{}-{n}", spec.name);
-    if copy.name.len() > 55 {
+    // The limit the environment's name has (a Kubernetes namespace's), its suffix included.
+    if copy.name.len() > crate::validate::NAME_MAX {
         return Err(Error::InstanceName(copy.name));
     }
     // Docker blocks: the second octet moves by n (10.61.10.0/24 -> 10.63.10.0/24 for instance 2),
