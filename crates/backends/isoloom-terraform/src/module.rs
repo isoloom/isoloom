@@ -13,6 +13,9 @@ use isoloom_render::{GeneratedFile, project};
 use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::Target;
 
+/// How a module's machines get the project's files, which decides the lists it ends with
+/// (`isoloom_render::project`), under the name the modules use.
+pub(crate) use isoloom_render::project::Copy as ProjectCopy;
 pub(crate) use usage::Usage;
 
 use crate::{Error, Result};
@@ -97,10 +100,6 @@ pub(crate) fn password(name: &str) -> Block {
         .add_attribute(("min_numeric", number(2)))
         .build()
 }
-
-/// How a module's machines get the project's files, which decides the lists it ends with
-/// (`isoloom_render::project`), under the name the modules use.
-pub(crate) use isoloom_render::project::Copy as ProjectCopy;
 
 /// A module, started with its header and how to start and stop it.
 pub(crate) fn start(usage: &Usage) -> Module {
