@@ -902,6 +902,8 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-shared-files-app"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1119,6 +1121,8 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-shared-files-app"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do

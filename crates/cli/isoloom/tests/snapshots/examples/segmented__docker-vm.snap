@@ -657,7 +657,8 @@ route_back() {
   done
 }
 netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
-if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+# nmcli translates `running` even in its terse output: read it in C.
+if command -v nmcli >/dev/null 2>&1 && LC_ALL=C nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
   con=$(nmcli -g GENERAL.CONNECTION device show "$up")
   if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
     nmcli connection modify "$con" ipv4.route-metric "$metric"
@@ -2836,12 +2837,10 @@ systemctl enable --now isoloom-published.service
     ]
   },
   "recovery": {
-    "stale_markers": [
-      "verr_already_exists",
-      "could not rename",
-      "is locked",
-      "different provider",
-      "single provider at a time"
+    "leftovers": [
+      "virtualbox_name_taken",
+      "machine_locked",
+      "other_provider"
     ],
     "steps": [
       {

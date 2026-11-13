@@ -1083,10 +1083,9 @@ volumes:
     ]
   },
   "recovery": {
-    "stale_markers": [
-      "is already in use by container",
-      "network with name",
-      "has incorrect label"
+    "leftovers": [
+      "container_name_taken",
+      "network_left"
     ],
     "steps": [
       {

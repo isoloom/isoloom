@@ -83,7 +83,7 @@ pub use identity::{
     Cloud, ComposeIdentity, Driver, Elevation, GoneError, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity,
     VagrantProvider,
 };
-pub use lifecycle::{Condition, Expiry, ExpiryUnit, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries, Seal};
+pub use lifecycle::{Condition, Expiry, ExpiryUnit, Leftover, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries, Seal};
 pub use list::{NonEmpty, StepSelection};
 pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, VagrantBox, Volume};
 pub use manifest::{Manifest, parse, to_json};
