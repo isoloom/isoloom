@@ -32,8 +32,11 @@ pub(super) fn networks(spec: &Spec, p: &mut Problems) {
                     "the default route comes from the LAN's DHCP server: set `dhcp: true`, or leave `default_route` out",
                 );
             }
-            if b.vlan.is_some_and(|v| !(1..=4094).contains(&v)) {
-                p.add(format!("{at}.bridged.vlan"), "a VLAN tag is 1 to 4094");
+            if b.vlan.is_some_and(|v| !crate::vlans::VLAN_IDS.contains(&v)) {
+                p.add(
+                    format!("{at}.bridged.vlan"),
+                    format!("a VLAN tag is {} to {}", crate::vlans::VLAN_IDS.start(), crate::vlans::VLAN_IDS.end()),
+                );
             }
         }
         if net.is_outside() {

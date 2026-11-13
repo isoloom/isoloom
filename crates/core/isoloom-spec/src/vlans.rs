@@ -13,6 +13,10 @@ use crate::model::{Network, Reach, Spec, Vlan};
 use crate::net::Cidr;
 use crate::syntax::{Code, FieldPath, Problem};
 
+/// The VLAN ids 802.1Q allows (0 and 4095 are reserved): one range where three places wrote
+/// its bounds (Clean Code G25, 2026-11-13).
+pub(crate) const VLAN_IDS: std::ops::RangeInclusive<u16> = 1..=4094;
+
 /// The network a VLAN becomes: `office` + 10 -> `office-vlan10`.
 pub(crate) fn vlan_network(lan: &str, id: u16) -> String {
     format!("{lan}-vlan{id}")
@@ -89,8 +93,8 @@ fn check_vlans(spec: &Spec) -> Result<(), Problem> {
         let outer = Cidr::parse(&net.cidr);
         for (id, vlan) in &net.vlans {
             let at = here.key("vlans").key(&id.to_string());
-            if !(1..=4094).contains(id) {
-                return Err(refused(at, "a VLAN id is between 1 and 4094".to_owned()));
+            if !VLAN_IDS.contains(id) {
+                return Err(refused(at, format!("a VLAN id is between {} and {}", VLAN_IDS.start(), VLAN_IDS.end())));
             }
             let inner = Cidr::parse(&vlan.cidr).ok_or_else(|| refused(at.key("cidr"), format!("`{}` isn't an IPv4 block such as 10.10.10.0/24", vlan.cidr)))?;
             if let Some(outer) = outer
