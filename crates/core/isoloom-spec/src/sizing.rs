@@ -81,10 +81,16 @@ impl MachineSize {
     }
 }
 
-/// One machine's CPUs, memory and disk in a form ([`MachineSize::of`]).
-fn machine_size(m: &model::Machine, form: Form) -> (u32, u32, u32) {
-    let s = MachineSize::of(m.resources, form);
-    (s.cpus, s.memory_mb, s.disk_gb)
+impl Totals {
+    /// These totals with one more machine of size `s`.
+    fn with(self, s: MachineSize) -> Totals {
+        Totals {
+            machines: self.machines + 1,
+            cpus: self.cpus.saturating_add(s.cpus),
+            memory_mb: self.memory_mb.saturating_add(s.memory_mb),
+            disk_gb: self.disk_gb.saturating_add(s.disk_gb),
+        }
+    }
 }
 
 /// Whether `target` runs `m` as a container (lighter) rather than a VM. Proxmox decides machine
@@ -102,23 +108,17 @@ fn form_on(target: model::Target, m: &model::Machine) -> Form {
 /// Add each machine's size, picked by `size`, into the running totals. Saturating: a spec with
 /// absurd per-machine resources reports a capped total instead of overflowing (a debug panic, a
 /// release wrap).
-fn add_up(spec: &model::Spec, size: impl Fn(&model::Machine) -> (u32, u32, u32)) -> Totals {
-    spec.machines.values().fold(Totals::default(), |t, m| {
-        let (cpus, memory_mb, disk_gb) = size(m);
-        Totals {
-            machines: t.machines + 1,
-            cpus: t.cpus.saturating_add(cpus),
-            memory_mb: t.memory_mb.saturating_add(memory_mb),
-            disk_gb: t.disk_gb.saturating_add(disk_gb),
-        }
-    })
+fn add_up(spec: &model::Spec, form: impl Fn(&model::Machine) -> Form) -> Totals {
+    spec.machines
+        .values()
+        .fold(Totals::default(), |t, m| t.with(MachineSize::of(m.resources, form(m))))
 }
 
 /// What the whole spec needs when every machine is a VM, each machine's `resources` or the VM
 /// defaults: the heaviest a spec runs, and what `isoloom resources` reports before a run.
 #[must_use]
 pub fn totals(spec: &model::Spec) -> Totals {
-    add_up(spec, |m| machine_size(m, Form::Vm))
+    add_up(spec, |_| Form::Vm)
 }
 
 /// What the whole spec needs on `target`: every machine sized the way that target runs it (a
@@ -126,7 +126,7 @@ pub fn totals(spec: &model::Spec) -> Totals {
 /// environment there, so the Docker targets read lighter than the VM ones for the same spec.
 #[must_use]
 pub fn totals_for(spec: &model::Spec, target: model::Target) -> Totals {
-    add_up(spec, |m| machine_size(m, form_on(target, m)))
+    add_up(spec, |m| form_on(target, m))
 }
 
 #[cfg(test)]
