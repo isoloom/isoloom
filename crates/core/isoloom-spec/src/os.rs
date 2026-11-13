@@ -136,7 +136,38 @@ pub struct Os {
     pub installer: Installer,
 }
 
+/// What kind of OS: the one rule that tells Windows (WinRM, PowerShell, no container form) from
+/// Linux (SSH, sh), in one place for every target and tool (Clean Code J3, G5: 76 string checks
+/// told it apart by a prefix, 2026-11-13).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Kind {
+    /// Reached over SSH, provisioned by sh; a container form exists.
+    Linux,
+    /// Reached over WinRM, provisioned by PowerShell; VMs only.
+    Windows,
+}
+
+impl Kind {
+    /// The kind of the OS an image-table name (`windows-11`, `debian-12`) or a family names.
+    #[must_use]
+    pub fn of(name: &str) -> Kind {
+        if name.starts_with("windows") { Kind::Windows } else { Kind::Linux }
+    }
+
+    /// Whether it is Windows.
+    #[must_use]
+    pub fn is_windows(self) -> bool {
+        self == Kind::Windows
+    }
+}
+
 impl Os {
+    /// Its kind: Windows or Linux.
+    #[must_use]
+    pub fn kind(&self) -> Kind {
+        Kind::of(self.name)
+    }
+
     /// How the spec writes it in full: `debian@12`.
     #[must_use]
     pub fn id(&self) -> String {
