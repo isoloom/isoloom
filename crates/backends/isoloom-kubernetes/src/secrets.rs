@@ -56,14 +56,8 @@ pub(crate) fn init_container(m: &Machine) -> Option<Container> {
         .iter()
         .filter(|s| owned(s))
         .map(|s| {
-            let to = format!("{DIR}/out/{}", s.name);
-            format!(
-                "cp {DIR}/in/{} {to} && chown {}:{} {to} && chmod {:04o} {to}",
-                s.name,
-                s.uid.unwrap_or(0),
-                s.gid.unwrap_or(0),
-                s.mode.unwrap_or(DEFAULT_MODE)
-            )
+            let mode = format!("{:04o}", s.mode.unwrap_or(DEFAULT_MODE));
+            crate::files::owned_copy(&format!("{DIR}/in/{}", s.name), &format!("{DIR}/out/{}", s.name), s.uid, s.gid, mode)
         })
         .collect();
     if script.is_empty() {

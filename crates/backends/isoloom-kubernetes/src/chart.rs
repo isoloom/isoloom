@@ -51,7 +51,7 @@ pub(crate) fn files(env: &Environment, r: &Rendered) -> Result<Vec<GeneratedFile
         path: format!("{OUTPUT_DIR}/{DIR}/{CHART}/{path}"),
         contents,
     };
-    let inputs = env.machines.values().any(|m| !m.inputs.is_empty());
+    let inputs = crate::render::reads_inputs(env);
     let mut out = vec![
         file("Chart.yaml", chart_file(env)?),
         file("values.yaml", values(env, inputs)?),

@@ -80,14 +80,7 @@ pub(crate) fn init_container(m: &Machine, project: &str) -> Option<Container> {
                 Some(source) => format!("{DIR}/project/{}", key(source)),
                 None => format!("{DIR}/text/file-{n}"),
             };
-            let to = format!("{DIR}/out/{n}");
-            format!(
-                "cp {} {to} && chown {}:{} {to} && chmod {} {to}",
-                shell::quote(&from),
-                f.uid.unwrap_or(0),
-                f.gid.unwrap_or(0),
-                f.mode_or_default()
-            )
+            owned_copy(&shell::quote(&from), &format!("{DIR}/out/{n}"), f.uid, f.gid, f.mode_or_default())
         })
         .collect();
     let mut c = Container::new(FILES_CONTAINER, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
@@ -102,6 +95,12 @@ pub(crate) fn init_container(m: &Machine, project: &str) -> Option<Container> {
         c.volume_mounts.push(VolumeMount::read_only(project, format!("{DIR}/project")));
     }
     Some(c)
+}
+
+/// The shell line an init container copies `from` to `to` with: owned by `uid`:`gid` (root by
+/// default) and given `mode`, both written as the shell reads them.
+pub(crate) fn owned_copy(from: &str, to: &str, uid: Option<u32>, gid: Option<u32>, mode: impl std::fmt::Display) -> String {
+    format!("cp {from} {to} && chown {}:{} {to} && chmod {mode} {to}", uid.unwrap_or(0), gid.unwrap_or(0))
 }
 
 /// The pod's volumes for the files: the `emptyDir`, and the machine's `ConfigMap` when it has one
