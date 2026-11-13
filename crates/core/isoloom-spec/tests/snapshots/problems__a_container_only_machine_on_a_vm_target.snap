@@ -3,5 +3,5 @@ source: crates/core/isoloom-spec/tests/problems.rs
 expression: "format!(\"vagrant: {}\", refusal.render(\"isoloom.yml\"))"
 ---
 vagrant: error[refused] machines.web.app.build  (isoloom.yml:8:12)
-  a Dockerfile builds a container only
-  fix: add `os` and `app.steps`, or use `docker`, `docker-vm` or `cloud-docker`
+  its Dockerfile wasn't read, so it has no VM form
+  fix: generate from the project folder (its Dockerfile is translated into a VM form), or add `os` and `app.steps`

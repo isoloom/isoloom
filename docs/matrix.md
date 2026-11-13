@@ -191,7 +191,7 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 
 ### `machines.*.app.build`
 
-- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`: lowering: a Dockerfile builds a container only
+- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`: lowering: its Dockerfile wasn't read, so it has no VM form
 
 ### `machines.*.app.appliance`
 

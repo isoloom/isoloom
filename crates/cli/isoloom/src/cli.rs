@@ -3,7 +3,7 @@
 
 use clap::{Parser, Subcommand};
 
-use crate::commands::{Listing, check, defaults, docs, generate, graph, import, inspect, matrix, message, report, schema, validate};
+use crate::commands::{Listing, bases, check, defaults, docs, generate, graph, import, inspect, matrix, message, report, schema, validate};
 
 // No doc comments on the clap types themselves: clap would print them in `--help`.
 #[derive(Debug, Parser)]
@@ -65,4 +65,9 @@ pub(crate) enum Command {
     /// that refuses and why, – not applicable), worked out from the generators themselves, and
     /// each target's tier with its evidence. `--json` for tools.
     Matrix(matrix::Args),
+    /// Vendor the published Dockerfiles of the base images the project's builds start FROM
+    /// that Isoloom's service matrix doesn't have (under vendor/bases/), so those machines get a
+    /// VM form offline.
+    #[command(subcommand)]
+    Bases(bases::Bases),
 }

@@ -110,7 +110,32 @@ pub(crate) fn settled(profile: Option<&isoloom_spec::profile::Profile>, dir: &Pa
         .with_images(settings.defaults.images.clone())
         .with_regions(settings.defaults.regions());
     let templates = templates(&lab, dir, unread)?;
-    Ok((lab.with_templates(templates), settings))
+    let lab = lab.with_templates(templates);
+    let dockerfiles = dockerfiles(&lab, dir);
+    let index = bases_index(dir)?;
+    let bases = isoloom_targets::dockerfile::Sources::of(&index, |p| std::fs::read_to_string(dir.join(p)).ok());
+    Ok((lab.with_dockerfiles(dockerfiles).with_bases(bases), settings))
+}
+
+/// The texts of the Dockerfiles `lab`'s builds name, read from `dir`, for their machines' VM
+/// form. One that can't be read is left out: its machine's VM form is refused saying so, and
+/// its container form reads it as the build does.
+fn dockerfiles(lab: &Lab, dir: &Path) -> std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String> {
+    lab.dockerfile_paths()
+        .into_iter()
+        .filter_map(|p| std::fs::read_to_string(dir.join(p.as_str())).ok().map(|text| (p, text)))
+        .collect()
+}
+
+/// The project's vendored base images (`vendor/bases/index.yml`, which `isoloom bases fetch`
+/// writes): empty when it has none.
+pub(crate) fn bases_index(dir: &Path) -> Result<isoloom_targets::dockerfile::Index> {
+    let path = dir.join(isoloom_targets::dockerfile::sources::INDEX);
+    match std::fs::read_to_string(&path) {
+        Ok(text) => serde_yaml_ng::from_str(&text).map_err(|e| CliError::Read { path, source: std::io::Error::other(e) }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(isoloom_targets::dockerfile::Index::new()),
+        Err(source) => Err(CliError::Read { path, source }),
+    }
 }
 
 /// The texts of the project files `lab`'s steps fill in as templates, read from `dir`. One that
