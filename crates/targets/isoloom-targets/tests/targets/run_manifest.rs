@@ -537,8 +537,8 @@ fn a_machines_size_follows_one_rule_on_every_target_and_in_the_snapshot() -> Out
         let r = web.resources.ok_or("no resources")?;
         Ok((r.cpus, r.memory_mb))
     };
-    let container = isoloom_spec::MachineSize::of(None, true);
-    let vm = isoloom_spec::MachineSize::of(None, false);
+    let container = isoloom_spec::MachineSize::of(None, isoloom_spec::Form::Container);
+    let vm = isoloom_spec::MachineSize::of(None, isoloom_spec::Form::Vm);
     assert_eq!(
         size(Target::Docker, ".isoloom/docker/run.json")?,
         (Some(container.cpus), Some(container.memory_mb))

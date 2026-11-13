@@ -92,7 +92,12 @@ fn resources(m: &Machine, shapes: &[&str]) -> Value {
     shapes
         .iter()
         .map(|shape| {
-            let s = isoloom_spec::MachineSize::of(m.resources, *shape == "docker");
+            let form = if *shape == "docker" {
+                isoloom_spec::Form::Container
+            } else {
+                isoloom_spec::Form::Vm
+            };
+            let s = isoloom_spec::MachineSize::of(m.resources, form);
             ((*shape).to_owned(), json!({ "cpus": s.cpus, "memory_mb": s.memory_mb, "disk_gb": s.disk_gb }))
         })
         .collect::<Map<String, Value>>()
