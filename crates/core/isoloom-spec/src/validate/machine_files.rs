@@ -4,11 +4,12 @@ use std::collections::BTreeSet;
 
 use super::Problems;
 use crate::model::{Machine, MachineFile, Spec};
+use crate::os::Kind;
 
 /// Every machine's files.
 pub(super) fn check(spec: &Spec, p: &mut Problems) {
     for (name, m) in &spec.machines {
-        let windows = m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os));
+        let os = m.vm.as_ref().map_or(Kind::Linux, |v| Kind::of(&v.os));
         if !m.files.is_empty() && m.docker.as_ref().is_some_and(|d| d.appliance.is_some()) {
             p.add(
                 format!("machines.{name}.files"),
@@ -19,27 +20,29 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
         let mut seen = BTreeSet::new();
         for (i, f) in m.files.iter().enumerate() {
             let at = format!("machines.{name}.files[{i}]");
-            path(&at, f, windows, p);
+            path(&at, f, os, p);
             if !seen.insert(f.path.trim_end_matches(['/', '\\'])) {
                 p.add(format!("{at}.path"), format!("`{}` is placed twice: keep one entry per path", f.path));
             }
             text(&at, f, p);
-            owner(&at, f, windows, p);
+            owner(&at, f, os, p);
         }
         under_volume(name, m, p);
     }
 }
 
 /// An absolute path on the machine's OS, naming a file.
-fn path(at: &str, f: &MachineFile, windows: bool, p: &mut Problems) {
+fn path(at: &str, f: &MachineFile, os: Kind, p: &mut Problems) {
     let path = f.path.as_str();
-    let absolute = if windows {
-        crate::model::is_drive_path(path)
-    } else {
-        path.starts_with('/') && path.len() > 1
+    let absolute = match os {
+        Kind::Windows => crate::model::is_drive_path(path),
+        Kind::Linux => path.starts_with('/') && path.len() > 1,
     };
     if !absolute {
-        let example = if windows { "C:\\app\\app.ini" } else { "/etc/app/app.ini" };
+        let example = match os {
+            Kind::Windows => "C:\\app\\app.ini",
+            Kind::Linux => "/etc/app/app.ini",
+        };
         p.add(
             format!("{at}.path"),
             format!("`{path}` must be an absolute path on the machine, like `{example}`"),
@@ -63,8 +66,8 @@ fn text(at: &str, f: &MachineFile, p: &mut Problems) {
 }
 
 /// Octal digits for the mode; no owner or mode on Windows, whose files have neither.
-fn owner(at: &str, f: &MachineFile, windows: bool, p: &mut Problems) {
-    if windows && f.sets_owner_or_mode() {
+fn owner(at: &str, f: &MachineFile, os: Kind, p: &mut Problems) {
+    if os.is_windows() && f.sets_owner_or_mode() {
         p.add(at, "a Windows machine's files have no `uid`, `gid` or `mode`: remove them");
         return;
     }
