@@ -635,9 +635,62 @@ fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() 
     let said: Vec<&str> = out.lines().collect();
     assert_eq!(
         said,
-        ["up true", "joined true", "left true", "destroyed nil []"],
-        "the hub runs on through the visit and goes, files and all, with the environment"
+        ["up true", "joined true", "left true", "destroyed nil [\"app.lock\"]"],
+        "the hub runs on through the visit and goes, files and all (its lock kept), with the environment"
     );
+    Ok(())
+}
+
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and starts network `app`'s
+/// VMs on QEMU at once, as Vagrant does (`parallel: true`): each VM's trigger asks for the hub on
+/// a thread of its own. QEMU's hub is stood in for by a start that takes a while (its ports to
+/// listen on) before it writes its pid file, and a stop that ends whatever hub runs. It prints how
+/// many hubs were started and stopped, and whether one runs.
+#[cfg(unix)]
+const QEMU_HUB_RACE_RB: &str = r#"
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); end
+end
+module IsoloomQemu; end
+$started = 0
+$stopped = 0
+IsoloomQemu.singleton_class.prepend(Module.new {
+  def running(net); File.exist?(pid_file(net)) ? 4242 : nil; end
+  def stop(net)
+    $stopped += 1 if running(net)
+    File.delete(pid_file(net)) if running(net)
+  end
+  def system(*args, **_opts)
+    sleep 0.3
+    $started += 1
+    File.write(args[args.index("-pidfile") + 1], "4242\n")
+    true
+  end
+})
+load ARGV[0]
+net = "app"
+vms = QEMU_HUBS[net]
+vms.keys.map { Thread.new { IsoloomQemu.hub(net, vms) } }.each(&:join)
+puts "started #{$started} stopped #{$stopped} running #{!IsoloomQemu.running(net).nil?}"
+"#;
+
+/// Regression: two VMs of one network started at once (Vagrant starts QEMU's VMs in parallel) each
+/// found no hub and started one, the second stopping the first's hub under the VM that had just
+/// connected to it. A network's hub is decided under its lock: one start, the other VM joining it.
+#[cfg(unix)]
+#[test]
+fn vms_starting_at_once_on_qemu_share_one_hub() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-race-").tempdir()?;
+    let (vagrantfile, mut ruby) = loadable("solo-web", scratch.path())?;
+    ruby.arg("-e").arg(QEMU_HUB_RACE_RB).arg(&vagrantfile);
+    let out = printed(ruby)?;
+    assert_eq!(out.trim(), "started 1 stopped 0 running true", "one hub for the VMs starting at once");
     Ok(())
 }
 
