@@ -1787,6 +1787,7 @@ name = "xtask-quality"
 version = "2.1.9"
 dependencies = [
  "clap",
+ "serde",
  "serde_json",
  "tempfile",
  "toml",
