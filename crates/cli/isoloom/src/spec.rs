@@ -132,7 +132,10 @@ fn dockerfiles(lab: &Lab, dir: &Path) -> std::collections::BTreeMap<isoloom_spec
 pub(crate) fn bases_index(dir: &Path) -> Result<isoloom_targets::dockerfile::Index> {
     let path = dir.join(isoloom_targets::dockerfile::sources::INDEX);
     match std::fs::read_to_string(&path) {
-        Ok(text) => serde_yaml_ng::from_str(&text).map_err(|e| CliError::Read { path, source: std::io::Error::other(e) }),
+        Ok(text) => serde_yaml_ng::from_str(&text).map_err(|e| CliError::Read {
+            path,
+            source: std::io::Error::other(e),
+        }),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(isoloom_targets::dockerfile::Index::new()),
         Err(source) => Err(CliError::Read { path, source }),
     }

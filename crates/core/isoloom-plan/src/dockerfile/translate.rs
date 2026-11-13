@@ -158,7 +158,13 @@ impl<'a> Run<'a> {
         let lines = instruction::read(df.text).map_err(|u| Untranslatable::at(df.file, u.line, "", u.reason, "fix the Dockerfile"))?;
         let stages = split_stages(&lines);
         let Some(last) = stages.len().checked_sub(1) else {
-            return Err(Untranslatable::at(df.file, 1, "FROM", "the Dockerfile has no `FROM`".to_owned(), "start it `FROM` an image"));
+            return Err(Untranslatable::at(
+                df.file,
+                1,
+                "FROM",
+                "the Dockerfile has no `FROM`".to_owned(),
+                "start it `FROM` an image",
+            ));
         };
         let mut global: Vars = AUTOMATIC.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect();
         for line in stages.first().map(|(l, _)| l.as_slice()).unwrap_or_default() {
@@ -197,7 +203,13 @@ impl<'a> Run<'a> {
     /// The image stage `i` starts `FROM` (at `line`): an earlier stage's, or a base's.
     fn from(&mut self, f: &File<'_>, i: usize, line: Option<&Line>, done: &BTreeMap<usize, Image>) -> Result<Image, Untranslatable> {
         let Some(line) = line else {
-            return Err(Untranslatable::at(f.df.file, 1, "FROM", "a stage has no `FROM`".to_owned(), "start each stage `FROM` an image"));
+            return Err(Untranslatable::at(
+                f.df.file,
+                1,
+                "FROM",
+                "a stage has no `FROM`".to_owned(),
+                "start each stage `FROM` an image",
+            ));
         };
         let Instruction::From { image, .. } = &line.instruction else {
             return Err(f.at(line, "a stage has no `FROM`".to_owned(), "start each stage `FROM` an image"));
@@ -205,7 +217,10 @@ impl<'a> Run<'a> {
         // A reference may quote its parts (`debian:"${RELEASE}-slim"`): the image is without them.
         let image_ref = substitute(image, &f.global).replace(['"', '\''], "");
         let img = match stage_index(&f.stages, &image_ref).filter(|j| *j < i) {
-            Some(j) => done.get(&j).cloned().ok_or_else(|| f.at(line, format!("stage `{image_ref}` didn't run"), "report this to Isoloom"))?,
+            Some(j) => done
+                .get(&j)
+                .cloned()
+                .ok_or_else(|| f.at(line, format!("stage `{image_ref}` didn't run"), "report this to Isoloom"))?,
             None => self.base(f, line, &image_ref)?,
         };
         match &self.os {
@@ -275,7 +290,11 @@ impl<'a> Run<'a> {
                 }
             }
             Instruction::Other(keyword) => {
-                return Err(f.at(line, format!("`{keyword}` has no VM form"), "leave it out, or give the machine `os` and `app.steps`"));
+                return Err(f.at(
+                    line,
+                    format!("`{keyword}` has no VM form"),
+                    "leave it out, or give the machine `os` and `app.steps`",
+                ));
             }
         }
         Ok(())
@@ -302,9 +321,11 @@ impl<'a> Run<'a> {
             }
             Err(NoEntry::Refused { reason, fix }) => Err(f.at(line, reason, &fix)),
             Err(NoEntry::Unknown(_)) => match self.sources.get(image_ref) {
-                Some(_) if f.depth >= MAX_DEPTH => {
-                    Err(f.at(line, format!("`{image_ref}` is more than {MAX_DEPTH} fetched images deep"), "give the machine `os` and `app.steps`"))
-                }
+                Some(_) if f.depth >= MAX_DEPTH => Err(f.at(
+                    line,
+                    format!("`{image_ref}` is more than {MAX_DEPTH} fetched images deep"),
+                    "give the machine `os` and `app.steps`",
+                )),
                 Some(fetched) => {
                     let named = format!("{image_ref} ({})", fetched.origin);
                     let (text, context, args) = (fetched.dockerfile.clone(), fetched.context.clone(), fetched.args.clone());
@@ -328,7 +349,13 @@ impl<'a> Run<'a> {
     /// Shell step `body`, run with the stage's environment and arguments in its folder, as its
     /// user unless `as_root` (Docker makes folders and copies files as root).
     fn push(&mut self, st: &Stage, body: &str, as_root: bool) {
-        let exports = st.args.iter().chain(st.img.env.iter()).map(|(k, v)| format!("export {k}={}\n", quote(v))).collect::<Vec<_>>().concat();
+        let exports = st
+            .args
+            .iter()
+            .chain(st.img.env.iter())
+            .map(|(k, v)| format!("export {k}={}\n", quote(v)))
+            .collect::<Vec<_>>()
+            .concat();
         let script = format!("set -e\n{exports}mkdir -p {0} && cd {0}\n{body}\n", quote(&st.img.workdir));
         let step = match (&st.img.user, as_root) {
             (Some(user), false) => format!(
@@ -501,7 +528,11 @@ fn value(name: &str, vars: &[(String, String)]) -> Option<String> {
 /// `${inner}` filled in: `NAME`, `NAME:-default` or `NAME:+alt`.
 fn braced(inner: &str, vars: &[(String, String)]) -> String {
     let (name, op, word) = match inner.find(":-").or_else(|| inner.find(":+")) {
-        Some(at) => (inner.get(..at).unwrap_or_default(), inner.get(at..at + 2).unwrap_or_default(), inner.get(at + 2..).unwrap_or_default()),
+        Some(at) => (
+            inner.get(..at).unwrap_or_default(),
+            inner.get(at..at + 2).unwrap_or_default(),
+            inner.get(at + 2..).unwrap_or_default(),
+        ),
         None => (inner, "", ""),
     };
     let set = value(name, vars).filter(|v| !v.is_empty());
@@ -514,7 +545,11 @@ fn braced(inner: &str, vars: &[(String, String)]) -> String {
 
 /// `path` against folder `base` (`.` is `base`), absolute.
 fn absolute(base: &str, path: &str) -> String {
-    let joined = if path.starts_with('/') { path.to_owned() } else { format!("{}/{path}", base.trim_end_matches('/')) };
+    let joined = if path.starts_with('/') {
+        path.to_owned()
+    } else {
+        format!("{}/{path}", base.trim_end_matches('/'))
+    };
     let mut parts: Vec<&str> = Vec::new();
     for part in joined.split('/') {
         match part {

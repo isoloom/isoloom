@@ -241,7 +241,11 @@ fn php(tag: &str) -> Base {
 fn mariadb(tag: &str, wanted: Option<&str>) -> Base {
     let (version, _) = version_and_variants(tag);
     let version = if version == "latest" { "11.8".to_owned() } else { minor(&version) };
-    database(Families::DebianOrRhel.pick(wanted, "debian@12"), MARIADB.replace("{VERSION}", &version), "mariadbd")
+    database(
+        Families::DebianOrRhel.pick(wanted, "debian@12"),
+        MARIADB.replace("{VERSION}", &version),
+        "mariadbd",
+    )
 }
 
 /// The full release `mysql:<version>` names, and Oracle's archive of it. A tag names a minor
@@ -275,7 +279,11 @@ fn mysql(tag: &str, wanted: Option<&str>) -> Result<Base, NoEntry> {
     let old = full.starts_with('5');
     let os = Families::AnyGlibc.pick(wanted, if old { "debian@11" } else { "debian@12" });
     let ncurses = if old { "libncurses5" } else { "libncurses6" };
-    let install = MYSQL.replace("{FULL}", &full).replace("{VERSION}", &version).replace("{URL}", &url).replace("{NCURSES}", ncurses);
+    let install = MYSQL
+        .replace("{FULL}", &full)
+        .replace("{VERSION}", &version)
+        .replace("{URL}", &url)
+        .replace("{NCURSES}", ncurses);
     Ok(database(os, install, "mysqld"))
 }
 
@@ -323,7 +331,11 @@ fn postgres(tag: &str, wanted: Option<&str>) -> Base {
 /// standalone builds, any 3.x); Python 2.7 is Debian 11's own.
 fn python(tag: &str, wanted: Option<&str>) -> Base {
     let (version, _) = version_and_variants(tag);
-    let version = if version == "latest" || version == "3" { "3.13".to_owned() } else { minor(&version) };
+    let version = if version == "latest" || version == "3" {
+        "3.13".to_owned()
+    } else {
+        minor(&version)
+    };
     let os = if version.starts_with('2') {
         "debian@11".to_owned()
     } else {

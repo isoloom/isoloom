@@ -213,7 +213,11 @@ fn heredoc_end(keyword: &str, rest: &str) -> Option<String> {
     }
     let at = rest.find("<<")?;
     let word = rest.get(at + 2..)?.trim_start_matches('-');
-    let word: String = word.trim_matches(['"', '\'']).chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
+    let word: String = word
+        .trim_matches(['"', '\''])
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect();
     (!word.is_empty()).then_some(word)
 }
 
@@ -413,33 +417,64 @@ mod tests {
 
     #[test]
     fn exec_and_shell_forms_are_told_apart() {
-        assert_eq!(one(r#"CMD ["nginx", "-g", "daemon off;"]"#), Instruction::Cmd(Command::Exec(vec!["nginx".into(), "-g".into(), "daemon off;".into()])));
+        assert_eq!(
+            one(r#"CMD ["nginx", "-g", "daemon off;"]"#),
+            Instruction::Cmd(Command::Exec(vec!["nginx".into(), "-g".into(), "daemon off;".into()]))
+        );
         assert_eq!(one("CMD python app.py"), Instruction::Cmd(Command::Shell("python app.py".into())));
     }
 
     #[test]
     fn env_reads_both_forms_and_quotes() {
-        assert_eq!(one(r#"ENV A=1 B="two words""#), Instruction::Env(vec![("A".into(), "1".into()), ("B".into(), "two words".into())]));
-        assert_eq!(one("ENV PATH /usr/local/bin:$PATH"), Instruction::Env(vec![("PATH".into(), "/usr/local/bin:$PATH".into())]));
+        assert_eq!(
+            one(r#"ENV A=1 B="two words""#),
+            Instruction::Env(vec![("A".into(), "1".into()), ("B".into(), "two words".into())])
+        );
+        assert_eq!(
+            one("ENV PATH /usr/local/bin:$PATH"),
+            Instruction::Env(vec![("PATH".into(), "/usr/local/bin:$PATH".into())])
+        );
     }
 
     #[test]
     fn copy_reads_its_flags() {
-        let Instruction::Copy(c) = one("COPY --from=build --chown=app:app /src/out /app/") else { panic!() };
-        assert_eq!((c.source, c.sources, c.dest, c.chown), (Source::From("build".into()), vec!["/src/out".to_owned()], "/app/".to_owned(), Some("app:app".to_owned())));
+        let Instruction::Copy(c) = one("COPY --from=build --chown=app:app /src/out /app/") else {
+            panic!()
+        };
+        assert_eq!(
+            (c.source, c.sources, c.dest, c.chown),
+            (
+                Source::From("build".into()),
+                vec!["/src/out".to_owned()],
+                "/app/".to_owned(),
+                Some("app:app".to_owned())
+            )
+        );
     }
 
     #[test]
     fn a_heredoc_is_folded_into_its_run() {
         let lines = read("FROM alpine:3.19\nRUN <<EOF\nset -e\necho hi\nEOF\nCMD [\"sh\"]\n").unwrap();
         assert_eq!(lines.len(), 3);
-        assert_eq!(lines[1].instruction, Instruction::Run { command: Command::Shell("set -e\necho hi".into()), flags: false });
+        assert_eq!(
+            lines[1].instruction,
+            Instruction::Run {
+                command: Command::Shell("set -e\necho hi".into()),
+                flags: false
+            }
+        );
     }
 
     #[test]
     fn the_escape_directive_changes_the_continuation() {
         let lines = read("# escape=`\nFROM debian:12\nRUN echo a `\n  b\n").unwrap();
-        assert_eq!(lines[1].instruction, Instruction::Run { command: Command::Shell("echo a  b".into()), flags: false });
+        assert_eq!(
+            lines[1].instruction,
+            Instruction::Run {
+                command: Command::Shell("echo a  b".into()),
+                flags: false
+            }
+        );
     }
 
     #[test]

@@ -179,7 +179,9 @@ impl Lab {
 
     /// The spec with the VM forms its Dockerfiles give, worked out once.
     fn translated(&self) -> &dockerfiles::Translated {
-        self.memo.translated.get_or_init(|| dockerfiles::translate(&self.source, &self.dockerfiles, &self.bases))
+        self.memo
+            .translated
+            .get_or_init(|| dockerfiles::translate(&self.source, &self.dockerfiles, &self.bases))
     }
 
     /// `l` with each refusal of a Dockerfile that has no VM form saying why.
@@ -271,7 +273,11 @@ impl Lab {
             return Some(NotPossible::NoMachines);
         }
         if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.catalogue, target) {
-            let missing = if dockerfiles::wants_vm(target) { self.translated().explain(missing) } else { missing };
+            let missing = if dockerfiles::wants_vm(target) {
+                self.translated().explain(missing)
+            } else {
+                missing
+            };
             return Some(NotPossible::MissingForm(self.place(missing)));
         }
         if let Some(missing) = self.unsupplied(target) {
