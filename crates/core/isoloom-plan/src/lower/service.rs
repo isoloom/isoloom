@@ -58,7 +58,7 @@ pub(super) fn effective<'a>(name: &str, m: &'a syntax::Machine, services: Option
     (Cow::Owned(out), problems)
 }
 
-/// The machine's ports: each entry's, by name, with the author's `publish` and `dormant`; a port
+/// The machine's ports: each entry's, by name, with the author's `publish`, `dormant` and `login`; a port
 /// the author names that no entry has is an `unknown-reference`.
 fn ports(at: &FieldPath, m: &mut syntax::Machine, resolved: &[Resolved]) -> Problems {
     let mut ports = IndexMap::new();
@@ -71,6 +71,7 @@ fn ports(at: &FieldPath, m: &mut syntax::Machine, resolved: &[Resolved]) -> Prob
                 protocol: p.protocol,
                 publish: written.and_then(|w| w.publish),
                 dormant: written.is_some_and(|w| w.dormant),
+                login: written.and_then(|w| w.login.clone()),
             },
         );
     }

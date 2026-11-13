@@ -543,7 +543,7 @@
               "$ref": "#/$defs/Port"
             }
           },
-          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
+          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
         },
         "command": {
           "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
@@ -1920,6 +1920,10 @@
           "type": "boolean",
           "description": "Only answers once something wakes it: nothing waits for it.",
           "default": false
+        },
+        "login": {
+          "$ref": "#/$defs/Login",
+          "description": "The account its service ships with, `{ user, password }`: shown to the user beside the\nport so they can sign in. For a training environment's published sign-in only, never a\nsecret (a secret is an input)."
         }
       },
       "description": "A port written in full."
@@ -1990,6 +1994,25 @@
         }
       ],
       "description": "`publish:` as written, for the schema."
+    },
+    "Login": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "The account's name."
+        },
+        "password": {
+          "type": "string",
+          "description": "Its password."
+        }
+      },
+      "required": [
+        "user",
+        "password"
+      ],
+      "description": "The fixed account a port's service ships with, shown to the user beside the port: a training\nenvironment's published sign-in, never a secret (a secret is an input)."
     },
     "Command": {
       "anyOf": [

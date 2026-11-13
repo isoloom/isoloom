@@ -10,6 +10,27 @@ stable spec format.
 
 ## [Unreleased]
 
+### Added
+
+- **A port declares the fixed login its service ships with (#296).** `login: { user, password }`
+  on a port written in full is kept on the spec's port (`isoloom_spec::model::Login`,
+  `model::Port::login`), so an embedder reading the spec through the library shows the sign-in
+  next to the port it belongs to. For a training environment's published account only, never a
+  secret (a secret is an input); a login names its account. Nothing of it reaches the rendered
+  files. Breaking for the Rust API (a new public field on the spec's `Port`s).
+- `isoloom_spec::shell::here_tag` and `isoloom_spec::shell::heredoc`: a here-document's
+  terminator chosen so no line of its text ends it, and the whole document written with it.
+- **`isoloom_plan::Names` (`Environment::names`): every name an environment takes on the host,
+  built in one place.** A VM's display name (VirtualBox, VMware Desktop, Parallels, UTM), its
+  Hyper-V and ESXi name, its libvirt domain and the environment's libvirt prefix, and each
+  network's host name (VirtualBox internal network, libvirt network, Hyper-V private switch, the
+  hybrid Docker host's network) all come from the environment's name, which carries its
+  instance's suffix. The Vagrantfiles and the run manifests of the `vagrant`, `docker-vm` and
+  `hybrid` targets now read them there, so the two can't drift apart, and a test holds two
+  instances of the VM examples to disjoint VM, network and prefix names (#285). An environment
+  generated without an instance keeps every name it had; to run two copies of one environment
+  side by side, give each its own instance number (`isoloom_targets::generate_instance`).
+
 ### Changed
 
 - **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
@@ -35,22 +56,6 @@ stable spec format.
   terminators (`COMMAND`, `NFT`, `INV`, `NET`, `ISOLOOM_SETUP`, `ISOLOOM_EOF`...): a line equal to
   the terminator ended the document early, and the rest ran as root shell. The terminator is now
   picked so that no line of the text is it; the rendered files keep their terminators otherwise.
-
-### Added
-
-- `isoloom_spec::shell::here_tag` and `isoloom_spec::shell::heredoc`: a here-document's
-  terminator chosen so no line of its text ends it, and the whole document written with it.
-
-- **`isoloom_plan::Names` (`Environment::names`): every name an environment takes on the host,
-  built in one place.** A VM's display name (VirtualBox, VMware Desktop, Parallels, UTM), its
-  Hyper-V and ESXi name, its libvirt domain and the environment's libvirt prefix, and each
-  network's host name (VirtualBox internal network, libvirt network, Hyper-V private switch, the
-  hybrid Docker host's network) all come from the environment's name, which carries its
-  instance's suffix. The Vagrantfiles and the run manifests of the `vagrant`, `docker-vm` and
-  `hybrid` targets now read them there, so the two can't drift apart, and a test holds two
-  instances of the VM examples to disjoint VM, network and prefix names (#285). An environment
-  generated without an instance keeps every name it had; to run two copies of one environment
-  side by side, give each its own instance number (`isoloom_targets::generate_instance`).
 
 ## [2.1.9] — 2026-11-12
 
