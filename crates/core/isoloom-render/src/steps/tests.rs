@@ -441,27 +441,27 @@ fn root_runs_a_command_as_it_is_and_another_user_through_sudo() {
 
 #[test]
 fn every_project_unpack_replaces_the_old_copy() {
-    use super::{Archive, project_unpack};
+    use super::{Archive, TopFolder, project_unpack};
     assert_eq!(
-        project_unpack(Archive::Stdin, false),
+        project_unpack(Archive::Stdin, TopFolder::Kept),
         "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom"
     );
     assert_eq!(
-        project_unpack(Archive::Uploaded, true),
+        project_unpack(Archive::Uploaded, TopFolder::Stripped),
         "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz"
     );
-    assert!(!project_unpack(Archive::Uploaded, false).contains('\''), "it goes in sh -c '…'");
+    assert!(!project_unpack(Archive::Uploaded, TopFolder::Kept).contains('\''), "it goes in sh -c '…'");
 }
 
 #[test]
 fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder() {
-    let unpack = super::windows_project_unpack(false);
+    let unpack = super::windows_project_unpack(super::TopFolder::Kept);
     assert!(
         unpack.starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 0\n"),
         "{unpack}"
     );
     assert!(unpack.ends_with(crate::powershell::UNTAR), "{unpack}");
-    assert!(super::windows_project_unpack(true).contains("; $strip = 1\n"));
+    assert!(super::windows_project_unpack(super::TopFolder::Stripped).contains("; $strip = 1\n"));
 }
 
 #[cfg(unix)]

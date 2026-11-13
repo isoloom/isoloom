@@ -90,9 +90,9 @@ pub(crate) fn project_rb() -> String {
         include_str!("vagrant_project.rb"),
         copy_rules(&[]),
         Value::str(steps::PROJECT_ARCHIVE),
-        Value::str(&steps::project_unpack(steps::Archive::Uploaded, false)),
+        Value::str(&steps::project_unpack(steps::Archive::Uploaded, steps::TopFolder::Kept)),
         Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
-        steps::windows_project_unpack(false)
+        steps::windows_project_unpack(steps::TopFolder::Kept)
     )
 }
 
