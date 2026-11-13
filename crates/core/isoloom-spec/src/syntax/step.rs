@@ -139,3 +139,19 @@ impl schemars::JsonSchema for Step {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod kind_keys {
+    use super::input::KIND_KEYS;
+
+    /// The keys the input lists are the kinds the steps name, `reboot` aside: one list.
+    #[test]
+    fn every_kind_key_names_a_step_kind() {
+        let yaml = KIND_KEYS.iter().map(|k| format!("- {{ {k}: x }}")).collect::<Vec<_>>().join("\n");
+        let parsed: Result<Vec<super::Step>, _> = serde_yaml_ng::from_str(&yaml);
+        // Each key is known (a wrong value fails on the value, never as an unknown kind).
+        if let Err(e) = parsed {
+            assert!(!e.to_string().contains("needs one of"), "{e}");
+        }
+    }
+}
