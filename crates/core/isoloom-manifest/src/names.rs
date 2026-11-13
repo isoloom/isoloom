@@ -479,20 +479,44 @@ mod tests {
     }
 
     #[test]
-    fn names_follow_their_patterns() {
+    fn an_environment_name_is_lowercase_words_joined_by_single_hyphens() {
         assert!(EnvironmentName::parse("web-portal").is_ok());
         assert!(EnvironmentName::parse("Portal").is_err());
         assert!(EnvironmentName::parse("a--b").is_err());
+    }
+
+    #[test]
+    fn a_name_doesnt_start_with_a_hyphen() {
         assert!(Name::parse("isoloom-check-db").is_ok());
         assert!(Name::parse("-web").is_err());
+    }
+
+    #[test]
+    fn an_environment_variable_name_doesnt_start_with_a_digit() {
         assert!(EnvName::parse("DEMO_SECRET").is_ok());
         assert!(EnvName::parse("demo_secret").is_ok());
         assert!(EnvName::parse("1TOKEN").is_err());
+    }
+
+    #[test]
+    fn an_identifier_takes_hyphens() {
         assert!(Identifier::parse("db-password").is_ok());
+    }
+
+    #[test]
+    fn a_step_id_is_lowercase() {
         assert!(StepId::parse("job-isoloom-init-web-1").is_ok());
         assert!(StepId::parse("Up").is_err());
+    }
+
+    #[test]
+    fn a_snake_name_takes_underscores_not_hyphens() {
         assert!(SnakeName::parse("web_portal").is_ok());
         assert!(SnakeName::parse("web-portal").is_err());
+    }
+
+    #[test]
+    fn an_os_name_takes_its_version() {
         assert!(OsName::parse("alpine-3.19").is_ok());
     }
 

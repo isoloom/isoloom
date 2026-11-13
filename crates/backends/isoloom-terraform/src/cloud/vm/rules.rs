@@ -584,18 +584,27 @@ fn kept_address<'a>(env: &Environment, vm: Vm<'a>, kept: RangeInclusive<u8>) -> 
 mod tests {
     use super::*;
 
+    static GROWS: [Size; 2] = [Size::new("a", 2, 1024, 2), Size::new("b", 2, 2048, 3)];
+
     #[test]
     fn a_size_table_that_shrinks_somewhere_is_refused() {
         static SHRINKS: [Size; 2] = [Size::new("a", 4, 1024, 2), Size::new("b", 2, 2048, 2)];
-        static GROWS: [Size; 2] = [Size::new("a", 2, 1024, 2), Size::new("b", 2, 2048, 3)];
         assert!(std::panic::catch_unwind(|| Sizes::ordered(&SHRINKS)).is_err());
-        let need = Need::new(1, 1500, 10);
-        assert_eq!(Sizes::ordered(&GROWS).fit(&need), "b");
-        assert_eq!(Sizes::ordered(&GROWS).fit(&need.on(4)), "b", "the largest when none takes it");
-        assert!(
-            Sizes::ordered(&GROWS)
-                .short(Cloud::Aws, "x", &need.on(4))
-                .is_some_and(|w| w.contains("takes 3 network interfaces"))
-        );
+    }
+
+    #[test]
+    fn fit_picks_the_smallest_size_that_takes_the_need() {
+        assert_eq!(Sizes::ordered(&GROWS).fit(&Need::new(1, 1500, 10)), "b");
+    }
+
+    #[test]
+    fn fit_falls_back_to_the_largest_when_none_takes_the_need() {
+        assert_eq!(Sizes::ordered(&GROWS).fit(&Need::new(1, 1500, 10).on(4)), "b");
+    }
+
+    #[test]
+    fn short_says_which_interfaces_the_largest_size_cant_take() {
+        let why = Sizes::ordered(&GROWS).short(Cloud::Aws, "x", &Need::new(1, 1500, 10).on(4));
+        assert!(why.as_deref().is_some_and(|w| w.contains("takes 3 network interfaces")), "{why:?}");
     }
 }

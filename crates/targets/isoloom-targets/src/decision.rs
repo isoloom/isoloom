@@ -223,20 +223,35 @@ mod tests {
     }
 
     #[test]
-    fn each_step_refuses_with_its_own_code() {
-        let two = lab(TWO);
-        assert_eq!(decide(&two, Target::Docker, None), Decision::Generated);
-        let cloud = refused_on(&two, on(Target::CloudVm, Some("digitalocean")));
+    fn a_lab_the_target_takes_is_generated() {
+        assert_eq!(decide(&lab(TWO), Target::Docker, None), Decision::Generated);
+    }
+
+    #[test]
+    fn the_cloud_step_refuses_with_the_cloud_code() {
+        let cloud = refused_on(&lab(TWO), on(Target::CloudVm, Some("digitalocean")));
         assert_eq!(cloud.code, Code::Cloud, "{cloud:?}");
         assert!(cloud.reason.contains("one machine on one network"), "{cloud:?}");
+    }
+
+    #[test]
+    fn the_lowering_step_refuses_with_the_lowering_code_and_the_field() {
         let image = lab("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: redis } }\n");
         let lowering = refused_on(&image, on(Target::Vagrant, Some("virtualbox")));
         assert_eq!((lowering.code, lowering.field.as_deref()), (Code::Lowering, Some("machines.a.app.image")));
+    }
+
+    #[test]
+    fn the_capability_step_refuses_with_the_missing_feature() {
         let aliased = lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, aliases: [www.x.test], app: { image: redis } }\n",
         );
         let lacking = refused_on(&aliased, on(Target::Kubernetes, None));
         assert_eq!(lacking.code, Code::Capability(Feature::MachineAliases), "{lacking:?}");
+    }
+
+    #[test]
+    fn the_provider_step_refuses_with_the_provider_code() {
         let two_networks = lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 }, wan: { cidr: 10.9.1.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lan: 10, wan: 10 }, app: { steps: [{ run: a.sh }] } }\n",
         );
