@@ -234,7 +234,7 @@ impl Provision {
 /// When a VM [`Ruby::define`] writes is started.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Start {
-    /// By `vagrant up`, with the lab.
+    /// By `vagrant up`, with the environment.
     WithUp,
     /// Not by `vagrant up` (`autostart: false`): the runner brings it up on its own.
     OnDemand,
