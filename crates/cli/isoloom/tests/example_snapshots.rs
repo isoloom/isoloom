@@ -213,21 +213,32 @@ fn every_example_on_every_target() -> Outcome {
     let scratch = tempfile::Builder::new().prefix("isoloom-example-snapshots-").tempdir()?;
     let dirs = examples()?;
     assert!(!dirs.is_empty(), "no example found");
-    // One thread per example (each runs the binary once per target); snapshots are asserted in
-    // order afterwards.
-    let generated: Vec<Example> = std::thread::scope(|s| {
-        let handles: Vec<_> = dirs
-            .iter()
-            .map(|dir| {
-                let work = scratch.path().join(dir.file_name().unwrap_or_default());
-                s.spawn(move || generate_example(dir, &work))
-            })
-            .collect();
-        handles
-            .into_iter()
-            .map(|h| h.join().map_err(|_| "an example's thread panicked")?)
-            .collect::<Outcome<Vec<_>>>()
-    })?;
+    // The examples in batches of as many threads as the host has cores (each runs the binary
+    // once per target): one thread per example was a fan-out the host couldn't bound, on top of
+    // the test runner's own parallelism (Clean Code ch.13, 2026-11-13); `ISOLOOM_TEST_JOBS` caps
+    // it lower on a shared host. Snapshots are asserted in order afterwards.
+    let jobs = std::env::var("ISOLOOM_TEST_JOBS")
+        .ok()
+        .and_then(|j| j.parse::<usize>().ok())
+        .filter(|j| *j > 0)
+        .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get));
+    let mut generated: Vec<Example> = Vec::with_capacity(dirs.len());
+    for batch in dirs.chunks(jobs) {
+        let done: Vec<Example> = std::thread::scope(|s| {
+            let handles: Vec<_> = batch
+                .iter()
+                .map(|dir| {
+                    let work = scratch.path().join(dir.file_name().unwrap_or_default());
+                    s.spawn(move || generate_example(dir, &work))
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().map_err(|_| "an example's thread panicked")?)
+                .collect::<Outcome<Vec<_>>>()
+        })?;
+        generated.extend(done);
+    }
     drop(scratch);
     let mut settings = insta::Settings::clone_current();
     settings.set_snapshot_path("snapshots/examples");
