@@ -71,6 +71,8 @@ stable spec format.
 - **`isoloom_spec::syntax::Unresolved` is an enum (breaking):** a placeholder that can't be read
   is `Unresolved::Unclosed`, one that names nothing the spec has is `Unresolved::Unknown`, each
   holding its reason; `reason()` and `code()` replace the `reason` and `unclosed` fields.
+- **`isoloom_spec::probe::Url::scheme` is a `Scheme` (breaking):** `Scheme::Http` or
+  `Scheme::Https`, with `as_str()`, in place of the `https: bool` field.
 - **Targets are presented by what they write and the validators that check it**, not by tiers of
   real runs: `isoloom targets` ends with each generated target's validators, and `isoloom matrix`
   and `docs/matrix.md` have a validators table (target, what it writes, validated by) in place of

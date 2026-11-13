@@ -103,7 +103,7 @@ fn without_a_machine_to_run_them_derived_checks_stand_on_the_networks() -> Outco
     assert!(
         matches!(&derived[1].probe, Probe::Tcp { host: checks::Host::Machine { name, network }, port: 389, expect: TcpExpect::Open, .. } if name == "dc" && network == "vault")
     );
-    assert!(matches!(&derived[2].probe, Probe::Http { url, expect: HttpExpect::Any, .. } if url.https));
+    assert!(matches!(&derived[2].probe, Probe::Http { url, expect: HttpExpect::Any, .. } if url.scheme == isoloom_spec::probe::Scheme::Https));
 
     // windows-hello: its page, besides the author's script.
     let plan = checks::plan(&example("windows-hello")?.spec());
