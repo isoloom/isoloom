@@ -531,12 +531,12 @@ mod tests {
     #[test]
     fn appliance_interfaces_attach_in_order_from_the_highest_priority() {
         let target = isoloom_spec::model::Target::Docker;
-        let spec = isoloom_plan::Lab::parse(
+        let lab = isoloom_plan::Lab::parse(
             "version: 1\nname: t\nnetworks: { a: { cidr: 10.1.0.0/24 }, b: { cidr: 10.2.0.0/24 } }\nmachines:\n  r: { networks: { a: 1, b: 1 }, app: { image: iol, appliance: cisco-iol } }\n",
         )
-        .expect("parses")
-        .for_target(target);
-        let env = Environment::build(&spec, target, None).expect("the spec plans");
+        .expect("parses");
+        let spec = lab.for_target(target);
+        let env = lab.plan(&spec, target, None).expect("the spec plans");
         let ports = appliances::ports(&env, "r", &spec.machines["r"]);
         let nets = appliance_networks(&spec, "r", &ports, Vec::new());
         let order: Vec<(&str, Option<u32>)> = nets.iter().map(|(n, a)| (n.as_str(), a.as_ref().and_then(|a| a.priority))).collect();

@@ -5,19 +5,19 @@ pub mod testing;
 
 use std::path::Path;
 
-use isoloom_plan::{Environment, Lab};
+use isoloom_plan::Lab;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::{Spec, Target, Virtiofs, VirtiofsCache};
 use isoloom_terraform::ProxmoxBackend;
 use testing::{Outcome, example, file};
 
-/// The module of `spec`, a lowered spec, checked valid.
-fn render(spec: &Spec) -> Outcome<String> {
+/// The module of `spec`, a lowered spec of `lab`, checked valid.
+fn render(lab: &Lab, spec: &Spec) -> Outcome<String> {
     let problems = isoloom_spec::validate(spec);
     if !problems.is_empty() {
         return Err(format!("the spec isn't valid: {problems:?}").into());
     }
-    Ok(file(&ProxmoxBackend.render(&Environment::build(spec, Target::Proxmox, None)?)?, "proxmox/main.tf")?.to_owned())
+    Ok(file(&ProxmoxBackend.render(&lab.plan(spec, Target::Proxmox, None)?)?, "proxmox/main.tf")?.to_owned())
 }
 
 /// The problems an author sees in `yaml`, one line each.
@@ -32,24 +32,32 @@ fn refusal(yaml: &str) -> Outcome<Option<String>> {
     testing::refusal(&ProxmoxBackend, yaml)
 }
 
-/// The `shared-files` example, lowered for Proxmox, with its volume a folder of the server.
-fn shared_files() -> Outcome<Spec> {
-    let mut spec = example("shared-files")?.for_target(Target::Proxmox);
+/// The `shared-files` example, and its spec lowered for Proxmox with its volume a folder of the
+/// server.
+fn shared_files() -> Outcome<(Lab, Spec)> {
+    let lab = example("shared-files")?;
+    let mut spec = lab.for_target(Target::Proxmox);
     if let Some(volume) = spec.volumes.get_mut("shared") {
         volume.virtiofs = Some(Virtiofs::default());
     }
-    Ok(spec)
+    Ok((lab, spec))
 }
 
 #[test]
 fn proxmox_shared_files_on_virtiofs() -> Outcome {
-    insta::assert_snapshot!(render(&shared_files()?)?);
+    insta::assert_snapshot!({
+        let (lab, spec) = shared_files()?;
+        render(&lab, &spec)?
+    });
     Ok(())
 }
 
 #[test]
 fn the_module_creates_the_mapping_and_each_vm_mounts_it() -> Outcome {
-    let tf = render(&shared_files()?)?;
+    let tf = {
+        let (lab, spec) = shared_files()?;
+        render(&lab, &spec)?
+    };
     assert!(tf.contains("resource \"proxmox_hardware_mapping_dir\" \"shared\""), "{tf}");
     assert!(tf.contains("\"iso${var.slot}-shared\""), "{tf}");
     assert!(tf.contains("path = \"${var.virtiofs_root}/shared-files/shared\""), "{tf}");
@@ -65,7 +73,7 @@ fn the_module_creates_the_mapping_and_each_vm_mounts_it() -> Outcome {
 
 #[test]
 fn a_named_mapping_is_used_as_it_is() -> Outcome {
-    let mut spec = shared_files()?;
+    let (lab, mut spec) = shared_files()?;
     spec.volumes["shared"].virtiofs = Some(Virtiofs {
         mapping: Some("lab-shared".into()),
         cache: Some(VirtiofsCache::Never),
@@ -73,7 +81,7 @@ fn a_named_mapping_is_used_as_it_is() -> Outcome {
         xattr: false,
         acl: true,
     });
-    let tf = render(&spec)?;
+    let tf = render(&lab, &spec)?;
     assert!(!tf.contains("proxmox_hardware_mapping_dir"), "{tf}");
     assert!(!tf.contains("virtiofs_root"), "{tf}");
     assert!(tf.contains("mapping      = \"lab-shared\""), "{tf}");
@@ -91,7 +99,7 @@ fn a_folder_of_the_volume_is_bound_from_the_whole() -> Outcome {
     let text = text.replace("volumes: { shared: /data/shared }", "volumes: { shared: { path: /data/shared, subpath: out } }")
         + "\noverrides:\n  proxmox:\n    volumes: { shared: { virtiofs: {} } }\n";
     let lab = Lab::parse(&text).map_err(|problems| format!("{problems:?}"))?;
-    let tf = render(&lab.for_target(Target::Proxmox))?;
+    let tf = render(&lab, &lab.for_target(Target::Proxmox))?;
     assert!(tf.contains("/var/lib/isoloom/volumes/shared/out"), "{tf}");
     assert!(tf.contains("none bind,nofail"), "{tf}");
     Ok(())

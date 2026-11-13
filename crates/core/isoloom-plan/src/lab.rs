@@ -136,16 +136,19 @@ impl Lab {
         self
     }
 
-    /// The lab planned for `target` (as instance `instance` of `spec`, the lab as that target runs
-    /// it): the plan with the lab's regions. Hidden: it returns a building-block crate's type,
-    /// outside the supported API `isoloom-targets` re-exports [`Lab`] in.
+    /// `spec` (the lab as `target` runs it, [`Lab::for_target`], or a spec derived from it)
+    /// planned for `target` as instance `instance`, with the lab's catalogue and regions: the one
+    /// way to plan an environment. Hidden: it returns a building-block crate's type, outside the
+    /// supported API `isoloom-targets` re-exports [`Lab`] in.
     ///
     /// # Errors
     ///
-    /// As [`Environment::build`](crate::Environment::build).
+    /// [`PlanError::UnresolvedRecipe`](crate::environment::PlanError::UnresolvedRecipe) for a
+    /// machine whose configuration has steps its OS's family can't carry, which lowering refuses
+    /// for the target first.
     #[doc(hidden)]
     pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> Result<crate::Environment, crate::environment::PlanError> {
-        let mut env = crate::Environment::planned(spec, target, instance, &self.loaded.daemons)?;
+        let mut env = crate::Environment::planned(spec, target, instance, self.loaded.catalogue, &self.loaded.daemons)?;
         env.regions.clone_from(&self.regions);
         Ok(env)
     }

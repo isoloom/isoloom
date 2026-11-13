@@ -216,7 +216,7 @@ machines:
     fn planned(yaml: &str) -> Environment {
         let lab = Lab::parse(yaml).expect("the test spec parses");
         assert_eq!(lab.problems(), [], "the test spec is valid");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
+        lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
     }
 
     fn env() -> Environment {

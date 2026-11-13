@@ -57,7 +57,7 @@ pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
 ///
 /// When it can't be planned.
 pub fn planned(lab: &Lab, target: Target) -> Outcome<Environment> {
-    Ok(Environment::build(&lab.for_target(target), target, None)?)
+    Ok(lab.plan(&lab.for_target(target), target, None)?)
 }
 
 /// `cloud`'s `cloud-vm` module for `yaml`, a valid spec.

@@ -76,13 +76,6 @@ impl DaemonTable {
         DaemonTable { entries }
     }
 
-    /// The daemons of the catalogue built into Isoloom (empty only if it doesn't load, which
-    /// its own tests rule out).
-    #[must_use]
-    pub fn common() -> DaemonTable {
-        Catalogue::embedded().map(DaemonTable::from).unwrap_or_default()
-    }
-
     /// The entries.
     #[must_use]
     pub fn entries(&self) -> &[DaemonEntry] {

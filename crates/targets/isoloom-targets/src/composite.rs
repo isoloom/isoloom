@@ -24,7 +24,7 @@ use isoloom_vagrant::{docker_vm, hybrid};
 /// `env` planned for the `docker` target: what a Docker host runs. It plans, since `env` did; a
 /// failure is `env`'s target's.
 fn on_docker(env: &Environment) -> Result<Environment, RenderError> {
-    Environment::build(env.spec(), Target::Docker, env.instance)
+    env.replan(env.spec(), Target::Docker, env.instance)
         .map_err(|e| RenderError::internal(env.target, "the containers couldn't be planned for Docker", e))
 }
 

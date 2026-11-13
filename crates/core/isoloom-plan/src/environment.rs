@@ -36,6 +36,8 @@ pub use vm::Vm;
 use crate::addressing::{address, address_for, cidr, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
+use isoloom_catalogue::Catalogue;
+
 use crate::configure::{DaemonTable, Recipe};
 use crate::hardware::{self, Hardware};
 use crate::images::Images;
@@ -99,6 +101,10 @@ pub struct Environment {
     /// defaults set one ([`crate::Lab::with_regions`]); a cloud left out keeps its own.
     pub regions: BTreeMap<String, String>,
     spec: Spec,
+    /// The catalogue it was planned with, for [`Environment::replan`] and the backends.
+    catalogue: &'static Catalogue,
+    /// The daemon table its machines' configurations were resolved with, for [`Environment::replan`].
+    daemons: DaemonTable,
 }
 
 /// A network, as the target lays it out.
@@ -306,18 +312,40 @@ impl Settings {
 }
 
 impl Environment {
-    /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run).
+    /// Plans another validated `spec` for `target` (`instance`: the copy it is) with what this
+    /// environment was planned with (its catalogue's daemon table): for a backend that derives
+    /// one environment from another (a hybrid's containers alone, a composite's Docker host).
+    ///
+    /// # Errors
+    ///
+    /// As [`Lab::plan`](crate::Lab::plan).
+    pub fn replan(&self, spec: &Spec, target: Target, instance: Option<u8>) -> Result<Environment, PlanError> {
+        Environment::planned(spec, target, instance, self.catalogue, &self.daemons)
+    }
+
+    /// The catalogue it was planned with (its `Lab`'s). Hidden: it returns a building-block crate's
+    /// type, as [`Lab::catalogue`](crate::Lab::catalogue) does.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn catalogue(&self) -> &'static Catalogue {
+        self.catalogue
+    }
+
+    /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run) with
+    /// its `Lab`'s `catalogue`, each machine's configuration resolved with `daemons`, the
+    /// catalogue's ([`Lab::plan`](crate::Lab::plan)).
     ///
     /// # Errors
     ///
     /// [`PlanError::UnresolvedRecipe`] for a machine whose configuration has steps its OS's
     /// family can't carry, which lowering refuses for the target first.
-    pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Environment, PlanError> {
-        Environment::planned(spec, target, instance, &DaemonTable::common())
-    }
-
-    /// [`Environment::build`], each machine's configuration resolved with `daemons`.
-    pub(crate) fn planned(spec: &Spec, target: Target, instance: Option<u8>, daemons: &DaemonTable) -> Result<Environment, PlanError> {
+    pub(crate) fn planned(
+        spec: &Spec,
+        target: Target,
+        instance: Option<u8>,
+        catalogue: &'static Catalogue,
+        daemons: &DaemonTable,
+    ) -> Result<Environment, PlanError> {
         // Laid out with the outside networks (so a moved block avoids them), then without them.
         let laid_out = outside::without(&lay_out(spec, target));
         let machines = machines(spec, &laid_out, target, daemons)?;
@@ -352,6 +380,8 @@ impl Environment {
             private_dns: crate::private_dns::plan(&laid_out),
             spec: laid_out,
             regions: BTreeMap::new(),
+            catalogue,
+            daemons: daemons.clone(),
         })
     }
 
@@ -399,7 +429,7 @@ impl Environment {
 }
 
 /// Why a spec can't be planned: what lowering and validation refuse first, so a bug of either
-/// when it happens. [`Environment::build`] says so rather than plan around it (a machine with no
+/// when it happens. Planning says so rather than plan around it (a machine with no
 /// configuration at all).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -612,7 +642,7 @@ fn files(spec: &Spec, m: &Machine, shape: MachineShape) -> Vec<MachineFile> {
 mod tests {
     use isoloom_spec::model::Target;
 
-    use super::{Controller, Environment};
+    use super::Controller;
     use crate::testing;
 
     const NEEDS_ONE: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nprovision: [{ ansible: site.yml }]\n";
@@ -808,7 +838,7 @@ overrides:
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n",
         );
         let spec = lab.for_target(Target::Vagrant);
-        assert!(!Controller::needed(&spec) && Environment::build(&spec, Target::Vagrant, None).expect("the spec plans").controller.is_none());
+        assert!(!Controller::needed(&spec) && lab.plan(&spec, Target::Vagrant, None).expect("the spec plans").controller.is_none());
         let playbook = testing::lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.yml]\n",
         );
@@ -822,7 +852,9 @@ overrides:
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  win: { networks: { lan: 10 }, os: windows-server@2022, app: { steps: [{ run: iis.ps1 }, { copy: { from: a, to: 'C:\\a', owner: admin } }] } }\n",
         );
         assert!(lab.refusal(Target::Vagrant).is_some(), "lowering refuses the step first");
-        let unresolved = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect_err("the recipe doesn't resolve");
+        let unresolved = lab
+            .plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None)
+            .expect_err("the recipe doesn't resolve");
         let super::PlanError::UnresolvedRecipe { machine, unportable } = &unresolved else {
             panic!("not the recipe: {unresolved:?}")
         };
@@ -841,7 +873,7 @@ overrides:
             let lab = testing::lab(&format!(
                 "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, rate_limit: {rate} }}\n"
             ));
-            Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)
+            lab.plan(&lab.for_target(Target::Proxmox), Target::Proxmox, None)
         };
         let env = plan("512kbit").expect("a rate plans");
         let rate = env.machines["web"].rate_limit.as_ref().expect("its rate limit");

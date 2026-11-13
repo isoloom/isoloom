@@ -107,11 +107,12 @@ fn esxi_shared_files() -> Outcome {
 /// setting and shares the volume over NFS from its owner, as every other target does.
 #[test]
 fn virtiofs_is_ignored() -> Outcome {
-    let mut spec = example("shared-files")?.for_target(Target::Esxi);
-    let plain = Environment::build(&spec, Target::Esxi, None).expect("the spec plans");
+    let lab = example("shared-files")?;
+    let mut spec = lab.for_target(Target::Esxi);
+    let plain = lab.plan(&spec, Target::Esxi, None).expect("the spec plans");
     spec.volumes.get_mut("shared").unwrap().virtiofs = Some(isoloom_spec::model::Virtiofs::default());
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
-    let with = Environment::build(&spec, Target::Esxi, None).expect("the spec plans");
+    let with = lab.plan(&spec, Target::Esxi, None).expect("the spec plans");
     assert_eq!(EsxiBackend.refusal(&with), None);
     assert_eq!(EsxiBackend.render(&with), EsxiBackend.render(&plain));
     Ok(())
