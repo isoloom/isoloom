@@ -18,6 +18,12 @@ stable spec format.
   ran again, and the command's task, working in that folder, made its removal fail. Both now live
   in the state folder (`C:\ProgramData\isoloom`), and the unpack stops Isoloom's scheduled tasks
   before it replaces the project (the command's step starts its task again).
+- **A problem with a box set through a group's or a counted machine's override is reported at
+  the key it is written under (#292).** A VM image, an LXC flag or an existing host taken from
+  `overrides.<target>.machines.<group>` was reported at the machine's own name
+  (`overrides.vagrant.machines.dc1.box` for a box written under the group `windows`), a path that
+  doesn't exist in the spec; the Proxmox and cloud image, `lxc` and `ssh` paths did the same.
+
 ### Added
 
 - **`isoloom_plan::Names` (`Environment::names`): every name an environment takes on the host,
