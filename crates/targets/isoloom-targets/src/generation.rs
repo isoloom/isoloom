@@ -60,26 +60,28 @@ pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     let mut files: Vec<GeneratedFile> = Vec::new();
     let mut skipped = Vec::new();
     for target in lab.possible() {
-        match target_files(lab, target, None).and_then(|own| added(&mut files, target, own)) {
-            // The resolved snapshot (it asks each target whether it refuses the lab) and the
-            // .gitignore are the same for every target: written once, after the first target's
-            // files.
-            Ok(true) => {
-                files.push(resolved::file(lab));
-                files.push(gitignore::file());
+        let first = files.is_empty();
+        match target_files(lab, target, None).and_then(|own| unwritten(&files, target, own)) {
+            Ok(new) => {
+                files.extend(new);
+                // The resolved snapshot (it asks each target whether it refuses the lab) and the
+                // .gitignore are the same for every target: written once, after the first
+                // target's files.
+                if first {
+                    files.push(resolved::file(lab));
+                    files.push(gitignore::file());
+                }
             }
-            Ok(false) => {}
             Err(e) => skipped.push(e),
         }
     }
     (files, skipped)
 }
 
-/// Adds `target`'s files (`own`) to the earlier targets' (`files`), each path once (a file an
-/// earlier target wrote the same is theirs), and says whether they are the first target's. A
-/// file at an earlier target's path with other contents would replace it, a bug of one of the two
-/// backends: an error, and none of `own` is added.
-fn added(files: &mut Vec<GeneratedFile>, target: Target, own: Vec<GeneratedFile>) -> std::result::Result<bool, GenerateError> {
+/// Of `target`'s files (`own`), the ones the earlier targets' (`files`) don't hold yet, each path
+/// once (a file an earlier target wrote the same is theirs). A file at an earlier target's path
+/// with other contents would replace it, a bug of one of the two backends: an error.
+fn unwritten(files: &[GeneratedFile], target: Target, own: Vec<GeneratedFile>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
     if let Some(clash) = own.iter().find(|f| files.iter().any(|x| x.path == f.path && x.contents != f.contents)) {
         return Err(GenerateError::Internal {
             target,
@@ -87,13 +89,13 @@ fn added(files: &mut Vec<GeneratedFile>, target: Target, own: Vec<GeneratedFile>
             source: std::sync::Arc::new(WrittenTwice),
         });
     }
-    let first = files.is_empty();
+    let mut new: Vec<GeneratedFile> = Vec::new();
     for file in own {
-        if !files.iter().any(|x| x.path == file.path) {
-            files.push(file);
+        if !files.iter().chain(&new).any(|x| x.path == file.path) {
+            new.push(file);
         }
     }
-    Ok(first)
+    Ok(new)
 }
 
 /// The project's own files the generated ones copy, read from the project folder `dir`: when
@@ -256,26 +258,22 @@ mod tests {
 
     #[test]
     fn a_path_two_targets_write_is_theirs_once_or_an_error() {
-        let mut files = Vec::new();
-        assert!(matches!(
-            added(&mut files, Target::Docker, vec![GeneratedFile::new(".isoloom/docker/compose.yml", "a")]),
-            Ok(true)
-        ));
+        let mut files = unwritten(&[], Target::Docker, vec![GeneratedFile::new(".isoloom/docker/compose.yml", "a")]).unwrap();
+        assert_eq!(files.len(), 1);
         // The same file again (docker-vm runs the docker target's Compose file): kept once.
         let same = vec![
             GeneratedFile::new(".isoloom/docker/compose.yml", "a"),
             GeneratedFile::new(".isoloom/docker-vm/Vagrantfile", "v"),
         ];
-        assert!(matches!(added(&mut files, Target::DockerVm, same), Ok(false)));
+        files.extend(unwritten(&files, Target::DockerVm, same).unwrap());
         assert_eq!(files.len(), 2);
         // Other contents at that path would replace it: an error, and nothing of the target added.
         let other = vec![
             GeneratedFile::new(".isoloom/hybrid/Vagrantfile", "h"),
             GeneratedFile::new(".isoloom/docker/compose.yml", "b"),
         ];
-        let e = added(&mut files, Target::Hybrid, other).err().map(|e| e.to_string()).unwrap_or_default();
+        let e = unwritten(&files, Target::Hybrid, other).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(e.contains("`.isoloom/docker/compose.yml` is an earlier target's file"), "{e}");
-        assert_eq!(files.len(), 2);
     }
 
     fn at(path: &str) -> GeneratedFile {
