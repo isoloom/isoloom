@@ -12,8 +12,29 @@ use super::{
 };
 use crate::syntax::{Code, mistake::Mistake};
 
-/// The kind keys, as an author reads them in a list.
-const KINDS: &str = "`run`, `copy`, `packages`, `playbook`, `repository`, `file`, `template`, `user`, `group`, `service`, `command` and `firewall`";
+/// The kind keys a step map takes (every [`Step`] but `reboot`, which is a bare word), in the
+/// order an author reads them in a list.
+pub(super) const KIND_KEYS: [&str; 12] = [
+    "run",
+    "copy",
+    "packages",
+    "playbook",
+    "repository",
+    "file",
+    "template",
+    "user",
+    "group",
+    "service",
+    "command",
+    "firewall",
+];
+
+/// The kind keys as an author reads them in a list: "`run`, `copy`, … and `firewall`".
+fn kinds() -> String {
+    let [rest @ .., last] = KIND_KEYS;
+    let rest: Vec<String> = rest.iter().map(|k| format!("`{k}`")).collect();
+    format!("{} and `{last}`", rest.join(", "))
+}
 
 /// A step as written: one kind key, and its guard.
 #[derive(Deserialize, JsonSchema)]
@@ -95,7 +116,7 @@ impl<'de> Deserialize<'de> for StepSchema {
         impl<'de> Visitor<'de> for V {
             type Value = StepSchema;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "`reboot`, or a map with one of {KINDS}")
+                write!(f, "`reboot`, or a map with one of {}", kinds())
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<StepSchema, E> {
                 if v == "reboot" {
@@ -165,8 +186,8 @@ fn step(s: StepInput) -> Result<Step, Mistake> {
     .collect();
     match given.len() {
         1 => Ok(given.remove(0)),
-        0 => Err(invalid(&format!("a step needs one of {KINDS} (or is `reboot`)"))),
-        _ => Err(invalid(&format!("a step does one thing: one of {KINDS} per step"))),
+        0 => Err(invalid(&format!("a step needs one of {} (or is `reboot`)", kinds()))),
+        _ => Err(invalid(&format!("a step does one thing: one of {} per step", kinds()))),
     }
 }
 
