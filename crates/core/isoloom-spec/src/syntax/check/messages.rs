@@ -16,19 +16,43 @@ pub(super) fn check(spec: &Spec, out: &mut Problems) {
     let Some(message) = &spec.message else { return };
     let at = FieldPath::new("message");
     for found in placeholder_problems(spec, None, message, Place::Message) {
-        let code = if found.unclosed { Code::InvalidValue } else { Code::UnknownReference };
-        let p = Problem::new(code, at.clone(), found.reason);
-        out.push(if found.unclosed { p } else { p.fix(example(spec)) });
+        let p = Problem::new(found.code(), at.clone(), found.reason().to_owned());
+        out.push(match found {
+            Unresolved::Unclosed(_) => p,
+            Unresolved::Unknown(_) => p.fix(example(spec)),
+        });
     }
 }
 
-/// A placeholder that names nothing the spec has, or can't be read.
+/// A placeholder that can't be read, or names nothing the spec has; each says why, naming the
+/// placeholder (a flag told them apart before, and every reader branched on it: Clean Code F3,
+/// 2026-11-13).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unresolved {
+pub enum Unresolved {
+    /// A `{{` without its `}}`.
+    Unclosed(String),
+    /// A path naming nothing the spec has.
+    Unknown(String),
+}
+
+impl Unresolved {
     /// Why, naming the placeholder.
-    pub reason: String,
-    /// Whether it is a `{{` without its `}}` (else a path naming nothing there).
-    pub unclosed: bool,
+    #[must_use]
+    pub fn reason(&self) -> &str {
+        match self {
+            Unresolved::Unclosed(reason) | Unresolved::Unknown(reason) => reason,
+        }
+    }
+
+    /// The problem it is: an unclosed placeholder is an invalid value, an unknown path a
+    /// reference to nothing.
+    #[must_use]
+    pub fn code(&self) -> Code {
+        match self {
+            Unresolved::Unclosed(_) => Code::InvalidValue,
+            Unresolved::Unknown(_) => Code::UnknownReference,
+        }
+    }
 }
 
 /// The placeholders of `text`, written at `place`, that name nothing the spec has, in order:
@@ -38,14 +62,11 @@ pub fn placeholder_problems(spec: &Spec, machine: Option<&str>, text: &str, plac
     placeholder::placeholders(text, place)
         .into_iter()
         .filter_map(|found| match found {
-            Ok(r) => resolve(spec, machine, &r).err().map(|why| Unresolved {
-                reason: format!("`{{{{ {r} }}}}`: {why}"),
-                unclosed: false,
-            }),
-            Err(e) => Some(Unresolved {
-                unclosed: matches!(e, Error::Unclosed),
-                reason: e.to_string(),
-            }),
+            Ok(r) => resolve(spec, machine, &r)
+                .err()
+                .map(|why| Unresolved::Unknown(format!("`{{{{ {r} }}}}`: {why}"))),
+            Err(Error::Unclosed) => Some(Unresolved::Unclosed(Error::Unclosed.to_string())),
+            Err(e) => Some(Unresolved::Unknown(e.to_string())),
         })
         .collect()
 }

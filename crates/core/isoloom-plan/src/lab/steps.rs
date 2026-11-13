@@ -75,8 +75,8 @@ fn template(source: &syntax::Spec, machine: &str, at: &FieldPath, file: &Path, f
     // One problem per template, every placeholder in it: a field holds one problem.
     let found = syntax::placeholder_problems(source, Some(machine), &text, Place::Template);
     let Some(first) = found.first() else { return Vec::new() };
-    let code = if first.unclosed { Code::InvalidValue } else { Code::UnknownReference };
-    let reasons: Vec<&str> = found.iter().map(|u| u.reason.as_str()).collect();
+    let code = first.code();
+    let reasons: Vec<&str> = found.iter().map(syntax::Unresolved::reason).collect();
     vec![
         Problem::new(code, at.clone(), format!("`{from}`: {}", reasons.join("; ")))
             .fix("a template names `machine.name`, `machine.addresses.<network>`, `machines.<m>.addresses.<network>` and `machines.<m>.ports.<name>.port`"),
