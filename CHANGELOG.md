@@ -39,6 +39,11 @@ stable spec format.
 
 ### Fixed
 
+- **VMs of one network started at once on QEMU share one hub.** Vagrant starts QEMU's VMs in
+  parallel: two could each find no hub and start one, the second failing on the ports or
+  stopping the hub the first VM had just connected to. A network's hub is now started, joined and
+  stopped under a lock of its own (`<network>.lock` beside its record).
+
 - **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer
   fails on a running command (#289).** The setup mark and the command script lived in
   `C:\isoloom`, the project folder, which every unpack replaces: the mark was gone and the setup

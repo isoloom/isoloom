@@ -58,7 +58,7 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
         assert!(!define(&vf, vm)?.contains("IsoloomQemu.stop("), "{}", define(&vf, vm)?);
     }
     // The hub is left running while another of its VMs keeps a Vagrant id.
-    assert!(vf.contains("return if left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }"));
+    assert!(vf.contains("stop(net) unless left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }"));
     // Other providers are untouched.
     assert!(!provider_block(&vf, "a", "virtualbox")?.contains("socket"));
     Ok(())
