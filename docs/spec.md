@@ -366,7 +366,7 @@ A published image, by tag or digest (`example/clamd:1.4`): the container form. W
 
 ### `machines.*.app.build`
 
-The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form; translating it to a VM is never attempted, so add `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
+The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form, and on a VM target the VM form it translates to (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as that published name.
 
 - **Type:** string or mapping
 

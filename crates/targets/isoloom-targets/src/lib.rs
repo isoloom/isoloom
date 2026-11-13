@@ -46,7 +46,7 @@ pub mod tiers;
 
 pub use error::{Error, GenerateError, Result};
 pub use generation::{default_regions, generate, generate_all, generate_instance, project_copies};
-pub use isoloom_plan::{Lab, NotPossible};
+pub use isoloom_plan::{Lab, NotPossible, dockerfile};
 pub use isoloom_render::GeneratedFile;
 pub use refusal::{CloudRefusal, Clouds, cloud_refusals, refusal, refusal_on};
 #[doc(hidden)]

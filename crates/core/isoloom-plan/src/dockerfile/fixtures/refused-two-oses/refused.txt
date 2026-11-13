@@ -1,0 +1,2 @@
+refused: build/refused-two-oses/Dockerfile line 3 (`FROM`): `alpine:3.19` is alpine@3.19, but `python:3.12` made the VM debian@12: a VM is one OS
+fix: build every stage FROM images of one OS, or give the machine `os` and `app.steps`

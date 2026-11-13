@@ -1,0 +1,2 @@
+refused: build/refused-onbuild/Dockerfile line 2 (`ONBUILD`): `ONBUILD` has no VM form
+fix: leave it out, or give the machine `os` and `app.steps`

@@ -37,6 +37,7 @@ pub mod boot;
 pub mod checks;
 pub mod configure;
 mod constraints;
+pub mod dockerfile;
 pub mod environment;
 mod error;
 mod existing_hosts;

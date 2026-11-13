@@ -17,6 +17,7 @@ use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems, ProjectPath
 use crate::lower::{Lowered, Scope, lower};
 
 mod access;
+mod dockerfiles;
 mod steps;
 mod templates;
 mod warnings;
@@ -31,6 +32,8 @@ pub struct Lab {
     images: Table,
     regions: BTreeMap<String, String>,
     templates: templates::Texts,
+    dockerfiles: BTreeMap<ProjectPath, String>,
+    bases: crate::dockerfile::Sources,
     catalogue: &'static Catalogue,
     memo: Memo,
 }
@@ -54,6 +57,8 @@ struct Memo {
     lowered: [OnceLock<Lowered>; SCOPES],
     /// [`Lab::problems`].
     problems: OnceLock<Problems>,
+    /// The spec with the VM forms its Dockerfiles give, for the targets that run VMs.
+    translated: OnceLock<dockerfiles::Translated>,
 }
 
 impl PartialEq for Memo {
@@ -81,6 +86,8 @@ impl Lab {
             images: Table::default(),
             regions: BTreeMap::new(),
             templates: templates::Texts::new(),
+            dockerfiles: BTreeMap::new(),
+            bases: crate::dockerfile::Sources::default(),
             catalogue: built_in(),
             memo: Memo::default(),
         }
@@ -136,6 +143,54 @@ impl Lab {
         self
     }
 
+    /// The lab with the texts of its builds' Dockerfiles (read by the caller that generates,
+    /// from [`Lab::dockerfile_paths`]): on a target that runs VMs, each such machine takes the
+    /// VM form its Dockerfile translates to, or is refused at the line that has none.
+    #[must_use]
+    pub fn with_dockerfiles(mut self, texts: BTreeMap<ProjectPath, String>) -> Lab {
+        self.dockerfiles = texts;
+        self.memo = Memo::default();
+        self
+    }
+
+    /// The lab with the base images vendored in its project (`isoloom bases fetch`), which a
+    /// Dockerfile's translation starts `FROM` when the service matrix doesn't have them.
+    #[must_use]
+    pub fn with_bases(mut self, bases: crate::dockerfile::Sources) -> Lab {
+        self.bases = bases;
+        self.memo = Memo::default();
+        self
+    }
+
+    /// The Dockerfiles the lab's VM forms are translated from: each build's whose machine has no
+    /// `app.steps` of its own, each once.
+    #[must_use]
+    pub fn dockerfile_paths(&self) -> Vec<ProjectPath> {
+        dockerfiles::paths(&self.source)
+    }
+
+    /// The spec `scope` lowers: the translated one for a target that runs VMs.
+    fn source_for(&self, scope: Scope) -> &syntax::Spec {
+        match scope {
+            Scope::Target(t) if dockerfiles::wants_vm(t) => &self.translated().source,
+            _ => &self.source,
+        }
+    }
+
+    /// The spec with the VM forms its Dockerfiles give, worked out once.
+    fn translated(&self) -> &dockerfiles::Translated {
+        self.memo.translated.get_or_init(|| dockerfiles::translate(&self.source, &self.dockerfiles, &self.bases))
+    }
+
+    /// `l` with each refusal of a Dockerfile that has no VM form saying why.
+    fn explained(&self, scope: Scope, mut l: Lowered) -> Lowered {
+        if matches!(scope, Scope::Target(t) if dockerfiles::wants_vm(t)) {
+            let t = self.translated();
+            l.refusals = l.refusals.into_iter().map(|p| t.explain(p)).collect();
+        }
+        l
+    }
+
     /// The project files the lab's steps fill in as templates, each once.
     #[must_use]
     pub fn template_paths(&self) -> Vec<ProjectPath> {
@@ -172,8 +227,8 @@ impl Lab {
     /// The spec lowered for `scope` before the image table, lowered once.
     fn raw(&self, scope: Scope) -> Cow<'_, Lowered> {
         match slot(scope).and_then(|i| self.memo.lowered.get(i)) {
-            Some(cell) => Cow::Borrowed(cell.get_or_init(|| lower(&self.source, self.catalogue, scope))),
-            None => Cow::Owned(lower(&self.source, self.catalogue, scope)),
+            Some(cell) => Cow::Borrowed(cell.get_or_init(|| self.explained(scope, lower(self.source_for(scope), self.catalogue, scope)))),
+            None => Cow::Owned(self.explained(scope, lower(self.source_for(scope), self.catalogue, scope))),
         }
     }
 
@@ -215,7 +270,8 @@ impl Lab {
         if spec.machines.is_empty() {
             return Some(NotPossible::NoMachines);
         }
-        if let Some(missing) = crate::lower::missing_form(&self.source, self.catalogue, target) {
+        if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.catalogue, target) {
+            let missing = if dockerfiles::wants_vm(target) { self.translated().explain(missing) } else { missing };
             return Some(NotPossible::MissingForm(self.place(missing)));
         }
         if let Some(missing) = self.unsupplied(target) {

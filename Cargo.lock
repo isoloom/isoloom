@@ -724,6 +724,7 @@ dependencies = [
  "isoloom-catalogue",
  "isoloom-spec",
  "proptest",
+ "serde",
  "serde_json",
  "serde_yaml_ng",
  "tempfile",

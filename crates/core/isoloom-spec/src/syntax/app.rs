@@ -80,8 +80,9 @@ struct AppInput {
     #[serde(default)]
     image: Option<String>,
     /// The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,
-    /// target, args }`. The container form; translating it to a VM is never attempted, so add
-    /// `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
+    /// target, args }`. The container form, and on a VM target the VM form it translates to
+    /// (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as
+    /// that published name.
     #[serde(default, deserialize_with = "build")]
     #[schemars(with = "Option<BuildInput>")]
     build: Option<Build>,
