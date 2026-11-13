@@ -54,6 +54,13 @@ pub enum Form {
     Container,
 }
 
+/// The least a VM can be given: below this, its OS doesn't boot or its disk doesn't fit.
+pub(crate) const MIN_VM_MEMORY_MB: u32 = 256;
+/// The least disk a VM can be given, in GB.
+pub(crate) const MIN_VM_DISK_GB: u32 = 5;
+/// The least memory a container can be given (a shell with 64 MB is common).
+pub(crate) const MIN_CONTAINER_MEMORY_MB: u32 = 16;
+
 impl MachineSize {
     /// The size of a machine whose `resources` are `r`, run in `form`.
     #[must_use]
