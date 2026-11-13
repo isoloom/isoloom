@@ -63,7 +63,7 @@ fn disk_name_problem(s: &Subject, name: &str) -> Option<String> {
         Some(format!(
             "`{name}` is a volume of this machine too: a disk is stored as `<machine>-<disk>`, as a volume"
         ))
-    } else if s.name.len() + 1 + name.len() > 63 {
+    } else if s.name.len() + 1 + name.len() > super::DNS_LABEL_MAX {
         Some("machine name and disk name together are at most 62 characters: the Kubernetes claim is `<machine>-<disk>`".into())
     } else {
         None

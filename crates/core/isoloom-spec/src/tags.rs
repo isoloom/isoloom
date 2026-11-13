@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 
 use crate::model::Spec;
 
-/// The longest label key or value Google Cloud and Kubernetes take.
-const LABEL_MAX: usize = 63;
+/// The longest label key or value Google Cloud and Kubernetes take: a DNS label's length.
+const LABEL_MAX: usize = crate::validate::DNS_LABEL_MAX;
 
 /// The longest and shortest tag Linode takes, as its `key:value` word: the strictest cloud's.
 const WORD: std::ops::RangeInclusive<usize> = 3..=50;

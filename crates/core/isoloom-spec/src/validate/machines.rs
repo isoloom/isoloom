@@ -100,7 +100,7 @@ use isoloom_manifest::contract::RESERVED_PREFIX;
 
 /// The longest machine name: its published ports' Kubernetes Service, `isoloom-<name>`, is a
 /// 63-character DNS label.
-pub const MACHINE_NAME_MAX: usize = 63 - RESERVED_PREFIX.len();
+pub const MACHINE_NAME_MAX: usize = super::DNS_LABEL_MAX - RESERVED_PREFIX.len();
 const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (its controller, router and tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs): choose another";
 
 /// The machine's name (a DNS label short enough for Kubernetes, its length checked first), and a

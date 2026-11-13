@@ -23,6 +23,11 @@ mod machine_files;
 mod machines;
 pub use machines::{MACHINE_NAME_MAX, dns_name};
 pub(crate) use top::NAME_MAX;
+
+/// The longest DNS label (RFC 1035), the limit of a Kubernetes name, a namespace, a cloud label
+/// and a machine's host name: one number where it was written as `63` five times (Clean Code
+/// G25, 2026-11-13).
+pub(crate) const DNS_LABEL_MAX: usize = 63;
 mod networks;
 mod os;
 mod outside;
