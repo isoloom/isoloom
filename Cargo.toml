@@ -50,7 +50,7 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 tempfile = "3"
 serde_path_to_error = "0.1"
 # Benchmarks (`cargo xtask bench`): the statistics only, no plots and no thread pool.
-criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 saphyr-parser = "0.2"
 jsonschema = { version = "0.58", default-features = false }
 # A catalogue setting's `pattern`.
