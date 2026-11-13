@@ -281,7 +281,10 @@ machines:
         let setup = step(&env, "win", |s| matches!(s, Step::Setup { .. }));
         let once = super::super::windows(&env, "win", &setup).expect("renders");
         assert!(
-            once.contains("secret.ps1") && once.contains("C:\\ProgramData\\isoloom\\setup.done") && !once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
+            once.contains("secret.ps1")
+                && once.contains("C:\\ProgramData\\isoloom\\setup.done")
+                && !once.contains("C:\\isoloom\\setup.done")
+                && !once.contains("Register-ScheduledTask"),
             "run once, not a startup task: {once}"
         );
         let command = super::super::windows(&env, "win", &Step::Command).expect("renders");
