@@ -209,7 +209,7 @@ const DOCKER_VERSION: &str = "29.9.0";
 const COMPOSE_VERSION: &str = "5.6.0";
 
 /// Docker's apt signing key, pinned by SHA-256 (the same armored key for Debian and Ubuntu,
-/// `download.docker.com/linux/<id>/gpg`); verified against download.docker.com on 2026-10-16.
+/// `download.docker.com/linux/<id>/gpg`); the pins refresh verifies it against download.docker.com.
 const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570";
 
 /// Installs Docker, unless it is there, as a root script. On the apt family (Debian, Ubuntu) it

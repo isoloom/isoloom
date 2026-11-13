@@ -117,8 +117,8 @@ fn identity() -> Result<Identity> {
 }
 
 /// The first Compose that copies a secret read from the environment into the container with
-/// its `uid`, `gid` and `mode`: docker/compose 5c1484e, "apply uid/gid when creating secret from
-/// environment" (2022-12-15), first released in v2.14.1. An input or a secret delivered as a
+/// its `uid`, `gid` and `mode`: v2.14.1, the first to apply them to a secret read from the
+/// environment. An input or a secret delivered as a
 /// file relies on it (a `file:` secret is bind-mounted, and Compose ignores its owner and mode).
 const ENVIRONMENT_SECRETS: &str = "2.14.1";
 

@@ -1,7 +1,6 @@
 //! The earlier format's keys, recognised on the raw YAML before the typed parse, each with the
 //! targeted fix: what to write now. Nothing here is read as the new form (there is no alias),
-//! so this isn't compatibility; it only keeps an author from being stranded. The module goes
-//! once no environment in use is still written in the earlier format.
+//! so this isn't compatibility; it only keeps an author from being stranded.
 
 use serde_yaml_ng::{Mapping, Value};
 
