@@ -9,6 +9,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
+use super::mistake::Mistake;
 use super::names::{InputName, PortName};
 use crate::Error;
 use crate::model::CommandLine;
@@ -168,14 +169,14 @@ struct HealthcheckInput {
 }
 
 impl TryFrom<HealthcheckInput> for Healthcheck {
-    type Error = Error;
+    type Error = Mistake;
 
-    fn try_from(h: HealthcheckInput) -> Result<Healthcheck, Error> {
+    fn try_from(h: HealthcheckInput) -> Result<Healthcheck, Mistake> {
         let probe = match (h.test, h.http) {
             (Some(test), None) => HealthProbe::Test(test),
             (None, Some(page)) => HealthProbe::Http(page),
-            (Some(_), Some(_)) => return Err(Error::TestAndHttp),
-            (None, None) => return Err(Error::NoHealthProbe),
+            (Some(_), Some(_)) => return Err(Error::TestAndHttp.into()),
+            (None, None) => return Err(Error::NoHealthProbe.into()),
         };
         Ok(Healthcheck {
             probe,
