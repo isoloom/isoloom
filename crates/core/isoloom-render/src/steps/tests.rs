@@ -241,12 +241,15 @@ fn windows_routes_keep_across_restarts() {
     assert_eq!(windows(&env, "web", &none), None);
 }
 
+/// A step's name, how to pick it from a plan, and a text its rendering holds.
+type StepCase = (&'static str, fn(&Step) -> bool, &'static str);
+
 #[test]
 fn every_windows_step_is_powershell() {
     let env = testing::env(WINDOWS, Target::Vagrant);
     let step = |pick: fn(&Step) -> bool| windows(&env, "win", &planned(&env, "win", pick)).expect("a Windows step");
     // Each step's PowerShell, and a text it holds: every step is checked, and every mismatch said.
-    let cases: [(&str, fn(&Step) -> bool, &str); 6] = [
+    let cases: [StepCase; 6] = [
         ("settings", |s| matches!(s, Step::Settings), "SetEnvironmentVariable('MODE', 'lab', 'Machine')"),
         ("ipv6", |s| matches!(s, Step::Ipv6 { .. }), "-IPAddress 'fd00:86::10' -PrefixLength 64"),
         (
