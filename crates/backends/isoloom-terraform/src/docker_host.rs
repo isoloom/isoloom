@@ -119,7 +119,10 @@ pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<
     let copy = GuestCommand {
         id: StepId::parse("project")?,
         note: Some("Copying the project into the VM…".into()),
-        command: Template::text(&format!("{sudo}sh -c '{}'", steps::project_unpack(steps::Archive::Stdin, false))),
+        command: Template::text(&format!(
+            "{sudo}sh -c '{}'",
+            steps::project_unpack(steps::Archive::Stdin, steps::TopFolder::Kept)
+        )),
         timeout_s: 600,
         failure: Failure::Fail,
         download: false,

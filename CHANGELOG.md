@@ -10,6 +10,12 @@ stable spec format.
 
 ## [Unreleased]
 
+### Changed
+
+- **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
+  (`Kept`, `Stripped`) instead of a `strip: bool`** (breaking, for 3.0): a call says what it does
+  with the archive's top folder instead of passing a bare `true` or `false`.
+
 ### Fixed
 
 - **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer

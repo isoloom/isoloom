@@ -85,7 +85,7 @@ const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// ([`steps::project_unpack`] as root on Linux, [`steps::windows_project_unpack`] on Windows).
 /// Every Vagrantfile Isoloom writes carries it, after `ROOT`.
 pub(crate) fn project_rb() -> String {
-    let unpack = steps::windows_project_unpack(false);
+    let unpack = steps::windows_project_unpack(steps::TopFolder::Kept);
     // A Ruby heredoc ends at the first line that is its terminator, as sh's does.
     let tag = isoloom_spec::shell::here_tag("PS1", &unpack);
     format!(
@@ -93,7 +93,7 @@ pub(crate) fn project_rb() -> String {
         include_str!("vagrant_project.rb"),
         copy_rules(&[]),
         Value::str(steps::PROJECT_ARCHIVE),
-        Value::str(&steps::project_unpack(steps::Archive::Uploaded, false)),
+        Value::str(&steps::project_unpack(steps::Archive::Uploaded, steps::TopFolder::Kept)),
         Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
     )
 }
