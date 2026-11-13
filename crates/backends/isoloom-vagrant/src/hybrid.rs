@@ -73,7 +73,7 @@ pub fn render(env: &Environment, containers: HybridContainers) -> Result<Files> 
         dir: DIR,
         extra: &|r| host::write(r, env, &containers, &nics),
     };
-    let mut files = vms::render_spec_in(&vms_only(env.spec()), &layout).map_err(|e| e.on(Target::Hybrid))?;
+    let mut files = vms::render_spec_in(env, &vms_only(env.spec()), &layout).map_err(|e| e.on(Target::Hybrid))?;
     files.insert(1.min(files.len()), containers.file);
     Ok(files)
 }

@@ -14,6 +14,7 @@ use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems, ProjectPath};
 
+use crate::configure::DaemonTable;
 use crate::lower::{Lowered, Scope, lower};
 
 mod access;
@@ -34,15 +35,37 @@ pub struct Lab {
     templates: templates::Texts,
     dockerfiles: BTreeMap<ProjectPath, String>,
     bases: crate::dockerfile::Sources,
-    catalogue: &'static Catalogue,
+    loaded: Loaded,
     memo: Memo,
 }
 
-/// The catalogue built into Isoloom, or an empty one when it doesn't load (its own tests rule
-/// that out; [`Lab::problems`] says so at each service it would have resolved).
-fn built_in() -> &'static Catalogue {
-    static EMPTY: OnceLock<Catalogue> = OnceLock::new();
-    Catalogue::embedded().unwrap_or_else(|_| EMPTY.get_or_init(Catalogue::default))
+/// The catalogue a lab resolves its services in, read once when the lab is made, with what
+/// planning reads of it: lowering, planning and the checks take it from here, never from the
+/// global catalogue again.
+#[derive(Debug, Clone, PartialEq)]
+struct Loaded {
+    catalogue: &'static Catalogue,
+    /// Why the catalogue didn't load (`catalogue` is then empty).
+    broken: Option<String>,
+    /// The daemons `catalogue` knows the foreground form of.
+    daemons: DaemonTable,
+}
+
+impl Loaded {
+    /// The catalogue built into Isoloom, or an empty one when it doesn't load (its own tests rule
+    /// that out; [`Lab::problems`] says so at each service it would have resolved).
+    fn built_in() -> Loaded {
+        static EMPTY: OnceLock<Catalogue> = OnceLock::new();
+        let (catalogue, broken) = match Catalogue::embedded() {
+            Ok(catalogue) => (catalogue, None),
+            Err(broken) => (EMPTY.get_or_init(Catalogue::default), Some(broken.to_string())),
+        };
+        Loaded {
+            catalogue,
+            broken,
+            daemons: DaemonTable::from(catalogue),
+        }
+    }
 }
 
 /// [`Scope::Lab`], then one scope per target of [`Target::ALL`].
@@ -88,7 +111,7 @@ impl Lab {
             templates: templates::Texts::new(),
             dockerfiles: BTreeMap::new(),
             bases: crate::dockerfile::Sources::default(),
-            catalogue: built_in(),
+            loaded: Loaded::built_in(),
             memo: Memo::default(),
         }
     }
@@ -120,16 +143,19 @@ impl Lab {
         self
     }
 
-    /// The lab planned for `target` (as instance `instance` of `spec`, the lab as that target runs
-    /// it): the plan with the lab's regions. Hidden: it returns a building-block crate's type,
-    /// outside the supported API `isoloom-targets` re-exports [`Lab`] in.
+    /// `spec` (the lab as `target` runs it, [`Lab::for_target`], or a spec derived from it)
+    /// planned for `target` as instance `instance`, with the lab's catalogue and regions: the one
+    /// way to plan an environment. Hidden: it returns a building-block crate's type, outside the
+    /// supported API `isoloom-targets` re-exports [`Lab`] in.
     ///
     /// # Errors
     ///
-    /// As [`Environment::build`](crate::Environment::build).
+    /// [`PlanError::UnresolvedRecipe`](crate::environment::PlanError::UnresolvedRecipe) for a
+    /// machine whose configuration has steps its OS's family can't carry, which lowering refuses
+    /// for the target first.
     #[doc(hidden)]
     pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> Result<crate::Environment, crate::environment::PlanError> {
-        let mut env = crate::Environment::build(spec, target, instance)?;
+        let mut env = crate::Environment::planned(spec, target, instance, self.loaded.catalogue, &self.loaded.daemons)?;
         env.regions.clone_from(&self.regions);
         Ok(env)
     }
@@ -215,7 +241,12 @@ impl Lab {
     #[doc(hidden)]
     #[must_use]
     pub fn catalogue(&self) -> &'static Catalogue {
-        self.catalogue
+        self.loaded.catalogue
+    }
+
+    /// The daemons its catalogue knows the foreground form of.
+    pub(crate) fn daemons(&self) -> &DaemonTable {
+        &self.loaded.daemons
     }
 
     /// The spec lowered for `scope`, the image table applied (what the lowering's tests read).
@@ -229,8 +260,8 @@ impl Lab {
     /// The spec lowered for `scope` before the image table, lowered once.
     fn raw(&self, scope: Scope) -> Cow<'_, Lowered> {
         match slot(scope).and_then(|i| self.memo.lowered.get(i)) {
-            Some(cell) => Cow::Borrowed(cell.get_or_init(|| self.explained(scope, lower(self.source_for(scope), self.catalogue, scope)))),
-            None => Cow::Owned(self.explained(scope, lower(self.source_for(scope), self.catalogue, scope))),
+            Some(cell) => Cow::Borrowed(cell.get_or_init(|| self.explained(scope, lower(self.source_for(scope), self.loaded.catalogue, scope)))),
+            None => Cow::Owned(self.explained(scope, lower(self.source_for(scope), self.loaded.catalogue, scope))),
         }
     }
 
@@ -272,7 +303,7 @@ impl Lab {
         if spec.machines.is_empty() {
             return Some(NotPossible::NoMachines);
         }
-        if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.catalogue, target) {
+        if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.loaded.catalogue, target) {
             let missing = if dockerfiles::wants_vm(target) {
                 self.translated().explain(missing)
             } else {
@@ -312,7 +343,7 @@ impl Lab {
     /// [`Lab::problems`], worked out.
     fn find_problems(&self) -> Problems {
         let mut out = syntax::check(&self.source);
-        if let Err(broken) = Catalogue::embedded() {
+        if let Some(broken) = &self.loaded.broken {
             add(
                 &mut out,
                 self.services()
@@ -385,7 +416,7 @@ impl Lab {
             isoloom_spec::validate_files(&lowered.spec, dir).iter().map(|p| translated(&lowered, p)),
         );
         add(&mut out, steps::step_files(&self.source, dir));
-        add(&mut out, steps::setting_files(&self.source, self.catalogue, dir));
+        add(&mut out, steps::setting_files(&self.source, self.loaded.catalogue, dir));
         self.sorted(out)
     }
 

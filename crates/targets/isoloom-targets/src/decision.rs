@@ -161,7 +161,7 @@ pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decisi
     let backend = backend(target);
     // A lab that doesn't plan is a bug of lowering, which the generation reports as a failure
     // ([`crate::GenerateError::Internal`]), not a refusal that would leave the target out.
-    let Ok(env) = Environment::build(&spec, target, None) else {
+    let Ok(env) = lab.plan(&spec, target, None) else {
         return Decision::Generated;
     };
     let lacking = isoloom_plan::refusal(&env.requirements, &backend.capabilities());

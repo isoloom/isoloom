@@ -4,7 +4,7 @@
 //! ([`crate::decision`]); why a target isn't possible for the environment at all is the environment's own answer
 //! ([`Lab::not_possible`]).
 
-use isoloom_plan::{Environment, Lab};
+use isoloom_plan::Lab;
 use isoloom_spec::model::Target;
 
 use crate::decision::{Decision, decide};
@@ -71,7 +71,7 @@ pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
         return None;
     }
     // A lab that doesn't plan fails the generation (`GenerateError::Internal`): no module is written.
-    let Ok(env) = Environment::build(&lab.for_target(target), target, None) else {
+    let Ok(env) = lab.plan(&lab.for_target(target), target, None) else {
         return None;
     };
     let each = if target == Target::CloudVm {

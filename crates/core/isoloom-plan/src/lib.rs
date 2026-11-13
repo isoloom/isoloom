@@ -24,7 +24,7 @@
 //! )?);
 //! assert!(lab.problems().is_empty());
 //! assert!(lab.possible().contains(&Target::Docker));
-//! let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)?;
+//! let env = lab.plan(&lab.for_target(Target::Docker), Target::Docker, None)?;
 //! let web = env.machines.get("web").ok_or("web is planned")?;
 //! assert_eq!(web.shape, MachineShape::Container);
 //! assert_eq!(web.addresses.get("lan").map(ToString::to_string).as_deref(), Some("10.9.0.10"));

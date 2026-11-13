@@ -139,9 +139,10 @@ pub(crate) fn boot(env: &Environment) -> Result<BootStatements> {
 /// The `vagrant` target's layout: its folder, nothing after the VMs.
 const VAGRANT: Layout<'static> = Layout { dir: DIR, extra: &|_| {} };
 
-/// The VMs of `spec` (the `vagrant` target's plan of it) into `layout`: the `hybrid` target's.
-pub(crate) fn render_spec_in(spec: &Spec, layout: &Layout) -> Result<Files> {
-    let env = Environment::build(spec, Target::Vagrant, None).map_err(|source| Error::Unplanned {
+/// The VMs of `spec` (the `vagrant` target's plan of it, re-planned from `env`) into `layout`:
+/// the `hybrid` target's.
+pub(crate) fn render_spec_in(env: &Environment, spec: &Spec, layout: &Layout) -> Result<Files> {
+    let env = env.replan(spec, Target::Vagrant, None).map_err(|source| Error::Unplanned {
         target: Target::Vagrant,
         source,
     })?;

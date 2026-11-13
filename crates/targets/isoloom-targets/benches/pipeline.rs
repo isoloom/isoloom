@@ -43,7 +43,7 @@ fn measure(c: &mut Criterion, e: &Example) -> Result<(), String> {
     let lower = || {
         e.targets
             .iter()
-            .map(|t| Environment::build(&black_box(&e.lab).for_target(*t), *t, None))
+            .map(|t| black_box(&e.lab).plan(&black_box(&e.lab).for_target(*t), *t, None))
             .collect::<Vec<_>>()
     };
     c.bench_function(&format!("lower/{}", e.name), |b| b.iter(lower));

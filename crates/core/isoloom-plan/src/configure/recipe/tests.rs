@@ -9,7 +9,7 @@ fn machine(yaml: &str) -> syntax::Machine {
 /// The recipe of `yaml`'s machine.
 fn resolved(yaml: &str) -> Result<Recipe, Vec<Unportable>> {
     let m = machine(yaml);
-    recipe(m.os.expect("an os"), &m, &DaemonTable::common())
+    recipe(m.os.expect("an os"), &m, &crate::testing::daemons())
 }
 
 fn key() -> String {
