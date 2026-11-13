@@ -97,7 +97,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
 
 /// Which image a machine's container is: the catalogue entry's own, or one built for it. A flag
 /// (`official: bool`) threaded through three functions before, one caller passing a bare
-/// `false` (Clean Code F3, 2026-11-13).
+/// `false` (Clean Code F3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ContainerImage {
     /// The entry's published image, as is: its platforms, variables and configuration are its.

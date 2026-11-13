@@ -44,8 +44,7 @@ pub struct MachineSize {
 }
 
 /// The form a machine runs in, which decides its default size: a container reserves less than a
-/// VM (the flag it was, `container: bool`, read as a bare `true` at every call: Clean Code F3,
-/// 2026-11-13).
+/// VM. A flag before (`container: bool`), read as a bare `true` or `false` at every call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     /// A virtual machine: the heavier defaults.
