@@ -33,7 +33,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
     console.print(isoloom_targets::report::report(&a.name, &snapshot, a.md)?)?;
     // Published UDP ports on Hyper-V (the provider the defaults or Vagrant pick): not relayed.
     if a.name == "ports"
-        && vagrant_provider(&resolved).as_deref() == Some("hyperv")
+        && vagrant_provider(&resolved, spec::vagrant_default_provider()).as_deref() == Some("hyperv")
         && let Some(note) = isoloom_targets::report::hyperv_ports_note(&snapshot)
     {
         console.print(format_args!("\n{note}"))?;
@@ -42,12 +42,7 @@ pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> R
 }
 
 /// The Vagrant provider the project's files are for: the defaults' (`vagrant.provider`, as the
-/// command read them), else Vagrant's own `VAGRANT_DEFAULT_PROVIDER`.
-fn vagrant_provider(resolved: &Resolved) -> Option<String> {
-    resolved
-        .defaults
-        .vagrant
-        .provider
-        .clone()
-        .or_else(|| std::env::var("VAGRANT_DEFAULT_PROVIDER").ok().filter(|v| !v.is_empty()))
+/// command read them), else Vagrant's own default on this host (`host_default`).
+fn vagrant_provider(resolved: &Resolved, host_default: Option<String>) -> Option<String> {
+    resolved.defaults.vagrant.provider.clone().or(host_default)
 }

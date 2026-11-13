@@ -313,9 +313,14 @@ impl Environment {
     /// [`PlanError::UnresolvedRecipe`] for a machine whose configuration has steps its OS's
     /// family can't carry, which lowering refuses for the target first.
     pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Environment, PlanError> {
+        Environment::planned(spec, target, instance, &DaemonTable::common())
+    }
+
+    /// [`Environment::build`], each machine's configuration resolved with `daemons`.
+    pub(crate) fn planned(spec: &Spec, target: Target, instance: Option<u8>, daemons: &DaemonTable) -> Result<Environment, PlanError> {
         // Laid out with the outside networks (so a moved block avoids them), then without them.
         let laid_out = outside::without(&lay_out(spec, target));
-        let machines = machines(spec, &laid_out, target)?;
+        let machines = machines(spec, &laid_out, target, daemons)?;
         let requirements = all_requirements(spec, &laid_out, &machines);
         let networks = laid_out
             .networks
@@ -460,12 +465,12 @@ fn network(spec: &Spec, name: &str, n: &Network, declared: NetworkBlock) -> Netw
 }
 
 /// The machines of `laid_out`, each with its place on the outside networks of `spec`.
-fn machines(spec: &Spec, laid_out: &Spec, target: Target) -> Result<IndexMap<String, MachinePlan>, PlanError> {
+fn machines(spec: &Spec, laid_out: &Spec, target: Target, daemons: &DaemonTable) -> Result<IndexMap<String, MachinePlan>, PlanError> {
     laid_out
         .machines
         .iter()
         .map(|(name, m)| {
-            let mut mp = machine(laid_out, target, name, m)?;
+            let mut mp = machine(laid_out, target, name, m, daemons)?;
             mp.outside = spec.machines.get(name).map(|om| outside::addresses(spec, om)).unwrap_or_default();
             Ok((name.clone(), mp))
         })
@@ -489,10 +494,10 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
 }
 
 /// Machine `name`'s recipe, when it has a configuration.
-fn recipe(name: &str, m: &Machine) -> Result<Option<Recipe>, PlanError> {
+fn recipe(name: &str, m: &Machine, daemons: &DaemonTable) -> Result<Option<Recipe>, PlanError> {
     m.configuration
         .as_ref()
-        .map(|c| Recipe::of(c, &m.ports, &DaemonTable::common()))
+        .map(|c| Recipe::of(c, &m.ports, daemons))
         .transpose()
         .map_err(|unportable| PlanError::UnresolvedRecipe {
             machine: name.to_owned(),
@@ -517,10 +522,10 @@ fn rate_limit(name: &str, m: &Machine) -> Result<Option<Rate>, PlanError> {
 /// Machine `name` (`m`), planned for `target`. Lowering refuses a configuration that doesn't
 /// resolve (an app's steps per target, a service's for the environment), so the lowered spec `build`
 /// plans has its recipe; one that doesn't is an error, not a machine with no configuration.
-fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<MachinePlan, PlanError> {
+fn machine(spec: &Spec, target: Target, name: &str, m: &Machine, daemons: &DaemonTable) -> Result<MachinePlan, PlanError> {
     let shape = shape(target, m);
     let routing = lifecycle::Routing::of(spec, target, name, m);
-    let recipe = recipe(name, m)?;
+    let recipe = recipe(name, m, daemons)?;
     Ok(MachinePlan {
         shape,
         role: if m.access { MachineRole::Access } else { MachineRole::Member },

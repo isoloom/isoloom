@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn the_catalogue_fills_the_table() {
-        let table = DaemonTable::common();
+        let table = crate::testing::daemons();
         let keys: Vec<&str> = table.entries().iter().map(|e| e.key.as_str()).collect();
         for key in ["nginx", "apache", "ssh", "cron", "rsyslog"] {
             assert!(keys.contains(&key), "{key}: {keys:?}");
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn a_step_finds_a_daemon_by_key_or_by_the_unit_its_family_names() {
-        let table = DaemonTable::common();
+        let table = crate::testing::daemons();
         let (_, debian) = table.find(&unit("ssh"), Family::Debian).unwrap();
         assert_eq!(debian.daemon.unit.as_str(), "ssh");
         let (entry, rocky) = table.find(&unit("sshd"), Family::RedHat).unwrap();
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn a_package_names_the_daemon_it_ships() {
-        let table = DaemonTable::common();
+        let table = crate::testing::daemons();
         let (entry, form) = table.shipped_by(&"httpd".parse().unwrap(), Family::RedHat).unwrap();
         assert_eq!((entry.key.as_str(), form.daemon.unit.as_str()), ("apache", "httpd"));
         assert!(table.shipped_by(&"httpd".parse().unwrap(), Family::Debian).is_none());
