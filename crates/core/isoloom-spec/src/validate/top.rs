@@ -10,7 +10,7 @@ use crate::tags;
 
 /// The longest environment name: it becomes the Kubernetes namespace `isoloom-<name>`, a
 /// 63-character DNS label.
-pub(crate) const NAME_MAX: usize = 63 - RESERVED_PREFIX.len();
+pub(crate) const NAME_MAX: usize = super::DNS_LABEL_MAX - RESERVED_PREFIX.len();
 
 /// The format version this isoloom reads, and a name every target can carry: its length is
 /// checked before its characters, so a long name is told its limit.
