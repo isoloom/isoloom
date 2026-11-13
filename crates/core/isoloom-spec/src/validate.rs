@@ -44,8 +44,6 @@ mod windows;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeSet;
-
 use crate::contract::is_kebab;
 
 use crate::model::{Machine, Spec};
@@ -196,32 +194,4 @@ pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a Machine) -> Vec<&'a s
         }
     }
     after
-}
-
-/// The first cycle in the machines' start order (`depends_on`, gateways, shared volumes), as
-/// the names along it, the first repeated at the end.
-fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
-    fn visit<'a>(spec: &'a Spec, n: &'a str, stack: &mut Vec<&'a str>, done: &mut BTreeSet<&'a str>) -> Option<Vec<String>> {
-        if let Some(pos) = stack.iter().position(|s| *s == n) {
-            let mut c: Vec<String> = stack.iter().skip(pos).map(|s| (*s).to_owned()).collect();
-            c.push(n.to_owned());
-            return Some(c);
-        }
-        if done.contains(n) {
-            return None;
-        }
-        stack.push(n);
-        for dep in spec.machines.get(n).map(|m| starts_after(spec, n, m)).unwrap_or_default() {
-            if spec.machines.contains_key(dep)
-                && let Some(c) = visit(spec, dep, stack, done)
-            {
-                return Some(c);
-            }
-        }
-        stack.pop();
-        done.insert(n);
-        None
-    }
-    let mut done = BTreeSet::new();
-    spec.machines.keys().find_map(|n| visit(spec, n, &mut Vec::new(), &mut done))
 }
