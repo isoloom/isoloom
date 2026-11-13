@@ -4,6 +4,23 @@
 //! problem coded and placed ([`Problem`]). The plan lowers it into [`crate::model`], the form
 //! the backends read, once per target.
 
+/// A type whose JSON schema is the one of the input shape it is parsed from (`$written`), under
+/// its own name.
+macro_rules! schema_as {
+    ($ty:ident, $written:ident) => {
+        impl schemars::JsonSchema for $ty {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($ty).into()
+            }
+
+            fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                <$written as schemars::JsonSchema>::json_schema(g)
+            }
+        }
+    };
+}
+pub(crate) use schema_as;
+
 mod app;
 mod check;
 mod files;

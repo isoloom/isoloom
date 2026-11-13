@@ -87,15 +87,7 @@ impl From<CommandInput> for Command {
     }
 }
 
-impl JsonSchema for Command {
-    fn schema_name() -> Cow<'static, str> {
-        "Command".into()
-    }
-
-    fn json_schema(g: &mut SchemaGenerator) -> Schema {
-        CommandInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(Command, CommandInput);
 
 /// A port a healthcheck names: one of the machine's ports by name, or a port number.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
@@ -195,15 +187,7 @@ impl TryFrom<HealthcheckInput> for Healthcheck {
     }
 }
 
-impl JsonSchema for Healthcheck {
-    fn schema_name() -> Cow<'static, str> {
-        "Healthcheck".into()
-    }
-
-    fn json_schema(g: &mut SchemaGenerator) -> Schema {
-        HealthcheckInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(Healthcheck, HealthcheckInput);
 
 /// An environment variable's value: a fixed text (a number or a boolean read as its text), or a
 /// non-sensitive input's value.
