@@ -922,7 +922,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
 ", args: ["10.83.0.10/24"]
     m.vm.provision "shell", name: "data disks", inline: <<~'SH'
       set -e
-      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
+      pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
       disk() {
         label=$1; fs=$2; at=$3; bytes=$4
         mkdir -p "$at"
