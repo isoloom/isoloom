@@ -5,6 +5,7 @@ use serde_json::{Map, Value, json};
 
 use super::{Cell, Matrix, Row};
 use crate::decision::{Column, Refused};
+use crate::report::md_cell as md;
 
 /// What the three marks mean.
 const LEGEND: &str = "✓ generated, ✗ refused, – not applicable";
@@ -92,11 +93,6 @@ pub(super) fn text(m: &Matrix) -> String {
     }
     lines.push(String::new());
     lines.join("\n")
-}
-
-/// A Markdown table cell's text, its pipes escaped.
-fn md(text: &str) -> String {
-    text.replace('|', "\\|")
 }
 
 /// The matrix as Markdown: the validators, the grid, then why each refused cell is refused.

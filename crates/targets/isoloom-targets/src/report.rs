@@ -209,12 +209,17 @@ fn largest_form_size(machine: &Value) -> [u64; 3] {
     size
 }
 
+/// A Markdown table cell's text, its pipes escaped: the one escaping of the crate's tables.
+pub(crate) fn md_cell(text: &str) -> String {
+    text.replace('|', "\\|")
+}
+
 /// A Markdown table, `|` in a cell escaped.
 fn markdown_table(head: &[String], rows: &[Vec<String>]) -> String {
     let mut lines = vec![format!("| {} |", head.join(" | ")), format!("|{}", " --- |".repeat(head.len()))];
     lines.extend(
         rows.iter()
-            .map(|r| format!("| {} |", r.iter().map(|c| c.replace('|', "\\|")).collect::<Vec<_>>().join(" | "))),
+            .map(|r| format!("| {} |", r.iter().map(|c| md_cell(c)).collect::<Vec<_>>().join(" | "))),
     );
     format!("{}\n", lines.join("\n"))
 }
