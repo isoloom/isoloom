@@ -12,30 +12,30 @@ use crate::powershell;
 /// The files as a root shell script: each written (or copied from the project), then given its
 /// owner (root unless the spec says otherwise) and its mode.
 pub(super) fn linux(files: &[MachineFile]) -> String {
-    files
-        .iter()
-        .map(|f| {
-            let path = quote(&f.path);
-            let folder = f
-                .path
-                .rsplit_once('/')
-                .map(|(d, _)| d)
-                .filter(|d| !d.is_empty())
-                .map(|d| format!("mkdir -p {} && ", quote(d)))
-                .unwrap_or_default();
-            let write = match (&f.source, &f.content) {
-                (Some(source), _) => format!("cp {} {path}", quote(&format!("{PROJECT_DIR}/{source}"))),
-                (None, content) => format!("printf '%s' {} > {path}", quote(content.as_deref().unwrap_or_default())),
-            };
-            format!(
-                "{folder}{write} && chown {}:{} {path} && chmod {} {path}\n",
-                f.uid.unwrap_or(0),
-                f.gid.unwrap_or(0),
-                quote(f.mode_or_default())
-            )
-        })
-        .collect::<Vec<_>>()
-        .concat()
+    // `set -e`: a file that can't be copied or written fails the step, not only the last one
+    // (a missing source left the service to fail far from the cause; the review of 2026-11-13).
+    let mut script = String::from("set -e\n");
+    script.extend(files.iter().map(|f| {
+        let path = quote(&f.path);
+        let folder = f
+            .path
+            .rsplit_once('/')
+            .map(|(d, _)| d)
+            .filter(|d| !d.is_empty())
+            .map(|d| format!("mkdir -p {} && ", quote(d)))
+            .unwrap_or_default();
+        let write = match (&f.source, &f.content) {
+            (Some(source), _) => format!("cp {} {path}", quote(&format!("{PROJECT_DIR}/{source}"))),
+            (None, content) => format!("printf '%s' {} > {path}", quote(content.as_deref().unwrap_or_default())),
+        };
+        format!(
+            "{folder}{write} && chown {}:{} {path} && chmod {} {path}\n",
+            f.uid.unwrap_or(0),
+            f.gid.unwrap_or(0),
+            quote(f.mode_or_default())
+        )
+    }));
+    script
 }
 
 /// The files as PowerShell: each folder created, then each file copied from the project or
@@ -85,7 +85,7 @@ mod tests {
         let sh = super::linux(&[owned, file("/b.conf", Some("conf/b.conf"), None)]);
         assert_eq!(
             sh,
-            "mkdir -p '/etc/app' && printf '%s' 'it'\\''s\n' > '/etc/app/a.ini' && chown 1000:1001 '/etc/app/a.ini' && chmod '0600' '/etc/app/a.ini'\n\
+            "set -e\nmkdir -p '/etc/app' && printf '%s' 'it'\\''s\n' > '/etc/app/a.ini' && chown 1000:1001 '/etc/app/a.ini' && chmod '0600' '/etc/app/a.ini'\n\
              cp '/opt/isoloom/conf/b.conf' '/b.conf' && chown 0:0 '/b.conf' && chmod '0644' '/b.conf'\n"
         );
     }

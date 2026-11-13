@@ -1121,6 +1121,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "provision/gateway.yml", inline: <<~'SH'
+      set -e
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
       command -v ansible-playbook >/dev/null || pkg ansible-core
       cd /opt/isoloom && sh -c 'ansible-playbook -c local -i gateway, '\''provision/gateway.yml'\'''
@@ -1338,6 +1339,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "provision/app.yml", inline: <<~'SH'
+      set -e
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
       command -v ansible-playbook >/dev/null || pkg ansible-core
       cd /opt/isoloom && sh -c 'ansible-playbook -c local -i app, '\''provision/app.yml'\'''
@@ -1591,6 +1593,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "provision/db.yml", inline: <<~'SH'
+      set -e
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; else yum install -y -q "$@"; fi; }
       command -v ansible-playbook >/dev/null || pkg ansible-core
       cd /opt/isoloom && sh -c 'ansible-playbook -c local -i db, '\''provision/db.yml'\'''

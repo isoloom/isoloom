@@ -165,7 +165,7 @@ fn a_provision_step_runs_from_the_project_folder_its_way() {
         Some(concat!(r"cd /opt/isoloom && sh -c 'sh '\''steps/web.sh'\'''", "\n"))
     );
     let play = run("site.yml", RunKind::Playbook).expect("a playbook runs locally");
-    assert!(play.starts_with("pkg() {") && play.contains("|| pkg ansible-core\n"), "{play}");
+    assert!(play.starts_with("set -e\npkg() {") && play.contains("|| pkg ansible-core\n"), "{play}");
     assert!(
         play.ends_with(concat!(r"cd /opt/isoloom && sh -c 'ansible-playbook -c local -i web, '\''site.yml'\'''", "\n")),
         "{play}"
