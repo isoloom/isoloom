@@ -35,7 +35,7 @@ pub use implementation::{
 };
 pub use ipv6::{Ipv6, Ipv6Addresses};
 pub(crate) use machine::scalars;
-pub use machine::{Arch, Machine, Octets, Port, Protocol, Resources, ScalarSchema, Seal};
+pub use machine::{Arch, Login, Machine, Octets, Port, Protocol, Resources, ScalarSchema, Seal};
 pub use machine_file::MachineFile;
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use private_dns::EnvironmentDns;

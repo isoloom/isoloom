@@ -1,5 +1,5 @@
 //! A machine's ports: a map keyed by name, each port a number (TCP) or `{ port, protocol,
-//! publish, dormant }`. The message reaches them by name (`machines.web.ports.site.published`),
+//! publish, dormant, login }`. The message reaches them by name (`machines.web.ports.site.published`),
 //! so reordering never breaks a reference.
 
 use std::fmt;
@@ -8,6 +8,8 @@ use std::num::NonZeroU16;
 use schemars::JsonSchema;
 use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::model::Login;
 
 /// What a port speaks: TCP or UDP, and for TCP whether probes and checks speak HTTP or TLS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Serialize, Deserialize, JsonSchema)]
@@ -134,6 +136,9 @@ pub struct Port {
     /// It only answers later: nothing listens on it until something in the machine starts it.
     /// Nothing waits for it and no derived check expects it to answer.
     pub dormant: bool,
+    /// The account its service ships with (`{ user, password }`), shown to the user beside the
+    /// port: a training environment's published sign-in, never a secret.
+    pub login: Option<Login>,
 }
 
 /// A port written in full.
@@ -157,6 +162,11 @@ struct PortFull {
     /// Only answers once something wakes it: nothing waits for it.
     #[serde(default)]
     dormant: bool,
+    /// The account its service ships with, `{ user, password }`: shown to the user beside the
+    /// port so they can sign in. For a training environment's published sign-in only, never a
+    /// secret (a secret is an input).
+    #[serde(default)]
+    login: Option<Login>,
 }
 
 // What the schema shows and the reader returns.
@@ -176,7 +186,7 @@ impl<'de> Deserialize<'de> for PortInput {
         impl<'de> Visitor<'de> for V {
             type Value = PortInput;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a port number, or `{ port, protocol, publish, dormant }`")
+                f.write_str("a port number, or `{ port, protocol, publish, dormant, login }`")
             }
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<PortInput, E> {
                 let port = u16::try_from(v)
@@ -201,12 +211,14 @@ impl From<PortInput> for Port {
                 protocol: PortProtocol::Tcp,
                 publish: None,
                 dormant: false,
+                login: None,
             },
             PortInput::Full(f) => Port {
                 port: f.port,
                 protocol: f.protocol,
                 publish: f.publish,
                 dormant: f.dormant,
+                login: f.login,
             },
         }
     }
@@ -259,7 +271,7 @@ mod tests {
     #[test]
     fn a_port_or_a_publish_of_the_wrong_shape_says_what_is_expected() {
         let port = ports("{ a: [1] }").unwrap_err();
-        assert!(port.contains("a port number, or `{ port, protocol, publish, dormant }`"), "{port}");
+        assert!(port.contains("a port number, or `{ port, protocol, publish, dormant, login }`"), "{port}");
         let publish = ports("{ a: { port: 1, publish: [1] } }").unwrap_err();
         assert!(publish.contains("`true`, a host port, or `{ host, fixed: true }`"), "{publish}");
         assert!(ports("{ a: { port: 1, publish: 0 } }").unwrap_err().contains("a host port is 1 to 65535"));

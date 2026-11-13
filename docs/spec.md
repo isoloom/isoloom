@@ -842,7 +842,7 @@ The machine the user lands on (at most one). Without `os` (and nothing to run), 
 
 ### `machines.*.ports`
 
-Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
+Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
 
 - **Type:** map of name to integer or mapping
 
@@ -892,6 +892,24 @@ Only answers once something wakes it: nothing waits for it.
 
 - **Type:** boolean
 - **Default:** `false`
+
+### `machines.*.ports.*.login`
+
+The account its service ships with, `{ user, password }`: shown to the user beside the port so they can sign in. For a training environment's published sign-in only, never a secret (a secret is an input).
+
+- **Type:** mapping
+
+### `machines.*.ports.*.login.user`
+
+The account's name.
+
+- **Type:** string
+
+### `machines.*.ports.*.login.password`
+
+Its password.
+
+- **Type:** string
 
 ### `machines.*.command`
 

@@ -10,6 +10,15 @@ stable spec format.
 
 ## [Unreleased]
 
+### Added
+
+- **A port declares the fixed login its service ships with (#296).** `login: { user, password }`
+  on a port written in full is kept on the spec's port (`isoloom_spec::model::Login`,
+  `model::Port::login`), so an embedder reading the spec through the library shows the sign-in
+  next to the port it belongs to. For a training environment's published account only, never a
+  secret (a secret is an input); a login names its account. Nothing of it reaches the rendered
+  files. Breaking for the Rust API (a new public field on the spec's `Port`s).
+
 ### Fixed
 
 - **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer

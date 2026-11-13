@@ -273,6 +273,7 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
                 fixed,
                 dormant: p.dormant,
                 protocol: if p.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp },
+                login: p.login.clone(),
             })
         })
         .collect();

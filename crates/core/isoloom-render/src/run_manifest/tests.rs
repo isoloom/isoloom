@@ -145,6 +145,7 @@ fn model_port(port: u16, protocol: model::Protocol, http: bool) -> model::Port {
         fixed: false,
         dormant: false,
         protocol,
+        login: None,
     }
 }
 
