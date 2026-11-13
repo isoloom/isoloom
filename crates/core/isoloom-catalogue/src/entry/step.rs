@@ -126,7 +126,7 @@ pub struct When {
 pub struct DistroName(&'static str);
 
 impl DistroName {
-    /// The family's name.
+    /// The distribution's name.
     #[must_use]
     pub fn as_str(&self) -> &'static str {
         self.0

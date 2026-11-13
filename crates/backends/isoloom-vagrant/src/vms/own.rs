@@ -179,10 +179,6 @@ fn tool_shell(r: &mut Ruby, ctx: &Ctx, tool: &ToolPlan) {
 /// netcat (checks). Alpine's packages (the default box), or Debian's (a `controller.image`).
 const CONTROLLER_PACKAGES: &str = "if command -v apk >/dev/null; then\n  apk add -q --no-cache python3 sshpass curl netcat-openbsd\nelse\n  export DEBIAN_FRONTEND=noninteractive\n  apt-get update -qq\n  apt-get install -y -qq python3-venv sshpass curl netcat-openbsd >/dev/null\nfi\n";
 
-/// The controller: a small VM (Alpine by default) on every network at its controller address,
-/// started after every machine. It writes the inventory, runs the environment's playbooks, then
-/// halts unless the spec keeps it running; it runs the checks standing on every network on
-/// demand (their runner is returned).
 /// The controller as its providers see it (on `link`), and its main box.
 fn controller_guest<'a>(env: &'a Environment, link: &'a Link) -> (Guest<'a>, MainBox<'a>) {
     let (bx, version) = controller_box(env.spec());
@@ -216,6 +212,10 @@ pub(crate) fn boxes(env: &Environment, kind: Kind, providers: &[Provider]) -> Ve
     providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
 }
 
+/// The controller: a small VM (Alpine by default) on every network at its controller address,
+/// started after every machine. It writes the inventory, runs the environment's playbooks, then
+/// halts unless the spec keeps it running; it runs the checks standing on every network on
+/// demand (their runner is returned).
 pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     let env = ctx.env;
     let size = Size::controller(env.controller.as_ref());

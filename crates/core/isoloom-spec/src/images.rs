@@ -169,8 +169,8 @@ pub fn is_windows(os: &str) -> bool {
     crate::os::Kind::of(os).is_windows()
 }
 
-/// How a machine's Windows box answers WinRM: what its image declares, else plain HTTP (every
-/// built-in Windows box uses plain HTTP today).
+/// How a machine's Windows box answers WinRM: what its image declares, else plain HTTP (the
+/// built-in Windows boxes declare none, so plain HTTP).
 #[must_use]
 pub fn winrm(vm: &VmImpl) -> crate::model::Winrm {
     vm.image.as_ref().and_then(|i| i.winrm).unwrap_or_default()
