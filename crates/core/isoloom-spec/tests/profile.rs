@@ -166,19 +166,17 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
     Ok(())
 }
 
+/// A `profiles` that is a file can't be listed, for any user (root included, who reads a folder
+/// whatever its mode): an error, not "no profiles".
 #[cfg(unix)]
 #[test]
 fn a_profiles_folder_that_cant_be_read_is_an_error_not_no_profiles() -> Outcome {
-    use std::os::unix::fs::PermissionsExt;
-    let dir = project("unreadable", &[("a-site", "{}\n")])?;
+    let dir = project("unreadable", &[])?;
     let dir = dir.path();
     let folder = dir.join(profile::DIR);
-    std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o000))?;
-    let listed = profile::list(dir);
-    std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755))?;
-    // Root reads any folder: nothing to show there.
-    let Err(e) = listed else { return Ok(()) };
-    let e = e.to_string();
+    std::fs::remove_dir(&folder)?;
+    std::fs::write(&folder, "not a folder\n")?;
+    let e = profile::list(dir).expect_err("a profiles file isn't a folder of profiles").to_string();
     assert!(e.starts_with("can't read ") && e.contains("profiles"), "{e}");
     Ok(())
 }
