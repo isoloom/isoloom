@@ -45,7 +45,11 @@ pub(super) fn blocks(env: &Environment, module: &mut Module) {
         id: "isoloom_router".to_owned(),
         snippet: ident(NAME),
         name: NAME.to_owned(),
-        size: (1, 512, 8),
+        size: isoloom_spec::MachineSize {
+            cpus: 1,
+            memory_mb: 512,
+            disk_gb: 8,
+        },
         boot: Boot::Image(ident(controller::OS)),
         tpm: false,
         own_boot: None,

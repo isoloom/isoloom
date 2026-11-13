@@ -50,12 +50,12 @@ pub(super) struct Guest {
     pub(super) index: u64,
     /// Its OS (the key of its OVA in `images`).
     pub(super) os: String,
-    /// CPUs, memory in MB, disk in GB.
-    pub(super) size: (u32, u32, u32),
+    /// Its CPUs, memory and disk.
+    pub(super) size: isoloom_spec::MachineSize,
     /// Its interfaces, in order.
     pub(super) nics: Vec<Nic>,
     /// Its resolvers and search domain, on its first interface.
-    pub(super) dns: (Vec<String>, Option<String>),
+    pub(super) dns: GuestDns,
     /// Its user data: a `#cloud-config` document, or a cloudbase-init script on Windows.
     pub(super) user_data: Expression,
     /// How long the provider waits for VMware Tools to report an address, when it should.
@@ -88,10 +88,23 @@ fn mac(index: u64, nic: u64) -> Expression {
     call("format", [string("00:50:56:%02x:%02x:%02x"), reference("var.slot"), number(index), number(nic)])
 }
 
+/// A guest's resolvers and search domain, on its first interface.
+#[derive(Debug, Clone, Default)]
+pub(super) struct GuestDns {
+    /// The resolvers it asks.
+    pub(super) servers: Vec<String>,
+    /// Its search domain, when it has one.
+    pub(super) search: Option<String>,
+}
+
 impl Guest {
     /// The `esxi_guest` block.
     pub(super) fn block(self, env_name: &str) -> Block {
-        let (cpus, memory, disk) = self.size;
+        let isoloom_spec::MachineSize {
+            cpus,
+            memory_mb: memory,
+            disk_gb: disk,
+        } = self.size;
         let encoded = |e: Expression| call("base64encode", [e]);
         let guestinfo = object([
             ("metadata", encoded(call("yamlencode", [self.metadata()]))),
@@ -177,9 +190,9 @@ impl Guest {
         if let Some(mtu) = nic.mtu {
             items.push(("mtu", number(mtu.into())));
         }
-        if i == 0 && !self.dns.0.is_empty() {
-            let mut ns = vec![("addresses", list(self.dns.0.iter().map(|s| string(s.as_str()))))];
-            ns.extend(self.dns.1.as_ref().map(|d| ("search", list([string(d.as_str())]))));
+        if i == 0 && !self.dns.servers.is_empty() {
+            let mut ns = vec![("addresses", list(self.dns.servers.iter().map(|s| string(s.as_str()))))];
+            ns.extend(self.dns.search.as_ref().map(|d| ("search", list([string(d.as_str())]))));
             items.push(("nameservers", object(ns)));
         }
         object(items)

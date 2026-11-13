@@ -28,14 +28,13 @@ pub(super) fn blocks(env: &Environment, module: &mut Module) {
         nics.push(super::links::device(env, &net, None, None));
         ips.push(ip_config(&format!("{at}/{}", env.block(&net).prefix()), None));
     }
-    let (cpus, memory, disk) = controller::size(env);
     let mut depends_on = vec![reference("proxmox_virtual_environment_vm.isoloom_router")];
     depends_on.extend(env.vms().map(|vm| reference(&format!("proxmox_virtual_environment_vm.{}", ident(vm.name)))));
     let vm = Vm {
         id: "isoloom_controller".to_owned(),
         snippet: ident(controller::NAME),
         name: controller::NAME.to_owned(),
-        size: (cpus, memory, disk),
+        size: controller::size(env),
         boot: Boot::Image(ident(controller::OS)),
         tpm: false,
         own_boot: None,

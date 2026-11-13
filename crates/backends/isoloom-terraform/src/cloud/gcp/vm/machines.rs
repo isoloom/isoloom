@@ -280,7 +280,7 @@ pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
     }
     module.blocks(rules);
     module.block(firewall(who, ("ssh", first), list([reference("var.allowed_cidr")]), vec![allow("tcp", &[22])]));
-    let (_, _, disk) = controller::size(env);
+    let disk = controller::size(env).disk_gb;
     let inventory = controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic);
     let who_logs_in = |os: &str| user(os).to_owned();
     let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses));
