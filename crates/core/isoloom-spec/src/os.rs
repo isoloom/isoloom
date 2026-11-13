@@ -138,7 +138,7 @@ pub struct Os {
 
 /// What kind of OS: the one rule that tells Windows (WinRM, PowerShell, no container form) from
 /// Linux (SSH, sh), in one place for every target and tool (Clean Code J3, G5: 76 string checks
-/// told it apart by a prefix, 2026-11-13).
+/// told it apart by a prefix).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
     /// Reached over SSH, provisioned by sh; a container form exists.

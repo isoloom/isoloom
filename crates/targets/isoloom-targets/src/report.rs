@@ -197,7 +197,7 @@ fn resources(r: &Value) -> Table {
 /// The largest of a machine's per-form sizes, `[cpus, memory_mb, disk_gb]`, each the maximum
 /// over its forms; zeros for a machine with none (the reader of the snapshot's earlier shape,
 /// `resources.cpus`, read zeros for every machine from version 4 on: commit 703331d0 changed the
-/// writer and three backends, not this reader, 2026-11-13).
+/// writer and three backends, not this reader).
 fn largest_form_size(machine: &Value) -> [u64; 3] {
     let forms = machine.get("resources").and_then(Value::as_object).into_iter().flat_map(|forms| forms.values());
     let mut size = [0_u64; 3];

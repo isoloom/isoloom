@@ -13,7 +13,7 @@ use crate::powershell;
 /// owner (root unless the spec says otherwise) and its mode.
 pub(super) fn linux(files: &[MachineFile]) -> String {
     // `set -e`: a file that can't be copied or written fails the step, not only the last one
-    // (a missing source left the service to fail far from the cause; the review of 2026-11-13).
+    // (a missing source left the service to fail far from the cause).
     let mut script = String::from("set -e\n");
     script.extend(files.iter().map(|f| {
         let path = quote(&f.path);
