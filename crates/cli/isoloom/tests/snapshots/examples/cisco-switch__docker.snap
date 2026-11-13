@@ -433,10 +433,10 @@ services:
     environment:
       IOL_PID: '1'
     volumes:
-    - ./appliances/sw1/base.txt:/iol/base.txt:ro
-    - ./appliances/sw1/NETMAP:/iol/NETMAP:ro
-    - ./appliances/sw1/iouyap.ini:/iol/iouyap.ini:ro
-    - ../../configs/sw1.cfg:/iol/own.txt:ro
+    - ./appliances/sw1/base.txt:/iol/base.txt:ro,z
+    - ./appliances/sw1/NETMAP:/iol/NETMAP:ro,z
+    - ./appliances/sw1/iouyap.ini:/iol/iouyap.ini:ro,z
+    - ../../configs/sw1.cfg:/iol/own.txt:ro,z
     labels:
       isoloom.managed: 'true'
       isoloom.environment: cisco-switch
@@ -564,7 +564,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:files
     volumes:
-    - ./checks/files.sh:/isoloom/run.sh:ro
+    - ./checks/files.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-routes-sw1:
         condition: service_healthy
@@ -584,7 +584,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:staff
     volumes:
-    - ./checks/staff.sh:/isoloom/run.sh:ro
+    - ./checks/staff.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-routes-sw1:
         condition: service_healthy
@@ -606,7 +606,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:guest
     volumes:
-    - ./checks/guest.sh:/isoloom/run.sh:ro
+    - ./checks/guest.sh:/isoloom/run.sh:ro,z
     depends_on:
       isoloom-routes-sw1:
         condition: service_healthy

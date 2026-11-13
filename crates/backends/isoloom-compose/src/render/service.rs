@@ -12,7 +12,7 @@ use isoloom_spec::model;
 
 use super::{Out, configs, hardware, process, secrets};
 use crate::appliances::{self, Port};
-use crate::file::{Attachment, Build, Condition, Deploy, Limits, NetworkMode, Resources, Restart, Service, Ulimit};
+use crate::file::{Attachment, Build, Condition, Deploy, Limits, NetworkMode, RO_BIND, Resources, Restart, Service, Ulimit};
 use crate::interpolation::literal;
 use crate::layout::{DIR, ROOT, file_name, relative_to};
 use crate::machine::Machine;
@@ -220,13 +220,13 @@ fn appliance(env: &Environment, m: Machine<'_>, svc: &mut Service, files: &mut V
             path: format!("{OUTPUT_DIR}/{DIR}/appliances/{name}/{}", f.name),
             contents: f.contents,
         });
-        svc.volumes.push(format!("./appliances/{name}/{}:{}:ro", f.name, f.inside).into());
+        svc.volumes.push(format!("./appliances/{name}/{}:{}:{RO_BIND}", f.name, f.inside).into());
     }
     if let Some(own) = &d.config {
-        svc.volumes.push(format!("{ROOT}/{own}:{}:ro", w.own_config).into());
+        svc.volumes.push(format!("{ROOT}/{own}:{}:{RO_BIND}", w.own_config).into());
     }
     if let (Some(fw), Some(inside)) = (&d.firmware, w.firmware) {
-        svc.volumes.push(format!("{ROOT}/{fw}:{inside}:ro").into());
+        svc.volumes.push(format!("{ROOT}/{fw}:{inside}:{RO_BIND}").into());
     }
     // An emulator Isoloom builds itself (its Dockerfile next to the Compose file).
     if let Some(dockerfile) = w.build {
@@ -374,8 +374,8 @@ fn init_jobs(env: &Environment, m: Machine<'_>, services: &mut IndexMap<String, 
             restart: Some(Restart::No),
             ..Service::default()
         };
-        j.volumes.push(format!("{ROOT}/{script}:{mounted}:ro").into());
-        j.volumes.push(format!("{ROOT}:{PROJECT_DIR}:ro").into());
+        j.volumes.push(format!("{ROOT}/{script}:{mounted}:{RO_BIND}").into());
+        j.volumes.push(format!("{ROOT}:{PROJECT_DIR}:{RO_BIND}").into());
         j.volumes.extend(storage::volume_mounts(plan));
         j.after(m.name, readiness(m.spec));
         if sidecars::needed(env, m) {

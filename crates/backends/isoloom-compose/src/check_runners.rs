@@ -11,7 +11,7 @@ use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, UTILITY_IMAGE, exec_runner, init_names};
 
-use crate::file::{Condition, NetworkMode, Service};
+use crate::file::{Condition, NetworkMode, RO_BIND, Service};
 use crate::layout::{DIR, ROOT};
 use crate::machine::Machine;
 use crate::names::{STAND_IN, check_runner_service, routes_service};
@@ -59,11 +59,11 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
         image: Some(env.images.pull(CHECK_IMAGE)),
         profiles: vec![PROFILE.into()],
         entrypoint: vec!["/bin/sh".into(), "/isoloom/run.sh".into()],
-        volumes: vec![format!("./checks/{}.sh:/isoloom/run.sh:ro", pos.id()).into()],
+        volumes: vec![format!("./checks/{}.sh:/isoloom/run.sh:{RO_BIND}", pos.id()).into()],
         ..Service::default()
     };
     if scripts {
-        c.volumes.push(format!("{ROOT}:/isoloom/project:ro").into());
+        c.volumes.push(format!("{ROOT}:/isoloom/project:{RO_BIND}").into());
     }
     // The access machine sits in the `access` profile, which the check
     // profile doesn't bring up; a check runner must not depend_on it, or Compose rejects the project

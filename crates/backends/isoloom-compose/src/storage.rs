@@ -9,7 +9,7 @@ use isoloom_render::container::{UTILITY_IMAGE, host_folders};
 use isoloom_spec::model::{HostFolder, HostPath, Machine, TmpfsMode};
 use isoloom_spec::shell;
 
-use crate::file::{BindOptions, Condition, LongMount, Mount, NetworkMode, Restart, Service, TmpfsOptions, Volume, VolumeOptions};
+use crate::file::{BindOptions, Condition, LongMount, Mount, NetworkMode, Restart, SELINUX_SHARED, Service, TmpfsOptions, Volume, VolumeOptions};
 use crate::labels::PERSISTENT_LABEL;
 use crate::layout::ROOT;
 
@@ -63,7 +63,10 @@ pub(crate) fn host_folders(name: &str, mp: &MachinePlan) -> Vec<Mount> {
                 source: format!("${{{}:-{}}}", host_folders::variable(name, n), on_this_computer(f, ROOT)),
                 target: f.path.clone(),
                 read_only: f.read_only,
-                bind: BindOptions { create_host_path: true },
+                bind: BindOptions {
+                    create_host_path: true,
+                    selinux: SELINUX_SHARED,
+                },
             })
         })
         .collect()

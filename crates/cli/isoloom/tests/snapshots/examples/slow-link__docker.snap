@@ -334,8 +334,8 @@ services:
     - /isoloom/run.sh
     network_mode: service:isoloom-access
     volumes:
-    - ./checks/user.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/user.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       web:
         condition: service_healthy

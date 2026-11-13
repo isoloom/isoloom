@@ -290,7 +290,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:store
     volumes:
-    - ./checks/store.sh:/isoloom/run.sh:ro
+    - ./checks/store.sh:/isoloom/run.sh:ro,z
     depends_on:
       store:
         condition: service_healthy
@@ -308,7 +308,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:app
     volumes:
-    - ./checks/app.sh:/isoloom/run.sh:ro
+    - ./checks/app.sh:/isoloom/run.sh:ro,z
     depends_on:
       store:
         condition: service_healthy

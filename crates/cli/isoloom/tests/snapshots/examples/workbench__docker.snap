@@ -178,7 +178,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:bench
     volumes:
-    - ./checks/bench.sh:/isoloom/run.sh:ro
+    - ./checks/bench.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy

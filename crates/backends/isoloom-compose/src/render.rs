@@ -23,7 +23,7 @@ use isoloom_spec::model::Arch;
 
 use crate::backend::ComposeTarget;
 use crate::error::{Error, Result};
-use crate::file::{Attachment, ComposeFile, NetworkMode, Restart, Service, Volume};
+use crate::file::{Attachment, ComposeFile, NetworkMode, RO_BIND, Restart, Service, Volume};
 use crate::trunks;
 use isoloom_render::run_manifest::RUNNER;
 
@@ -228,7 +228,7 @@ fn probes(env: &Environment, probes: &Probes, services: &mut IndexMap<String, Se
             "-c".into(),
             crate::interpolation::literal(&unrunnable(arch, machines)),
         ];
-        p.volumes.push(format!("{host}:{HOST_PROBE}:ro").into());
+        p.volumes.push(format!("{host}:{HOST_PROBE}:{RO_BIND}").into());
         p.after(host.clone(), crate::file::Condition::CompletedSuccessfully);
         services.insert(name, p);
     }

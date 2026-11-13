@@ -55,8 +55,8 @@ services:
     environment:
       DEMO_SECRET: ${DEMO_SECRET:-}
     volumes:
-    - ../../secret.sh:/isoloom/init/secret.sh:ro
-    - ../..:/opt/isoloom:ro
+    - ../../secret.sh:/isoloom/init/secret.sh:ro,z
+    - ../..:/opt/isoloom:ro,z
     depends_on:
       web:
         condition: service_healthy
@@ -104,7 +104,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:web
     volumes:
-    - ./checks/web.sh:/isoloom/run.sh:ro
+    - ./checks/web.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy
@@ -124,7 +124,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:api
     volumes:
-    - ./checks/api.sh:/isoloom/run.sh:ro
+    - ./checks/api.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy

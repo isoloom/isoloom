@@ -356,8 +356,8 @@ services:
       MYSQL_TCP_PORT: '8207'
       API_URL: ${API_URL:-}
     volumes:
-    - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro
-    - ../..:/opt/isoloom:ro
+    - ../../build/database/seed.sh:/isoloom/init/seed.sh:ro,z
+    - ../..:/opt/isoloom:ro,z
     secrets:
     - source: input-launch-token
       target: /run/lab/launch-token
@@ -422,8 +422,8 @@ services:
     networks:
       lab: null
     volumes:
-    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       database:
         condition: service_healthy
@@ -443,7 +443,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:database
     volumes:
-    - ./checks/database.sh:/isoloom/run.sh:ro
+    - ./checks/database.sh:/isoloom/run.sh:ro,z
     depends_on:
       database:
         condition: service_healthy
@@ -463,7 +463,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:web
     volumes:
-    - ./checks/web.sh:/isoloom/run.sh:ro
+    - ./checks/web.sh:/isoloom/run.sh:ro,z
     depends_on:
       database:
         condition: service_healthy

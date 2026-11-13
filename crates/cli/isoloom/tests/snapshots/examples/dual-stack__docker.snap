@@ -419,7 +419,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:isoloom-access
     volumes:
-    - ./checks/user.sh:/isoloom/run.sh:ro
+    - ./checks/user.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy
@@ -441,7 +441,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:web
     volumes:
-    - ./checks/web.sh:/isoloom/run.sh:ro
+    - ./checks/web.sh:/isoloom/run.sh:ro,z
     depends_on:
       web:
         condition: service_healthy

@@ -761,8 +761,8 @@ services:
     - /isoloom/run.sh
     network_mode: service:isoloom-access
     volumes:
-    - ./checks/user.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/user.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       gateway:
         condition: service_healthy
@@ -792,7 +792,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:gateway
     volumes:
-    - ./checks/gateway.sh:/isoloom/run.sh:ro
+    - ./checks/gateway.sh:/isoloom/run.sh:ro,z
     depends_on:
       gateway:
         condition: service_healthy
@@ -818,7 +818,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:app
     volumes:
-    - ./checks/app.sh:/isoloom/run.sh:ro
+    - ./checks/app.sh:/isoloom/run.sh:ro,z
     depends_on:
       gateway:
         condition: service_healthy
@@ -844,7 +844,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:db
     volumes:
-    - ./checks/db.sh:/isoloom/run.sh:ro
+    - ./checks/db.sh:/isoloom/run.sh:ro,z
     depends_on:
       gateway:
         condition: service_healthy

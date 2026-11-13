@@ -178,8 +178,8 @@ services:
     networks:
       lab: null
     volumes:
-    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/isoloom-networks.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       web:
         condition: service_healthy
@@ -213,7 +213,7 @@ services:
     network_mode: none
     volumes:
     - isoloom-probe-arm64:/probe
-    - isoloom-probe:/isoloom-host-probe:ro
+    - isoloom-probe:/isoloom-host-probe:ro,z
     depends_on:
       isoloom-probe:
         condition: service_completed_successfully

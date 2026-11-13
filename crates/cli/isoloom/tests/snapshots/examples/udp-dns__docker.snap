@@ -446,8 +446,8 @@ services:
     - /isoloom/run.sh
     network_mode: service:isoloom-access
     volumes:
-    - ./checks/client.sh:/isoloom/run.sh:ro
-    - ../..:/isoloom/project:ro
+    - ./checks/client.sh:/isoloom/run.sh:ro,z
+    - ../..:/isoloom/project:ro,z
     depends_on:
       dns:
         condition: service_healthy
@@ -469,7 +469,7 @@ services:
     - /isoloom/run.sh
     network_mode: service:dns
     volumes:
-    - ./checks/dns.sh:/isoloom/run.sh:ro
+    - ./checks/dns.sh:/isoloom/run.sh:ro,z
     depends_on:
       dns:
         condition: service_healthy
