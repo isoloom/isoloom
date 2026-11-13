@@ -252,12 +252,14 @@ pub(super) fn ready(shape: &Shape) -> Result<Vec<Condition>> {
 }
 
 /// A start whose output says it tripped over leftovers (`STALE_MARKERS`) clears them (destroy,
-/// orphans, Vagrant's state) and tries once more. A genuine failure is never retried.
+/// orphans, Vagrant's state) and tries once more. A genuine failure is never retried, and a
+/// destroy that fails ends the recovery as it is: Vagrant's state is reset only once the VMs it
+/// names are gone, else the next start would make new VMs beside the ones the state no longer
+/// knows (orphans on libvirt, VMware, Hyper-V and QEMU).
 pub(super) fn recovery() -> Result<Recovery> {
-    let mut destroy = cleanup(run("destroy", vagrant_argv(&["destroy", "--force"])?, 180)?);
+    let mut destroy = run("destroy", vagrant_argv(&["destroy", "--force"])?, 180)?;
     destroy.note = Some("Clearing what an earlier run left, then starting again…".into());
-    let mut reset = act("reset", Action::VagrantResetState)?;
-    reset.when = isoloom_manifest::When::Always;
+    let reset = act("reset", Action::VagrantResetState)?;
     Ok(Recovery {
         stale_markers: STALE_MARKERS.map(String::from).into(),
         steps: vec![destroy, orphans()?, reset],

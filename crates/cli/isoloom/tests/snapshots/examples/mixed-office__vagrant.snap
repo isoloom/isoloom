@@ -2475,9 +2475,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "destroy",
           "--force"
         ],
-        "timeout_s": 180,
-        "when": "always",
-        "failure": "tolerate"
+        "timeout_s": 180
       },
       {
         "id": "orphans",
@@ -2491,8 +2489,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       {
         "id": "reset",
-        "action": "vagrant.reset_state",
-        "when": "always"
+        "action": "vagrant.reset_state"
       }
     ],
     "retries": 1

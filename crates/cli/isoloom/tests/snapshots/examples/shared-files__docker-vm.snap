@@ -2656,9 +2656,7 @@ systemctl enable --now isoloom-published.service
           "destroy",
           "--force"
         ],
-        "timeout_s": 180,
-        "when": "always",
-        "failure": "tolerate"
+        "timeout_s": 180
       },
       {
         "id": "orphans",
@@ -2672,8 +2670,7 @@ systemctl enable --now isoloom-published.service
       },
       {
         "id": "reset",
-        "action": "vagrant.reset_state",
-        "when": "always"
+        "action": "vagrant.reset_state"
       }
     ],
     "retries": 1
