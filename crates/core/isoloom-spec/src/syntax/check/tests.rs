@@ -327,3 +327,13 @@ fn packages_on_windows_are_its_features() {
     let found = problems("machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ packages: [Web-Server] }] }\n");
     assert_eq!(found, []);
 }
+
+#[test]
+fn a_machines_own_address_outside_a_template_names_no_machine() {
+    let spec = parse("version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web: { os: ubuntu@24.04, networks: { lab: 10 } }\n")
+        .unwrap_or_else(|p| panic!("{p:?}"));
+    let found = placeholder_problems(&spec, None, "{{machine.addresses.lab}}", crate::syntax::placeholder::Place::Entry);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].reason.contains("names the machine a template is for"), "{}", found[0].reason);
+    assert!(!found[0].reason.contains("``"), "no empty machine name: {}", found[0].reason);
+}

@@ -327,15 +327,7 @@ impl Machine {
     }
 }
 
-impl JsonSchema for Machine {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "Machine".into()
-    }
-
-    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        MachineInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(Machine, MachineInput);
 
 #[cfg(test)]
 mod tests;
