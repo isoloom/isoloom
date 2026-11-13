@@ -10,6 +10,15 @@ stable spec format.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer
+  fails on a running command (#289).** The setup mark and the command script lived in
+  `C:\isoloom`, the project folder, which every unpack replaces: the mark was gone and the setup
+  ran again, and the command's task, working in that folder, made its removal fail. Both now live
+  in the state folder (`C:\ProgramData\isoloom`), and the unpack stops Isoloom's scheduled tasks
+  before it replaces the project (the command's step starts its task again).
+
 ## [2.1.9] — 2026-11-12
 
 ### Fixed

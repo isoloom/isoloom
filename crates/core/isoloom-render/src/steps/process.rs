@@ -6,7 +6,7 @@
 use isoloom_plan::{Environment, Health, HealthTest, MachinePlan};
 use isoloom_spec::model::CommandLine;
 use isoloom_spec::shell::quote;
-use isoloom_spec::windows::ISOLOOM_DIR;
+use isoloom_spec::windows::{ISOLOOM_DIR, STATE_DIR as WINDOWS_STATE_DIR};
 
 use super::{MAKE_STATE_DIR, PROJECT_DIR, inputs_file};
 use crate::boot;
@@ -74,7 +74,9 @@ pub(super) fn windows_setup(paths: &[String]) -> String {
         })
         .collect();
     format!(
-        "if (-not (Test-Path '{ISOLOOM_DIR}\\setup.done')) {{ Set-Location {ISOLOOM_DIR}; {}; Set-Content '{ISOLOOM_DIR}\\setup.done' done }}",
+        // The mark lives in the state folder, which the project's unpack never touches (it wipes
+        // the project folder), so a reprovision doesn't run the setup again.
+        "if (-not (Test-Path '{WINDOWS_STATE_DIR}\\setup.done')) {{ Set-Location {ISOLOOM_DIR}; {}; New-Item -ItemType Directory -Force '{WINDOWS_STATE_DIR}' | Out-Null; Set-Content '{WINDOWS_STATE_DIR}\\setup.done' done }}",
         runs.join("; ")
     )
 }
@@ -126,16 +128,20 @@ fn powershell(c: &CommandLine) -> String {
     }
 }
 
-/// A script under the project folder, written from `lines`.
+/// A script in the state folder (the project's unpack wipes the project folder), written from
+/// `lines`.
 fn windows_script(name: &str, lines: &[String]) -> String {
     let body = lines.join("\n");
-    format!("Set-Content -Path '{ISOLOOM_DIR}\\{name}.ps1' -Value {}", powershell::quote(&body))
+    format!(
+        "New-Item -ItemType Directory -Force '{WINDOWS_STATE_DIR}' | Out-Null; Set-Content -Path '{WINDOWS_STATE_DIR}\\{name}.ps1' -Value {}",
+        powershell::quote(&body)
+    )
 }
 
 /// A startup task running `name.ps1` as SYSTEM, started now.
 fn startup_task(name: &str) -> String {
     format!(
-        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {ISOLOOM_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
+        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {WINDOWS_STATE_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
     )
 }
 
@@ -275,7 +281,7 @@ machines:
         let setup = step(&env, "win", |s| matches!(s, Step::Setup { .. }));
         let once = super::super::windows(&env, "win", &setup).expect("renders");
         assert!(
-            once.contains("secret.ps1") && once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
+            once.contains("secret.ps1") && once.contains("C:\\ProgramData\\isoloom\\setup.done") && !once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
             "run once, not a startup task: {once}"
         );
         let command = super::super::windows(&env, "win", &Step::Command).expect("renders");
@@ -329,7 +335,7 @@ machines:
         );
         let windows = super::super::windows(&env, "iis", &Step::Command).expect("renders");
         assert!(
-            windows.starts_with("Set-Content -Path 'C:\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
+            windows.starts_with("New-Item -ItemType Directory -Force 'C:\\ProgramData\\isoloom' | Out-Null; Set-Content -Path 'C:\\ProgramData\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
             "{windows}"
         );
         assert!(
