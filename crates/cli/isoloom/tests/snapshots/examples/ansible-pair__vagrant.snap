@@ -1636,7 +1636,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       run_play ansible-playbook -i /etc/isoloom/inventory.ini -i '/opt/isoloom/ansible/groups.ini' -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' 'site.yml'
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-answers.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-answers.sh'"]].map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); "mkdir -p #{folder} && cat > #{file} <<'#{tag}'\n#{body}\n#{tag}\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 

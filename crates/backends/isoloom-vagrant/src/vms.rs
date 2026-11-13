@@ -85,14 +85,16 @@ const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// ([`steps::project_unpack`] as root on Linux, [`steps::windows_project_unpack`] on Windows).
 /// Every Vagrantfile Isoloom writes carries it, after `ROOT`.
 pub(crate) fn project_rb() -> String {
+    let unpack = steps::windows_project_unpack(false);
+    // A Ruby heredoc ends at the first line that is its terminator, as sh's does.
+    let tag = isoloom_spec::shell::here_tag("PS1", &unpack);
     format!(
-        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,\n# with no tar.exe before Windows Server 2019).\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::LINUX_UNPACK = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\nIsoloomProject::WINDOWS_UNPACK = <<'PS1'\n{}PS1\n",
+        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,\n# with no tar.exe before Windows Server 2019).\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::LINUX_UNPACK = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\nIsoloomProject::WINDOWS_UNPACK = <<'{tag}'\n{unpack}{tag}\n",
         include_str!("vagrant_project.rb"),
         copy_rules(&[]),
         Value::str(steps::PROJECT_ARCHIVE),
         Value::str(&steps::project_unpack(steps::Archive::Uploaded, false)),
         Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
-        steps::windows_project_unpack(false)
     )
 }
 

@@ -5,7 +5,7 @@
 //! way, as a `service`.
 
 use isoloom_spec::linux::CONFIG_DIR;
-use isoloom_spec::shell::quote;
+use isoloom_spec::shell::{heredoc, quote};
 
 /// When a script kept with [`at_boot`] runs again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,18 +111,26 @@ fn install(u: &Unit) -> String {
     } else {
         String::new()
     };
+    // The script holds the spec's values (an environment value's lines among them): its
+    // terminator is no line of it.
+    let script = heredoc(&format!("cat > {path}"), &marker, &format!("#!/bin/sh\n# {what}\n{}", u.script));
+    let unit_file = heredoc(
+        &format!("cat > /etc/systemd/system/{unit}"),
+        "UNIT",
+        &format!(
+            "[Unit]\nDescription={what}\nAfter=network-online.target{after}\nWants=network-online.target{requires}\n\n[Service]\n{}\n\n[Install]\nWantedBy=multi-user.target\n",
+            u.service
+        ),
+    );
     format!(
-        "mkdir -p {CONFIG_DIR}\ncat > {path} <<'{marker}'\n#!/bin/sh\n# {what}\n{script}{marker}\nchmod +x {path}\n{hooks}\
+        "mkdir -p {CONFIG_DIR}\n{script}chmod +x {path}\n{hooks}\
          if command -v systemctl >/dev/null; then\n\
-         cat > /etc/systemd/system/{unit} <<'UNIT'\n[Unit]\nDescription={what}\nAfter=network-online.target{after}\nWants=network-online.target{requires}\n\n\
-         [Service]\n{service}\n\n[Install]\nWantedBy=multi-user.target\nUNIT\n\
+         {unit_file}\
          systemctl daemon-reload\nsystemctl enable {unit}\nsystemctl restart {unit}\n\
          else\n\
          {openrc}rc-update add local default >/dev/null 2>&1 || true\n{now}\n\
          fi\n",
-        script = u.script,
         hooks = u.hooks,
-        service = u.service,
         openrc = u.openrc,
         now = u.now,
     )

@@ -124,9 +124,9 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
     let v6 = isoloom_render::ipv6::router_linux(&pairs)
         .map(|s| boot::at_boot("ipv6", "IPv6 addresses of the isoloom router", &s, Trigger::BootAndLinkUp, &[]))
         .unwrap_or_default();
+    let rules = isoloom_spec::shell::heredoc("cat > /etc/nftables.conf", "NFT", &format!("flush ruleset\n{}", router::nftables(spec)));
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
-        router::nftables(spec),
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\n{rules}systemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
     );
     define(r, router::NAME, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
@@ -261,9 +261,9 @@ pub(crate) fn access() -> Access<'static> {
 fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     let spec = env.spec();
     let setup = format!(
-        "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\n{}",
         controller::INSTALL_ANSIBLE,
-        inventory::render(env, &access())
+        isoloom_spec::shell::heredoc(&format!("cat > {CONTROLLER_INVENTORY}"), "INV", &inventory::render(env, &access()))
     );
     shell(r, "controller", &setup);
     if !spec.provision.is_empty() {

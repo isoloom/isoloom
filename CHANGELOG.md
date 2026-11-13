@@ -23,8 +23,17 @@ stable spec format.
   `overrides.<target>.machines.<group>` was reported at the machine's own name
   (`overrides.vagrant.machines.dc1.box` for a box written under the group `windows`), a path that
   doesn't exist in the spec; the Proxmox and cloud image, `lxc` and `ssh` paths did the same.
+- **No line of a machine's text ends the here-document that writes it (#293).** The scripts
+  Isoloom renders fed text it doesn't choose (a machine's command and environment, the spec's
+  nftables rules, the inventory, a check script) to `cat` through here-documents with fixed
+  terminators (`COMMAND`, `NFT`, `INV`, `NET`, `ISOLOOM_SETUP`, `ISOLOOM_EOF`...): a line equal to
+  the terminator ended the document early, and the rest ran as root shell. The terminator is now
+  picked so that no line of the text is it; the rendered files keep their terminators otherwise.
 
 ### Added
+
+- `isoloom_spec::shell::here_tag` and `isoloom_spec::shell::heredoc`: a here-document's
+  terminator chosen so no line of its text ends it, and the whole document written with it.
 
 - **`isoloom_plan::Names` (`Environment::names`): every name an environment takes on the host,
   built in one place.** A VM's display name (VirtualBox, VMware Desktop, Parallels, UTM), its

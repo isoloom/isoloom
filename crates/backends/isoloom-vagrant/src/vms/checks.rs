@@ -126,6 +126,7 @@ fn refreshed(path: &str) -> Value {
     Value::array([Value::str(path), Value::str(&quote(&folder)), Value::str(&quote(&in_vm))])
 }
 
-/// Writes each listed check script over the VM's copy, from the project on the host.
-const REFRESH: &str =
-    ".map { |p, folder, file| \"mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\\n#{File.read(File.join(ROOT, p))}\\nISOLOOM_EOF\\n\" }.join";
+/// Writes each listed check script over the VM's copy, from the project on the host, through a
+/// here-document whose terminator is no line of the script (as `isoloom_spec::shell::here_tag`
+/// picks it, in Ruby: the script is read when the step runs).
+const REFRESH: &str = ".map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); \"mkdir -p #{folder} && cat > #{file} <<'#{tag}'\\n#{body}\\n#{tag}\\n\" }.join";
