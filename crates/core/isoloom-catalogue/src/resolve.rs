@@ -208,8 +208,7 @@ impl Entry {
     /// The release `service`'s version picks: the default when it gives none.
     fn release_for(&self, service: &ServiceRef, field: &FieldPath) -> Result<&Release, Problem> {
         let def = self.definition();
-        let asked = service.as_str().split_once('@').map(|(_, v)| v);
-        let Some(asked) = asked else {
+        let Some(asked) = service.version() else {
             return def
                 .release(&def.default)
                 .ok_or_else(|| Problem::new(Code::InvalidValue, field.clone(), format!("{}'s default release is missing", self.name())));
