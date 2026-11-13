@@ -90,9 +90,12 @@ fn is_url(s: &str) -> bool {
         .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphabetic()))
 }
 
-/// A Proxmox VM id: 100 to 999999999.
+/// The VM ids Proxmox gives: 100 to 999999999 (below 100 are reserved).
+const PROXMOX_VMID: std::ops::RangeInclusive<u32> = 100..=999_999_999;
+
+/// A Proxmox VM id ([`PROXMOX_VMID`]).
 fn template_id(s: &str) -> bool {
-    s.parse::<u32>().is_ok_and(|n| (100..=999_999_999).contains(&n))
+    s.parse::<u32>().is_ok_and(|n| PROXMOX_VMID.contains(&n))
 }
 
 /// The boot's fields: host paths are absolute, each part has what it hangs on.

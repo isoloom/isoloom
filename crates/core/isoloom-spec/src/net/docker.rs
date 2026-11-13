@@ -4,6 +4,14 @@
 use super::Cidr;
 use crate::model::Spec;
 
+/// The first octet of the 192.168.0.0/16 private range, the one block whose second octet is
+/// fixed (168) and so is mapped by its first on Docker.
+const PRIVATE_192_FIRST_OCTET: u8 = 192;
+/// Where the scan for a free block starts when the mapped one is taken: 10.240.0.0, the top of
+/// 10.0.0.0/8, above anything a spec writes by hand, up to the range's end (10.255.255.255 + 1).
+const AUTO_MOVE_FROM: u32 = 0x0af0_0000;
+const AUTO_MOVE_END: u32 = 0x0b00_0000;
+
 /// Where the Docker target keeps its networks: 172.16.0.0/12 and 192.168.0.0/16 clash with
 /// Docker's own pools, Docker Desktop's network and home LANs.
 pub(crate) const DOCKER_BLOCK: Cidr = match Cidr::new(0x0a00_0000, 8) {
@@ -43,8 +51,10 @@ pub fn docker_cidrs(spec: &Spec) -> Vec<(String, Cidr)> {
 /// of the same size.
 fn moved_block(block: Cidr, taken: &[Cidr]) -> Cidr {
     let [first_octet, second, third, fourth] = block.address().octets();
-    let first = if first_octet == 192 {
-        u32::from_be_bytes([10, 192, third, fourth])
+    // 192.168.x.y keeps its 192 as the second octet (10.192.x.y), as a block of 172.16/12 or
+    // 10/8 keeps its own second octet: a mapping a reader can invert by eye.
+    let first = if first_octet == PRIVATE_192_FIRST_OCTET {
+        u32::from_be_bytes([10, PRIVATE_192_FIRST_OCTET, third, fourth])
     } else {
         u32::from_be_bytes([10, second, third, fourth])
     };
@@ -53,7 +63,7 @@ fn moved_block(block: Cidr, taken: &[Cidr]) -> Cidr {
     // within 10.0.0.0/8: a range stepped by the block's size, so `find` always ends. Running
     // out needs thousands of auto-moved networks: the mapped block is kept then, and
     // validation reports the overlap.
-    let scan = (0x0af0_0000u32..0x0b00_0000).step_by(size);
+    let scan = (AUTO_MOVE_FROM..AUTO_MOVE_END).step_by(size);
     std::iter::once(first)
         .chain(scan)
         .filter_map(|base| Cidr::new(base, block.prefix()))
