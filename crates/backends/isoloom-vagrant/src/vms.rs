@@ -35,6 +35,7 @@ mod hyperv;
 pub(crate) mod limits;
 mod machine;
 mod nested;
+mod once;
 mod own;
 pub(crate) mod provider;
 pub(crate) mod providers;
@@ -161,7 +162,7 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<(Files, BootStatement
         checks: &checks,
     };
     let mut r = Ruby::new();
-    preamble(&mut r, env, layout.dir);
+    preamble(&mut r, env, layout.dir, &checks);
     qemu_preamble(&mut r, env, &links);
     let mut runners = Vec::new();
     r.configure(|r| {
@@ -190,11 +191,9 @@ fn render_in(env: &Environment, layout: &Layout) -> Result<(Files, BootStatement
 }
 
 /// Before `Vagrant.configure`: how to run it, the constants and helpers the VMs use.
-fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
+fn preamble(r: &mut Ruby, env: &Environment, dir: &str, checks: &checks::Checks<'_>) {
     r.text(&header("#"));
-    r.comment(&format!(
-        "Start:  cd {OUTPUT_DIR}/{dir} && vagrant up\nStop:   cd {OUTPUT_DIR}/{dir} && vagrant destroy -f"
-    ));
+    r.comment(&usage(env, dir, checks));
     r.blank();
     // Machines start one after the other, in dependency order: a machine's services are up
     // before the ones depending on it boot, the controller comes last, and on QEMU the VM that
@@ -221,6 +220,54 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     }
     esxi(r, env);
     r.blank();
+}
+
+/// How to start and stop the environment with Vagrant alone, start its access machine, give it
+/// its values, and run its checks, at the top of the Vagrantfile.
+fn usage(env: &Environment, dir: &str, checks: &checks::Checks<'_>) -> String {
+    let mut lines = vec![
+        format!("Start:  cd {OUTPUT_DIR}/{dir} && vagrant up"),
+        format!("Stop:   cd {OUTPUT_DIR}/{dir} && vagrant destroy -f"),
+    ];
+    let access: Vec<&str> = env
+        .start_order
+        .iter()
+        .filter(|n| machine::has_vm(env, n) && env.machines.get(*n).is_some_and(isoloom_plan::MachinePlan::is_access))
+        .map(String::as_str)
+        .collect();
+    for name in access {
+        lines.push(format!("Access: vagrant up {name} (`vagrant up` leaves it down)"));
+    }
+    let values = values::variables(env);
+    if !values.is_empty() {
+        lines.push(format!(
+            "Values: set {} in the environment of each vagrant command (unset: empty, or the value given before)",
+            values.join(", ")
+        ));
+    }
+    let mut vms: Vec<&str> = env
+        .start_order
+        .iter()
+        .filter(|n| machine::has_vm(env, n) && env.vm(n).is_some_and(|vm| !vm.plan.is_windows()) && checks.of_machine(n).is_some())
+        .map(String::as_str)
+        .collect();
+    let halts = !checks.controller.is_empty() && !env.controller.as_ref().is_some_and(|c| c.keep_running);
+    if !checks.controller.is_empty() {
+        vms.push(CONTROLLER);
+    }
+    if !vms.is_empty() {
+        lines.push(format!(
+            "Checks: vagrant ssh <vm> -c '{}', for each of {}; each check prints a PASS or FAIL line,\n        and a failed one fails the command (ISOLOOM_DERIVED=0 after sudo leaves the derived checks out)",
+            checks::command(),
+            vms.join(", ")
+        ));
+    }
+    if halts {
+        lines.push(format!(
+            "        {CONTROLLER} halts once set up: vagrant up {CONTROLLER} --no-provision boots it for its checks"
+        ));
+    }
+    lines.join("\n")
 }
 
 /// QEMU's helpers ([`qemu::QEMU_RB`]) and its networks' hubs, when a VM needs them.

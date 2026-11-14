@@ -40,8 +40,32 @@ vagrant destroy -f
 ```
 
 The provider is the one you choose at `vagrant up`, or `vagrant.provider` in your defaults
-([configuration](../../reference/configuration.md#defaults)). A runner reads
-`.isoloom/vagrant/run.json` and runs the same steps, then the checks:
+([configuration](../../reference/configuration.md#defaults)).
+
+`vagrant up` ends once every machine is ready: each machine's last provisioner is its readiness
+check, which tries its healthcheck and fails `vagrant up` when it doesn't pass. The access
+machine is defined `autostart: false`: `vagrant up` leaves it down, `vagrant up <machine>`
+starts it. Inputs are read from the environment of each `vagrant` command by their own names,
+and secrets as `ISOLOOM_SECRET_<NAME>` (unset: empty, or the value given before).
+
+`vagrant provision` (or `vagrant up --provision`) runs again safely: Isoloom's own steps
+converge, and a project script without `creates` runs once, until it changes (its mark is in
+`/var/lib/isoloom/done/` on Linux, `C:\ProgramData\isoloom\done\` on Windows).
+
+Each VM with checks has them installed at `/var/lib/isoloom/checks.sh` at every provisioning,
+and Vagrant runs them:
+
+```sh
+vagrant ssh web -c 'sudo sh /var/lib/isoloom/checks.sh'
+```
+
+Each prints a PASS or FAIL line per check and fails when one does; `sudo ISOLOOM_DERIVED=0 sh
+...` leaves the checks Isoloom derives from the spec out. The checks that stand on every network
+run on `isoloom-controller`, which halts once set up unless `controller.keep_running` is set:
+`vagrant up isoloom-controller --no-provision` boots it first. The comment at the top of the
+Vagrantfile lists these commands for your spec.
+
+A runner reads `.isoloom/vagrant/run.json` and runs the same steps, then the checks:
 
 ```sh
 isothrum up . --target vagrant --provider libvirt

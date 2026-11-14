@@ -68,8 +68,15 @@ fn list(names: &[String]) -> String {
     names.iter().map(|n| isoloom_render::powershell::quote(n)).collect::<Vec<_>>().join(", ")
 }
 
+/// Where a Linux machine keeps each input's value, root's alone: a provisioning given none (a
+/// runner provisioning again without the launch's values, which it keeps none of) keeps the
+/// value given before, as its secrets are kept.
+pub(crate) const KEPT_INPUTS_DIR: &str = isoloom_spec::linux_state_path!("/inputs");
+
 /// A Linux machine's inputs, decoded into the file its steps read (`KEY='value'` lines, readable
-/// by root alone); then the step itself (kept on disk when a reboot comes).
+/// by root alone); then the step itself (kept on disk when a reboot comes). Each value is kept
+/// first ([`KEPT_INPUTS_DIR`]): an unset or empty variable writes an empty value the first time,
+/// and keeps the value kept after.
 pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step: &isoloom_plan::lifecycle::Step) {
     let Some(mp) = env.machines.get(machine) else { return };
     let file = steps::INPUTS_FILE;
@@ -78,12 +85,16 @@ pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step:
         .inputs
         .iter()
         .map(|k| {
+            let kept = quote(&format!("{KEPT_INPUTS_DIR}/{k}"));
             let k = quote(k);
-            format!("printf \"%s='%s'\\n\" {k} \"$(printenv {k} | base64 -d | sed \"s/'/'\\\\\\\\''/g\")\" >> {file}\n")
+            format!(
+                "v=\"$(printenv {k} || true)\"; if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}; fi\n\
+                 printf \"%s='%s'\\n\" {k} \"$(sed \"s/'/'\\\\\\\\''/g\" {kept})\" >> {file}\n"
+            )
         })
         .collect::<Vec<_>>()
         .concat();
-    let mut script = format!("umask 077\n: > {file}\n{lines}");
+    let mut script = format!("umask 077\nmkdir -p {KEPT_INPUTS_DIR}\n: > {file}\n{lines}unset v\n");
     script.push_str(&steps::linux(env, machine, step).unwrap_or_default());
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
     r.provision(call.script("inline", &script));
@@ -92,13 +103,14 @@ pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step:
 /// A Windows machine's inputs, kept as machine-wide environment variables: its `setup`, `before`
 /// and command scripts (the last two startup tasks, run at every boot) read them as a Linux
 /// machine's read its inputs file. Only inputs the spec lets show (`sensitive: false`) reach an
-/// environment; a sensitive one is a file.
+/// environment; a sensitive one is a file. A provisioning given no value keeps the one set
+/// before (unset, a variable is empty).
 pub(crate) fn windows_inputs(r: &mut Ruby, env: &Environment, machine: &str) {
     let Some(mp) = env.machines.get(machine).filter(|mp| !mp.inputs.is_empty()) else {
         return;
     };
     let script = format!(
-        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); $t = if ($v) {{ {DECODED} }} else {{ '' }}; [Environment]::SetEnvironmentVariable($k, $t, 'Machine') }}",
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}, 'Machine') }} }}",
         list(&mp.inputs)
     );
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
@@ -132,6 +144,22 @@ pub(crate) fn secret_files(r: &mut Ruby, env: &Environment, machine: &str, os: O
     };
     let hash = Value::hash(read.into_iter().map(|(var, value)| (Value::str(&var), value)));
     r.provision(vagrantfile::shell("m", "secrets").kw("env", hash).script("inline", &script));
+}
+
+/// The variables `env`'s VMs read from the host's environment, as a user sets them for `vagrant
+/// up`: each input by its own name, then each secret as `ISOLOOM_SECRET_<NAME>`, in the spec's
+/// order.
+pub(crate) fn variables(env: &Environment) -> Vec<String> {
+    let mut out = env.input_names();
+    for f in env.machines.values().flat_map(|mp| &mp.secrets) {
+        if let ValueSource::Secret(name) = &f.source {
+            let var = secret_variable(name);
+            if !out.contains(&var) {
+                out.push(var);
+            }
+        }
+    }
+    out
 }
 
 /// Whether a provisioner of `env`'s VMs reads a secret from the host's environment (in base64,
@@ -266,7 +294,10 @@ machines:
         let env = environment(SPEC);
         let s = text(|r| windows_inputs(r, &env, "dc"));
         assert!(s.contains("env: { \"MODE\" => isoloom_b64(INPUTS[\"MODE\"]) }"), "{s}");
-        assert!(s.contains("SetEnvironmentVariable($k, $t, 'Machine')"), "{s}");
+        assert!(
+            s.contains("if ($v) { [Environment]::SetEnvironmentVariable($k, [Text.Encoding]"),
+            "kept when given none: {s}"
+        );
         assert!(windows_decode(&env, "dc").contains("FromBase64String"));
         assert!(windows_decode(&env, "web").contains("MODE"));
     }

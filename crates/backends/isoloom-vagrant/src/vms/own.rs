@@ -47,8 +47,8 @@ const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 
 /// The provisioners of planned steps on one of Isoloom's own (Linux) VMs.
 fn steps_of(r: &mut Ruby, env: &Environment, vm: &str, steps: &[Step]) {
-    for s in steps {
-        step_provisioners(r, env, vm, s, Os::Linux);
+    for (at, s) in steps.iter().enumerate() {
+        step_provisioners(r, env, vm, (at, s), Os::Linux);
     }
 }
 
@@ -231,11 +231,17 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
         networks(r, env, |c| Some(c.controller()));
         providers::blocks(r, &guest);
+        let offline = offline(env, !on_controller.is_empty());
+        if offline {
+            online_again(r);
+        }
         steps_of(r, env, CONTROLLER, &steps);
-        controller_steps(r, env, !on_controller.is_empty());
+        controller_steps(r, env, offline);
         if !on_controller.is_empty() {
+            checks::installer(r, CONTROLLER);
             checks::provisioner(r, CONTROLLER, on_controller);
         }
+        halt(r, env);
     });
     (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller))
 }
@@ -257,8 +263,25 @@ pub(crate) fn access() -> Access<'static> {
     })
 }
 
-/// Ansible and the inventory, the environment's playbooks, going offline, halting.
-fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
+/// Whether the controller goes offline once set up: standing in for a user on offline networks
+/// to run checks, it would otherwise see its own NAT internet.
+fn offline(env: &Environment, with_checks: bool) -> bool {
+    with_checks && !env.networks.values().any(|n| n.internet)
+}
+
+/// The controller online again for its set-up, when Vagrant provisions it again once offline:
+/// its packages, Ansible and the playbooks' roles come from the internet. Its last steps take it
+/// offline again.
+fn online_again(r: &mut Ruby) {
+    shell(
+        r,
+        "online",
+        "if command -v nft >/dev/null; then nft delete table inet isoloom-egress 2>/dev/null || true; fi",
+    );
+}
+
+/// Ansible and the inventory, the environment's playbooks, going offline (`offline`).
+fn controller_steps(r: &mut Ruby, env: &Environment, offline: bool) {
     let spec = env.spec();
     let setup = format!(
         "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\n{}",
@@ -269,13 +292,15 @@ fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     if !spec.provision.is_empty() {
         shell(r, "ansible", &controller::provision_script(spec, &[]));
     }
-    // Standing in for a user on offline networks, the controller goes offline too once it's
-    // done installing (its checks would otherwise see its own NAT internet).
-    if with_checks && !env.networks.values().any(|n| n.internet) {
-        step_provisioners(r, env, CONTROLLER, &Step::Egress, Os::Linux);
+    if offline {
+        step_provisioners(r, env, CONTROLLER, (0, &Step::Egress), Os::Linux);
     }
-    // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
-    // provisioner returns before the VM goes; the runner's `check` boots it again for the checks.
+}
+
+/// Done: the controller halts (its disk kept) unless the spec keeps it running. Detached, so
+/// that the provisioner returns before the VM goes; `vagrant up isoloom-controller` boots it
+/// again for its checks.
+fn halt(r: &mut Ruby, env: &Environment) {
     if !env.controller.as_ref().is_some_and(|c| c.keep_running) {
         shell(r, "halt", &format!("touch {HALTING}; (sleep 5; poweroff) >/dev/null 2>&1 &"));
     }

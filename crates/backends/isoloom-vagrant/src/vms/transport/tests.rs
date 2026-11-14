@@ -58,7 +58,7 @@ fn names(s: &str) -> Vec<&str> {
 
 #[test]
 fn the_steps_run_in_the_plans_order() {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux));
+    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
     assert_eq!(
         names(&s),
         [
@@ -80,7 +80,7 @@ fn the_steps_run_in_the_plans_order() {
 
 #[test]
 fn the_default_route_comes_once_provisioned() {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux));
+    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
     let playbook = s.find("name: \"site.yml\"").expect("the playbook");
     let default = s.find("name: \"default route\"").expect("the default route");
     assert!(playbook < default, "{s}");
@@ -91,13 +91,13 @@ fn the_default_route_comes_once_provisioned() {
 
 #[test]
 fn a_gateway_forwards() {
-    let s = text(|r| provisioners(r, &env(), "fw", Os::Linux));
+    let s = text(|r| provisioners(r, &env(), "fw", Os::Linux, |_| {}));
     assert!(names(&s).contains(&"forwarding"), "{s}");
 }
 
 #[test]
 fn a_reboot_is_vagrants_own_between_a_mark_and_its_check() {
-    let s = text(|r| step_provisioners(r, &env(), "app", &Step::Reboot, Os::Linux));
+    let s = text(|r| step_provisioners(r, &env(), "app", (0, &Step::Reboot), Os::Linux));
     assert!(s.contains("name: \"reboot\", reboot: true\n"), "{s}");
     assert!(s.contains("cp /proc/sys/kernel/random/boot_id") && s.contains("did not restart"), "{s}");
 }
@@ -105,7 +105,7 @@ fn a_reboot_is_vagrants_own_between_a_mark_and_its_check() {
 #[test]
 fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
     let env = env();
-    let s = text(|r| provisioners(r, &env, "app", Os::Linux));
+    let s = text(|r| provisioners(r, &env, "app", Os::Linux, |_| {}));
     let inputs = s
         .split_once("name: \"inputs\"")
         .map(|(_, rest)| format!("name: \"inputs\"{rest}"))
@@ -115,52 +115,79 @@ fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
         "{inputs}"
     );
     assert!(
-        inputs.contains("printf \"%s='%s'\\n\" 'TOKEN' \"$(printenv 'TOKEN' |") && inputs.contains("/var/lib/isoloom/inputs.env"),
+        inputs.contains("v=\"$(printenv 'TOKEN' || true)\"; if [ -n \"$v\" ] || [ ! -e '/var/lib/isoloom/inputs/TOKEN' ]")
+            && inputs.contains("/var/lib/isoloom/inputs.env"),
         "kept for the reboot: {inputs}"
     );
     assert!(s.contains(". /var/lib/isoloom/inputs.env"), "the steps read the kept file: {s}");
 }
 
-#[test]
-fn the_inputs_file_quotes_every_value() {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux));
+/// The inputs step's own lines (before the persisting step), as a script run in a test's folder
+/// writing the inputs file at `$OUT` and keeping the values in `./kept`, then reading `TOKEN`
+/// back from the file into `$OUT.read`.
+fn inputs_script() -> String {
+    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
     let (_, from_umask) = s.split_once("umask 077").expect("the inputs script");
     let lines: Vec<String> = format!("umask 077{from_umask}")
         .lines()
-        .take(3)
+        .take_while(|l| !l.contains("unset v"))
         .map(|l| format!("{}\n", l.trim_start()))
         .collect();
     // Run from a file, in the test's folder, the inputs file at a relative path: on Windows, Git's
     // `sh` reads a `-c` script's backslashes before quotes otherwise than it was written, and a
     // Windows path has no `/`, so `.` would look it up on PATH.
-    let script = lines.concat().replace("/tmp/isoloom-inputs.env", "\"$OUT\"");
+    let script = lines
+        .concat()
+        .replace("/tmp/isoloom-inputs.env", "\"$OUT\"")
+        .replace(super::values::KEPT_INPUTS_DIR, "./kept");
+    format!("{script}set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\"\n")
+}
+
+/// [`inputs_script`] run in `dir` with `TOKEN` set to `value` in base64 (unset: `None`): whether
+/// it succeeded, and the value the steps read.
+fn provision_inputs(dir: &std::path::Path, value: Option<&str>) -> (bool, String) {
+    std::fs::write(dir.join("inputs.sh"), inputs_script()).expect("the script written");
+    let mut posix = isoloom_render::test_support::posix_sh().expect("a POSIX shell, checked by the caller");
+    posix.arg("inputs.sh").current_dir(dir).env("OUT", "./inputs.env").env_remove("TOKEN");
+    if let Some(v) = value {
+        posix.env("TOKEN", isoloom_spec::shell::base64(v.as_bytes()));
+    }
+    let ok = posix.status().expect("sh runs").success();
+    (ok, std::fs::read_to_string(dir.join("inputs.env.read")).unwrap_or_default())
+}
+
+#[test]
+fn the_inputs_file_quotes_every_value() {
+    if isoloom_render::test_support::posix_sh().is_none() {
+        return;
+    }
     let dir = tempfile::Builder::new().prefix("isoloom-inputs-").tempdir().expect("a temporary folder");
-    let dir = dir.path();
-    let read_back = "set -a; . \"$OUT\"; set +a; printf %s \"$TOKEN\" > \"$OUT.read\"\n";
-    std::fs::write(dir.join("inputs.sh"), format!("{script}{read_back}")).expect("the script written");
     let tricky = "it's $(not run) \"quoted\" `nor this`";
-    let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
-    let status = posix
-        .arg("inputs.sh")
-        .current_dir(dir)
-        .env("OUT", "./inputs.env")
-        .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
-        .status()
-        .expect("sh runs");
-    let read = std::fs::read_to_string(dir.join("inputs.env.read")).unwrap_or_default();
-    assert!(status.success());
-    assert_eq!(read, tricky);
+    assert_eq!(provision_inputs(dir.path(), Some(tricky)), (true, tricky.to_owned()));
+}
+
+#[test]
+fn a_provisioning_given_no_input_keeps_the_one_given_before() {
+    if isoloom_render::test_support::posix_sh().is_none() {
+        return;
+    }
+    let dir = tempfile::Builder::new().prefix("isoloom-inputs-kept-").tempdir().expect("a temporary folder");
+    let dir = dir.path();
+    assert_eq!(provision_inputs(dir, None), (true, String::new()), "unset the first time: empty");
+    assert_eq!(provision_inputs(dir, Some("first")), (true, "first".to_owned()));
+    assert_eq!(provision_inputs(dir, None), (true, "first".to_owned()), "given none: kept");
+    assert_eq!(provision_inputs(dir, Some("second")), (true, "second".to_owned()));
 }
 
 #[test]
 fn a_linux_machine_waits_for_a_windows_one_by_address() {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux));
+    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
     assert!(s.contains("name: \"wait for dc\"") && s.contains("</dev/tcp/10.84.0.20/389"), "{s}");
 }
 
 #[test]
 fn windows_runs_powershell_with_its_inputs() {
-    let s = text(|r| provisioners(r, &env(), "dc", Os::Windows));
+    let s = text(|r| provisioners(r, &env(), "dc", Os::Windows, |_| {}));
     assert_eq!(names(&s), ["project", "hosts", "routes", "inputs", "dc.ps1", "ready"], "{s}");
     assert!(s.contains("route -p add 10.85.0.0 MASK 255.255.255.0 10.84.0.2"), "through the gateway: {s}");
     let run = s.lines().find(|l| l.contains("-File 'dc.ps1'")).unwrap_or_default();
@@ -172,10 +199,10 @@ fn windows_runs_powershell_with_its_inputs() {
 #[test]
 fn routes_trunks_tc_and_egress_survive_a_reboot() {
     let env = env();
-    let s = text(|r| step_provisioners(r, &env, "app", &Step::Egress, Os::Linux));
+    let s = text(|r| step_provisioners(r, &env, "app", (0, &Step::Egress), Os::Linux));
     assert!(s.contains("name: \"no internet\"") && s.contains("ExecStart=-/etc/isoloom/egress.sh"), "{s}");
     assert!(
-        text(|r| step_provisioners(r, &env, "app", &Step::Trunks, Os::Linux)).is_empty(),
+        text(|r| step_provisioners(r, &env, "app", (0, &Step::Trunks), Os::Linux)).is_empty(),
         "no trunk: nothing to run"
     );
 }
