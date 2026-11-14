@@ -261,13 +261,43 @@ pub fn hcl_blocks<'a>(body: &'a hcl::Body, kind: &str, labels: &[&str]) -> Vec<&
 #[must_use]
 pub fn hcl_literals(body: &hcl::Body) -> Vec<String> {
     let mut out = Vec::new();
-    for structure in body.iter() {
+    for structure in body {
         match structure {
             hcl::Structure::Attribute(a) => literals_of(a.expr(), &mut out),
             hcl::Structure::Block(b) => out.extend(hcl_literals(b.body())),
         }
     }
     out
+}
+
+/// The literal values of every attribute `key` anywhere in `body`, its nested blocks included
+/// (`volume_size` in an instance's `root_block_device`): an attribute read by name, never by a
+/// line that holds `key =`.
+#[must_use]
+pub fn hcl_values(body: &hcl::Body, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for structure in body {
+        match structure {
+            hcl::Structure::Attribute(a) if a.key() == key => literals_of(a.expr(), &mut out),
+            hcl::Structure::Attribute(_) => {}
+            hcl::Structure::Block(b) => out.extend(hcl_values(b.body(), key)),
+        }
+    }
+    out
+}
+
+/// The body of the one `resource "<kind>" "<name>"` of `tf`, parsed.
+///
+/// # Panics
+/// When `tf` isn't HCL or doesn't have exactly one such resource.
+#[must_use]
+pub fn hcl_resource(tf: &str, kind: &str, name: &str) -> hcl::Body {
+    let body = hcl_body(tf);
+    let found = hcl_blocks(&body, "resource", &[kind, name]);
+    match found.as_slice() {
+        [one] => one.body().clone(),
+        _ => panic!("{} `resource \"{kind}\" \"{name}\"` in:\n{tf}", found.len()),
+    }
 }
 
 fn literals_of(expr: &hcl::Expression, out: &mut Vec<String>) {

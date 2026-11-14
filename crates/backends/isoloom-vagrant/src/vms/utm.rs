@@ -190,7 +190,7 @@ mod tests {
         fn calls(&self) -> Result<String, Box<dyn std::error::Error>> {
             let networkd = self.networkd();
             let calls = self.bin.calls_of(NAT_ROUTE_SH, &[("ISOLOOM_NETWORKD_DIR", &networkd)])?;
-            Ok(calls.iter().map(|c| format!("{}\n", c.join(" "))).collect())
+            Ok(calls.iter().map(|c| c.join(" ") + "\n").collect())
         }
     }
 

@@ -4,7 +4,8 @@
 pub mod testing;
 
 use isoloom_terraform::Cloud;
-use testing::{Outcome, cloud_vm, proxmox, resource_body};
+use isoloom_test_support::{hcl_resource, hcl_values};
+use testing::{Outcome, cloud_vm, proxmox};
 
 /// Two machines and a playbook (the controller runs it), with `controller` in the spec.
 fn lab(controller: &str) -> String {
@@ -13,28 +14,20 @@ fn lab(controller: &str) -> String {
     )
 }
 
-/// `hcl` with each run of spaces one space: an attribute as written, whatever its block aligns.
-fn aligned(hcl: &str) -> String {
-    hcl.split(' ').filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ")
+/// The values of attribute `size` of the controller, a `kind` resource of `tf`, wherever it is set
+/// (its root disk's block).
+fn controller_disk(tf: &str, kind: &str, size: &str) -> Vec<String> {
+    hcl_values(&hcl_resource(tf, kind, "isoloom_controller"), size)
 }
 
 #[test]
 fn the_controller_has_the_disk_the_spec_gives_it() -> Outcome {
     let sized = lab("controller: { resources: { disk_gb: 40 } }\n");
-    let aws = cloud_vm(Cloud::Aws, &sized)?;
-    assert!(
-        resource_body(&aws, "resource \"aws_instance\" \"isoloom_controller\"").contains("volume_size = 40"),
-        "{aws}"
-    );
-    let gcp = cloud_vm(Cloud::Gcp, &sized)?;
-    assert!(
-        aligned(resource_body(&gcp, "resource \"google_compute_instance\" \"isoloom_controller\"")).contains("size = 40"),
-        "{gcp}"
-    );
-    let azure = cloud_vm(Cloud::Azure, &sized)?;
-    assert!(
-        resource_body(&azure, "resource \"azurerm_linux_virtual_machine\" \"isoloom_controller\"").contains("disk_size_gb         = 40"),
-        "{azure}"
+    assert_eq!(controller_disk(&cloud_vm(Cloud::Aws, &sized)?, "aws_instance", "volume_size"), ["40"]);
+    assert_eq!(controller_disk(&cloud_vm(Cloud::Gcp, &sized)?, "google_compute_instance", "size"), ["40"]);
+    assert_eq!(
+        controller_disk(&cloud_vm(Cloud::Azure, &sized)?, "azurerm_linux_virtual_machine", "disk_size_gb"),
+        ["40"]
     );
     Ok(())
 }
@@ -42,20 +35,8 @@ fn the_controller_has_the_disk_the_spec_gives_it() -> Outcome {
 #[test]
 fn without_one_every_target_gives_the_same_default() -> Outcome {
     let plain = lab("");
-    let aws = cloud_vm(Cloud::Aws, &plain)?;
-    assert!(
-        resource_body(&aws, "resource \"aws_instance\" \"isoloom_controller\"").contains("volume_size = 10"),
-        "{aws}"
-    );
-    let gcp = cloud_vm(Cloud::Gcp, &plain)?;
-    assert!(
-        aligned(resource_body(&gcp, "resource \"google_compute_instance\" \"isoloom_controller\"")).contains("size = 10"),
-        "{gcp}"
-    );
-    let pve = proxmox(&plain)?;
-    assert!(
-        resource_body(&pve, "resource \"proxmox_virtual_environment_vm\" \"isoloom_controller\"").contains("size         = 10"),
-        "{pve}"
-    );
+    assert_eq!(controller_disk(&cloud_vm(Cloud::Aws, &plain)?, "aws_instance", "volume_size"), ["10"]);
+    assert_eq!(controller_disk(&cloud_vm(Cloud::Gcp, &plain)?, "google_compute_instance", "size"), ["10"]);
+    assert_eq!(controller_disk(&proxmox(&plain)?, "proxmox_virtual_environment_vm", "size"), ["10"]);
     Ok(())
 }
