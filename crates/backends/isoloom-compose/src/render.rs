@@ -15,12 +15,12 @@ pub(crate) use service::readiness;
 use std::fmt;
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_ADDRESS};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{Position, Probe};
 use isoloom_render::backend::Files;
 use isoloom_render::container::{PROBE_IMAGE, exec_runner};
 use isoloom_render::{GeneratedFile, header};
+use isoloom_spec::contract::{OUTPUT_DIR, PUBLISH_ADDRESS};
 use isoloom_spec::model::Arch;
 
 use crate::backend::ComposeTarget;

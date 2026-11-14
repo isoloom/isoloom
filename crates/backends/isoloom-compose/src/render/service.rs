@@ -4,11 +4,11 @@
 
 use indexmap::IndexMap;
 use isoloom_manifest as manifest;
-use isoloom_manifest::contract::{PUBLISH_ADDRESS, PUBLISH_FIXED};
 use isoloom_plan::{Environment, Image, PublishedPort};
 use isoloom_render::configure::dockerfile;
 use isoloom_render::constraints;
 use isoloom_render::container::{PROBE_DIR, init_names};
+use isoloom_spec::contract::{PUBLISH_ADDRESS, PUBLISH_FIXED};
 use isoloom_spec::model;
 
 use super::{Out, appliance, configs, hardware, init_jobs, process, secrets};

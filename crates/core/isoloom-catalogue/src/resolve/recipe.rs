@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::syntax::{OsRef, ProjectPath, Step};
 use serde_json::{Map, Value};
 

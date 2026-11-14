@@ -18,7 +18,7 @@ use crate::ssh::Login;
 const VARS: &[(&str, RunVar)] = &[("TF_VAR_ssh_public_key", RunVar::SshPublicKey), ("TF_VAR_ssh_private_key_file", RunVar::SshKey)];
 
 /// `0`: the checks derived from the spec are skipped.
-use isoloom_manifest::contract::DERIVED;
+use isoloom_spec::contract::DERIVED;
 
 /// A machine the runner delivers the project to and waits for: its name in the manifest, where
 /// SSH reaches it, who logs in, how long its set-up may take.

@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 
-use isoloom_manifest::CheckLine;
 use isoloom_plan::checks::{self, Position, Probe};
+use isoloom_spec::check_line::CheckLine;
 
 use super::{BASE, runner};
 use crate::testing::{Outcome, lab};

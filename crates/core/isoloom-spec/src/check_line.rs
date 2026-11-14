@@ -1,5 +1,5 @@
 //! The lines a check runner prints, written and read back: the `isoloom-check/1` protocol
-//! ([`CheckProtocol::V1`](crate::CheckProtocol::V1)).
+//! (the check protocol `v1`).
 
 use std::fmt;
 
@@ -15,7 +15,7 @@ const REASON: &str = ": ";
 const END: &str = "END ";
 
 /// One line of a check runner's output, as the `isoloom-check/1` protocol defines it
-/// ([`CheckProtocol::V1`](crate::CheckProtocol::V1)). Read with [`CheckLine::parse`], written
+/// (the check protocol `v1`). Read with [`CheckLine::parse`], written
 /// with `Display`, or by a runner in another language from [`CheckLine::pass_line`],
 /// [`CheckLine::fail_line`] and [`CheckLine::end_line`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +51,7 @@ impl CheckLine {
     /// # Example
     ///
     /// ```
-    /// use isoloom_manifest::CheckLine;
+    /// use isoloom_spec::check_line::CheckLine;
     ///
     /// let failed = CheckLine::parse("    web: isoloom-check: FAIL db:5432 from web: nothing listens");
     /// let expected = CheckLine::Fail { name: "db:5432 from web".into(), reason: "nothing listens".into() };

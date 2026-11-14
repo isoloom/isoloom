@@ -175,7 +175,7 @@ pub(crate) fn input(name: &str, sensitive: bool, readers: &[isoloom_manifest::Na
 /// `ISOLOOM_SECRET_<NAME>` (`TF_VAR_` on the Terraform steps), which the machines' user data
 /// writes into `/var/lib/isoloom/secrets/<name>`.
 pub(crate) fn machine_secret(name: &str, source: SecretSource, machines: &[isoloom_manifest::Name]) -> Result<SecretSlot, ManifestError> {
-    let var = isoloom_manifest::contract::secret_variable(name);
+    let var = isoloom_spec::contract::secret_variable(name);
     Ok(SecretSlot {
         name: Identifier::parse(name)?,
         kind: SlotKind::Secret,

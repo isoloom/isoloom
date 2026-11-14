@@ -2,9 +2,9 @@
 //! order its image expects.
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::GeneratedFile;
+use isoloom_spec::contract::OUTPUT_DIR;
 
 use crate::appliances::{self, Port};
 use crate::file::{Attachment, Build, RO_BIND, Service};

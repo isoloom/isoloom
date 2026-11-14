@@ -2,10 +2,10 @@
 //! stand, the ready marker, the checks, the published services.
 
 use crate::hcl_builder::{Expression, Module, null, object, reference, string};
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Vm};
 use isoloom_render::steps::AsRoot;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::Target;
 
 use crate::checks::{Invocation, Runner, output_block};

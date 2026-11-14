@@ -5,12 +5,12 @@
 //! (`vagrant provision <vm> --provision-with checks`) runs them too, the project's check scripts
 //! read from the host first.
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::inventory::CONTROLLER_INVENTORY;
 use isoloom_render::steps::PROJECT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::linux::STATE_DIR;
 use isoloom_spec::shell::quote;
 

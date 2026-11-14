@@ -3,9 +3,9 @@
 //! machine (a Vagrant provisioner, cloud-init, `remote-exec`, WinRM), so every target sets a
 //! machine up the same way.
 
-use isoloom_manifest::ReadyLine;
 use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::{RunKind, Step};
+use isoloom_spec::ready_line::ReadyLine;
 use isoloom_spec::shell::quote;
 use isoloom_spec::windows::ISOLOOM_DIR;
 

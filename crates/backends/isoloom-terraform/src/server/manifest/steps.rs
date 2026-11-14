@@ -110,8 +110,8 @@ pub(super) fn runners(env: &Environment) -> Result<Vec<CheckRunner>, ManifestErr
     manifest::check_runners(env, |pos, _, group| {
         let Some((_, host)) = check_host(env, pos) else { return Ok(None) };
         let derived = Template::from_parts([
-            Part::Text(format!("{}=", isoloom_manifest::contract::DERIVED)),
-            Part::Placeholder(Placeholder::Param(EnvName::parse(isoloom_manifest::contract::DERIVED)?)),
+            Part::Text(format!("{}=", isoloom_spec::contract::DERIVED)),
+            Part::Placeholder(Placeholder::Param(EnvName::parse(isoloom_spec::contract::DERIVED)?)),
             Part::Text(" sh -s".into()),
         ]);
         let login = Login::new(Template::text(&host), USER);

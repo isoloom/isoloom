@@ -184,7 +184,7 @@ fn every_env_delivered_slot_has_a_value_or_a_default() -> Outcome {
 fn compose_and_vagrant_declare_the_fixed_ports_switch_alike_and_only_when_a_port_is_published() -> Outcome {
     let fixed = |yaml: &str, target: Target, path: &str| -> Outcome<Option<String>> {
         let m = run_json(&generate(&lab(yaml)?, target).unwrap(), path)?;
-        let p = m.params.iter().find(|p| p.name.as_str() == isoloom_manifest::contract::PUBLISH_FIXED);
+        let p = m.params.iter().find(|p| p.name.as_str() == isoloom_spec::contract::PUBLISH_FIXED);
         Ok(p.map(|p| serde_json::to_string(p).unwrap()))
     };
     let spec = |ports: &str| {

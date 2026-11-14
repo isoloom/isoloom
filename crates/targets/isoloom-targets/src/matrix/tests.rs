@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 
 use super::*;
 use crate::tiers::Tier;

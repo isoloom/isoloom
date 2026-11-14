@@ -491,7 +491,7 @@ fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder
 #[cfg(unix)]
 #[test]
 fn a_tracked_step_writes_lines_of_the_ready_grammar() {
-    use isoloom_manifest::ReadyLine;
+    use isoloom_spec::ready_line::ReadyLine;
     let dir = tempfile::Builder::new().prefix("isoloom-tracked-").tempdir().unwrap();
     let ready = dir.path().join("ready");
     let run = |command: &str| {

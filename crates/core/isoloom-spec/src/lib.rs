@@ -22,6 +22,7 @@
 
 pub mod appliance;
 mod as_written;
+pub mod check_line;
 mod clones;
 pub mod contract;
 pub mod defaults;
@@ -42,6 +43,7 @@ pub mod placeholders;
 pub mod probe;
 pub mod profile;
 pub mod project_path;
+pub mod ready_line;
 pub mod reference;
 pub mod schema;
 pub mod shell;

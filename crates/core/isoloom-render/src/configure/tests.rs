@@ -63,7 +63,7 @@ fn a_users_password_hashes_the_same_for_the_same_lab() {
 
 #[test]
 fn the_configuration_files_and_the_compose_outputs_are_under_the_output_folder() {
-    use isoloom_manifest::contract::OUTPUT_DIR;
+    use isoloom_spec::contract::OUTPUT_DIR;
     assert_eq!(DIR, format!("{OUTPUT_DIR}/configure"));
     for library in [shell::LIBRARY_PATH, powershell::LIBRARY_PATH] {
         assert!(library.starts_with(&format!("{DIR}/")), "{library}");

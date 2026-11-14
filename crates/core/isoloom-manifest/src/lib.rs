@@ -50,7 +50,6 @@
 
 pub mod access;
 mod argv;
-mod check_line;
 mod console;
 pub mod contract;
 mod error;
@@ -65,7 +64,6 @@ mod outputs;
 mod path;
 mod port;
 mod provenance;
-mod ready_line;
 mod schema;
 mod slots;
 mod step;
@@ -74,7 +72,6 @@ mod validate;
 mod walk;
 
 pub use argv::{Argv, HostArgv, PerHostArgv, Program};
-pub use check_line::CheckLine;
 pub use console::{Console, ConsoleAccount, ConsoleProtocol, ConsoleSource};
 pub use error::{Error, Result};
 pub use guest::Guest;
@@ -82,6 +79,8 @@ pub use identity::{
     Cloud, ComposeIdentity, Driver, Elevation, GoneError, HostOs, Identity, Provider, StateOwner, Target, TerraformIdentity, Tool, VagrantIdentity,
     VagrantProvider,
 };
+pub use isoloom_spec::check_line::CheckLine;
+pub use isoloom_spec::ready_line::ReadyLine;
 pub use lifecycle::{Condition, Expiry, ExpiryUnit, Leftover, Lifecycle, Park, Provision, ReadyGrammar, Recovery, Retries, Seal};
 pub use list::{NonEmpty, StepSelection};
 pub use machine::{Arch, Cidr, Machine, Native, Network, Resources, Role, VagrantBox, Volume};
@@ -94,7 +93,6 @@ pub use outputs::{Check, CheckKind, CheckProtocol, CheckRunner, Checks, Output, 
 pub use path::{GuestPath, PathTemplate, RelPath};
 pub use port::{Port, PortKind, Protocol, Publish, PublishMode};
 pub use provenance::{EnvironmentRef, Generator, GeneratorName, Instance, ManifestVersion};
-pub use ready_line::ReadyLine;
 pub use schema::{COMPATIBILITY, SCHEMA_URL, schema};
 pub use slots::{Delivery, Param, SecretSlot, SecretSource, SetBy, SlotKind, StateFileFormat, Store, TfVarShape, Transport};
 pub use step::{Action, Failure, Run, Step, When};

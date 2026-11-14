@@ -183,7 +183,7 @@ pub fn project_archive(root: &str, outputs: &[&str]) -> Result<Step, ManifestErr
     Ok(s)
 }
 
-/// `ISOLOOM_DERIVED` ([`isoloom_manifest::contract::DERIVED`]), the switch of the checks derived
+/// `ISOLOOM_DERIVED` ([`isoloom_spec::contract::DERIVED`]), the switch of the checks derived
 /// from the spec (`0` skips them), delivered to the check runners' `steps`; `None` when there is
 /// none.
 ///
@@ -195,7 +195,7 @@ pub fn derived_switch(steps: Vec<StepId>) -> Result<Option<Param>, ManifestError
         return Ok(None);
     };
     let what = "0: the checks derived from the spec (reachability, no internet) are skipped.";
-    embedder_param(isoloom_manifest::contract::DERIVED, what, Some("1"), &["0", "1"], StepSelection::Only(steps)).map(Some)
+    embedder_param(isoloom_spec::contract::DERIVED, what, Some("1"), &["0", "1"], StepSelection::Only(steps)).map(Some)
 }
 
 /// An optional param `name` the embedder sets (its `default` and the `values` it takes, if any
@@ -221,7 +221,7 @@ pub fn embedder_param(name: &str, description: &str, default: Option<&str>, valu
     })
 }
 
-/// `ISOLOOM_PUBLISH_FIXED` ([`isoloom_manifest::contract::PUBLISH_FIXED`]), delivered to every
+/// `ISOLOOM_PUBLISH_FIXED` ([`isoloom_spec::contract::PUBLISH_FIXED`]), delivered to every
 /// step, when one of `machines` publishes a port: set, each published port takes its own
 /// `publish` number on the host instead of a free one. A program running the environment (to
 /// keep its own ports) may pass it whenever a port is published; it changes nothing for a port
@@ -235,7 +235,7 @@ pub fn publish_fixed(machines: &[Machine]) -> Result<Option<Param>, ManifestErro
         return Ok(None);
     }
     let what = "Set: each published port takes its own `publish` number on the host, instead of a free one.";
-    embedder_param(isoloom_manifest::contract::PUBLISH_FIXED, what, None, &["1"], StepSelection::Every).map(Some)
+    embedder_param(isoloom_spec::contract::PUBLISH_FIXED, what, None, &["1"], StepSelection::Every).map(Some)
 }
 
 /// Every host a run starts from: Linux, macOS and Windows.

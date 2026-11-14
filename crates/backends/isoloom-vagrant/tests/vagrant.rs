@@ -875,7 +875,7 @@ fn each_network_is_named_with_the_copy_key_and_the_manifest_names_none() -> Outc
     assert_eq!(manifest.networks.len(), env.networks.len());
     for n in &manifest.networks {
         assert!(n.native.is_none(), "{}", n.name);
-        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{}", isoloom_manifest::contract::RESERVED_PREFIX, n.name);
+        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{}", isoloom_spec::contract::RESERVED_PREFIX, n.name);
         assert!(file.contains(&format!("virtualbox__intnet: \"{keyed}\"")), "{keyed}");
         assert!(file.contains(&format!("libvirt__network_name: \"{keyed}\"")), "{keyed}");
     }

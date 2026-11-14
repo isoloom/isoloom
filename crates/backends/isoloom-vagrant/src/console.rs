@@ -157,7 +157,7 @@ mod tests {
         );
         let ruby = CONSOLE_RB;
         assert!(ruby.contains("\"127.0.0.1:0,to=99\""), "QEMU's VNC on the loopback");
-        assert!(ruby.contains(isoloom_manifest::contract::CONSOLES), "the runner's variable");
+        assert!(ruby.contains(isoloom_spec::contract::CONSOLES), "the runner's variable");
     }
 
     #[test]

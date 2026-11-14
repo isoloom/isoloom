@@ -4,10 +4,10 @@
 
 use std::fmt;
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header};
+use isoloom_spec::contract::OUTPUT_DIR;
 use serde::Serialize;
 
 use crate::backend::capabilities;

@@ -2,16 +2,16 @@
 //! for the runner to deliver them over the machine's own connection (SSH), then puts each
 //! file in place. Delivery writes a root-only copy of each value under `KEPT_DIR` (it outlives
 //! a reboot, which empties `/run/secrets`) and the mark `DELIVERED` the set-up waits for
-//! ([`isoloom_manifest::contract::SECRETS_DIR`], [`isoloom_manifest::contract::DELIVERED`]).
+//! ([`isoloom_spec::contract::SECRETS_DIR`], [`isoloom_spec::contract::DELIVERED`]).
 //!
 //! The order is the plan's `Secrets` step: after the machine's files, before what may read a
 //! secret (its `provision` steps, its `before` steps and its command). The set-up runs inside
 //! the target's own tool (`vagrant up`, `terraform apply`, cloud-init), so the step is a gate:
 //! it waits for the mark, and the runner delivers while the tool runs.
 
-use isoloom_manifest::contract::secret_variable;
 use isoloom_plan::secrets::VM_DEFAULT_MODE;
 use isoloom_plan::{Environment, MachineShape, SecretFile};
+use isoloom_spec::contract::secret_variable;
 use isoloom_spec::model::SecretSource;
 use isoloom_spec::shell::quote;
 
@@ -21,9 +21,9 @@ use crate::run_manifest::RUNNER;
 pub mod windows;
 
 /// The mark delivery leaves once every secret is kept.
-pub(crate) use isoloom_manifest::contract::DELIVERED;
+pub(crate) use isoloom_spec::contract::DELIVERED;
 /// Where a machine keeps the secrets delivered to it: root-only, on disk.
-pub(crate) use isoloom_manifest::contract::SECRETS_DIR as KEPT_DIR;
+pub(crate) use isoloom_spec::contract::SECRETS_DIR as KEPT_DIR;
 /// Seconds the set-up waits for the runner to deliver the secrets.
 pub(crate) const DELIVERY_TIMEOUT: u32 = 1800;
 /// The boot service putting the secrets back in place (`/run` is emptied at every boot). Its

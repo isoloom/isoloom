@@ -3,10 +3,10 @@
 
 use std::path::Path;
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Placed;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::{Spec, Target};
 
 use crate::registry::backend;

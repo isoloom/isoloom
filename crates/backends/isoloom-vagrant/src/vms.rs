@@ -45,7 +45,7 @@ pub(crate) mod values;
 mod windows;
 
 /// The name of a network on the host as a report shows it, `isoloom-<environment>-<key>-<network>`
-/// (after the contract's [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)), the
+/// (after the contract's [`RESERVED_PREFIX`](isoloom_spec::contract::RESERVED_PREFIX)), the
 /// copy's key written `<key>`: its VirtualBox internal network, its libvirt network and its
 /// Hyper-V private switch, as the Vagrantfile makes them with the key it reads
 /// ([`isoloom_plan::Names::network`]).
@@ -55,11 +55,11 @@ pub fn network_name(environment: &str, network: &str) -> String {
 }
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header, router, steps};
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::Target;
 
 use crate::backend::capabilities;
@@ -74,7 +74,7 @@ const DIR: &str = "vagrant";
 /// The define names of Isoloom's own VMs (the router's is `router::NAME`), which are also their
 /// display names, step ids and file names: under the prefix an environment machine can't take, so none is
 /// ever a machine's.
-pub(crate) const CONTROLLER: &str = isoloom_manifest::contract::CONTROLLER;
+pub(crate) const CONTROLLER: &str = isoloom_spec::contract::CONTROLLER;
 const TOOL_SHELL: &str = "isoloom-tool-shell";
 
 /// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the

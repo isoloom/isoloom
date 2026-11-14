@@ -6,8 +6,6 @@
 //! files Compose reads from its environment read from the VM's copy, and root's Docker (through
 //! `sudo` keeping the values the way in forwarded, unless the way in is root: [`AsRoot`]).
 
-use isoloom_manifest::contract::DERIVED;
-use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_ADDRESS, PUBLISH_FIXED};
 use isoloom_manifest::{EnvName, Failure, Machine, Name, Part, Placeholder, PublishMode, StepId, Template};
 use isoloom_plan::Environment;
 use isoloom_render::container::{exec_runner, host_environment, host_folders};
@@ -15,6 +13,8 @@ use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose, GuestRunne
 use isoloom_render::run_manifest::{check, derived_switch, networks, timeout_s};
 use isoloom_render::steps;
 use isoloom_render::steps::AsRoot;
+use isoloom_spec::contract::DERIVED;
+use isoloom_spec::contract::{OUTPUT_DIR, PUBLISH_ADDRESS, PUBLISH_FIXED};
 
 use super::Project;
 

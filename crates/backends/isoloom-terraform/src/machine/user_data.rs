@@ -23,8 +23,8 @@ use isoloom_render::steps::wait_for_mark;
 use isoloom_spec::model::Target;
 
 use crate::{Error, Result};
-use isoloom_manifest::ReadyLine;
 use isoloom_render::steps::{READY_FILE, failed_pattern, ready_mark};
+use isoloom_spec::ready_line::ReadyLine;
 
 /// Where the set-up writes its output: Terraform's wait shows its tail when a step failed.
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";

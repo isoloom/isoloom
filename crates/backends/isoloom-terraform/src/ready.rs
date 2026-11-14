@@ -144,7 +144,7 @@ impl Wait {
              if [ \"$t\" -ge {within} ]; then echo \"{who}: not set up after {within} s (${{s:-no ready file}}); the end of {log}:\"; {tail}; exit 1; fi\n\
              sleep {POLL_S}; t=$((t + {POLL_S}))\n\
              done",
-            ready = isoloom_manifest::ReadyLine::READY,
+            ready = isoloom_spec::ready_line::ReadyLine::READY,
             failed = steps::failed_pattern(),
             log = self.log,
             within = self.within_s,

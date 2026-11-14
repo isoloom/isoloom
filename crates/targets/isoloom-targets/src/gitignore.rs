@@ -43,7 +43,7 @@ pub(crate) fn file() -> GeneratedFile {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_manifest::contract::OUTPUT_DIR;
+    use isoloom_spec::contract::OUTPUT_DIR;
 
     use super::*;
 

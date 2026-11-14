@@ -3,7 +3,7 @@
 //! manifest's params advertise the same names and defaults (`crate::manifest`), so the runner
 //! never sees one default and the Vagrantfile use another.
 
-use isoloom_manifest::contract;
+use isoloom_spec::contract;
 
 use crate::ruby::Value;
 

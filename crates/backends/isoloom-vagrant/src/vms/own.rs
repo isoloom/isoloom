@@ -2,7 +2,7 @@
 //! controller that runs the environment's playbooks and the checks standing on every network.
 //! Their set-up goes through the same step renderings and transport as the environment's machines.
 
-use isoloom_manifest::contract::HALTING;
+use isoloom_spec::contract::HALTING;
 use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
