@@ -39,6 +39,9 @@ stable spec format.
 
 ### Fixed
 
+- **A counted machine whose clones run past `.255` on a network is one problem at that network
+  (#313),** saying why, where the spec was refused with a raw "untagged enum" error from the
+  parser.
 - **`isoloom import compose` drafts a host folder read from the shell as a folder, and says when a
   variable is set from another one (#301).** A short volume `${DATA:-./data}:/path` was split on
   the `:` inside `${...}` and drafted as a named volume `-./data}`, so the draft didn't validate;

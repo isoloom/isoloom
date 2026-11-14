@@ -79,6 +79,10 @@ fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Vec<Problem>
                 continue;
             }
         };
+        if let Some(past) = past_the_last_octet(base, m, count) {
+            refused.push(past);
+            continue;
+        }
         let mut names = Vec::new();
         for i in 1..=count {
             let n = name(base, i);
@@ -106,6 +110,26 @@ fn count_of(base: &str, m: &Mapping) -> Result<Option<u8>, Problem> {
         return Err(refused("the access machine is one machine; leave `count` out".to_owned()));
     }
     Ok(Some(count))
+}
+
+/// The problem when `count` clones of machine `base`, one address further each, run past an
+/// address's last octet (.255) on a network, with the last address it would take.
+fn past_the_last_octet(base: &str, m: &Mapping, count: u8) -> Option<Problem> {
+    let Some(Value::Mapping(nets)) = m.get(key("networks")) else { return None };
+    nets.iter().find_map(|(net, octets)| {
+        let first = match octets {
+            Value::Sequence(list) => list.iter().filter_map(Value::as_u64).max(),
+            one => one.as_u64(),
+        }?;
+        let last = first + u64::from(count) - 1;
+        (last > 255).then(|| {
+            Problem::new(
+                Code::InvalidValue,
+                FieldPath::new("machines").key(base).key("networks").key(net.as_str().unwrap_or_default()),
+                format!("{count} machines from .{first} run past .255 (the last would be .{last}): start lower or count fewer"),
+            )
+        })
+    })
 }
 
 /// Clone `i` (from 1) of machine `m`: no `count`, each address `i - 1` further along.
@@ -288,6 +312,27 @@ mod tests {
         let (_, refused) = expanded("networks:\n  a: { gateway: rt, switch: sw }\n  b: { gateway: rt }\nmachines:\n  rt: { count: 2 }\n  sw: { count: 2 }\n");
         let paths: Vec<String> = refused.unwrap_err().iter().map(|p| p.path.to_string()).collect();
         assert_eq!(paths, ["networks.a.gateway", "networks.a.switch", "networks.b.gateway"]);
+    }
+
+    #[test]
+    fn clones_running_past_the_last_octet_are_one_problem_at_the_network() {
+        let (_, refused) = expanded("machines:\n  ws: { count: 10, networks: { lan: 250 } }\n  db: { count: 3, networks: { lan: 20, mgmt: [200, 254] } }\n");
+        let problems: Vec<(String, String)> = refused.unwrap_err().iter().map(|p| (p.path.to_string(), p.reason.clone())).collect();
+        assert_eq!(
+            problems,
+            [
+                (
+                    "machines.ws.networks.lan".to_owned(),
+                    "10 machines from .250 run past .255 (the last would be .259): start lower or count fewer".to_owned()
+                ),
+                (
+                    "machines.db.networks.mgmt".to_owned(),
+                    "3 machines from .254 run past .255 (the last would be .256): start lower or count fewer".to_owned()
+                ),
+            ]
+        );
+        let (_, fine) = expanded("machines:\n  ws: { count: 6, networks: { lan: 250 } }\n");
+        assert_eq!(fine.unwrap()["ws"].len(), 6, "up to .255 is for the address checks to judge");
     }
 
     #[test]
