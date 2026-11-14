@@ -140,15 +140,12 @@ pub(crate) fn write(env: &Environment, reach: &Reach, module: &mut Module) {
     }
     if let Some(address) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
         module.block(output(&address_output(controller::NAME), address.clone()));
-        module.block(output(
-            &ssh_user_output(controller::NAME),
-            string((reach.user)(controller::OS)),
-        ));
+        module.block(output(&ssh_user_output(controller::NAME), string((reach.user)(controller::OS))));
     }
     module.block(output("ssh_users", object(users)));
     module.block(output("ip", stand_at(env, reach)));
     module.block(output("ready_file", string(isoloom_render::steps::READY_FILE)));
-    super::console::outputs(env, module);
+    super::console::outputs(env, reach, module);
     if let Some(checks) = output_block(env, Target::CloudVm.id(), Invocation::Command, &|p| runner(env, reach, p)) {
         module.commented("The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>').", checks);
     }
