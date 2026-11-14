@@ -182,7 +182,7 @@ fn a_starter_names_the_services_it_answers_only_when_it_has_ports() {
     ))[0]
         .contents;
     assert!(!without.contains("Services the project expects"), "{without}");
-    assert!(without.contains("Nothing to install for this machine's ports yet"), "{without}");
+    assert!(without.contains("Nothing to install for this machine's ports"), "{without}");
 }
 
 #[test]

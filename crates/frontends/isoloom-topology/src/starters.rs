@@ -117,7 +117,7 @@ fn shell(blocks: &Blocks, name: &str, m: &Machine, os: OsRef) -> String {
     lines.push("set -eu".to_owned());
     lines.push(String::new());
     match family.filter(|_| !wanted.is_empty()) {
-        None => lines.push("# Nothing to install for this machine's ports yet: add your own steps here.".to_owned()),
+        None => lines.push("# Nothing to install for this machine's ports: add your own steps here.".to_owned()),
         Some(family) => {
             lines.push(install(&wanted, family));
             for p in wanted.iter().filter(|p| !p.configure.is_empty()) {
@@ -184,7 +184,7 @@ fn powershell(blocks: &Blocks, name: &str, m: &Machine, os: OsRef) -> String {
         ));
     }
     if ports.is_empty() {
-        lines.push("# Nothing to install for this machine's ports yet: add your own steps here.".to_owned());
+        lines.push("# Nothing to install for this machine's ports: add your own steps here.".to_owned());
     }
     text(&lines)
 }
