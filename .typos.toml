@@ -10,6 +10,7 @@ exportfs = "exportfs"
 # Misspelled keys on purpose: the tests check they are refused.
 provder = "provder"
 targt = "targt"
+evn = "evn"
 
 [default]
 # Commit hashes and agent ids (hex, 7 to 40 characters) are identifiers, not words.

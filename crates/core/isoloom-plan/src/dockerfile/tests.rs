@@ -168,7 +168,7 @@ fn a_postgres_image_installs_the_exact_release_with_the_images_defaults() {
 }
 
 #[test]
-fn a_catalogue_image_brings_its_entrys_recipe_with_the_images_settings() {
+fn a_catalogue_image_brings_its_entry_recipe_with_the_images_settings() {
     let text = std::fs::read_to_string(fixtures().join("mysql-catalogue/Dockerfile")).unwrap();
     let build = Build {
         path: "build/db/Dockerfile",
