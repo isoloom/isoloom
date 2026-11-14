@@ -325,6 +325,27 @@ fn settings(r: &mut Ruby, env: &Environment) {
     r.assign("config.vm.boot_timeout", 900u32);
     vagrantfile::ssh_proxy(r, "config");
     vagrantfile::libvirt_prefix(r, "config", &env.names().libvirt_prefix());
+    if let Some(n) = env.instance {
+        instance_stop(r, n);
+    }
+}
+
+/// An instance's `vagrant up` stopped, before any VM is made, on the providers whose networks
+/// are this computer's, one per address block (`provider::instance_refusal`): there the
+/// instance's networks are the environment's own.
+fn instance_stop(r: &mut Ruby, n: u8) {
+    let providers = provider::sharing_networks().iter().map(|p| format!(":{p}")).collect::<Vec<_>>().join(", ");
+    let why = format!(
+        "instance {n}'s networks are this computer's under this provider, one per address block, and the environment as written makes the same: run instances on VirtualBox, Hyper-V, QEMU or UTM"
+    );
+    r.block(Call::new("config.trigger.before").arg(Value::sym("up")), "t", |r| {
+        r.block("t.ruby", "_, machine", |r| {
+            r.line(format_args!(
+                "abort(\"#{{machine.name}}: \" + {}) if [{providers}].include?(machine.provider_name)",
+                Value::str(&why)
+            ));
+        });
+    });
 }
 
 /// Whether the Vagrantfile has a controller: to run the environment's playbooks, or checks.

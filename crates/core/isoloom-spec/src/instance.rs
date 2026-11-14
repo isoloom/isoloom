@@ -3,8 +3,11 @@
 //! collide: the name gets a suffix (so Compose project, container, network, VM and namespace
 //! names differ), the Docker networks move to other blocks (Docker refuses two networks on one
 //! subnet), published host ports shift, and the files go to `.isoloom-<n>/` next to the
-//! committed `.isoloom/`. Local VM networks are isolated by name already (VirtualBox internal
-//! networks), so machines keep the addresses the spec writes.
+//! committed `.isoloom/`. A VM network keeps the block the spec writes, so machines keep their
+//! addresses: the providers that give each copy networks of its own (VirtualBox's internal
+//! networks, Hyper-V's private switches, QEMU's hubs, UTM's vmnet networks) run an instance
+//! beside the environment as written, and those whose networks are the computer's, one per block
+//! (libvirt, VMware, Parallels), refuse it.
 
 use crate::contract::OUTPUT_DIR;
 use crate::model::{NetworkDocker, Spec};

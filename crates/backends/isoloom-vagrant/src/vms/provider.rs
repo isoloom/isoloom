@@ -95,6 +95,12 @@ pub(crate) struct Profile {
     pub(crate) attaches_disks: bool,
     /// Whether Isoloom bridges a network under it; `false` refuses a bridged network.
     pub(crate) bridges: bool,
+    /// Whether each copy of the environment has networks of its own under it (VirtualBox's
+    /// internal networks, Hyper-V's private switches, QEMU's hubs, UTM's vmnet networks,
+    /// ESXi's port groups); `false` where a network is this computer's, one per address block
+    /// (libvirt's bridges, VMware's vmnets, Parallels' host-only networks), so an instance
+    /// can't have one beside the environment as written.
+    pub(crate) own_networks: bool,
     /// What else it refuses of the environment's networks and boxes (QEMU's links, Hyper-V's
     /// and UTM's boxes).
     pub(crate) networks: Option<fn(&Environment) -> Option<String>>,
@@ -125,6 +131,7 @@ const DESKTOP: Profile = Profile {
     tpm: false,
     attaches_disks: true,
     bridges: true,
+    own_networks: true,
     networks: None,
     boot: OwnBoot::BoxAsIs,
     remote_arch: None,
@@ -178,6 +185,7 @@ impl Provider {
                     ro_option: "mount_options",
                 },
                 nested: Nested::Vmx,
+                own_networks: false,
                 ..DESKTOP
             },
             Provider::HyperV => Profile {
@@ -200,6 +208,7 @@ impl Provider {
                     ro_option: "mount_options",
                 },
                 attaches_disks: false,
+                own_networks: false,
                 nested: Nested::Customize("set", "--nested-virt"),
                 ..DESKTOP
             },
@@ -212,6 +221,7 @@ impl Provider {
                 },
                 tpm: true,
                 bridges: false,
+                own_networks: false,
                 boot: OwnBoot::Own,
                 nested: Nested::Flag("nested"),
                 ..DESKTOP
@@ -280,10 +290,38 @@ pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let provider = Provider::parse(provider)?;
     windows::tpm_refusal(env, provider)
         .or_else(|| networks_refusal(env, provider))
+        .or_else(|| instance_refusal(env, provider))
         .or_else(|| boot::refusal(env, provider))
         .or_else(|| crate::host_folders::refusal(env, provider))
         .or_else(|| arch_refusal(env, provider))
         .or_else(|| disk_refusal(env, provider))
+}
+
+/// Why an instance of the environment can't have its networks under `provider`, if it can't:
+/// one that makes a network of this computer per address block, which the environment as written
+/// (and every other instance) makes on the same block.
+fn instance_refusal(env: &Environment, provider: Provider) -> Option<String> {
+    let n = env.instance?;
+    let profile = provider.profile();
+    if profile.own_networks {
+        return None;
+    }
+    let spec = env.spec();
+    let (name, net) = env
+        .networks
+        .iter()
+        .filter(|(name, _)| spec.networks.get(name.as_str()).is_some_and(|net| !net.is_outside()))
+        .find(|(name, _)| env.vms().any(|vm| vm.plan.addresses.contains_key(name.as_str())))?;
+    Some(format!(
+        "network `{name}` ({}) is a network of this computer under {}, one per address block, which the environment as written makes too: instance {n} can't have its own (VirtualBox, Hyper-V, QEMU and UTM give each copy networks of its own)",
+        net.cidr, profile.label
+    ))
+}
+
+/// The providers whose networks are this computer's ([`Profile::own_networks`]), as Vagrant
+/// names them.
+pub(crate) fn sharing_networks() -> Vec<&'static str> {
+    Provider::profiles().filter(|p| !p.own_networks).map(|p| p.id).collect()
 }
 
 /// A VM ESXi can't run: one of another architecture than the ESXi host's ([`ESXI_ARCH`]).
@@ -339,6 +377,41 @@ mod tests {
         assert_eq!(Provider::parse("docker"), None);
         let ids: std::collections::BTreeSet<&str> = Provider::ALL.iter().map(|p| p.id()).collect();
         assert_eq!(ids.len(), Provider::ALL.len());
+    }
+
+    /// An environment with a VM on `lan`, planned for Vagrant as itself or as `instance`.
+    fn planned(instance: Option<u8>) -> isoloom_plan::Environment {
+        let lab = isoloom_plan::Lab::parse(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.20.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, app: { steps: [{ run: s.sh }] } }\n",
+        )
+        .expect("the spec parses");
+        lab.plan(
+            &lab.for_target(isoloom_spec::model::Target::Vagrant),
+            isoloom_spec::model::Target::Vagrant,
+            instance,
+        )
+        .expect("the spec plans")
+    }
+
+    /// Two instances on one computer each make their networks under the provider: where a
+    /// network is the computer's, one per block (libvirt, VMware, Parallels), the second would
+    /// fail to start it, or share the first's.
+    #[test]
+    fn an_instance_is_refused_where_a_network_is_the_computers_and_taken_elsewhere() {
+        let as_written = planned(None);
+        let instance = planned(Some(2));
+        for id in ["libvirt", "vmware_desktop", "parallels"] {
+            assert_eq!(super::provider_refusal(&as_written, id), None, "{id}");
+            let why = super::provider_refusal(&instance, id).unwrap_or_default();
+            assert!(
+                why.starts_with("network `lan` (10.20.0.0/24) is a network of this computer under ") && why.contains("instance 2"),
+                "{id}: {why}"
+            );
+        }
+        for id in ["virtualbox", "hyperv", "qemu", "utm", "vmware_esxi"] {
+            assert_eq!(super::provider_refusal(&instance, id), None, "{id}");
+        }
+        assert_eq!(super::sharing_networks(), ["vmware_desktop", "parallels", "libvirt"]);
     }
 
     #[test]

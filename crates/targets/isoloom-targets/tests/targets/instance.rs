@@ -172,3 +172,29 @@ fn two_instances_never_share_a_vm_network_or_prefix_name() -> Outcome {
     assert!(compared >= 6, "{compared} labs and targets compared");
     Ok(())
 }
+
+/// An instance's Vagrantfile stops `vagrant up` before any VM is made on the providers whose
+/// networks are this computer's, one per block, which the environment as written makes too; the
+/// environment as written stops nowhere.
+#[test]
+fn an_instances_vagrantfile_stops_where_its_networks_would_be_the_environments() -> Outcome {
+    let lab = crate::testing::example("hello-stack")?;
+    let stop = |vf: &isoloom_test_support::RubyBlock| -> Vec<String> {
+        vf.find("config.trigger.before :up")
+            .iter()
+            .flat_map(|t| t.every_statement())
+            .map(str::to_owned)
+            .collect()
+    };
+    let as_written = crate::testing::vagrantfile(&lab)?;
+    assert!(stop(&as_written).is_empty(), "{:?}", stop(&as_written));
+    let files = isoloom_targets::generate_instance(&lab, Target::Vagrant, 3)?;
+    let instance = isoloom_test_support::ruby_blocks(crate::testing::file(&files, ".isoloom-3/vagrant/Vagrantfile")?);
+    let stops = stop(&instance);
+    assert!(
+        stops.iter().any(|s| s.starts_with("abort(\"#{machine.name}: \" + \"instance 3's networks")
+            && s.ends_with(" if [:vmware_desktop, :parallels, :libvirt].include?(machine.provider_name)")),
+        "{stops:?}"
+    );
+    Ok(())
+}
