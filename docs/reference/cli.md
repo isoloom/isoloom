@@ -31,7 +31,7 @@ Arguments:
 
 ## `isoloom targets`
 
-List the targets the spec can be generated for, why the others can't, and the tier of each one generated (how far it has been proven).
+List the targets the spec can be generated for, why the others can't, and the validators that check each one generated.
 
 ```text
 Usage: isoloom targets [OPTIONS] [DIR]
@@ -339,12 +339,12 @@ Arguments:
 | Argument | Description |
 | --- | --- |
 | `--spec` | The spec reference (docs/spec.md): every field, its type, default, allowed values and limits. |
-| `--matrix` | The capability matrix (docs/matrix.md): what each target does with each spec field, and each target's tier with its evidence. |
+| `--matrix` | The capability matrix (docs/matrix.md): what each target does with each spec field, and the validators of each target's files. |
 | `--cli` | The command-line reference (docs/reference/cli.md): every command and its arguments. |
 
 ## `isoloom matrix`
 
-Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and each target's tier with its evidence. `--json` for tools.
+Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and the validators of each target's files. `--json` for tools.
 
 ```text
 Usage: isoloom matrix [OPTIONS]
@@ -354,7 +354,7 @@ Arguments:
 
 | Argument | Description |
 | --- | --- |
-| `--json` | The matrix as JSON: the columns with their tiers, every tier entry with its evidence, and each row's cell per column (its state, and for a refusal the step and reason). |
+| `--json` | The matrix as JSON: the columns, each target's validators, and each row's cell per column (its state, and for a refusal the step and reason). |
 
 ## `isoloom bases`
 
@@ -423,7 +423,7 @@ Usage: isoloom help validate
 
 ## `isoloom help targets`
 
-List the targets the spec can be generated for, why the others can't, and the tier of each one generated (how far it has been proven).
+List the targets the spec can be generated for, why the others can't, and the validators that check each one generated.
 
 ```text
 Usage: isoloom help targets
@@ -551,7 +551,7 @@ Usage: isoloom help docs
 
 ## `isoloom help matrix`
 
-Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and each target's tier with its evidence. `--json` for tools.
+Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and the validators of each target's files. `--json` for tools.
 
 ```text
 Usage: isoloom help matrix

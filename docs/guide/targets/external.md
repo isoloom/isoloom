@@ -4,7 +4,7 @@ The `external` target creates nothing. It takes machines that already exist (ser
 hand) and writes an Ansible inventory and playbook that set each one up as its spec says, plus
 check scripts that prove the environment behaves as the spec says from each machine.
 
-Tier 2. Run the playbook with Ansible.
+The playbook is checked by `ansible-lint`. Run it with Ansible.
 
 ## Prerequisites
 

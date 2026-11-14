@@ -4,7 +4,8 @@ The `docker` target turns each machine into a container on your Docker host, wit
 network per spec network and the spec's addresses. `hosted` writes the same Compose file for a
 hosting service that runs Compose files itself.
 
-Tier: `docker` is Tier 1 (real runs from Linux, macOS and Windows); `hosted` is Tier 2.
+Both write a Compose file (`.isoloom/docker/compose.yml`) and the files it mounts, checked by
+`docker compose config`.
 
 ## Prerequisites
 

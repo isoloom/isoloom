@@ -68,6 +68,6 @@ but a container runs one).
 ## See also
 
 - [Spec reference](../spec.md) — `service:`, `with:` and the ports a service machine takes.
-- [Targets and tiers](../reference/targets.md) — the forms each target gives a service machine.
+- [Targets and providers](../reference/targets.md) — the forms each target gives a service machine.
 - [Getting started](getting-started.md).
 - Writing an entry: [the contributor guide](../../.github/CONTRIBUTING.md#the-catalogue-contributors).

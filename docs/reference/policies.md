@@ -20,7 +20,7 @@ ones marked **Breaking**.
 | **The contract's names** (`isoloom_spec::contract`: the output folder, the reserved prefix, the controller and its halting mark, the cloud tags, the Vagrantfile's variables, the published ports' params, the derived checks' switch `ISOLOOM_DERIVED`, the variable each secret is handed over in `ISOLOOM_SECRET_<NAME>`, the access machine's image and box variables `ISOLOOM_ACCESS_IMAGE` and `ISOLOOM_ACCESS_BOX`, the secrets folder and its mark) | Strict: a runner uses them as they are, and the generated files are written from them. Renaming or removing one, or changing what it means, is a major release; a new one comes in a minor release. | The `isoloom-spec` crate version, with its library API above. |
 | **The resolved snapshot** (`.isoloom/resolved.json`) | Versioned by its `resolved_version`, raised when its shape changes. | `resolved_version`. |
 | **Catalogue entries** (`service: <entry>`) | An entry, or a release of one, can be removed with notice: it is marked deprecated in the CHANGELOG at least one minor release before, and removed no earlier than three months later. A removal that makes specs fail is listed under **Breaking** in the release that removes it. | The CHANGELOG. Pins (`lock.yml`) move in any release. |
-| **The library API** | Supported: the public items of `isoloom-spec` (parsing, loading, validation and the spec model under `isoloom_spec::model`), `isoloom-targets` (`Lab`, generation, refusals, the resolved snapshot, the matrix and tiers). Not a promise: `#[doc(hidden)]` items, test-support features, building the spec model's structs by hand (parse a spec instead: a new spec key adds a field), and the other published crates (`isoloom-plan`, `isoloom-render`, `isoloom-catalogue`, the backends, `isoloom-import`, the `isoloom` crate's library items), which exist so the supported crates can be built from crates.io. | The crate version. CI runs `cargo semver-checks` on the two supported crates against their latest release on crates.io. |
+| **The library API** | Supported: the public items of `isoloom-spec` (parsing, loading, validation and the spec model under `isoloom_spec::model`), `isoloom-targets` (`Lab`, generation, refusals, the resolved snapshot, the matrix and the validators of each target). Not a promise: `#[doc(hidden)]` items, test-support features, building the spec model's structs by hand (parse a spec instead: a new spec key adds a field), and the other published crates (`isoloom-plan`, `isoloom-render`, `isoloom-catalogue`, the backends, `isoloom-import`, the `isoloom` crate's library items), which exist so the supported crates can be built from crates.io. | The crate version. CI runs `cargo semver-checks` on the two supported crates against their latest release on crates.io. |
 | **The generated files** | Their behavior is the contract: the environment the spec describes, which its checks prove. Their text is not stable: a release may change any generated file to fix or improve it. `isoloom check` tells you when your committed files need regenerating. | Snapshots in the test suite; the CHANGELOG says what changed. |
 
 ## Deprecation and removal
@@ -32,8 +32,8 @@ ones marked **Breaking**.
   removed outright, not kept as deprecated shims; the CHANGELOG names each one and its
   replacement.
 - **Catalogue entries** follow the notice above.
-- **Targets, providers and clouds** are removed only in a major release. A target can move down
-  a tier at any time: tiers state evidence, not a promise ([tiers](targets.md#tiers-how-far-a-target-is-proven)).
+- **Targets, providers and clouds** are removed only in a major release. The validators that
+  check a target's files ([validators](targets.md#validators)) may change in any release.
 
 ## Supported releases
 
@@ -58,6 +58,6 @@ vulnerability, and the response times: [SECURITY.md](../../.github/SECURITY.md).
 ## Platforms
 
 The release binaries are built for Linux (x86_64 and aarch64, static), macOS (x86_64 and arm64)
-and Windows (x86_64). CI runs the tests on Linux, macOS and Windows. The generated files run from
-all three; each target's [tier](targets.md#tiers-how-far-a-target-is-proven) says from which host
-OSes it has been proven.
+and Windows (x86_64). CI runs the tests on Linux, macOS and Windows. The generated files are each
+target's own tools' files, checked by their official validators
+([validators](targets.md#validators)).

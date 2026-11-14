@@ -1121,7 +1121,7 @@ Where it is mounted: an absolute path on Linux and in containers, a drive letter
 
 ### `machines.*.host_folders`
 
-Folders of the computer that runs the environment, mounted in the machine (read-only unless `read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when whoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`) or absolute; a writable one needs `writable-host-folders`, the container engine's socket `docker-socket`. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
+Folders of the computer that runs the environment, mounted in the machine (read-only unless `read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when whoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`) or absolute; a writable one needs `writable-host-folders`, the container engine's socket `docker-socket`. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, UTM's VirtFS, QEMU with `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
 
 - **Type:** list of mappings
 
@@ -1754,6 +1754,12 @@ The box the QEMU provider boots (libvirt format).
 ### `overrides.vagrant.machines.*.boxes.hyperv`
 
 The box the Hyper-V provider boots.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.boxes.utm`
+
+The box the UTM provider (`vagrant_utm`) boots: a UTM-format box.
 
 - **Type:** string
 

@@ -32,35 +32,34 @@ fn targets_lists_the_refused_clouds_under_cloud_vm() -> Outcome {
 }
 
 #[test]
-fn targets_gives_the_tier_of_each_target_generated_and_its_evidence() -> Outcome {
-    let home = scratch("targets-tiers")?;
+fn targets_gives_the_validators_of_each_target_generated() -> Outcome {
+    let home = scratch("targets-validators")?;
     let text = isoloom(&home, &[&"targets", &example("hello-stack")])?;
     assert_eq!(text.code, Some(0), "{text:?}");
-    let (_, tiers) = text.stdout.split_once("\nTiers (").ok_or("no tiers after the listing")?;
-    assert!(tiers.lines().any(|l| l.starts_with("  docker ")), "{}", text.stdout);
+    let (_, validators) = text.stdout.split_once("\nValidated by (").ok_or("no validators after the listing")?;
+    assert!(validators.lines().any(|l| l.starts_with("  docker ")), "{}", text.stdout);
     let o = isoloom(&home, &[&"targets", &example("hello-stack"), &"--json"])?;
     let listed: serde_json::Value = serde_json::from_str(&o.stdout)?;
     let targets = listed.as_array().ok_or("not a list")?;
     assert!(targets.iter().any(|t| t["id"] == "vagrant"), "{listed}");
     for t in targets {
-        let entries = t["tiers"].as_array().ok_or("no tiers")?;
-        assert!(!entries.is_empty(), "{t}");
-        for e in entries {
-            assert!(matches!(e["tier"].as_u64(), Some(1..=3)), "{e}");
-            assert!(e["evidence"].as_str().is_some_and(|s| !s.is_empty()), "{e}");
-            assert_eq!(e["target"], t["id"], "{e}");
-        }
+        assert!(t["validators"].as_array().is_some_and(|v| !v.is_empty()), "{t}");
+        assert!(t["writes"].as_str().is_some_and(|s| !s.is_empty()), "{t}");
     }
     Ok(())
 }
 
 #[test]
-fn matrix_shows_each_field_against_each_target_with_the_tiers() -> Outcome {
+fn matrix_shows_each_field_against_each_target_with_the_validators() -> Outcome {
     let home = scratch("matrix")?;
     let text = isoloom(&home, &[&"matrix"])?;
     assert_eq!(text.code, Some(0), "{text:?}");
     assert!(text.stdout.starts_with("Capability matrix: "), "{}", text.stdout);
-    assert!(text.stdout.contains("\n  vagrant/libvirt "), "the tiers");
+    assert!(
+        text.stdout.lines().any(|l| l.starts_with("  vagrant ") && l.ends_with("  vagrant validate")),
+        "the validators: {}",
+        text.stdout
+    );
     assert!(text.stdout.contains("\nmachines.*.app.image: "), "a row");
     let json = isoloom(&home, &[&"matrix", &"--json"])?;
     let v: serde_json::Value = serde_json::from_str(&json.stdout)?;
