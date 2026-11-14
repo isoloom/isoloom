@@ -67,12 +67,9 @@ fn parts(text: &str) -> Result<Vec<SpecPart>> {
 }
 
 /// What placeholder `r` shows, from the snapshot: its value, scalars plainly, lists and maps as
-/// compact JSON; a cloud output, known only once the module is applied, as written.
+/// compact JSON.
 /// [`Error::Placeholder`] for one that points at nothing.
 fn shown(snapshot: &Value, r: &Reference) -> Result<String> {
-    if let Reference::CloudOutput(_) = r {
-        return Ok(format!("{{{{ {r} }}}}"));
-    }
     let path = r.to_string();
     let value = lookup(snapshot, &path).ok_or_else(|| Error::Placeholder {
         path,

@@ -17,9 +17,9 @@ pub(super) struct Subject<'a> {
     pub at: String,
 }
 
-/// At least one machine (unless the environment is cloud services), and one access machine at most.
+/// At least one machine, and one access machine at most.
 pub(super) fn declared(spec: &Spec, problems: &mut Problems) {
-    if spec.machines.is_empty() && spec.cloud.is_none() {
+    if spec.machines.is_empty() {
         problems.add("machines", "declare at least one machine");
     }
     let access = spec.machines.values().filter(|m| m.access).count();

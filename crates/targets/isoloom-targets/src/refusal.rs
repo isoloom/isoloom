@@ -116,7 +116,6 @@ mod tests {
         let invalid_why = refusal(&invalid, Target::Docker).unwrap().unwrap();
         assert!(invalid_why.starts_with("the spec is invalid: machines.a.networks"), "{invalid_why}");
         assert_eq!(refusal(&lab(MACHINES), Target::Docker).unwrap(), None);
-        assert_eq!(refusal(&lab(MACHINES), Target::CloudServices).unwrap(), None, "not possible, not refused");
         let two = lab(&format!("{MACHINES}  b: {{ os: debian@12, networks: {{ lan: 11 }} }}\n"));
         assert_eq!(refusal(&two, Target::CloudVm).unwrap(), None);
         let digitalocean = refusal_on(&two, Target::CloudVm, Some("digitalocean")).unwrap().unwrap_or_default();

@@ -26,14 +26,11 @@ pub enum Target {
     /// Machines that already exist, reached over SSH at the addresses the spec gives
     /// (`machines.*.external`): nothing is created, everything else applies.
     External,
-    /// The spec's cloud services (`cloud:`): its Terraform module applied into the user's own
-    /// cloud account.
-    CloudServices,
 }
 
 impl Target {
     /// Every target, in the order they are listed (`isoloom targets`, the snapshot).
-    pub const ALL: [Target; 10] = [
+    pub const ALL: [Target; 9] = [
         Target::Docker,
         Target::Hosted,
         Target::CloudDocker,
@@ -43,7 +40,6 @@ impl Target {
         Target::Esxi,
         Target::CloudVm,
         Target::External,
-        Target::CloudServices,
     ];
 
     /// The implementation every machine needs for this target.
@@ -54,7 +50,6 @@ impl Target {
             Target::Vagrant | Target::Esxi | Target::CloudVm => Shape::Vm,
             Target::Proxmox => Shape::VmOrLxc,
             Target::External => Shape::External,
-            Target::CloudServices => Shape::Cloud,
         }
     }
 
@@ -71,7 +66,6 @@ impl Target {
             Target::Esxi => "esxi",
             Target::CloudVm => "cloud-vm",
             Target::External => "external",
-            Target::CloudServices => "cloud-services",
         }
     }
 }
@@ -87,8 +81,6 @@ pub enum Shape {
     VmOrLxc,
     /// An `external` block: the machine exists already.
     External,
-    /// No machines: the spec's `cloud:` services.
-    Cloud,
 }
 
 impl Shape {
@@ -100,7 +92,6 @@ impl Shape {
             Shape::Vm => "vm",
             Shape::VmOrLxc => "docker.lxc` or `vm",
             Shape::External => "external",
-            Shape::Cloud => "cloud",
         }
     }
 }
@@ -111,7 +102,7 @@ mod tests {
 
     #[test]
     fn a_shape_names_the_keys_a_refusal_quotes() {
-        let quoted = [Shape::Docker, Shape::Vm, Shape::VmOrLxc, Shape::External, Shape::Cloud].map(|s| format!("`{}`", s.key()));
-        assert_eq!(quoted, ["`docker`", "`vm`", "`docker.lxc` or `vm`", "`external`", "`cloud`"]);
+        let quoted = [Shape::Docker, Shape::Vm, Shape::VmOrLxc, Shape::External].map(|s| format!("`{}`", s.key()));
+        assert_eq!(quoted, ["`docker`", "`vm`", "`docker.lxc` or `vm`", "`external`"]);
     }
 }

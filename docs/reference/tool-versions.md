@@ -14,7 +14,6 @@ anything.
 | `proxmox` | Terraform, an OpenSSH client | Terraform 1.6.0 |
 | `esxi` | Terraform, `ovftool`, an OpenSSH client | Terraform 1.6.0 |
 | `cloud-vm`, `cloud-docker` | Terraform, an OpenSSH client | Terraform 1.6.0 |
-| `cloud-services` | Terraform, and what the spec's `cloud.requires` lists (installed by you) | none set |
 | `external` | Ansible, an OpenSSH client | none set |
 
 Terraform 1.6 or later works for every target.
@@ -53,8 +52,7 @@ reaches you only through a new Isoloom release, after the modules are validated 
 | Time | `hashicorp/time` | `~> 0.14.2` | a Windows machine's restart after its renaming |
 
 `terraform init` downloads them from the Terraform Registry, or from your provider mirror
-([offline guide](../guide/offline.md#running-without-internet-access)). `cloud-services` runs your
-own module, with the providers it pins.
+([offline guide](../guide/offline.md#running-without-internet-access)).
 
 OpenTofu is not tested: no CI job runs the generated modules with it.
 

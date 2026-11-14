@@ -14,7 +14,7 @@ fn labs_of(p: &Probe) -> Vec<(Target, Lab)> {
     let probes = probe::probes().unwrap();
     Target::ALL
         .into_iter()
-        .filter(|t| *t != Target::CloudServices && (p.only.is_empty() || p.only.contains(t)))
+        .filter(|t| p.only.is_empty() || p.only.contains(t))
         .filter_map(|t| {
             let lab = match t {
                 Target::External => lab(&probes.base, &p.patch, p.hosts),
@@ -62,11 +62,7 @@ fn the_lab_every_row_changes_is_generated_everywhere_but_where_a_network_is_refu
     };
     let row = row(&probes, &base, &columns()).unwrap();
     for (column, cell) in columns().iter().zip(&row.cells) {
-        let expected = match column.id().as_str() {
-            "cloud-services" => Cell::NotApplicable,
-            _ => Cell::Supported,
-        };
-        assert_eq!(*cell, expected, "{}", column.id());
+        assert_eq!(*cell, Cell::Supported, "{}", column.id());
     }
 }
 
@@ -158,7 +154,6 @@ fn sealed_by(target: Target) -> Option<Sealed> {
         Target::Docker | Target::Hosted | Target::CloudDocker => Sealed::AsMade("an internal Compose network: the containers have no route out"),
         Target::Kubernetes => Sealed::AsMade("an egress network policy on the offline pods"),
         Target::Vagrant | Target::External => Sealed::AsMade("each machine's own egress step, at the end of its set-up"),
-        Target::CloudServices => return None,
     })
 }
 
@@ -393,7 +388,7 @@ fn a_row_generated_on_a_target_changes_that_targets_files() {
     let mut dropped = Vec::new();
     let mut compared = 0;
     let mut excused_seen = BTreeSet::new();
-    for p in probes.rows.iter().filter(|p| !p.cloud) {
+    for p in &probes.rows {
         let name = match &p.value {
             Some(v) => format!("{} = {v}", p.field),
             None => p.field.clone(),

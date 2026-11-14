@@ -10,7 +10,6 @@
 
 mod boot;
 mod checks;
-mod cloud;
 mod constraints;
 mod dns;
 mod files;
@@ -122,7 +121,6 @@ pub fn validate(spec: &Spec) -> Vec<Problem> {
     networks::declared(spec, &mut p);
     networks::vlans(spec, &mut p);
     constraints::check(spec, &mut p);
-    cloud::check(spec, &mut p);
     let blocks = networks::blocks(spec, &mut p);
     networks::gateways(spec, &blocks, &mut p);
     outside::networks(spec, &mut p);

@@ -7,9 +7,9 @@ use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Network, Spec, Tc};
 use crate::net::{Cidr, DOCKER_BLOCK, NetworkBlock, PRIVATE};
 
-/// At least one network, unless the environment is cloud services.
+/// At least one network.
 pub(super) fn declared(spec: &Spec, problems: &mut Problems) {
-    if spec.networks.is_empty() && spec.cloud.is_none() {
+    if spec.networks.is_empty() {
         problems.add("networks", "declare at least one network");
     }
 }

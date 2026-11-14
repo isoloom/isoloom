@@ -21,7 +21,7 @@ Per target backend (prerequisites, credentials, permissions, cost, teardown):
 - [Vagrant](guide/targets/vagrant.md): `vagrant`
 - [Proxmox VE](guide/targets/proxmox.md): `proxmox`
 - [ESXi](guide/targets/esxi.md): `esxi`
-- [Clouds](guide/targets/cloud.md): `cloud-vm`, `cloud-docker`, `cloud-services` on AWS, Azure,
+- [Clouds](guide/targets/cloud.md): `cloud-vm`, `cloud-docker` on AWS, Azure,
   Google Cloud, DigitalOcean, Linode and Oracle Cloud
 - [Existing hosts](guide/targets/external.md): `external`, with Ansible
 

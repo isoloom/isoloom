@@ -64,12 +64,3 @@ fn a_placeholder_pointing_at_nothing_is_an_error_and_syntax_is_validated() {
     assert_eq!(problems.len(), 3, "{problems:?}");
     assert!(problems.iter().all(|p| p.starts_with("message:")), "{problems:?}");
 }
-
-#[test]
-fn a_cloud_output_stays_as_written_until_the_module_gives_it() -> Outcome {
-    let lab = example("cloud-bucket")?;
-    let shown = render_message(&lab, None)?.unwrap_or_default();
-    assert_eq!(shown, "The website answers at {{ cloud.outputs.site }}.\n");
-    assert_eq!(resolve(&lab)["message"].as_str(), Some(shown.as_str()));
-    Ok(())
-}

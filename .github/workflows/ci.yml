@@ -290,8 +290,8 @@ jobs:
       # The exports as JavaScript calls them (wasm-bindgen-test, on Node).
       - run: wasm-pack test --node crates/frontends/isoloom-wasm
 
-  # The generated Terraform (Proxmox, ESXi, cloud-docker, cloud-vm,
-  # cloud-services) is valid for its providers, with the latest Terraform.
+  # The generated Terraform (Proxmox, ESXi, cloud-docker, cloud-vm) is valid for its providers,
+  # with the latest Terraform.
   terraform:
     name: Terraform validate
     runs-on: ubuntu-24.04
@@ -322,11 +322,6 @@ jobs:
           }
           for d in examples/*/.isoloom/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
             validate "$d"
-          done
-          # cloud-services applies the lab's own module (its spec's `cloud.terraform`).
-          for d in examples/*/.isoloom/cloud-services; do
-            lab="${d%/.isoloom/cloud-services}"
-            validate "$lab/$(sed -n 's/^  terraform: *//p' "$lab/isoloom.yml" | head -n 1)"
           done
 
   # The cloud and server modules' logic proven without a cloud (`cargo xtask tf-test`): every

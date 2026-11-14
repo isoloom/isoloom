@@ -334,19 +334,12 @@ impl Lab {
 
     /// Why `target` can't run the lab at all, whatever its generator would say, if it can't: the
     /// one rule [`Lab::possible`] and every caller that explains a target left out read. In this
-    /// order: cloud services run on `cloud-services` only, which runs nothing else; a spec with no
-    /// machines runs nowhere; a machine the target has no form for (the access machine the spec
+    /// order: a spec with no machines runs nowhere; a machine the target has no form for (the access machine the spec
     /// leaves to the runner has the forms the image table gives it); and `targets:` leaves the
     /// target out.
     #[must_use]
     pub fn not_possible(&self, target: Target) -> Option<NotPossible> {
         let spec = &self.source;
-        if spec.cloud.is_some() {
-            return (target != Target::CloudServices).then_some(NotPossible::CloudServicesOnly);
-        }
-        if target == Target::CloudServices {
-            return Some(NotPossible::NoCloud);
-        }
         if spec.machines.is_empty() {
             return Some(NotPossible::NoMachines);
         }
@@ -514,10 +507,6 @@ impl Lab {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum NotPossible {
-    /// The spec has `cloud:`, which only `cloud-services` runs.
-    CloudServicesOnly,
-    /// The target is `cloud-services`, and the spec has machines instead of `cloud:`.
-    NoCloud,
     /// The spec has no machines.
     NoMachines,
     /// The first machine the target has no form for, at the field that rules it out.
@@ -532,8 +521,6 @@ pub enum NotPossible {
 impl fmt::Display for NotPossible {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NotPossible::CloudServicesOnly => f.write_str("cloud services run on `cloud-services` only"),
-            NotPossible::NoCloud => f.write_str("needs `cloud:` (cloud services instead of machines)"),
             NotPossible::NoMachines => f.write_str("the spec has no machines"),
             NotPossible::MissingForm(p) | NotPossible::Unsupplied(p) => f.write_str(&p.line()),
             NotPossible::LeftOut => f.write_str("left out by `targets:`"),

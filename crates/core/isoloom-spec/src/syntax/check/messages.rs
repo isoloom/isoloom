@@ -85,11 +85,6 @@ fn resolve(spec: &Spec, template_of: Option<&str>, r: &Reference) -> Result<(), 
             }
             Ok(())
         }
-        Reference::CloudOutput(name) => match &spec.cloud {
-            Some(c) if c.outputs.contains_key(name) => Ok(()),
-            Some(_) => Err(format!("`cloud.outputs` has no `{name}`")),
-            None => Err("the spec has no `cloud:`".into()),
-        },
         // Each names what every machine has, or an entry's own value: listed, so a new kind of
         // reference is resolved here before it is accepted.
         Reference::MachineName

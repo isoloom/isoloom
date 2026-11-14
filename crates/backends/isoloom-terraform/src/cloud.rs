@@ -1,6 +1,6 @@
 //! The clouds: the [`Cloud`]s the modules run on, what every cloud module shares (its head: the
 //! operator's variables, the provider, the environment's instance; the auto-stop), the targets
-//! on them (`cloud-vm`, `cloud-docker`, `cloud-services`), and each cloud's own folder: its
+//! on them (`cloud-vm`, `cloud-docker`), and each cloud's own folder: its
 //! pieces for both targets, and its driver of each (`<cloud>::vm::DRIVER`,
 //! `<cloud>::docker::DRIVER`), which holds only what the cloud does its own way.
 
@@ -14,7 +14,6 @@ pub(crate) mod instance;
 pub(crate) mod linode;
 pub(crate) mod oci;
 pub(crate) mod operator;
-pub(crate) mod services;
 pub(crate) mod user_data_limit;
 pub(crate) mod vm;
 

@@ -126,8 +126,7 @@ pub(crate) enum Decision {
     Generated,
     /// It refuses it.
     Refused(Refused),
-    /// The environment isn't one the target takes: cloud services on a machine target, machines on
-    /// `cloud-services`, a target `targets:` leaves out.
+    /// The environment isn't one the target takes: a target `targets:` leaves out.
     NotApplicable,
 }
 
@@ -286,7 +285,7 @@ mod tests {
 
     #[test]
     fn a_lab_a_target_doesnt_take_is_not_applicable_there() {
-        let two = lab(TWO);
-        assert_eq!(decide(&two, Target::CloudServices, None).unwrap(), Decision::NotApplicable);
+        let two = lab(&format!("{TWO}targets: [docker]\n"));
+        assert_eq!(decide(&two, Target::Vagrant, None).unwrap(), Decision::NotApplicable);
     }
 }

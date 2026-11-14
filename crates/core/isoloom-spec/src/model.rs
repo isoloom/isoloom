@@ -5,7 +5,6 @@
 mod boot;
 mod bridged;
 mod checks;
-mod cloud;
 mod configuration;
 mod constraints;
 mod hardware;
@@ -25,7 +24,6 @@ mod virtiofs;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub use checks::{Check, Declared, Expect};
-pub use cloud::{CloudProvider, CloudServices};
 pub use configuration::Configuration;
 pub use constraints::{Constraints, Mirrors, Proxy, resolvers};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
@@ -85,11 +83,6 @@ pub struct Spec {
     /// `depends_on`).
     #[serde(default)]
     pub machines: IndexMap<String, Machine>,
-    /// An environment of cloud services rather than machines (IAM users and roles, functions,
-    /// buckets, queues...): a Terraform module in the project, applied into the user's own cloud
-    /// account. A spec has either `cloud:` or machines.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cloud: Option<CloudServices>,
     /// Volumes shared between machines: a machine volume with one of these names is this
     /// volume, wherever it mounts it. One declared here can also outlive the runner's `down`
     /// (`persistent: true`) or be one that exists already (`external: <name>`).
@@ -213,7 +206,6 @@ impl Spec {
             inputs: Vec::new(),
             secrets: IndexMap::new(),
             machines: IndexMap::new(),
-            cloud: None,
             volumes: IndexMap::new(),
             constraints: None,
             common: None,

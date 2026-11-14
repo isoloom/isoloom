@@ -127,7 +127,13 @@ impl Reader {
         self.set(&mut top, "tools", &mut spec.tools);
         self.set(&mut top, "targets", &mut spec.targets);
         self.set(&mut top, "constraints", &mut spec.constraints);
-        self.set(&mut top, "cloud", &mut spec.cloud);
+        if top.remove("cloud").is_some() {
+            self.problems.push(Problem::new(
+                Code::RemovedField,
+                FieldPath::new("cloud"),
+                "cloud-services is not supported in Isoloom 3.0",
+            ));
+        }
         let mut tags: indexmap::IndexMap<String, super::tags::TagValue> = indexmap::IndexMap::new();
         if self.set(&mut top, "tags", &mut tags) {
             spec.tags = super::tags::text(tags);

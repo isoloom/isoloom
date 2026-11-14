@@ -7,7 +7,6 @@
 //! Isoloom read this instead of parsing a Vagrantfile.
 
 mod checks;
-mod cloud;
 mod machines;
 mod message;
 mod networks;
@@ -111,11 +110,7 @@ fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     out.insert("published".into(), ports::published(spec).into());
     out.insert("targets".into(), targets::section(lab));
     out.insert("checks".into(), checks::section(spec));
-    if let Some(c) = &spec.cloud {
-        out.insert("cloud".into(), cloud::section(c));
-    }
-    // The message, with its placeholders filled from everything above (a cloud output stays as
-    // written: it is known only once the module is applied).
+    // The message, with its placeholders filled from everything above.
     let mut snapshot = Value::Object(out);
     if let Some(m) = &spec.message {
         let filled = fill(m, &snapshot).ok();

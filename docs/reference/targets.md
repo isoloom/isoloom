@@ -17,7 +17,6 @@ is the prose around it.
 | `esxi` | A Terraform module for a standalone ESXi host |
 | `cloud-vm` | A Terraform module: one cloud VM per machine |
 | `cloud-docker` | A Terraform module: the containers on one cloud VM |
-| `cloud-services` | Your own Terraform module, applied into your cloud account |
 | `external` | Hosts that already exist, set up and checked over SSH with Ansible |
 
 ## Targets are derived, not declared
@@ -40,8 +39,8 @@ Two targets fan out:
   exists only on the hosts that have it (Hyper-V on Windows, libvirt on Linux, Parallels and UTM
   on macOS, QEMU on Linux and macOS); the others run on all three. On UTM each network is an
   isolated vmnet network the Vagrantfile attaches the VMs to, and a VM boots a UTM box.
-- **`cloud-vm`, `cloud-docker` and `cloud-services`** target six clouds: AWS, Azure, Google
-  Cloud, DigitalOcean, Linode and Oracle Cloud.
+- **`cloud-vm` and `cloud-docker`** target six clouds: AWS, Azure, Google Cloud, DigitalOcean,
+  Linode and Oracle Cloud. `cloud-services` is not supported in Isoloom 3.0: a spec with `cloud:` is refused.
 
 The Vagrantfile is one file for every provider, chosen at `vagrant up --provider`; the cloud
 targets write one module per cloud (`.isoloom/cloud-vm/<cloud>/main.tf`).
@@ -64,7 +63,6 @@ mocked and every run a plan (`cargo xtask tf-test`).
 | `esxi` | a Terraform module for a standalone ESXi host | `terraform validate`, `tflint`, `terraform test` |
 | `cloud-vm` | a Terraform module per cloud | `terraform validate`, `tflint`, `terraform test` |
 | `external` | an Ansible inventory and playbook for hosts that exist | `ansible-lint` |
-| `cloud-services` | the fixed variables (`terraform.tfvars.json`) of the environment's own Terraform module | `terraform validate`, `terraform test` |
 
 `isoloom targets` shows the validators of a spec's targets, and `isoloom matrix` (and the
 [target matrix](../matrix.md) generated from it) all of them.

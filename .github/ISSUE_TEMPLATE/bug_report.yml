@@ -41,7 +41,6 @@ body:
         - esxi
         - cloud-vm
         - cloud-docker
-        - cloud-services
         - external
         - none (validate, generate, import, another command)
     validations:

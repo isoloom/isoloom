@@ -1,7 +1,0 @@
----
-source: crates/isoloom-terraform/tests/cloud_services.rs
-expression: "file(\"terraform.tfvars.json\")"
----
-{
-  "region": "us-east-1"
-}

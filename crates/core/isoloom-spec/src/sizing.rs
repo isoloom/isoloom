@@ -88,13 +88,12 @@ fn machine_size(m: &model::Machine, form: Form) -> (u32, u32, u32) {
 }
 
 /// Whether `target` runs `m` as a container (lighter) rather than a VM. Proxmox decides machine
-/// by machine; the machine targets that aren't about a local footprint (external
-/// hosts, cloud services) count as VM-sized, the heavier guess.
+/// by machine; external hosts, which aren't about a local footprint, count as VM-sized, the heavier guess.
 fn form_on(target: model::Target, m: &model::Machine) -> Form {
     use model::Shape;
     let container = match target.needs() {
         Shape::Docker => true,
-        Shape::Vm | Shape::External | Shape::Cloud => false,
+        Shape::Vm | Shape::External => false,
         Shape::VmOrLxc => m.docker.as_ref().is_some_and(|d| d.lxc),
     };
     if container { Form::Container } else { Form::Vm }

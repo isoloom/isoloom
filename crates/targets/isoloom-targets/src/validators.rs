@@ -52,10 +52,6 @@ pub fn of(target: Target) -> Validated {
         Target::Esxi => ("a Terraform module for a standalone ESXi host", &TERRAFORM),
         Target::CloudVm => ("a Terraform module per cloud", &TERRAFORM),
         Target::External => ("an Ansible inventory and playbook for hosts that exist", &["ansible-lint"]),
-        Target::CloudServices => (
-            "the fixed variables (`terraform.tfvars.json`) of the environment's own Terraform module",
-            &["terraform validate", "terraform test"],
-        ),
     };
     Validated { target, writes, validators }
 }
@@ -78,9 +74,6 @@ pub(crate) fn name(target: Target, variant: Option<&str>) -> String {
 /// The Vagrant providers the Vagrantfile has a block for, as `vagrant up --provider` names them.
 pub(crate) const VAGRANT_PROVIDERS: [&str; 8] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "utm", "vmware_esxi"];
 
-/// The clouds `cloud-services` reads (`cloud.provider`).
-const CLOUD_SERVICES: [&str; 3] = ["aws", "azure", "gcp"];
-
 /// The providers or clouds `target` has, each its own column of the matrix; empty for a target
 /// that has none.
 #[must_use]
@@ -88,7 +81,6 @@ pub fn variants(target: Target) -> Vec<&'static str> {
     match target {
         Target::Vagrant => VAGRANT_PROVIDERS.to_vec(),
         Target::CloudVm | Target::CloudDocker => isoloom_terraform::Cloud::ALL.iter().map(|c| c.id()).collect(),
-        Target::CloudServices => CLOUD_SERVICES.to_vec(),
         Target::Docker | Target::Hosted | Target::Kubernetes | Target::Proxmox | Target::Esxi | Target::External => Vec::new(),
     }
 }

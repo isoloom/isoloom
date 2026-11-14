@@ -50,7 +50,7 @@ fn an_access_machine_the_runner_supplies_counts_as_the_image_table_gives_it() ->
     // Without an image table, every target that creates the machines is ruled out at the access
     // machine's `os`, and says so.
     assert!(
-        bare.possible().iter().all(|t| matches!(t, Target::External | Target::CloudServices)),
+        bare.possible().iter().all(|t| *t == Target::External),
         "{:?}",
         bare.possible()
     );

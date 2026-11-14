@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-terraform"
-description = "The Terraform backends of Isoloom (Proxmox, ESXi, cloud VMs, cloud Docker, cloud services)."
+description = "The Terraform backends of Isoloom (Proxmox, ESXi, cloud VMs, cloud Docker)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
