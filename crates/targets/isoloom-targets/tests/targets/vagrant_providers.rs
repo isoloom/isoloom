@@ -1,5 +1,5 @@
 //! What the Vagrant target writes for one provider beyond the others: QEMU's hubs and disk
-//! sizes, UTM's missing private networks, VMware's nested virtualization, ESXi's architecture.
+//! sizes, UTM's vmnet networks and boxes, VMware's nested virtualization, ESXi's architecture.
 
 use isoloom_spec::Target;
 use isoloom_targets::{refusal, refusal_on};
@@ -100,19 +100,31 @@ fn qemu_sizes_the_disk_only_above_the_box() -> Outcome {
 }
 
 #[test]
-fn the_vagrant_target_has_no_utm_provider() -> Outcome {
-    // Every machine is on a network (validation asks it), and vagrant_utm gives a VM none: UTM
-    // could run no environment's VMs, so the Vagrantfile has no block for it, and asking for it
-    // says so; the other providers run the environment.
+fn utm_runs_each_vm_on_its_networks_isolated_vmnet_ones() -> Outcome {
+    // vagrant_utm makes no adapter for a private network: each VM's adapters are QEMU arguments
+    // set before it boots (one isolated vmnet network per network), its addresses set once it
+    // answers.
     let spec = lab(THREE)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("utm")).unwrap().ok_or("UTM taken")?;
-    assert!(
-        why.starts_with("the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network"),
-        "{why}"
-    );
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("utm")).unwrap(), None);
     let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
-    assert!(!vf.contains("\"utm\"") && !vf.contains("ISOLOOM_NAT_ROUTE"), "{vf}");
+    assert!(vf.contains("module IsoloomUtm"), "the preamble carries IsoloomUtm");
+    let a = provider_block(&vf, "a", "utm")?;
+    assert!(a.contains("o.vm.box = \"utm/bookworm\""), "{a}");
+    let vm = define(&vf, "a")?;
+    assert!(vm.contains("IsoloomUtm.attach(machine, [[\"lab\", \"02:15:"), "{vm}");
+    assert!(vm.contains(":\"VagrantPlugins::Utm::Action::CheckGuestAdditions\""), "{vm}");
+    Ok(())
+}
+
+#[test]
+fn utm_refuses_what_it_cant_give_saying_what_would() -> Outcome {
+    // An OS with no UTM box, data disks and a bridged network: each refused with its way out.
+    let no_box = lab("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@13, networks: { lab: 10 }, app: { steps: [{ run: p.sh }] } }\n")?;
+    let why = refusal_on(&no_box, Target::Vagrant, Some("utm")).unwrap().ok_or("debian 13 taken")?;
+    assert!(why.contains("no known UTM box") && why.contains("boxes.utm"), "{why}");
+    let disks = lab("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 }, disks: { data: { size_gb: 2, mount: /data } }, app: { steps: [{ run: p.sh }] } }\n")?;
+    let why = refusal_on(&disks, Target::Vagrant, Some("utm")).unwrap().ok_or("data disks taken")?;
+    assert!(why.contains("data disks"), "{why}");
     Ok(())
 }
 

@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn vagrant_and_cloud_vm_have_a_column_per_provider_and_per_cloud() {
         let ids: Vec<String> = columns().iter().map(Column::id).collect();
-        assert_eq!(ids.len(), Target::ALL.len() - 2 + 7 + 6);
+        assert_eq!(ids.len(), Target::ALL.len() - 2 + 8 + 6);
         assert!(ids.contains(&"vagrant/libvirt".to_owned()) && ids.contains(&"cloud-vm/oci".to_owned()));
         assert!(!ids.contains(&"vagrant".to_owned()) && ids.contains(&"cloud-docker".to_owned()));
     }
