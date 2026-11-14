@@ -397,6 +397,7 @@ rows:
     patch: { checks: [check.sh] }
   - field: tools
     about: a toolbox beside the environment, on every network
+    features: [tools]
     patch: { tools: { shell: {} } }
   - field: constraints.proxy
     about: an HTTP proxy every machine goes through

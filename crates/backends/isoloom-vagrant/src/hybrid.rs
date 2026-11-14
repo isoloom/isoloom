@@ -39,6 +39,8 @@ pub fn capabilities() -> Capabilities {
         Feature::PlaybookChecks,
         Feature::ExecWithoutContainer,
         Feature::MachineAliases,
+        // Each tool a container of its own on every network.
+        Feature::Tools,
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Tpm,
