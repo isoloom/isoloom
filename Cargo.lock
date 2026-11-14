@@ -829,6 +829,7 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "isoloom-terraform",
+ "isoloom-test-support",
  "isoloom-vagrant",
  "jsonschema",
  "proptest",
@@ -861,6 +862,7 @@ name = "isoloom-test-support"
 version = "3.0.0"
 dependencies = [
  "hcl-rs",
+ "serde",
  "serde_yaml_ng",
  "tempfile",
 ]
