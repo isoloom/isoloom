@@ -114,6 +114,48 @@ pub(crate) fn secrets_step(mp: &MachinePlan) -> Option<Template> {
     Some(t)
 }
 
+/// A server machine's secrets as a file of `NAME='<base64>'` lines, one per value its set-up
+/// keeps, each from its variable: cloud-init writes it (Proxmox) or Terraform uploads it over SSH
+/// (ESXi), and [`secrets_from_file`] reads it. `None` when the machine gets no secret.
+pub(crate) fn secrets_file(mp: &MachinePlan) -> Option<Expression> {
+    let (unique, values) = kept_values(mp)?;
+    let lines = unique.iter().zip(&values).map(|(f, (_, var))| {
+        Template::text(format!("{var}='"))
+            .with_expr(call("base64encode", [value_of(f)]))
+            .with_text("'")
+            .into_expression()
+    });
+    Some(call("join", [string(""), list(lines.map(|l| call("format", [string("%s\n"), l])))]))
+}
+
+/// The `Secrets` step reading [`secrets_file`] at `path` (run as root): the values exported from
+/// it, the file removed, then each kept and the files put in place now and at every boot
+/// (`isoloom_render::secrets::from_environment`). `None` when the machine gets no secret.
+pub(crate) fn secrets_from_file(mp: &MachinePlan, path: &str) -> Option<String> {
+    let (_, values) = kept_values(mp)?;
+    let script = isoloom_render::secrets::from_environment(&values, &mp.secrets);
+    Some(format!(
+        "set -a && . {path} && set +a && rm -f {path} && sh -c {}",
+        isoloom_spec::shell::quote(script.trim_end_matches('\n'))
+    ))
+}
+
+/// A machine's secret files, each once, and each one's kept name with the variable its value
+/// travels in.
+type Kept<'a> = (Vec<&'a SecretFile>, Vec<(String, String)>);
+
+/// Each secret file of `mp` once by the name its value is kept under, with that name and the
+/// variable its value travels in. `None` when it has none.
+fn kept_values(mp: &MachinePlan) -> Option<Kept<'_>> {
+    if mp.secrets.is_empty() {
+        return None;
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    let unique: Vec<&SecretFile> = mp.secrets.iter().filter(|f| seen.insert(f.kept().to_owned())).collect();
+    let values = unique.iter().map(|f| (f.kept().to_owned(), secret_variable(&f.name))).collect();
+    Some((unique, values))
+}
+
 #[cfg(test)]
 mod tests {
     use isoloom_spec::model::Target;

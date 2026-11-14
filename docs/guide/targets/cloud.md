@@ -62,8 +62,8 @@ them, so one environment of values starts every format (`TF_VAR_<name>`, or `-va
   it.
 
 A machine's user data writes them in place (the inputs file, its secret files), so they are in
-the cloud's copy of the user data and in Terraform's state, as every value a module takes is: keep
-the state where its secrets are safe.
+the cloud's copy of the user data. Terraform stores sensitive values in its state, as it does for
+every variable.
 
 Prefer short-lived credentials: an assumed role (AWS), a workload identity or service principal
 with a federated credential (Azure), a service account impersonated or federated (Google Cloud).

@@ -71,7 +71,7 @@ machine the `checks` output names, through the router (`ssh -J isoloom@<ip> isol
 .isoloom/esxi/checks/<position>.sh`).
 
 Or with a runner, which gives the module its slot and key and runs the checks (it runs Terraform, `ovftool` and `ssh` from the machine it runs on;
-secrets are refused on ESXi):
+a Windows machine's secrets are refused on ESXi):
 
 ```sh
 isothrum up . --target esxi
@@ -83,8 +83,10 @@ isothrum down . --target esxi
 
 The ESXi provider connects over SSH with a password; prefer an account used only for this.
 Windows machines are set up over WinRM in plain HTTP on the environment's private networks (see
-[security considerations](../../explanation/security.md#winrm)). The ESXi target refuses secrets
-and inputs delivered as files.
+[security considerations](../../explanation/security.md#winrm)). A Linux machine's secrets and
+inputs delivered as files come from the module's variables (`ISOLOOM_SECRET_<NAME>`, sensitive,
+and each input under its name), written by cloud-init from the VM's guestinfo user data; Terraform stores sensitive values
+in its state, as it does for every variable. A Windows machine's are refused.
 
 ## Teardown
 

@@ -80,8 +80,9 @@ set); a cluster that admits only `restricted` pods refuses them. Every object is
 
 ## Public IP addresses on cloud VMs
 
-Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: the runner reaches
-the machines over SSH to deliver the project and secrets and to run the checks. Their security
+Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: Terraform reaches
+the machines over SSH to bring the project in and wait for their set-up, and you to run the
+checks. Their security
 groups or firewalls accept SSH (22), WinRM (5985, Windows) and the published ports only from
 `allowed_cidr`, which has no default: set it to your address or your egress range. Nothing is
 open to `0.0.0.0/0` inbound but one ICMP message on Oracle Cloud: "fragmentation needed" (and
@@ -101,9 +102,9 @@ a server's router (its sealed ruleset applied over SSH). Egress is then limited 
 environment's networks. The seal fails closed (the apply fails), and every later apply keeps it.
 DigitalOcean and Linode, whose firewalls can't be closed after the fact, refuse such a network.
 
-Values given at launch are module variables (`sensitive` for secrets), written into a machine by
-its user data or cloud-init: they are in the cloud's copy of the user data and in Terraform's
-state. Keep the state somewhere its secrets are safe. [ADR 0004](adr/0004-egress-seal.md) explains
+On the Terraform targets, values given at launch are module variables (`sensitive` for secrets
+and sensitive inputs), written into a machine by its user data, its cloud-init snippet or an
+upload over SSH. Terraform stores sensitive values in its state, as it does for every variable. [ADR 0004](adr/0004-egress-seal.md) explains
 the design and its one residual channel (the cloud's DNS resolver).
 
 ## Expiry

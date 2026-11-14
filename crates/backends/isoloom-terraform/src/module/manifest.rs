@@ -191,14 +191,6 @@ pub(crate) fn terraform_output(name: &str, role: OutputRole, description: &str) 
     })
 }
 
-/// The VMs that read the launch-time input `name`, in start order (empty: none do).
-pub(crate) fn input_readers(env: &Environment, name: &str) -> Result<Vec<Name>, ManifestError> {
-    env.vms()
-        .filter(|Vm { plan: mp, .. }| mp.inputs.iter().any(|i| i == name))
-        .map(|Vm { name: n, .. }| Name::parse(n))
-        .collect()
-}
-
 /// A check runner per position, on the machine `crate::machine::check_machine` says, its step
 /// from `step` (given the position, that machine and its checks; `None`: no runner there): the
 /// one loop of every Terraform target's run manifest.

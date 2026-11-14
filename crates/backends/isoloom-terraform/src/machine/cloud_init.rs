@@ -247,6 +247,10 @@ pub(crate) fn prelude(env: &Environment) -> Option<String> {
     Shell::Root.step(env, "", &Step::Prelude)
 }
 
+/// Where cloud-init writes a machine's secrets file (`inputs::secrets_file`), which its `Secrets`
+/// step reads and removes (Proxmox's cloud-init snippet, ESXi's guestinfo user data).
+pub(crate) const WRITTEN_SECRETS: &str = isoloom_spec::linux_state_path!("/secrets.env");
+
 /// Adds `machine`'s steps to `config`: the prelude, the inputs file, the steps (the project is
 /// the target's: its files are written in place), and what a `reboot` step needs.
 pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), config: &mut CloudConfig) {
@@ -257,12 +261,21 @@ pub(crate) fn machine(env: &Environment, (machine, mp): (&str, &MachinePlan), co
         config.files.push(file(steps::KEPT_INPUTS_FILE, Some("0600"), inputs::file(&mp.inputs)));
         config.track("inputs", &format!("install -m 600 {} {}", steps::KEPT_INPUTS_FILE, steps::INPUTS_FILE));
     }
+    if let Some(content) = inputs::secrets_file(mp) {
+        // Root's alone, read and removed by the `Secrets` step.
+        config.files.push(file(WRITTEN_SECRETS, Some("0600"), content));
+    }
     let mut parts: Vec<Vec<String>> = vec![Vec::new()];
     let mut again: Vec<String> = Vec::new();
     let mut configures = 0usize;
     for step in &mp.lifecycle {
         match step {
             Step::Prelude | Step::Project => {}
+            Step::Secrets => {
+                if let Some(read) = inputs::secrets_from_file(mp, WRITTEN_SECRETS) {
+                    parts.last_mut().into_iter().for_each(|p| p.push(tracked(&label(step), &read)));
+                }
+            }
             Step::Disks { disks } => config.disks.clone_from(disks),
             Step::Reboot => parts.push(again.clone()),
             // The recipe's script is carried in `write_files`, compressed, and run from here, so

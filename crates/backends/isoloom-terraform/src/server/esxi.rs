@@ -31,9 +31,9 @@
 //!   the `internet: false` networks at the router (`crate::server::router::seal`): the apply ends
 //!   with the environment ready. The run manifest (`.isoloom/esxi/run.json`, see `manifest`) is
 //!   the servers' own.
-//! - Secrets and inputs as files are refused: a machine would wait for a runner to deliver them
-//!   over SSH at its own address, and an ESXi machine is reached only through the router, which a
-//!   run manifest's guest delivery doesn't go through.
+//! - A Linux machine's secrets and inputs as files come from the module's variables (sensitive
+//!   ones for the secrets), written by cloud-init from its guestinfo user data; Terraform keeps them in its state, as
+//!   it does every variable. A Windows machine's are refused (`super::secrets_refusal`).
 
 mod base;
 mod boot;
@@ -46,7 +46,7 @@ mod outside;
 mod router;
 mod windows;
 
-use isoloom_plan::{Capabilities, Environment, Feature, Vm};
+use isoloom_plan::{Capabilities, Environment, Vm};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
@@ -124,6 +124,7 @@ fn refusal(env: &Environment) -> Option<String> {
         .or_else(|| boot::refusal(env))
         .or_else(|| disks::refusal(env))
         .or_else(|| interfaces(env))
+        .or_else(|| super::secrets_refusal(env))
 }
 
 /// Why a VM would have more interfaces than ESXi gives it, if one would: the router needs one
@@ -151,12 +152,12 @@ impl Backend for EsxiBackend {
 
     /// What a server target gives (`crate::server::features`): the router, the controller, the
     /// machines' own steps and the provider. The rest (own images, TPM, GPUs, nesting, rate
-    /// limits, which the provider has no setting for) is refused, and so are secrets and inputs
-    /// as files: a machine waits for a runner to deliver them over SSH at its own address, and an
-    /// ESXi machine is reached only through the router, which a run manifest's guest delivery
-    /// doesn't go through.
+    /// limits, which the provider has no setting for) is refused. A Linux machine's secrets come
+    /// from the module's variables, written by cloud-init from its guestinfo user data
+    /// (`super::secrets_refusal` says
+    /// where they can't).
     fn capabilities(&self) -> Capabilities {
-        Capabilities::of(super::features().filter(|f| !matches!(f, Feature::Secrets | Feature::SecretOwners)))
+        Capabilities::of(super::features())
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {

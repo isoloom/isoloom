@@ -118,6 +118,12 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
                 next.extend(again.iter().cloned());
                 done.push(std::mem::replace(&mut part, next));
             }
+            At::Step(Step::Secrets) => {
+                if let Some(read) = inputs::secrets_from_file(plan, cloud_init::WRITTEN_SECRETS) {
+                    let c = steps::tracked("its secrets", &Shell::Sudo.command(&read), &|mark| Shell::Sudo.command(mark));
+                    part.push(c.into());
+                }
+            }
             At::Step(step) => {
                 let Some(c) = Shell::Sudo.tracked_step(env, name, step) else { continue };
                 if at_every_boot(step)

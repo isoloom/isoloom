@@ -94,7 +94,16 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, m: &mut
         user_data: if windows {
             cloudbase_init::user_data(env, (name, mp))
         } else {
-            CloudConfig::new(name, reference("local.users")).document()
+            let mut config = CloudConfig::new(name, reference("local.users"));
+            // The secrets' values, root's alone, for the set-up over SSH to put in place.
+            if let Some(content) = crate::module::inputs::secrets_file(mp) {
+                config.files.push(crate::machine::cloud_init::file(
+                    crate::machine::cloud_init::WRITTEN_SECRETS,
+                    Some("0600"),
+                    content,
+                ));
+            }
+            config.document()
         },
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],

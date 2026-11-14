@@ -134,6 +134,7 @@ fn refusal(env: &Environment) -> Option<String> {
             .or_else(|| arch::refusal(env))
             .or_else(|| virtiofs::refusal(env))
             .or_else(|| lxc::refusal(env))
+            .or_else(|| super::secrets_refusal(env))
     })
 }
 
@@ -147,13 +148,11 @@ impl Backend for ProxmoxBackend {
     }
 
     /// What a server target gives (`crate::server::features`), and a virtual TPM, GPUs passed
-    /// through, nesting, rate limits and VMs waiting for LXC containers. Secrets and inputs as
-    /// files are refused: a machine waits for a runner to deliver them over SSH at its own
-    /// address, and a Proxmox machine is reached only through the router, which a run manifest's
-    /// guest delivery doesn't go through.
+    /// through, nesting, rate limits and VMs waiting for LXC containers. A Linux VM's secrets
+    /// come from the module's variables in its cloud-init snippet (`super::secrets_refusal` says
+    /// where they can't).
     fn capabilities(&self) -> Capabilities {
-        let delivered = |f: &Feature| !matches!(f, Feature::Secrets | Feature::SecretOwners);
-        Capabilities::of(super::features().filter(delivered).chain([
+        Capabilities::of(super::features().chain([
             Feature::Tpm,
             // Passed through by PCI id or resource mapping (`gpus.ids`, refused without).
             Feature::VmGpus,

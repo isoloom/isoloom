@@ -57,7 +57,12 @@ pub(crate) fn connection(variables: &[Variable]) -> Result<Vec<SecretSlot>, Mani
 pub(super) fn secrets(env: &Environment, variables: &[Variable]) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = connection(variables)?;
     for input in &env.inputs {
-        let readers = crate::module::manifest::input_readers(env, &input.name)?;
+        // The machines reading it in their environment or as a file.
+        let readers: Vec<Name> = env
+            .vms()
+            .filter(|vm| vm.plan.reads_input(&input.name))
+            .map(|vm| Name::parse(vm.name))
+            .collect::<Result<_, _>>()?;
         if readers.is_empty() {
             continue;
         }
@@ -70,6 +75,12 @@ pub(super) fn secrets(env: &Environment, variables: &[Variable]) -> Result<Vec<S
         // Left out, an input is an empty value in the map: the machines read it empty.
         s.default = Some(String::new());
         out.push(s);
+    }
+    // Each secret a machine gets as a file, from its store: the module's variable
+    // `ISOLOOM_SECRET_<NAME>`, which its set-up writes in place.
+    for held in isoloom_render::run_manifest::held_secrets(env, isoloom_plan::MachineShape::Vm) {
+        let readers: Vec<Name> = held.holders.iter().map(|n| Name::parse(n)).collect::<Result<_, _>>()?;
+        out.push(crate::cloud::manifest::connection::machine_secret(held.name, held.source, &readers)?);
     }
     Ok(out)
 }

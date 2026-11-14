@@ -91,20 +91,25 @@ fn windows_and_ipv6_are_hosted_within_limits() {
     assert_eq!(EsxiBackend.refusal(&env(PAIR)), None);
 }
 
-/// A secret's or an input's value as a file is refused: the machine would wait for a runner to
-/// deliver it over SSH at the machine's own address, and an ESXi machine is reached only through
-/// the router. A file written in the spec is not.
+/// A Linux machine's secret or input as a file comes from the module's variable, written by
+/// cloud-init from its guestinfo user data and read by its `Secrets` step; a Windows machine's is refused (its set-up
+/// has no step that takes it).
 #[test]
-fn secrets_and_inputs_as_files_are_refused() {
+fn a_linux_machines_secrets_come_from_the_modules_variables_and_a_windows_ones_are_refused() {
     let secret = ("secrets: { token: { env: TOKEN } }", "{ path: /etc/token, secret: token }");
     let input = ("inputs: [TOKEN]", "{ path: /etc/token, input: TOKEN }");
     for (top, file) in [secret, input] {
         let spec = format!(
             "version: 1\nname: s\n{top}\nnetworks: {{ lan: {{ cidr: 10.20.1.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, files: [{file}] }}\n"
         );
-        let why = EsxiBackend.refusal(&env(&spec)).unwrap();
-        assert!(why.contains("nothing delivers them"), "{why}");
+        assert_eq!(EsxiBackend.refusal(&env(&spec)), None, "{spec}");
+        let tf = module(&spec);
+        assert!(
+            tf.contains(". /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env"),
+            "{tf}"
+        );
+        let windows = spec.replace("os: debian@12", "os: windows-server@2022").replace("/etc/token", "C:\\\\token");
+        let why = crate::server::secrets_refusal(&env(&windows)).unwrap_or_default();
+        assert!(why.contains("gets `secrets`"), "{why}");
     }
-    let written = "version: 1\nname: s\nnetworks: { lan: { cidr: 10.20.1.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, files: [{ path: /etc/motd, content: hi }] }\n";
-    assert_eq!(EsxiBackend.refusal(&env(written)), None);
 }

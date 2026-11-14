@@ -284,7 +284,7 @@ fn secrets_project_files_kept_volumes_and_tools_reach_the_manifest() -> Outcome 
     assert_eq!(secret["machines"], serde_json::json!(["app", "isoloom-init-app-1"]));
     assert_eq!(secret["deliver"][0]["var"], "ISOLOOM_SECRET_DB_PASSWORD");
     // To the steps that create or start them (Compose writes the file again at each start).
-    assert_eq!(secret["deliver"][0]["steps"], serde_json::json!(["up", "start", "job-isoloom-init-app-1"]));
+    assert_eq!(secret["deliver"][0]["steps"], serde_json::json!(["up", "start"]));
     // A project file with an owner travels through Compose's environment too, read from the project.
     assert_eq!(
         json["secrets"][1]["source"],
@@ -423,21 +423,19 @@ fn a_secret_and_an_input_get_the_same_slot_on_every_target() -> Outcome {
 }
 
 #[test]
-fn proxmox_refuses_values_as_files_it_could_never_deliver() -> Outcome {
-    // Its machines sat waiting half an hour for a delivery the run manifest had no slot for.
-    let why = isoloom_targets::refusal(&lab(VALUES)?, Target::Proxmox)
-        .unwrap()
-        .ok_or("proxmox takes the lab")?;
-    assert!(why.contains("machine `db` gets `secrets`") && why.contains("nothing delivers them"), "{why}");
-    // An input in a machine's environment still goes in through the module's `inputs`.
-    let env_only = VALUES
-        .replace(
-            "      - { path: /run/db-password, secret: db-password }\n      - { path: /run/launch-token, input: LAUNCH_TOKEN }\n",
-            "",
-        )
-        .replace("    files:\n", "");
-    let m = run_json(&generate(&lab(&env_only)?, Target::Proxmox)?, ".isoloom/proxmox/run.json")?;
-    assert!(m.secrets.iter().any(|s| s.name.as_str() == "API_URL"), "{:?}", m.secrets);
+fn proxmox_takes_values_as_files_from_the_modules_variables() -> Outcome {
+    // A Linux VM's secret and input files come from the module's variables in its cloud-init
+    // snippet: each a slot the runner gives Terraform as `TF_VAR_<name>`.
+    let files = generate(&lab(VALUES)?, Target::Proxmox)?;
+    let m = run_json(&files, ".isoloom/proxmox/run.json")?;
+    for name in ["API_URL", "LAUNCH_TOKEN", "db-password"] {
+        assert!(m.secrets.iter().any(|s| s.name.as_str() == name), "{name}: {:?}", m.secrets);
+    }
+    let tf = file(&files, ".isoloom/proxmox/main.tf")?;
+    assert!(
+        tf.contains("variable \"ISOLOOM_SECRET_DB_PASSWORD\"") && tf.contains("variable \"LAUNCH_TOKEN\""),
+        "{tf}"
+    );
     Ok(())
 }
 

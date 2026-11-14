@@ -179,13 +179,13 @@ fn no_secret_value_reaches_a_generated_file() -> Outcome {
 #[test]
 fn no_secret_value_reaches_a_vm_target_file() -> Outcome {
     let generated = generated(VMS, "vms")?;
-    // The VM targets' set-up waits for the secrets the runner delivers (Proxmox refuses them:
-    // nothing could deliver them behind its router).
-    assert!(find(&generated, "proxmox/main.tf").is_err(), "proxmox refuses secrets");
-    for vm in ["vagrant/Vagrantfile", "cloud-vm/aws/main.tf"] {
+    // Every VM target keeps the values the way its tool hands them over: Vagrant's provisioner
+    // environment, the Terraform targets' module variables (cloud user data, Proxmox cloud-init),
+    // the secret's name in the files, never its value.
+    for vm in ["vagrant/Vagrantfile", "cloud-vm/aws/main.tf", "proxmox/main.tf"] {
         assert!(
             find(&generated, vm)?.contains("/var/lib/isoloom/secrets/.delivered"),
-            "{vm} doesn't wait for the secrets"
+            "{vm} doesn't keep the secrets"
         );
     }
     Ok(())

@@ -72,7 +72,10 @@ router. So the apply ends with the environment ready. The environment's inputs a
 their own names (`-var TOKEN=...`, or `TF_VAR_TOKEN`).
 
 Or with a runner, which also gives the module the environment's inputs and runs the checks (the
-machines take the project from their cloud-init; secrets are refused on Proxmox):
+machines take the project from their cloud-init; a Linux VM's secrets come from the module's
+`ISOLOOM_SECRET_<NAME>` variables in its cloud-init snippet, and Terraform stores sensitive values
+in its state, as it does for every variable; a Windows machine's or an LXC container's are
+refused):
 
 ```sh
 isothrum up . --target proxmox

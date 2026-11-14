@@ -108,6 +108,18 @@ pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variable
     m.block(provider);
 }
 
+/// Why a server can't give a machine of `env` its secrets, if it can't: a Linux VM gets them from
+/// the module's variables (cloud-init: its snippet on Proxmox, its guestinfo user data on ESXi), but a
+/// Windows machine's set-up (cloudbase-init, the controller over WinRM) and a container's (an LXC
+/// container on Proxmox) have no step that takes them.
+pub(crate) fn secrets_refusal(env: &Environment) -> Option<String> {
+    env.machines.iter().find_map(|(name, mp)| {
+        let linux_vm = mp.shape == isoloom_plan::MachineShape::Vm && !mp.is_windows();
+        (!mp.secrets.is_empty() && !linux_vm)
+            .then(|| format!("machine `{name}` gets `secrets` (a secret's or an input's value as a file), which a server writes into a Linux VM only"))
+    })
+}
+
 /// A base OS image pinned to a dated release, with the checksum that verifies the download.
 ///
 /// The server targets never emit a floating `latest`/`current` URL: an image is pinned to a
