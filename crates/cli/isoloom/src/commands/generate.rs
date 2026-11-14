@@ -47,10 +47,37 @@ pub(super) struct Planned {
 /// file would be written through a symbolic link. Nothing is read from the outputs when no file
 /// is generated.
 pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Path) -> Result<Planned> {
+    let Generated { files, skipped, scope } = generated(generation, profile, dir)?;
+    against_list(dir, files, skipped, &scope)
+}
+
+/// The files `generation` asks for in project `dir`, with the project files they copy, before
+/// anything is read from the outputs.
+struct Generated {
+    /// The files; none when the target asked for, or every target, refuses the environment.
+    files: Vec<GeneratedFile>,
+    /// The refusals of the targets left out.
+    skipped: Vec<GenerateError>,
+    /// Where files written before can go stale: the target's folder, or all of `.isoloom/`.
+    scope: String,
+}
+
+fn generated(generation: &Generation, profile: &spec::Profile, dir: &Path) -> Result<Generated> {
     let target = spec::pinned(profile, dir, generation.target.as_deref())?;
     let (lab, _) = spec::with_settings(profile, dir, &generation.settings)?;
     let lab = spec::checked(lab, dir)?;
     let (files, skipped) = files(&lab, target.as_deref())?;
+    let scope = generated::scope(target.as_deref());
+    if files.is_empty() {
+        return Ok(Generated { files, skipped, scope });
+    }
+    let files = generated::finish(&lab, files, dir)?;
+    Ok(Generated { files, skipped, scope })
+}
+
+/// What writing `files` changes, read from the list of what Isoloom wrote ([`Planned`]):
+/// nothing is read from the outputs when no file is generated.
+fn against_list(dir: &Path, files: Vec<GeneratedFile>, skipped: Vec<GenerateError>, scope: &str) -> Result<Planned> {
     if files.is_empty() {
         return Ok(Planned {
             files,
@@ -59,8 +86,7 @@ pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Pa
             skipped,
         });
     }
-    let files = generated::finish(&lab, files, dir)?;
-    let stale = generated::stale(dir, &files, &generated::scope(target.as_deref()))?;
+    let stale = generated::stale(dir, &files, scope)?;
     let list = generated::list(dir, &files, &stale)?;
     generated::writable(dir, files.iter().chain(&list))?;
     Ok(Planned { files, stale, list, skipped })
@@ -73,9 +99,16 @@ pub(super) fn planned(generation: &Generation, profile: &spec::Profile, dir: &Pa
 /// writes and removes nothing: the files there stay as they were. Skipping some of all the
 /// targets isn't a no, unless one was left out for a failure of its backend rather than a refusal
 /// of the environment: then nothing is written or removed.
+///
+/// Two `generate`s in one project at once take turns from reading the list of what Isoloom wrote
+/// to writing it ([`generated::Turn`]), so neither drops the other's new entries.
 pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
     let dir = &a.project.dir;
-    let Planned { files, stale, list, skipped } = planned(&a.generation, profile, dir)?;
+    let Generated { files, skipped, scope } = generated(&a.generation, profile, dir)?;
+    // Taken only when something is written: a generation every target refuses leaves the
+    // project as it was, the turn's file included.
+    let _turn = if files.is_empty() { None } else { Some(generated::Turn::take(dir)?) };
+    let Planned { files, stale, list, skipped } = against_list(dir, files, skipped, &scope)?;
     if files.is_empty() {
         for e in &skipped {
             console.line(format_args!("· {e}"))?;

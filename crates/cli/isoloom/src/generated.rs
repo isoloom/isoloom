@@ -35,6 +35,38 @@ pub(crate) const LIST: &str = ".isoloom/.generated";
 /// The list's first line: what it is.
 const LIST_HEADER: &str = "# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.";
 
+/// The file two `generate`s in one project take turns on ([`Turn`]): never renamed or removed,
+/// so both lock the same one.
+pub(crate) const TURN: &str = isoloom_targets::gitignore::TURN;
+
+/// One `generate`'s turn in its project, from reading [`LIST`] to writing it: held while it
+/// lives, so another `generate` there waits for it rather than writing a list that drops this
+/// one's files. The lock goes with the process, so a `generate` that dies never leaves it held.
+pub(crate) struct Turn {
+    _file: std::fs::File,
+}
+
+impl Turn {
+    /// Waits for the project `dir`'s turn and takes it. Its file is under `.isoloom/`, so it is
+    /// refused where a generated file would be ([`writable`]: through a symbolic link), and taken
+    /// only when the generation writes files.
+    pub(crate) fn take(dir: &Path) -> Result<Turn> {
+        let file = GeneratedFile::new(TURN, String::new());
+        writable(dir, [&file])?;
+        let path = dir.join(TURN);
+        let parent = path.parent().unwrap_or(dir);
+        std::fs::create_dir_all(parent).map_err(CliError::writing(parent))?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+            .map_err(CliError::writing(&path))?;
+        file.lock().map_err(CliError::writing(&path))?;
+        Ok(Turn { _file: file })
+    }
+}
+
 /// The generator's files plus the project's own files they copy into the output.
 pub(crate) fn finish(lab: &Lab, mut files: Vec<GeneratedFile>, dir: &Path) -> Result<Vec<GeneratedFile>> {
     let copies = isoloom_targets::project_copies(lab, &files, dir)?;

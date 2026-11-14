@@ -15,7 +15,7 @@ exclude = ["fuzz"]
 [workspace.package]
 version = "3.0.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 repository = "https://github.com/isoloom/isoloom"
 homepage = "https://github.com/isoloom/isoloom/tree/main/docs"
 license = "Apache-2.0"
