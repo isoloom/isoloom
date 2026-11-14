@@ -215,3 +215,23 @@ fn a_secrets_source_and_a_device_of_the_wrong_kind_say_what_they_take() {
     let (_, misspelt) = device("{ hots: /dev/fuse }");
     assert_eq!(misspelt, "`hots` isn't a field here");
 }
+
+#[test]
+fn a_free_host_port_is_asked_for_by_any_number_of_machines_and_a_number_once() {
+    let web = |rest: &str| problems(&spec(&format!("machines:\n  web: {{ os: debian@12, networks: {{ lab: 10 }}, {rest} }}\n")));
+    assert_eq!(web("count: 3, ports: { web: { port: 80, publish: true } }"), []);
+    let both = problems(&spec(
+        "machines:\n  a: { os: debian@12, networks: { lab: 10 }, ports: { web: { port: 80, publish: true } } }\n  b: { os: debian@12, networks: { lab: 11 }, ports: { web: { port: 80, publish: true } } }\n",
+    ));
+    assert_eq!(both, []);
+    for publish in ["8080", "{ host: 8080 }", "{ host: 8080, fixed: true }"] {
+        let found = web(&format!("count: 3, ports: {{ web: {{ port: 80, publish: {publish} }} }}"));
+        let [p] = &found[..] else { panic!("{publish}: one problem, on the machine as written: {found:?}") };
+        assert_eq!(p.path.to_string(), "machines.web.ports.web.publish", "{publish}");
+        assert!(
+            p.reason.contains("its 3 clones (`count`) can't all have host port 8080: `publish: true`"),
+            "{publish}: {}",
+            p.reason
+        );
+    }
+}

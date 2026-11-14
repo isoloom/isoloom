@@ -54,6 +54,7 @@ mod names;
 mod outside;
 pub mod private_dns;
 pub mod process;
+mod published;
 mod requirements;
 pub mod routing;
 pub mod secrets;

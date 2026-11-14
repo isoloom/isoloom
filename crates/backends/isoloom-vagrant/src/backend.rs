@@ -74,5 +74,8 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::TmpfsModes,
         // Each provider's own shared folder; `provider_refusal` refuses the ones with none.
         Feature::HostFolders,
+        // A forward that isn't `fixed` moves to a free host port when its own is taken
+        // (`auto_correct`), so machines may ask for one.
+        Feature::FreeHostPorts,
     ])
 }

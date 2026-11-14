@@ -292,6 +292,10 @@ pub struct Port {
     /// environment can't start while another holds that port.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,
+    /// `publish: true`: a free host port, which the format picks itself where it can (Compose, Vagrant);
+    /// `publish` is then the port's own number, only preferred. Another machine may ask for the same.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub free: bool,
     /// Only answers later: nothing listens on it until something in the machine starts it. Declared,
     /// published and opened by `reach` like any port, but nothing waits for it (healthcheck,
     /// readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.

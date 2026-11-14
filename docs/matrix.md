@@ -66,6 +66,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.dns` | its own resolver settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines` | several machines | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `machines.*.count` | clones of one machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `machines.*.ports.*.publish = true` | clones each publishing a port on a free host port | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
 | `machines.*.access` | the machine the user lands on, supplied by the runner's image table (no OS) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `machines.*.networks` | a machine on several networks | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
 | `machines.*.networks.*` | several addresses on one network | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | – |
@@ -234,6 +235,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 ### `machines.*.count`
 
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+
+### `machines.*.ports.*.publish = true`
+
+- `hosted`, `cloud-docker`, `kubernetes`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `free-host-ports`: machines `m-01` and `m-02` both publish on host port 6379 (`publish: true` asks for a free one), and this target publishes every port at its number: give each its own `publish` number
 
 ### `machines.*.access`
 
