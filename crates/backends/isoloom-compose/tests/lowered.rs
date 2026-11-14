@@ -101,17 +101,54 @@ fn file<'a>(files: &'a [GeneratedFile], path: &str) -> Outcome<&'a str> {
     Ok(&found.contents)
 }
 
+/// The parsed Compose file, and its services as (name, definition).
+fn compose(files: &[GeneratedFile]) -> Outcome<serde_yaml_ng::Value> {
+    Ok(serde_yaml_ng::from_str(file(files, ".isoloom/docker/compose.yml")?)?)
+}
+
+fn services(c: &serde_yaml_ng::Value) -> Vec<(&str, &serde_yaml_ng::Value)> {
+    c.get("services")
+        .and_then(serde_yaml_ng::Value::as_mapping)
+        .into_iter()
+        .flatten()
+        .filter_map(|(name, service)| Some((name.as_str()?, service)))
+        .collect()
+}
+
 #[test]
 fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outcome {
-    let files = render("help-desk")?;
-    let c = file(&files, ".isoloom/docker/compose.yml")?;
-    assert!(c.contains("secrets:\n  input-demo-secret:\n    environment: DEMO_SECRET\n"), "{c}");
-    assert!(
-        c.contains("- source: input-demo-secret\n      target: /srv/archive/secret.txt\n      uid: '1000'\n      mode: '0400'"),
-        "{c}"
+    let c = compose(&render("help-desk")?)?;
+    // The secret is read from the input's variable...
+    assert_eq!(
+        c.get("secrets")
+            .and_then(|s| s.get("input-demo-secret"))
+            .and_then(|s| s.get("environment"))
+            .and_then(|e| e.as_str()),
+        Some("DEMO_SECRET"),
+        "{c:?}"
     );
-    assert!(!c.contains("DEMO_SECRET: ${DEMO_SECRET"), "{c}");
-    assert!(c.contains("isoloom.port.site"), "{c}");
+    // ...mounted as the file, owned and private...
+    let mounts: Vec<&serde_yaml_ng::Value> = services(&c)
+        .into_iter()
+        .flat_map(|(_, s)| s.get("secrets").and_then(|l| l.as_sequence()).into_iter().flatten())
+        .filter(|m| m.get("source").and_then(|v| v.as_str()) == Some("input-demo-secret"))
+        .collect();
+    let mount = match mounts.as_slice() {
+        [one] => *one,
+        _ => return Err(format!("one service mounts the secret, not {}: {c:?}", mounts.len()).into()),
+    };
+    let field = |k: &str| mount.get(k).and_then(|v| v.as_str());
+    assert_eq!(
+        (field("target"), field("uid"), field("mode")),
+        (Some("/srv/archive/secret.txt"), Some("1000"), Some("0400"))
+    );
+    // ...and never put in a service's environment.
+    let text = serde_yaml_ng::to_string(&c)?;
+    for (name, service) in services(&c) {
+        let env = serde_yaml_ng::to_string(service.get("environment").unwrap_or(&serde_yaml_ng::Value::Null))?;
+        assert!(!env.contains("${DEMO_SECRET"), "{name}'s environment: {env}");
+    }
+    assert!(text.contains("isoloom.port.site"), "{text}");
     Ok(())
 }
 
@@ -164,12 +201,30 @@ fn portable_steps_build_from_the_os_image() -> Outcome {
     let dockerfile = file(&files, ".isoloom/docker/build/portal/Dockerfile")?;
     assert!(dockerfile.contains("FROM debian:12@sha256:"));
     assert!(dockerfile.contains("COPY --chown=www-data [\"portal/\", \"/var/www/html/\"]\n"));
-    let c = file(&files, ".isoloom/docker/compose.yml")?;
-    assert!(c.contains("context: ../..\n      dockerfile: .isoloom/docker/build/portal/Dockerfile"), "{c}");
+    let c = compose(&files)?;
+    let portal = services(&c)
+        .into_iter()
+        .find(|(name, _)| *name == "portal")
+        .map(|(_, s)| s)
+        .ok_or("no portal")?;
+    let build = |k: &str| portal.get("build").and_then(|b| b.get(k)).and_then(|v| v.as_str());
+    assert_eq!(
+        (build("context"), build("dockerfile")),
+        (Some("../.."), Some(".isoloom/docker/build/portal/Dockerfile"))
+    );
     // The clerk is the access box: its OS image is the parameterized default (the runner
     // overrides it with one it is given), and it sits in the `access` profile so the
     // initial `up` skips it, brought up on demand.
-    assert!(c.contains("image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:"), "{c}");
-    assert!(c.contains("profiles:\n    - access"), "{c}");
+    let clerk = services(&c).into_iter().find(|(name, _)| *name == "clerk").map(|(_, s)| s).ok_or("no clerk")?;
+    let image = clerk.get("image").and_then(|v| v.as_str()).unwrap_or_default();
+    assert!(image.starts_with("${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:"), "{image}");
+    let profiles: Vec<&str> = clerk
+        .get("profiles")
+        .and_then(|p| p.as_sequence())
+        .into_iter()
+        .flatten()
+        .filter_map(|p| p.as_str())
+        .collect();
+    assert_eq!(profiles, ["access"]);
     Ok(())
 }
