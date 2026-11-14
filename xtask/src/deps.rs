@@ -44,12 +44,7 @@ impl Level {
 }
 
 /// The core crates, in their order.
-const CORE: [(&str, u8); 4] = [
-    ("isoloom-spec", 1),
-    ("isoloom-catalogue", 2),
-    ("isoloom-plan", 3),
-    ("isoloom-render", 4),
-];
+const CORE: [(&str, u8); 4] = [("isoloom-spec", 1), ("isoloom-catalogue", 2), ("isoloom-plan", 3), ("isoloom-render", 4)];
 
 /// The front-ends, in their order: the WebAssembly engine runs the topology compiler.
 const FRONTENDS: [(&str, u8); 2] = [("isoloom-topology", 0), ("isoloom-wasm", 1)];

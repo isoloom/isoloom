@@ -205,4 +205,3 @@ fn the_size_floor_is_a_vms() {
     let tiny = problems(&spec("    app: { image: nginx }\n").replace("memory_mb: 64", "memory_mb: 8"));
     assert!(tiny.iter().any(|p| p.contains("at least 1 cpu and 16 MB")), "{tiny:?}");
 }
-

@@ -109,7 +109,10 @@ fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() ->
     assert!(!combo.contains("--build"), "a published build must not force a local build: {combo}");
     let local = start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      build: { context: web }\n")?;
     assert!(!local.contains("--ignore-pull-failures"), "a local build gains no pull step: {local}");
-    assert!(local.contains("up --detach --build") && local.contains("--wait"), "a local build still forces a build: {local}");
+    assert!(
+        local.contains("up --detach --build") && local.contains("--wait"),
+        "a local build still forces a build: {local}"
+    );
     Ok(())
 }
 

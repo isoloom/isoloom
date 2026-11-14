@@ -7,8 +7,8 @@ use isoloom_render::container::{host_environment, host_folders};
 use isoloom_render::steps::PROJECT_DIR;
 use isoloom_spec::contract::{OUTPUT_DIR, PUBLISH_ADDRESS, PUBLISH_FIXED};
 
-use crate::error::Result;
 use crate::backend::ComposeTarget;
+use crate::error::Result;
 use crate::layout::DIR;
 use crate::render;
 

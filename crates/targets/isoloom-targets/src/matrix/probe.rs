@@ -101,10 +101,7 @@ pub(crate) fn probes() -> Result<Probes> {
     let file: File = serde_yaml_ng::from_str(DATA).map_err(|e| invalid("probes.yml", &e.to_string()))?;
     let mut rows = file.rows.into_iter().map(row).collect::<Result<Vec<_>>>()?;
     rows.extend(os_rows());
-    Ok(Probes {
-        base: file.base,
-        rows,
-    })
+    Ok(Probes { base: file.base, rows })
 }
 
 /// The error for a row that names what doesn't exist.

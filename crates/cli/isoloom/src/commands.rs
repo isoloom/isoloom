@@ -143,9 +143,7 @@ mod tests {
         let rendered = crate::diagnostic::render(e);
         for target in ["vagrant", "cloud-docker"] {
             assert!(
-                rendered.contains(&format!(
-                    "error: {target}: the module couldn't be written\n  caused by: bad name"
-                )),
+                rendered.contains(&format!("error: {target}: the module couldn't be written\n  caused by: bad name")),
                 "{rendered}"
             );
         }

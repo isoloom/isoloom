@@ -96,11 +96,7 @@ mod tests {
         ] {
             assert!(ignores(&text, path), "{path}:\n{text}");
         }
-        for path in [
-            "cloud-vm/aws/.terraform.lock.hcl",
-            "cloud-vm/aws/main.tf",
-            "docker/compose.yml",
-        ] {
+        for path in ["cloud-vm/aws/.terraform.lock.hcl", "cloud-vm/aws/main.tf", "docker/compose.yml"] {
             assert!(!ignores(&text, path), "{path}:\n{text}");
         }
     }

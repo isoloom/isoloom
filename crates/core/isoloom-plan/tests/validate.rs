@@ -565,7 +565,11 @@ fn path_outside_the_project() {
 
 #[test]
 fn a_spec_with_cloud_services_is_refused() {
-    assert_problem("version: 1\nname: t\ncloud: { provider: aws, terraform: tf }\n", "cloud", "cloud-services is not supported in Isoloom 3.0");
+    assert_problem(
+        "version: 1\nname: t\ncloud: { provider: aws, terraform: tf }\n",
+        "cloud",
+        "cloud-services is not supported in Isoloom 3.0",
+    );
 }
 
 #[test]

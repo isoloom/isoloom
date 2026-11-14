@@ -90,12 +90,11 @@ fn triggers(r: &mut Ruby, vm_name: &str, utm: &Utm) {
     if utm.nics.is_empty() {
         return;
     }
-    let nics = Value::array(utm.nics.iter().map(|n| {
-        Value::array([
-            Value::str(n.net),
-            Value::str(&hyperv::linux_mac_text(hyperv::mac(vm_name, n.net))),
-        ])
-    }));
+    let nics = Value::array(
+        utm.nics
+            .iter()
+            .map(|n| Value::array([Value::str(n.net), Value::str(&hyperv::linux_mac_text(hyperv::mac(vm_name, n.net)))])),
+    );
     trigger(r, "before", "Boot", |r| {
         r.line(format_args!("t.ruby {{ |_, machine| IsoloomUtm.attach(machine, {nics}) }}"));
     });

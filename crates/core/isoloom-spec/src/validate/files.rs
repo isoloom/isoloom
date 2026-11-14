@@ -175,7 +175,6 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
         "v1..2/probe.sh",
     ];
 
-
     /// What `validate_files` finds for the lowered spec `yaml` in a fresh project folder (named
     /// after `test`) holding `files`, each written empty; a name ending in `/` is a folder.
     fn found(test: &str, files: &[&str], yaml: &str) -> Outcome<Vec<String>> {
