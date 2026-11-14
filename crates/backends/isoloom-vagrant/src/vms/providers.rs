@@ -191,13 +191,13 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
 }
 
 /// `m.vm.provider "<id>"`: the head of a provider's block.
-fn provider(p: Provider<'_>) -> Call {
+fn provider(p: Provider) -> Call {
     Call::new("m.vm.provider").arg(Value::str(p.id()))
 }
 
 /// VirtualBox and Parallels: a name, CPUs, memory and linked clones, then what only that
 /// provider sets (`more`).
-fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, more: impl FnOnce(&mut Ruby)) {
+fn desktop(r: &mut Ruby, p: Provider, g: &Guest, more: impl FnOnce(&mut Ruby)) {
     r.block(provider(p), "v", |r| {
         r.assign("v.name", Value::str(&g.label));
         r.assign("v.linked_clone", true);

@@ -3,38 +3,32 @@
 //! `vagrant up` on them stops with the reason before creating the VM, rather than boot a VM
 //! that can't do what the spec asks.
 
-use super::provider::Provider;
+use super::provider::{Nested, Provider};
 use crate::ruby::{Call, Ruby, Value};
 
 /// Why the Mac's providers stop: they run on Apple's hypervisor, which nests no VMs.
 const NO_NESTING: &str = "nested virtualization (`nested_virtualization`): QEMU and UTM run on the Mac's Hypervisor framework, which has none; use VirtualBox, VMware, Parallels, libvirt or Hyper-V";
 
-/// The provider block's switch for `provider`, if it has one.
-pub(crate) fn switch(r: &mut Ruby, provider: Provider<'_>) {
-    match provider {
-        Provider::VirtualBox => {
-            r.call(Call::new("v.customize").arg(modify("modifyvm", "--nested-hw-virt")));
+/// The provider block's switch for `provider`, if it has one ([`Nested`], its row's).
+pub(crate) fn switch(r: &mut Ruby, provider: Provider) {
+    match provider.profile().nested {
+        Nested::Customize(command, flag) => {
+            r.call(Call::new("v.customize").arg(modify(command, flag)));
         }
-        Provider::Parallels => {
-            r.call(Call::new("v.customize").arg(modify("set", "--nested-virt")));
-        }
-        Provider::VmwareDesktop => {
+        Nested::Vmx => {
             r.assign("v.vmx[\"vhv.enable\"]", Value::str("TRUE"));
         }
-        Provider::VmwareEsxi => {
+        Nested::CustomVmx => {
             r.assign(
                 "v.guest_custom_vmx_settings",
                 Value::array([Value::array([Value::str("vhv.enable"), Value::str("TRUE")])]),
             );
         }
-        Provider::Libvirt => {
-            r.assign("v.nested", true);
-        }
-        Provider::HyperV => {
-            r.assign("v.enable_virtualization_extensions", true);
+        Nested::Flag(field) => {
+            r.assign(&format!("v.{field}"), true);
         }
         // QEMU stops the VM instead (`refuse_elsewhere`); UTM has no block in this Vagrantfile.
-        Provider::Utm | Provider::Qemu | Provider::Other(_) => {}
+        Nested::None => {}
     }
 }
 
@@ -68,7 +62,7 @@ mod tests {
 
     #[test]
     fn each_provider_has_its_own_switch() {
-        let out = |p: &str| ruby(|r| switch(r, Provider::from(p)));
+        let out = |p: &str| ruby(|r| switch(r, Provider::parse(p).unwrap_or_else(|| panic!("{p}"))));
         assert_eq!(out("virtualbox"), "v.customize [\"modifyvm\", :id, \"--nested-hw-virt\", \"on\"]\n");
         assert_eq!(out("parallels"), "v.customize [\"set\", :id, \"--nested-virt\", \"on\"]\n");
         assert_eq!(out("vmware_desktop"), "v.vmx[\"vhv.enable\"] = \"TRUE\"\n");

@@ -123,8 +123,7 @@ fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
         })?;
     let debian = crate::boxes::debian_12();
     let choice = crate::docker_vm::host_boxes(&debian);
-    let offered = crate::vms::provider::Provider::ALL
-        .iter()
+    let offered = crate::vms::provider::Provider::profiles()
         .map(|k| k.manifest)
         .filter(|p| providers::docker_vm_offers(*p));
     let boxes = offered.flat_map(|p| choice.on(p).into_iter().map(move |b| (p, b))).collect();

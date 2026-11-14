@@ -115,8 +115,7 @@ pub(super) fn vm_names(names: Names<'_>, shown: &str, define: &str) -> BTreeMap<
 
 fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
     let vm_names = vm_names(env.names(), &d.name, &d.name);
-    let offered: Vec<Provider> = crate::vms::provider::Provider::ALL
-        .iter()
+    let offered: Vec<Provider> = crate::vms::provider::Provider::profiles()
         .filter(|k| k.provider.runs_vms())
         .map(|k| k.manifest)
         .collect();

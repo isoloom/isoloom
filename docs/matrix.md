@@ -283,10 +283,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 ### `machines.*.hardware.tpm = required`
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: only a VM gives it: a container has no kernel or firmware of its own
-- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)
+- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/digitalocean`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none
 - `cloud-vm/linode`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Linode gives none
@@ -294,10 +294,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 ### `machines.*.hardware.tpm = required`
 
 - `docker`, `hosted`, `docker-vm`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
-- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)
+- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/aws`: cloud: machine `m`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which Isoloom doesn't use
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
