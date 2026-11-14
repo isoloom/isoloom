@@ -116,6 +116,8 @@ fn the_kind_is_the_distributions_and_only_apt_releases_have_a_codename() {
             assert_eq!(Kind::of(r.name), d.kind, "{}", r.name);
         }
         assert_eq!(Kind::of(d.name), d.kind, "{}", d.name);
+        // As a spec writes it, with a version.
+        assert_eq!(Kind::of(&format!("{}@{}", d.name, d.default)), d.kind, "{}", d.name);
     }
     assert_eq!(by_name("debian-12").and_then(|o| o.codename()), Some("bookworm"));
     let tpm: Vec<&str> = all().filter(Os::expects_tpm).map(|o| o.name).collect();

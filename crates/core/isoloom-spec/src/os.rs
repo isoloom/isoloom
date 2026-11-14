@@ -39,13 +39,15 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The kind of the OS an image-table name (`windows-11`, `debian-12`) or a family
-    /// (`windows-server`) names, as [`DISTROS`] says; Linux for a name the table doesn't have.
+    /// The kind of the OS an image-table name (`windows-11`, `debian-12`), a family
+    /// (`windows-server`) or a spec's `<family>@<version>` (`windows-server@2019`) names, as
+    /// [`DISTROS`] says; Linux for a name the table doesn't have.
     #[must_use]
     pub fn of(name: &str) -> Kind {
+        let family = name.split_once('@').map_or(name, |(family, _)| family);
         by_name(name)
             .map(|os| os.kind)
-            .or_else(|| DISTROS.iter().find(|d| d.name == name).map(|d| d.kind))
+            .or_else(|| DISTROS.iter().find(|d| d.name == family).map(|d| d.kind))
             .unwrap_or(Kind::Linux)
     }
 
