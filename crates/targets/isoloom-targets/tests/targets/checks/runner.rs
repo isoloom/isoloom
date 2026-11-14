@@ -28,17 +28,17 @@ fn runner_scripts_come_by_position_and_end_with_their_counts() -> Outcome {
 fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() -> Outcome {
     let spec = example("arm-vm")?;
     assert_eq!(
-        isoloom_targets::refusal(&spec, isoloom_spec::Target::Vagrant),
+        isoloom_targets::refusal(&spec, isoloom_spec::Target::Vagrant).unwrap(),
         None,
         "a VM runs exec checks on the machine itself"
     );
     let with_docker = lab(&format!("{BASE}checks:\n  - {{ from: web, exec: id, expect: uid }}\n"))?;
-    assert_eq!(isoloom_targets::refusal(&with_docker, isoloom_spec::Target::Docker), None);
-    assert_eq!(isoloom_targets::refusal(&with_docker, isoloom_spec::Target::Kubernetes), None);
+    assert_eq!(isoloom_targets::refusal(&with_docker, isoloom_spec::Target::Docker).unwrap(), None);
+    assert_eq!(isoloom_targets::refusal(&with_docker, isoloom_spec::Target::Kubernetes).unwrap(), None);
     // From where no container of its own stands, there's nothing to run it inside (`validate`
     // says so first, and `refusal` reports the spec's problem).
     let from_user = lab(&format!("{BASE}checks:\n  - {{ exec: id }}\n"))?;
-    let why = isoloom_targets::refusal(&from_user, isoloom_spec::Target::Docker).expect("refused");
+    let why = isoloom_targets::refusal(&from_user, isoloom_spec::Target::Docker).unwrap().expect("refused");
     assert!(why.contains("say which with `from`"), "{why}");
     // Its own runner, piped into the machine; the runner beside it doesn't run it.
     let files = isoloom_targets::generate(&with_docker, isoloom_spec::Target::Docker).unwrap();

@@ -152,9 +152,14 @@ impl Lab {
     ///
     /// [`PlanError::UnresolvedRecipe`](crate::environment::PlanError::UnresolvedRecipe) for a
     /// machine whose configuration has steps its OS's family can't carry, which lowering refuses
-    /// for the target first.
+    /// for the target first; [`PlanError::Catalogue`](crate::environment::PlanError::Catalogue)
+    /// when the catalogue built into Isoloom doesn't load, never a plan with an empty one.
     #[doc(hidden)]
     pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> Result<crate::Environment, crate::environment::PlanError> {
+        // An empty catalogue would plan the lab's services as if it had none.
+        if let Some(reason) = &self.loaded.broken {
+            return Err(crate::environment::PlanError::Catalogue { reason: reason.clone() });
+        }
         let mut env = crate::Environment::planned(spec, target, instance, self.loaded.catalogue, &self.loaded.daemons)?;
         env.regions.clone_from(&self.regions);
         Ok(env)
@@ -583,6 +588,21 @@ mod tests {
                 "{scope:?}: its own lowering"
             );
         }
+    }
+
+    /// A lab whose built-in catalogue didn't load never plans: an empty catalogue would read as
+    /// a lab with no services.
+    #[test]
+    fn a_lab_whose_catalogue_doesnt_load_fails_to_plan() {
+        let mut lab = testing::lab(LAB);
+        lab.loaded.broken = Some("catalogue/nginx.yml: not YAML".to_owned());
+        let spec = lab.for_target(Target::Docker);
+        assert_eq!(
+            lab.plan(&spec, Target::Docker, None).err(),
+            Some(crate::environment::PlanError::Catalogue {
+                reason: "catalogue/nginx.yml: not YAML".to_owned()
+            })
+        );
     }
 
     #[test]

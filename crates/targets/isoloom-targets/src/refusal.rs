@@ -7,7 +7,9 @@
 use isoloom_plan::Lab;
 use isoloom_spec::model::Target;
 
+use crate::GenerateError;
 use crate::decision::{Decision, decide};
+use crate::generation::planned;
 
 /// A cloud refused by a multi-cloud target: the cloud's folder under the target's, and why it
 /// can't run the environment.
@@ -39,8 +41,12 @@ pub struct Clouds {
 ///
 /// Safe on an environment that hasn't been checked: an invalid environment is refused by every target, with its
 /// first problem as the reason, instead of reaching a generator that assumes validity.
-#[must_use]
-pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
+///
+/// # Errors
+///
+/// [`GenerateError::Internal`] when the environment doesn't plan for `target`: `generate` fails
+/// there too, so the target is neither refused nor generated.
+pub fn refusal(lab: &Lab, target: Target) -> Result<Option<String>, GenerateError> {
     refusal_on(lab, target, None)
 }
 
@@ -51,27 +57,30 @@ pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
 ///
 /// On `vagrant`, a provider refuses what [`isoloom_vagrant::provider_refusal`] says; on
 /// `cloud-vm`, a cloud (`aws`) what its module refuses.
-#[must_use]
-pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<String> {
-    match decide(lab, target, provider) {
+///
+/// # Errors
+///
+/// As [`refusal`].
+pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Result<Option<String>, GenerateError> {
+    Ok(match decide(lab, target, provider)? {
         Decision::Refused(r) => Some(r.line()),
         Decision::Generated | Decision::NotApplicable => None,
-    }
+    })
 }
 
 /// The clouds of a target that writes one module per cloud (`cloud-vm`, `cloud-docker`), when the
 /// target is generated. A cloud refusing drops only its module, so the target is generated as
 /// long as one cloud accepts the environment. `None` for every other target, and for one that
 /// isn't generated (its refusal says why).
-#[must_use]
-pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
-    if !matches!(target, Target::CloudVm | Target::CloudDocker) || !lab.possible().contains(&target) || refusal(lab, target).is_some() {
-        return None;
+///
+/// # Errors
+///
+/// As [`refusal`].
+pub fn cloud_refusals(lab: &Lab, target: Target) -> Result<Option<Clouds>, GenerateError> {
+    if !matches!(target, Target::CloudVm | Target::CloudDocker) || !lab.possible().contains(&target) || refusal(lab, target)?.is_some() {
+        return Ok(None);
     }
-    // A lab that doesn't plan fails the generation (`GenerateError::Internal`): no module is written.
-    let Ok(env) = lab.plan(&lab.for_target(target), target, None) else {
-        return None;
-    };
+    let env = planned(lab, &lab.for_target(target), target, None)?;
     let each = if target == Target::CloudVm {
         isoloom_terraform::CloudVmBackend.refusals(&env)
     } else {
@@ -84,7 +93,7 @@ pub fn cloud_refusals(lab: &Lab, target: Target) -> Option<Clouds> {
             Some(reason) => clouds.refused.push(CloudRefusal { cloud: cloud.id(), reason }),
         }
     }
-    Some(clouds)
+    Ok(Some(clouds))
 }
 
 #[cfg(test)]
@@ -100,17 +109,17 @@ mod tests {
     #[test]
     fn a_refusal_reads_as_the_decision_the_matrix_shows() {
         let image = lab("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: redis } }\n");
-        let why = refusal(&image, Target::Vagrant).unwrap();
+        let why = refusal(&image, Target::Vagrant).unwrap().unwrap();
         assert!(why.starts_with("machines.a.app.image: "), "{why}");
         let invalid =
             lab("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10, wan: 3 }, app: { image: redis } }\n");
-        let invalid_why = refusal(&invalid, Target::Docker).unwrap();
+        let invalid_why = refusal(&invalid, Target::Docker).unwrap().unwrap();
         assert!(invalid_why.starts_with("the spec is invalid: machines.a.networks"), "{invalid_why}");
-        assert_eq!(refusal(&lab(MACHINES), Target::Docker), None);
-        assert_eq!(refusal(&lab(MACHINES), Target::CloudServices), None, "not possible, not refused");
+        assert_eq!(refusal(&lab(MACHINES), Target::Docker).unwrap(), None);
+        assert_eq!(refusal(&lab(MACHINES), Target::CloudServices).unwrap(), None, "not possible, not refused");
         let two = lab(&format!("{MACHINES}  b: {{ os: debian@12, networks: {{ lan: 11 }} }}\n"));
-        assert_eq!(refusal(&two, Target::CloudVm), None);
-        let digitalocean = refusal_on(&two, Target::CloudVm, Some("digitalocean")).unwrap_or_default();
+        assert_eq!(refusal(&two, Target::CloudVm).unwrap(), None);
+        let digitalocean = refusal_on(&two, Target::CloudVm, Some("digitalocean")).unwrap().unwrap_or_default();
         assert!(digitalocean.contains("one machine on one network"), "{digitalocean}");
     }
 }

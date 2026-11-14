@@ -61,7 +61,7 @@ fn the_lab_every_row_changes_is_generated_everywhere_but_where_a_network_is_refu
             .unwrap()
             .clone()
     };
-    let row = row(&probes, &base, &columns());
+    let row = row(&probes, &base, &columns()).unwrap();
     for (column, cell) in columns().iter().zip(&row.cells) {
         let expected = match column.id().as_str() {
             "cloud-services" => Cell::NotApplicable,
@@ -265,7 +265,7 @@ fn every_step_row_is_decided_on_the_step_itself() {
                 .find(|(c, _)| c.target == target)
                 .map(|(_, cell)| cell)
                 .unwrap();
-            match (crate::refusal(&lab, target), cell) {
+            match (crate::refusal(&lab, target).unwrap(), cell) {
                 (None, Cell::Supported) => {}
                 (Some(why), Cell::Refused(r)) => assert!(why.ends_with(&r.reason), "{} on {}: {why} / {}", row.name(), target.id(), r.reason),
                 (theirs, cell) => panic!("{} on {}: the generator says {theirs:?}, the matrix {cell:?}", row.name(), target.id()),

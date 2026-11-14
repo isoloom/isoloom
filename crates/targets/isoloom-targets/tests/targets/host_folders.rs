@@ -31,7 +31,7 @@ fn desk() -> Outcome<Lab> {
 fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
     let lab = desk()?;
     for t in [Target::Docker, Target::Vagrant] {
-        assert_eq!(refusal(&lab, t), None, "{}", t.id());
+        assert_eq!(refusal(&lab, t).unwrap(), None, "{}", t.id());
     }
     for t in [
         Target::Hosted,
@@ -41,7 +41,7 @@ fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
         Target::Esxi,
         Target::CloudVm,
     ] {
-        let why = refusal(&lab, t).ok_or_else(|| format!("{} takes it", t.id()))?;
+        let why = refusal(&lab, t).unwrap().ok_or_else(|| format!("{} takes it", t.id()))?;
         assert!(
             why.contains("machine `desk` mounts a folder of the computer that runs the environment (`host_folders`)"),
             "{}: {why}",
@@ -55,16 +55,16 @@ fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
 fn vagrant_refuses_it_on_the_providers_with_no_two_way_shared_folder() -> Outcome {
     let lab = desk()?;
     for p in ["virtualbox", "vmware_desktop", "parallels", "libvirt"] {
-        assert_eq!(refusal_on(&lab, Target::Vagrant, Some(p)), None, "{p}");
+        assert_eq!(refusal_on(&lab, Target::Vagrant, Some(p)).unwrap(), None, "{p}");
     }
-    let hyperv = refusal_on(&lab, Target::Vagrant, Some("hyperv")).ok_or("Hyper-V takes it")?;
+    let hyperv = refusal_on(&lab, Target::Vagrant, Some("hyperv")).unwrap().ok_or("Hyper-V takes it")?;
     assert!(hyperv.contains("`host_folders`") && hyperv.contains("SMB"), "{hyperv}");
-    let esxi = refusal_on(&lab, Target::Vagrant, Some("vmware_esxi")).ok_or("ESXi takes it")?;
+    let esxi = refusal_on(&lab, Target::Vagrant, Some("vmware_esxi")).unwrap().ok_or("ESXi takes it")?;
     assert!(esxi.contains("run on the ESXi host"), "{esxi}");
-    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).ok_or("QEMU takes a read-only one")?;
+    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).unwrap().ok_or("QEMU takes a read-only one")?;
     assert!(qemu.contains("read-only (`read_only`)"), "{qemu}");
     let read_write = valid(&DESK.replace(", read_only: true", ""))?;
-    assert_eq!(refusal_on(&read_write, Target::Vagrant, Some("qemu")), None);
+    assert_eq!(refusal_on(&read_write, Target::Vagrant, Some("qemu")).unwrap(), None);
     Ok(())
 }
 
@@ -79,9 +79,11 @@ machines:
   b: { os: debian@12, networks: { lan: 11 }, host_folders: [{ from: notes, path: /notes, read_only: true }] }
 ",
     )?;
-    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).ok_or("QEMU takes b's read-only folder")?;
+    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu"))
+        .unwrap()
+        .ok_or("QEMU takes b's read-only folder")?;
     assert!(qemu.contains("machine `b`") && qemu.contains("read-only (`read_only`)"), "{qemu}");
-    assert_eq!(refusal_on(&lab, Target::Vagrant, Some("virtualbox")), None);
+    assert_eq!(refusal_on(&lab, Target::Vagrant, Some("virtualbox")).unwrap(), None);
     Ok(())
 }
 

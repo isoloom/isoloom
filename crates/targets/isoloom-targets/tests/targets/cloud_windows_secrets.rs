@@ -18,12 +18,14 @@ fn a_windows_machine_in_the_cloud_with_secrets_is_refused() -> Outcome {
     ))?;
     let without = lab(&SPEC.replace("FILES", ""))?;
     for cloud in ["aws", "azure"] {
-        let why = refusal_on(&with, Target::CloudVm, Some(cloud)).ok_or_else(|| format!("{cloud} refuses it"))?;
+        let why = refusal_on(&with, Target::CloudVm, Some(cloud))
+            .unwrap()
+            .ok_or_else(|| format!("{cloud} refuses it"))?;
         assert!(
             why.contains("machine `dc` gets `secrets`") && why.contains("before the runner delivers them"),
             "{cloud}: {why}"
         );
-        assert_eq!(refusal_on(&without, Target::CloudVm, Some(cloud)), None, "{cloud}");
+        assert_eq!(refusal_on(&without, Target::CloudVm, Some(cloud)).unwrap(), None, "{cloud}");
     }
     Ok(())
 }
