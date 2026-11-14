@@ -776,7 +776,7 @@ fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() 
 /// internal network and libvirt's alike (`isoloom-<environment>-#{ISOLOOM_KEY}-<network>`); the
 /// run manifest names none, since only the Vagrantfile reads the key.
 #[test]
-fn each_network_is_named_with_the_copys_key_and_the_manifest_names_none() -> Outcome {
+fn each_network_is_named_with_the_copy_key_and_the_manifest_names_none() -> Outcome {
     let env = plan("segmented")?;
     let manifest = VagrantBackend.run_manifest(&env)?.ok_or("a run manifest")?;
     let file = vagrantfile("segmented")?;

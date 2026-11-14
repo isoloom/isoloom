@@ -135,7 +135,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_name_holds_the_environment_its_instance_and_the_copys_key() {
+    fn every_name_holds_the_environment_its_instance_and_the_copy_key() {
         let plain = Names::new("solo-web");
         assert_eq!(plain.vm_label("web").with_key("k3x9a2"), "solo-web-k3x9a2 - web");
         assert_eq!(plain.vm_name("web").with_key("k3x9a2"), "solo-web-k3x9a2-web");
