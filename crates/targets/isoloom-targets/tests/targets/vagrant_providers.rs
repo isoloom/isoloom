@@ -119,10 +119,14 @@ fn utm_runs_each_vm_on_its_networks_isolated_vmnet_ones() -> Outcome {
 #[test]
 fn utm_refuses_what_it_cant_give_saying_what_would() -> Outcome {
     // An OS with no UTM box, data disks and a bridged network: each refused with its way out.
-    let no_box = lab("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@13, networks: { lab: 10 }, app: { steps: [{ run: p.sh }] } }\n")?;
+    let no_box = lab(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@13, networks: { lab: 10 }, app: { steps: [{ run: p.sh }] } }\n",
+    )?;
     let why = refusal_on(&no_box, Target::Vagrant, Some("utm")).unwrap().ok_or("debian 13 taken")?;
     assert!(why.contains("no known UTM box") && why.contains("boxes.utm"), "{why}");
-    let disks = lab("version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 }, disks: { data: { size_gb: 2, mount: /data } }, app: { steps: [{ run: p.sh }] } }\n")?;
+    let disks = lab(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 }, disks: { data: { size_gb: 2, mount: /data } }, app: { steps: [{ run: p.sh }] } }\n",
+    )?;
     let why = refusal_on(&disks, Target::Vagrant, Some("utm")).unwrap().ok_or("data disks taken")?;
     assert!(why.contains("data disks"), "{why}");
     Ok(())
@@ -130,7 +134,7 @@ fn utm_refuses_what_it_cant_give_saying_what_would() -> Outcome {
 
 #[test]
 fn vmware_runs_a_machine_with_nested_virtualization() -> Outcome {
-    let spec = "version: 1\nname: t\nmachines:\n  a:\n    os: debian@12\n    hardware: { nested_virtualization: true }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    app: { steps: [{ run: p.sh }] }\n";
+    let spec = "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    hardware: { nested_virtualization: true }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n";
     let vf = vagrantfile(spec)?;
     assert!(provider_block(&vf, "a", "vmware_desktop")?.contains("v.vmx[\"vhv.enable\"] = \"TRUE\""));
     assert!(!provider_block(&vf, "b", "vmware_desktop")?.contains("vhv.enable"));

@@ -160,7 +160,7 @@ fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
     let sh = wait("web");
     assert!(sh.contains("if [ \"$i\" -gt 1800 ]; then echo"), "{sh}");
     assert!(sh.ends_with("sleep 5; done\n"), "{sh}");
-    assert!(sh.contains("'web: waiting for its secrets, which the runner (run.json) delivers'"), "{sh}");
+    assert!(sh.contains("'web: waiting for its secrets, which the tool that runs it delivers'"), "{sh}");
     assert!(!sh.contains('`'), "no backquote, which shellcheck reads as an expansion left unexpanded: {sh}");
 }
 
