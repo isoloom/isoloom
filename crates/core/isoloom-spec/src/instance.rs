@@ -30,8 +30,9 @@ pub fn output_dir(instance: Option<u8>) -> String {
 /// # Errors
 ///
 /// [`Error::InstanceNumber`] outside 1 to [`MAX`], [`Error::InstanceName`] when the name with its
-/// suffix is too long, and [`Error::InstancePort`] or [`Error::InstanceIpv6`] when a published
-/// port or an IPv6 block leaves no room to shift.
+/// suffix is too long, and [`Error::InstancePort`], [`Error::InstanceDocker`] or
+/// [`Error::InstanceIpv6`] when a published port, a Docker block or an IPv6 block leaves no room
+/// to shift.
 pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
     if n == 0 || n > MAX {
         return Err(Error::InstanceNumber(n));
@@ -47,7 +48,12 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
     for (name, block) in docker_cidrs(spec) {
         let [_, second, third, fourth] = block.address().octets();
         // The low octets are the block's own, so the shifted one is a block too.
-        let Some(shifted) = Cidr::new(u32::from_be_bytes([10, second.wrapping_add(n), third, fourth]), block.prefix()) else {
+        let moved = second.checked_add(n).ok_or_else(|| Error::InstanceDocker {
+            network: name.clone(),
+            cidr: block.to_string(),
+            instance: n,
+        })?;
+        let Some(shifted) = Cidr::new(u32::from_be_bytes([10, moved, third, fourth]), block.prefix()) else {
             continue;
         };
         if let Some(net) = copy.networks.get_mut(&name) {
@@ -144,6 +150,21 @@ mod tests {
         let copy = apply(&web(8080)?, 2).map_err(|e| e.to_string())?;
         assert_eq!(copy.networks["lan"].docker, Some(NetworkDocker { cidr: "10.2.0.0/24".into() }));
         assert_eq!(copy.networks["lan"].cidr, "10.0.0.0/24", "the machines keep the addresses the spec writes");
+        Ok(())
+    }
+
+    #[test]
+    fn a_docker_block_too_high_to_move_is_refused_not_wrapped() -> Result<(), String> {
+        let spec = model(
+            "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.0.0.0/24, docker: { cidr: 10.250.0.0/24 } }\nmachines:\n  web: { docker: { image: nginx }, networks: { lan: 10 } }\n",
+        )?;
+        let copy = apply(&spec, 5).map_err(|e| e.to_string())?;
+        assert_eq!(copy.networks["lan"].docker, Some(NetworkDocker { cidr: "10.255.0.0/24".into() }));
+        // Regression: 250 + 9 wrapped to 10.3.0.0/24, a block another network or instance may hold.
+        assert!(matches!(
+            apply(&spec, 9),
+            Err(Error::InstanceDocker { network, instance: 9, .. }) if network == "lan"
+        ));
         Ok(())
     }
 
