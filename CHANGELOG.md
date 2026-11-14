@@ -53,6 +53,11 @@ stable spec format.
 
 ### Fixed
 
+- **A Windows machine's command healthcheck runs in a PowerShell of its own (#290),** as Linux runs
+  it in `sh -c`. The Ready step pasted the test into its own script: an `exit 1` ended the
+  provisioner at once, an `exit 0` ended it before the ready file was written, a cmdlet-only test
+  (`Test-Path`) never passed, and the timeout was ignored. It passes now when the child exits 0
+  and the command's last output isn't `$false`, and the child is stopped after the timeout.
 - **An external machine's `environment`, `sysctls` and `ulimits` are refused at validation (#311),**
   naming the field and pointing to the environment's own provisioning, where they were dropped
   without a word. An environment variable set from an input is still taken.
