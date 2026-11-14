@@ -22,6 +22,7 @@ mod machines;
 mod network;
 mod outputs;
 mod private_dns;
+mod resources;
 mod routing;
 
 use crate::hcl_builder::{Block, BlockBuilder, Module, string};

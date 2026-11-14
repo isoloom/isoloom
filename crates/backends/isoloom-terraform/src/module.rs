@@ -29,6 +29,41 @@ pub(crate) fn resource(kind: &str, name: &str) -> BlockBuilder {
     Block::builder("resource").add_label(kind).add_label(name)
 }
 
+/// A resource's address: its type and its name (a Terraform identifier), spelled in one place
+/// for its block and for every reference to it, so the two can't drift apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResourceRef {
+    kind: &'static str,
+    name: String,
+}
+
+impl ResourceRef {
+    /// Resource `name` of type `kind`; `name` is made an identifier ([`ident`]).
+    pub(crate) fn new(kind: &'static str, name: &str) -> ResourceRef {
+        ResourceRef { kind, name: ident(name) }
+    }
+
+    /// Its name, the block's second label.
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Its block, started.
+    pub(crate) fn block(&self) -> BlockBuilder {
+        resource(self.kind, &self.name)
+    }
+
+    /// Its attribute `attr`: `aws_subnet.lan.id`.
+    pub(crate) fn attr(&self, attr: &str) -> Expression {
+        crate::hcl_builder::reference(&format!("{}.{}.{attr}", self.kind, self.name))
+    }
+
+    /// The resource itself, as `depends_on` names it: `aws_internet_gateway.env`.
+    pub(crate) fn whole(&self) -> Expression {
+        crate::hcl_builder::reference(&format!("{}.{}", self.kind, self.name))
+    }
+}
+
 /// An `output` block.
 pub(crate) fn output(name: &str, value: Expression) -> Block {
     Block::builder("output").add_label(name).add_attribute(("value", value)).build()
