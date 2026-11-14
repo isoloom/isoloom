@@ -21,7 +21,6 @@ use isoloom_render::run_manifest;
 
 use crate::error::Result;
 use crate::file::ComposeFile;
-use crate::start::StartPlan;
 
 /// The Compose file, next to the manifest.
 const COMPOSE_FILE: &str = "compose.yml";
@@ -32,19 +31,18 @@ const PORTS_FILE: &str = "ports.yml";
 /// left empty.
 pub(crate) fn docker(env: &Environment, file: &ComposeFile) -> Result<Manifest> {
     let members = machines::classify(env, file)?;
-    let plan = StartPlan::of(file);
     let runners = checks::runners(env)?;
     let machines = machines::machines(env, file, &members, &Project::Run)?;
     Ok(run_manifest::Body {
         tools: tools()?,
         identity: identity()?,
         params: slots::params(&machines, &runners.derived)?,
-        secrets: slots::slots(env, &members, &plan, slots::Starts::Host)?,
+        secrets: slots::slots(env, &members, slots::Starts::Host)?,
         networks: run_manifest::networks(env, |n| Project::Run.prefixed(n))?,
         outputs: run_manifest::outputs(&machines)?,
         machines,
-        lifecycle: lifecycle::lifecycle(env, &plan, &members)?,
-        ready: lifecycle::ready(&plan, &members, "up")?,
+        lifecycle: lifecycle::lifecycle(env)?,
+        ready: lifecycle::ready("up")?,
         checks: Checks {
             protocol: isoloom_manifest::CheckProtocol::V1,
             setup: checks::setup(file)?,

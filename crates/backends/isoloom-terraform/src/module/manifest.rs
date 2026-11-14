@@ -191,34 +191,6 @@ pub(crate) fn terraform_output(name: &str, role: OutputRole, description: &str) 
     })
 }
 
-/// The seal's run-manifest param (`crate::cloud::vm::seal`): the runner sets it `true` once the
-/// machines are set up (its default is `false`) and records it with the run. It is delivered as
-/// the `isoloom_sealed` Terraform variable: a cloud module's rules switch on it; a server's module
-/// (Proxmox's, ESXi's) has no such variable (its router is sealed by the seal's SSH step), so
-/// Terraform ignores it there. `closed_at` names where the internet is closed for the description
-/// (the clouds' "network", a server's "router").
-pub(crate) fn seal_param(name: &str, closed_at: &str) -> Result<Param, ManifestError> {
-    Ok(Param {
-        name: EnvName::parse(name)?,
-        description: format!("true once the machines are set up: the internet is closed to the `internet: false` networks, at the {closed_at}."),
-        default: Some("false".into()),
-        values: vec!["true".into(), "false".into()],
-        required: false,
-        hosts: BTreeSet::new(),
-        providers: BTreeSet::new(),
-        set_by: SetBy::Runner,
-        deliver: tf_var_string(name)?,
-    })
-}
-
-/// The VMs that read the launch-time input `name`, in start order (empty: none do).
-pub(crate) fn input_readers(env: &Environment, name: &str) -> Result<Vec<Name>, ManifestError> {
-    env.vms()
-        .filter(|Vm { plan: mp, .. }| mp.inputs.iter().any(|i| i == name))
-        .map(|Vm { name: n, .. }| Name::parse(n))
-        .collect()
-}
-
 /// A check runner per position, on the machine `crate::machine::check_machine` says, its step
 /// from `step` (given the position, that machine and its checks; `None`: no runner there): the
 /// one loop of every Terraform target's run manifest.

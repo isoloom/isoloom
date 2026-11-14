@@ -63,7 +63,8 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &VmDriver) -> Re
     let mut machines = machines(env)?;
     let mut outputs = outputs(env, &machines)?;
     super::console::add(env, &guests, &mut machines, &mut outputs)?;
-    let mut variables = super::own_variables(env, driver);
+    // The cloud's own and the operator's: the values given at launch are slots of their own.
+    let mut variables = driver.base.variables(env);
     variables.extend(operator::host_reaching());
     let frame = Frame {
         target: isoloom_manifest::Target::CloudVm,
@@ -148,32 +149,31 @@ fn runners(env: &Environment, guests: &[Guest]) -> Result<Vec<CheckRunner>, Mani
     })
 }
 
-/// The launch's values (inputs), each one slot: an entry of the module's `inputs` for the
-/// machines reading it in their environment, delivered over SSH to those reading it as a file;
-/// then each secret a machine reads.
+/// The launch's values (inputs), each one slot: the module's variable of its name, for the
+/// machines reading it (in their environment or as a file); then each secret a machine reads.
 fn inputs(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = Vec::new();
     for input in &env.inputs {
-        let env_readers = manifest::input_readers(env, &input.name)?;
-        let file_readers: Vec<Name> = env
+        let readers: Vec<Name> = env
             .vms()
-            .filter(|Vm { plan: mp, .. }| mp.reads_input_file(&input.name))
+            .filter(|Vm { plan: mp, .. }| mp.reads_input(&input.name))
             .map(|Vm { name: n, .. }| Name::parse(n))
             .collect::<Result<_, _>>()?;
-        out.extend(connection::input(&input.name, input.sensitive, &env_readers, &file_readers)?);
+        out.extend(connection::input(&input.name, input.sensitive, &readers)?);
     }
     out.extend(machine_secrets(env)?);
     Ok(out)
 }
 
-/// Each secret a machine reads (`secrets:`), from its store: delivered over SSH, so the value
-/// stays out of the state. Owners are the machine's set-up's business (its `Secrets` step places
-/// the file). An input's file is the input's own slot.
+/// Each secret a machine reads (`secrets:`), from its store: the module's variable
+/// `ISOLOOM_SECRET_<NAME>`, which the machines' user data writes in place. Owners are the
+/// machine's set-up's business (its `Secrets` step places the file). An input's file is the
+/// input's own slot.
 fn machine_secrets(env: &Environment) -> Result<Vec<SecretSlot>, ManifestError> {
     let mut out = Vec::new();
     for held in held_secrets(env, MachineShape::Vm) {
         let readers: Vec<Name> = held.holders.iter().map(|n| Name::parse(n)).collect::<Result<_, _>>()?;
-        out.push(connection::guest_secret(held.name, held.source, &readers)?);
+        out.push(connection::machine_secret(held.name, held.source, &readers)?);
     }
     Ok(out)
 }

@@ -186,12 +186,12 @@ run "a_slot_beyond_vmware_s_static_macs_is_refused" {
 }
 
 # The spec: `back` has `internet: false`. The router's base /etc/nftables.conf is always the
-# unsealed ruleset (asserted above: back is forwarded for set-up) and never depends on
-# `isoloom_sealed`, so sealing never changes the snippet (no VM recreate). The sealed ruleset is a
-# second file, /etc/nftables.sealed.nft, which the seal-reload step applies live: it keeps the
-# reach rules but drops back from the internet forward and NAT, and drops what crosses into back.
-# ESXi has no per-VM firewall, so the router's drop is what isolates back once sealed: the run
-# manifest's seal applies it over SSH once the machines are set up, as on Proxmox.
+# unsealed ruleset (asserted above: back is forwarded for set-up) and never depends on the seal,
+# so sealing never changes the snippet (no VM recreate). The sealed ruleset is a second file,
+# /etc/nftables.sealed.nft, which terraform_data.isoloom_seal applies live once every machine is
+# set up, in the same apply: it keeps the reach rules but drops back from the internet forward and
+# NAT, and drops what crosses into back. ESXi has no per-VM firewall, so the router's drop is what
+# isolates back once sealed, as on Proxmox.
 run "the_router_carries_the_sealed_ruleset_for_the_live_seal_step" {
   command = plan
 

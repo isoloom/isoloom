@@ -165,9 +165,10 @@ fn an_idle_container_is_kept_running() -> Outcome {
 }
 
 /// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
-/// so the start plan waits for the rest and runs it after (#42).
+/// so one service of Isoloom's own waits for it to complete, and the one `up --wait` covers it
+/// (#42).
 #[test]
-fn leaf_init_jobs_run_after_the_wait() -> Outcome {
+fn leaf_init_jobs_are_waited_for_by_the_one_up() -> Outcome {
     let spec = lab(r#"
 version: 1
 name: leaf
@@ -185,16 +186,21 @@ machines:
     app: { image: "nginx:1.27-alpine" }
     setup: [setup.sh, warm.sh]
 "#)?;
-    // db's job is waited for by web; web's two jobs by nothing: the file's start line brings
-    // the rest up and waited for, then runs them attached (`up --wait` fails on an exiting job).
+    // db's job is waited for by web; web's two jobs by nothing but `isoloom-jobs-done`, which
+    // `--wait` waits for: a job that fails fails the `up`.
     let compose = generated(&spec, Target::Docker, "docker/compose.yml")?;
     let dc = "docker compose -f .isoloom/docker/compose.yml";
-    let start = format!(
-        "# Start:  {dc} up -d --build --wait db isoloom-init-db-1 web isoloom-probe \
-         && {dc} up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1 \
-         && {dc} up --no-deps --exit-code-from isoloom-init-web-2 isoloom-init-web-2\n"
-    );
-    assert!(compose.contains(&start), "{compose}");
+    assert!(compose.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{compose}");
+    assert!(!compose.contains("--exit-code-from"), "{compose}");
+    let (_, done) = compose.split_once("\n  isoloom-jobs-done:\n").ok_or("the jobs' service")?;
+    let done = done.split("\n  isoloom-").next().unwrap_or_default();
+    for job in ["isoloom-init-web-1", "isoloom-init-web-2"] {
+        assert!(
+            done.contains(&format!("{job}:\n        condition: service_completed_successfully")),
+            "{job}: {done}"
+        );
+    }
+    assert!(!done.contains("isoloom-init-db-1"), "web waits for db's: {done}");
     // Nothing left over: the one command it always was.
     let plain = generated(&example("hello-stack")?, Target::Docker, "docker/compose.yml")?;
     assert!(plain.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{plain}");

@@ -59,6 +59,16 @@ pub(super) fn guests(env: &Environment, module: &mut Module) {
     if controller::needed(env) {
         controller(env, module);
     }
+    // Terraform sets each Linux machine and the controller up itself: the seal comes after.
+    let mut set_up: Vec<Expression> = env
+        .vms()
+        .filter(|vm| !vm.plan.is_windows())
+        .map(|vm| reference(&format!("terraform_data.{}", ident(vm.name))))
+        .collect();
+    if controller::needed(env) {
+        set_up.push(reference("terraform_data.isoloom_controller"));
+    }
+    module.blocks(crate::server::router::seal(env, reference("esxi_guest.isoloom_router.id"), set_up));
 }
 
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.
@@ -84,7 +94,16 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, module:
         user_data: if windows {
             cloudbase_init::user_data(env, (name, mp))
         } else {
-            CloudConfig::new(name, reference("local.users")).document()
+            let mut config = CloudConfig::new(name, reference("local.users"));
+            // The secrets' values, root's alone, for the set-up over SSH to put in place.
+            if let Some(content) = crate::module::inputs::secrets_file(mp) {
+                config.files.push(crate::machine::cloud_init::file(
+                    crate::machine::cloud_init::WRITTEN_SECRETS,
+                    Some("0600"),
+                    content,
+                ));
+            }
+            config.document()
         },
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],

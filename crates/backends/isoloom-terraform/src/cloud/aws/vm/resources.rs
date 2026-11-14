@@ -27,6 +27,11 @@ pub(super) fn subnet(net: &str) -> ResourceRef {
     ResourceRef::new("aws_subnet", net)
 }
 
+/// The seal's network ACL on the networks without internet (`crate::seal`).
+pub(super) fn sealed_acl() -> ResourceRef {
+    ResourceRef::new("aws_network_acl", "sealed")
+}
+
 /// Network `net`'s subnet joined to its route table.
 pub(super) fn route_table_association(net: &str) -> ResourceRef {
     ResourceRef::new("aws_route_table_association", net)
@@ -37,8 +42,6 @@ pub(super) fn route_table_association(net: &str) -> ResourceRef {
 pub(super) enum RouteTable<'a> {
     /// The environment's, to the internet.
     Env,
-    /// The networks without internet once the run is sealed.
-    Sealed,
     /// A network's own, when a machine routes it.
     Own(&'a str),
 }
@@ -47,7 +50,6 @@ pub(super) enum RouteTable<'a> {
 pub(super) fn route_table(table: RouteTable<'_>) -> ResourceRef {
     let name = match table {
         RouteTable::Env => "env",
-        RouteTable::Sealed => "sealed",
         RouteTable::Own(net) => net,
     };
     ResourceRef::new("aws_route_table", name)

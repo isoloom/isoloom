@@ -56,7 +56,10 @@ pub(super) const USER: &str = "root";
 /// Why DigitalOcean can't run this environment, if it can't: its rules, then a machine with
 /// several addresses on its network.
 fn refusal(env: &Environment) -> Option<String> {
-    RULES.linux_refusal(env).or_else(|| several_addresses(env))
+    RULES
+        .linux_refusal(env)
+        .or_else(|| several_addresses(env))
+        .or_else(|| crate::cloud::vm::seal::refusal(env, "DigitalOcean"))
 }
 
 /// A machine with several addresses on one network (`lan: [10, 11]`): a Droplet has one address
@@ -113,7 +116,7 @@ fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     for vm in env.vms() {
         droplet(env, vm, module)?;
     }
-    outputs::write_as(env, super::BASE.user, &public_ip, module);
+    outputs::write_as(env, super::BASE.user, &public_ip, "digitalocean_droplet", module);
     Ok(())
 }
 
@@ -157,24 +160,17 @@ fn droplet(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, module: &mut Mo
     module.block(droplet.build());
     module.commented(
         "What may reach it: SSH and the published ports from allowed_cidr, everything from the VPC.",
-        firewall(mp, &id, crate::seal::sealed(env, mp)),
+        firewall(mp, &id),
     );
     Ok(())
 }
 
 /// SSH and the droplet's own published ports from `allowed_cidr`, everything from the VPC,
-/// everything out; the VPC only once the run is sealed, for a `sealed` droplet (no internet).
-fn firewall(mp: &MachinePlan, id: &str, sealed: bool) -> Block {
+/// everything out (a network without internet is refused: `crate::cloud::vm::seal`).
+fn firewall(mp: &MachinePlan, id: &str) -> Block {
     let allowed = || list([reference("var.allowed_cidr")]);
     let vpc = || list([reference("digitalocean_vpc.env.ip_range")]);
-    let everywhere = || list([string("0.0.0.0/0"), string("::/0")]);
-    let anywhere = || {
-        if sealed {
-            crate::cloud::vm::seal::when_sealed(vpc(), everywhere())
-        } else {
-            everywhere()
-        }
-    };
+    let anywhere = || list([string("0.0.0.0/0"), string("::/0")]);
     let mut b = resource("digitalocean_firewall", id)
         .add_attribute(("name", reference("local.name")))
         .add_attribute(("droplet_ids", list([reference(&format!("digitalocean_droplet.{id}.id"))])))

@@ -15,7 +15,7 @@ use crate::module::{Usage, resource};
 /// tagging every resource ([`instance::tags`]), and its images' users.
 pub(crate) const BASE: Base = Base {
     cloud: crate::cloud::Cloud::Aws,
-    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
     variables: |region| vec![crate::cloud::region_variable(region)],
     provider: |env, m| {
         m.block(provider(instance::tags(env)));
@@ -124,16 +124,6 @@ pub(crate) fn egress_to(cidrs: Expression) -> Block {
         .add_attribute(("to_port", number(0)))
         .add_attribute(("protocol", string("-1")))
         .add_attribute(("cidr_blocks", cidrs))
-        .build()
-}
-
-/// The route out of an `internet: false` network's subnet: the internet until the run is sealed,
-/// then `allowed_cidr` alone (the runner's SSH and the published ports' replies).
-pub(crate) fn sealed_route_out() -> Block {
-    let cidr = crate::cloud::vm::seal::when_sealed(reference("var.allowed_cidr"), string("0.0.0.0/0"));
-    Block::builder("route")
-        .add_attribute(("cidr_block", cidr))
-        .add_attribute(("gateway_id", reference("aws_internet_gateway.env.id")))
         .build()
 }
 

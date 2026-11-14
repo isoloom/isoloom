@@ -18,7 +18,7 @@ use crate::names::{STAND_IN, check_runner_service, routes_service};
 use crate::{networks, sidecars};
 
 /// The profile the runners (and the stand-in) are in: `up` leaves them out.
-const PROFILE: &str = "check";
+pub(crate) const PROFILE: &str = "check";
 
 /// Adds each position's runner to `services`; returns their scripts.
 pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Service>) -> Vec<GeneratedFile> {

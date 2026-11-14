@@ -7,7 +7,7 @@
 //!   AWS security groups do.
 //! - Each machine is a `google_compute_instance` at its address with a public address that sets
 //!   itself up from its startup script (`crate::cloud::vm::hooks::user_data`), once the
-//!   runner delivered the project over SSH. The SSH user comes from the `ssh-keys` metadata
+//!   Terraform brought the project in over SSH (`crate::ready`). The SSH user comes from the `ssh-keys` metadata
 //!   (created at first boot): the image's usual user, as on AWS. A machine
 //!   on several networks has an interface in each VPC (up to 8, as many as its vCPUs, two at
 //!   least), IP forwarding on so replies leave from the right one.
@@ -80,6 +80,7 @@ const MACHINES: vm::Machines = vm::Machines {
     linux: machines::linux,
     windows: None,
     controller: machines::controller,
+    instance: "google_compute_instance",
 };
 
 /// The machine types whose CPUs nest (N2: E2 has no nested virtualization), smallest first, as

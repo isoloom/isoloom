@@ -20,7 +20,7 @@ pub(crate) const BASE: Base = Base {
     cloud: crate::cloud::Cloud::Oci,
     usage: |folder| Usage {
         after: "# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n",
-        ..Usage::with_runner_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
+        ..Usage::with_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
     },
     variables: |region| {
         vec![

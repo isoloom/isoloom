@@ -107,7 +107,7 @@ fn linodes_root_host_runs_every_command_without_sudo_the_others_through_it() -> 
         ssh_commands(&serde_json::to_value(&placed.manifest).unwrap())
     };
     let linode = of("linode");
-    assert!(linode.len() > 4, "{linode:?}");
+    assert!(!linode.is_empty(), "{linode:?}");
     for (user, command) in &linode {
         assert_eq!(user, "root");
         // Linode's Debian has no `sudo`: root runs each command as it is.
@@ -115,6 +115,14 @@ fn linodes_root_host_runs_every_command_without_sudo_the_others_through_it() -> 
     }
     let aws = of("aws");
     assert!(aws.iter().all(|(user, _)| user != "root"), "{aws:?}");
-    assert!(aws.iter().any(|(_, c)| c.starts_with("sudo sh -c 'rm -rf /opt/isoloom")), "{aws:?}");
+    // The module brings the project in the same way: as root on Linode, through `sudo` elsewhere.
+    let files = backend(Target::CloudDocker).render(&env("configured-app")?).unwrap();
+    let module = |cloud: &str| crate::testing::file(&files, &format!("cloud-docker/{cloud}/main.tf")).map(str::to_owned);
+    assert!(module("aws")?.contains("sudo sh -c 'rm -rf /opt/isoloom"));
+    let linode_module = module("linode")?;
+    assert!(
+        linode_module.contains("\"sh -c 'rm -rf /opt/isoloom") && !linode_module.contains("sudo "),
+        "{linode_module}"
+    );
     Ok(())
 }

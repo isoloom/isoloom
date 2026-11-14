@@ -80,8 +80,9 @@ set); a cluster that admits only `restricted` pods refuses them. Every object is
 
 ## Public IP addresses on cloud VMs
 
-Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: the runner reaches
-the machines over SSH to deliver the project and secrets and to run the checks. Their security
+Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: Terraform reaches
+the machines over SSH to bring the project in and wait for their set-up, and you to run the
+checks. Their security
 groups or firewalls accept SSH (22), WinRM (5985, Windows) and the published ports only from
 `allowed_cidr`, which has no default: set it to your address or your egress range. Nothing is
 open to `0.0.0.0/0` inbound but one ICMP message on Oracle Cloud: "fragmentation needed" (and
@@ -94,13 +95,21 @@ on top.
 An `internet: false` network is a guarantee, not a convention. On Compose, the containers have no
 route out and a privileged container on such a network is refused unless it accepts a best-effort
 seal. On the clouds and the servers (Proxmox, ESXi), machines need the internet while they set
-themselves up, so the runner seals the network once they are ready, where root in a machine can't
-undo it: at the cloud's own level (a second apply with `isoloom_sealed`), or at a server's router
-(its sealed ruleset applied over SSH). Egress is then limited to the environment's networks. The
-seal fails closed: a failed seal means the environment is not ready. Every later apply keeps it,
-so a later change can't silently reopen the network. One channel stays open on the clouds: the
-cloud's own DNS resolver still answers for public names, so a machine can still resolve them,
-and a program that tunnels data through DNS lookups can still reach out.
+themselves up, so the module seals the network once they are ready, within the same `terraform
+apply`, where root in a machine can't undo it. The closing resources depend on each machine's
+readiness wait (its ready file, read over SSH), at the cloud's own level (a network ACL on AWS, a
+security group on Azure, deny rules on Google Cloud, a route table on Oracle Cloud), or at a
+server's router (its sealed ruleset applied over SSH). Egress is then limited to the
+environment's networks. The seal fails closed: a failed seal fails the apply, and the environment
+is not ready. Every later apply keeps it, so a later change can't silently reopen the network.
+DigitalOcean and Linode, whose firewalls only allow and are made with the machine, can't close a
+network once it is set up, so they refuse one without internet. One channel stays open on the
+clouds: the cloud's own DNS resolver still answers for public names, so a machine can still resolve
+them, and a program that tunnels data through DNS lookups can still reach out.
+
+On the Terraform targets, values given at launch are module variables (`sensitive` for secrets
+and sensitive inputs), written into a machine by its user data, its cloud-init snippet or an
+upload over SSH. Terraform stores sensitive values in its state, as it does for every variable.
 
 ## Expiry
 

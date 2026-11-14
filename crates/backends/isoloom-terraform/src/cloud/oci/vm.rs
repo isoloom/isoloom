@@ -191,7 +191,7 @@ fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
         machine(env, vm, at, module)?;
     }
     network::gateway_routes(env, module);
-    outputs::write_as(env, super::BASE.user, &public_ip, module);
+    outputs::write_as(env, super::BASE.user, &public_ip, "oci_core_instance", module);
     Ok(())
 }
 

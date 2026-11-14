@@ -77,6 +77,7 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_at_its_exact_range" {

@@ -1,5 +1,5 @@
 //! The controller on a cloud, set up from its own user data (`crate::machine::user_data`), as on
-//! Proxmox: the project the runner delivers, its key and the inventory written from its user
+//! Proxmox: the project Terraform brings in, its key and the inventory written from its user
 //! data, the site's certificate authorities, the hosts file, Ansible, then a wait for each machine's own set-up (its ready file over
 //! SSH, a Windows machine's marker over WinRM) before the playbooks run.
 

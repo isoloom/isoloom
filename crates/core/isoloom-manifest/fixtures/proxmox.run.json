@@ -309,6 +309,7 @@
           "TF_IN_AUTOMATION": "1",
           "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
         },
         "timeout_s": 900
@@ -329,6 +330,7 @@
           "TF_IN_AUTOMATION": "1",
           "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
         },
         "timeout_s": 3600
@@ -355,6 +357,7 @@
           "TF_IN_AUTOMATION": "1",
           "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
         },
         "timeout_s": 900
@@ -376,6 +379,7 @@
           "TF_IN_AUTOMATION": "1",
           "TF_VAR_proxmox_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_slot": "${run.slot}",
+          "TF_VAR_ssh_private_key_file": "${run.ssh_key}",
           "TF_VAR_ssh_public_key": "${run.ssh_public_key}"
         },
         "timeout_s": 1800

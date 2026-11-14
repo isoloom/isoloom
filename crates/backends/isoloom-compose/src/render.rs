@@ -17,9 +17,9 @@ use std::fmt;
 use indexmap::IndexMap;
 use isoloom_manifest::contract::{OUTPUT_DIR, PUBLISH_ADDRESS};
 use isoloom_plan::Environment;
-use isoloom_plan::checks::Position;
+use isoloom_plan::checks::{Position, Probe};
 use isoloom_render::backend::Files;
-use isoloom_render::container::PROBE_IMAGE;
+use isoloom_render::container::{PROBE_IMAGE, exec_runner};
 use isoloom_render::{GeneratedFile, header};
 use isoloom_spec::model::Arch;
 
@@ -27,26 +27,71 @@ use crate::backend::ComposeTarget;
 use crate::error::{Error, Result};
 use crate::file::{Attachment, ComposeFile, NetworkMode, RO_BIND, Restart, Service, Volume};
 use crate::trunks;
-use isoloom_render::run_manifest::RUNNER;
 
+use crate::check_runners::PROFILE as CHECK_PROFILE;
 use crate::layout::DIR;
 use crate::machine::Machine;
-use crate::names::{check_runner_service, probe_service, tool_service};
-use crate::start::StartPlan;
+use crate::names::{STAND_IN, check_runner_service, probe_service, routes_service, tool_service};
 use crate::{check_runners, ipv6, labels, networks, outside, router, storage};
 
-/// How to start, check and stop `file` by hand, at its top: started as its [`StartPlan`] says,
-/// so a set-up job nothing waits for runs after the rest is up.
-fn usage(file: &ComposeFile) -> String {
+/// How to start, check and stop `file` with Compose alone, at its top: one `up` that waits for
+/// everything, its set-up jobs included ([`start`](crate::start)); the access machine, in its
+/// profile; the checks, each position's runner run once in the `check` profile (and a machine's
+/// `exec` checks piped into it).
+fn usage(env: &Environment, file: &ComposeFile) -> String {
     let compose = format!("docker compose -f {OUTPUT_DIR}/{DIR}/compose.yml");
-    let start = StartPlan::of(file).command(&compose, None);
-    // The runner where a user stands, and another position's.
-    let user = Position::Networks;
-    let (own, other) = (
-        check_runner_service(&user, &user),
-        check_runner_service(&Position::Machine("<machine>".into()), &user),
-    );
-    format!("# Start:  {start}\n# Checks: {RUNNER}, or by hand: {compose} --profile check run --rm {own}, and {other}\n# Stop:   {compose} down -v\n")
+    let mut lines = vec![format!("Start:  {}", crate::start::command(&compose, None))];
+    let mut inputs: Vec<&str> = Vec::new();
+    for i in Machine::containers(env).flat_map(|m| m.plan.inputs.iter()) {
+        if !inputs.contains(&i.as_str()) {
+            inputs.push(i);
+        }
+    }
+    if !inputs.is_empty() {
+        lines.push(format!(
+            "Inputs: set {} in Compose's environment (the shell's, else .env) for `up` and `start` (unset: empty).",
+            inputs.join(", ")
+        ));
+    }
+    let access = isoloom_manifest::access::PROFILE;
+    let on_demand = file
+        .services
+        .iter()
+        .filter(|(n, s)| s.profiles.iter().any(|p| p == access) && env.machines.contains_key(*n));
+    lines.extend(on_demand.map(|(name, _)| format!("Access: {compose} --profile {access} up -d {name}")));
+    let default = env.default_position();
+    let mut checks = Vec::new();
+    for (pos, group) in env.checks_by_position() {
+        if group.iter().any(|c| !matches!(c.probe, Probe::Exec { .. })) {
+            let runner = check_runner_service(&pos, &default);
+            checks.push(format!("{compose} --profile {CHECK_PROFILE} run --rm {runner}"));
+        }
+        if let Position::Machine(m) = &pos
+            && group.iter().any(|c| matches!(c.probe, Probe::Exec { .. }))
+        {
+            checks.push(format!("{compose} exec -T {m} sh -s < {OUTPUT_DIR}/{DIR}/checks/{}", exec_runner(m)));
+        }
+    }
+    if !checks.is_empty() {
+        lines.push(format!("Checks: {}", checks.join("\n        ")));
+        lines.push(
+            "        Each prints a PASS or FAIL line per check, and fails when one does (`run -e ISOLOOM_DERIVED=0` leaves the derived checks out).".to_owned(),
+        );
+        if file.services.contains_key(STAND_IN) {
+            let routes = routes_service(STAND_IN);
+            let sidecar = if file.services.contains_key(&routes) {
+                format!(" {routes}")
+            } else {
+                String::new()
+            };
+            lines.push(format!(
+                "        Then {compose} --profile {CHECK_PROFILE} rm -sf {STAND_IN}{sidecar}: the access machine's stand-in, which a run starts."
+            ));
+        }
+    }
+    lines.push(format!("Stop:   {compose} --profile {CHECK_PROFILE} down -v"));
+    let text = lines.join("\n");
+    text.lines().flat_map(|l| ["# ", l, "\n"]).collect()
 }
 
 /// The Compose file of `env` and the files it mounts (check runners, appliance configurations),
@@ -64,7 +109,7 @@ pub(crate) fn render(target: ComposeTarget, env: &Environment) -> Result<Files> 
         contents: format!(
             "{}{}{}{}{}\n{yaml}",
             header("#"),
-            usage(&file),
+            usage(env, &file),
             secrets::usage(env, &file),
             configs::usage(env),
             Moved(env)
@@ -117,6 +162,7 @@ pub(crate) fn compose_file(target: ComposeTarget, env: &Environment) -> Result<R
         ..ComposeFile::default()
     };
     probes(env, &out.probes, &mut out.services);
+    crate::start::wait_for_jobs(env, &mut out.services);
     file.services = out.services;
     labels::mark(env, &mut file);
     // Existing networks aren't the environment's: unlabelled, so nothing collects them.

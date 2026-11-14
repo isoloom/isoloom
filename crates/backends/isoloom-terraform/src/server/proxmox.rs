@@ -20,7 +20,7 @@
 //!   server: SDN ids are short) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`, the `isoloom` user
 //!   with `ssh_public_key`): the `machines` output gives their addresses, and the check runners
-//!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them by the runner
+//!   in `.isoloom/proxmox/checks/<position>.sh` are piped to them over SSH through the router
 //!   (the `checks` output says which runs where).
 
 mod arch;
@@ -43,7 +43,8 @@ mod windows;
 
 use std::borrow::Cow;
 
-use crate::hcl_builder::Module;
+use crate::hcl_builder::{Module, reference, string};
+use crate::server::router as server_router;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
@@ -133,6 +134,7 @@ fn refusal(env: &Environment) -> Option<String> {
             .or_else(|| arch::refusal(env))
             .or_else(|| virtiofs::refusal(env))
             .or_else(|| lxc::refusal(env))
+            .or_else(|| super::secrets_refusal(env))
     })
 }
 
@@ -146,13 +148,11 @@ impl Backend for ProxmoxBackend {
     }
 
     /// What a server target gives (`crate::server::features`), and a virtual TPM, GPUs passed
-    /// through, nesting, rate limits and VMs waiting for LXC containers. Secrets and inputs as
-    /// files are refused: a machine waits for a runner to deliver them over SSH at its own
-    /// address, and a Proxmox machine is reached only through the router, which a run manifest's
-    /// guest delivery doesn't go through.
+    /// through, nesting, rate limits and VMs waiting for LXC containers. A Linux VM's secrets
+    /// come from the module's variables in its cloud-init snippet (`super::secrets_refusal` says
+    /// where they can't).
     fn capabilities(&self) -> Capabilities {
-        let delivered = |f: &Feature| !matches!(f, Feature::Secrets | Feature::SecretOwners);
-        Capabilities::of(super::features().filter(delivered).chain([
+        Capabilities::of(super::features().chain([
             Feature::Tpm,
             // Passed through by PCI id or resource mapping (`gpus.ids`, refused without).
             Feature::VmGpus,
@@ -174,7 +174,8 @@ impl Backend for ProxmoxBackend {
     }
 
     /// The run manifest (`.isoloom/proxmox/run.json`): Terraform applies the infrastructure, the
-    /// runner reads each machine's ready file and runs the checks over SSH through the router.
+    /// runner runs the checks over SSH through the router (the module itself waits for every
+    /// set-up and seals).
     fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
         Ok(Some(manifest::manifest(&prepared(env))?))
     }
@@ -197,7 +198,6 @@ const PARTS: Parts = Parts {
     refusal,
     usage: |folder| Usage {
         apply: " -var proxmox_endpoint=https://<server>:8006/ -var proxmox_api_token=<user@realm!name=secret>",
-        key: None,
         ..Usage::with_key(folder, "")
     },
     copy: ProjectCopy::Files,
@@ -210,7 +210,7 @@ const PARTS: Parts = Parts {
     },
 };
 
-/// The VMs, the LXC containers, then the controller.
+/// The VMs, the LXC containers, the controller, then the waits for their set-up and the seal.
 fn guests(env: &Environment, module: &mut Module) {
     for vm in env.vms() {
         machine::blocks(env, vm, module);
@@ -219,4 +219,54 @@ fn guests(env: &Environment, module: &mut Module) {
     if core_controller::needed(env) {
         controller::blocks(env, module);
     }
+    let waited = waits(env, module);
+    module.blocks(server_router::seal(
+        env,
+        reference("proxmox_virtual_environment_vm.isoloom_router.id"),
+        crate::ready::all(waited.iter().map(String::as_str)),
+    ));
 }
+
+/// Each Linux VM's readiness wait, then the controller's (`crate::ready`): Terraform signs in
+/// through the router as `isoloom` and waits for the set-up cloud-init runs. The machines it
+/// waits for.
+fn waits(env: &Environment, m: &mut Module) -> Vec<String> {
+    let mut waited = Vec::new();
+    let mut wait = |name: &str, id: &str, at: std::net::Ipv4Addr, within_s: u32, reboots: usize| {
+        let at = crate::machine::provisioner::Connection::SshVia {
+            host: string(at.to_string()),
+            user: crate::machine::USER.to_owned(),
+            bastion: reference("local.router_address"),
+        };
+        m.block(
+            crate::ready::Wait {
+                machine: name.to_owned(),
+                connection: at,
+                replace_on: reference(&format!("proxmox_virtual_environment_vm.{id}.id")),
+                as_root: isoloom_render::steps::AsRoot::Sudo,
+                log: CLOUD_INIT_LOG,
+                within_s,
+                reboots,
+                project: false,
+                outputs: Vec::new(),
+            }
+            .block(),
+        );
+        waited.push(name.to_owned());
+    };
+    for vm in env.vms().filter(|vm| !vm.plan.is_windows()) {
+        if let Some(at) = vm.plan.addresses.values().next() {
+            let reboots = crate::ready::reboots(&vm.plan.lifecycle);
+            wait(vm.name, &crate::module::ident(vm.name), *at, crate::module::manifest::SETUP_S, reboots);
+        }
+    }
+    if core_controller::needed(env)
+        && let Some(at) = core_controller::addresses(env).values().next()
+    {
+        wait(core_controller::NAME, "isoloom_controller", *at, crate::module::manifest::PLAYBOOKS_S, 0);
+    }
+    waited
+}
+
+/// Where cloud-init writes the set-up's output on a Proxmox VM: the end a failed wait prints.
+const CLOUD_INIT_LOG: &str = "/var/log/cloud-init-output.log";

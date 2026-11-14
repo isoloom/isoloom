@@ -2,20 +2,10 @@
 
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_render::header;
-use isoloom_render::run_manifest::RUNNER;
 
-/// The operator's SSH key, which the modules that set machines up over SSH take.
+/// The operator's SSH key: the machines let its public half in, and Terraform signs in with its
+/// private half to set them up or to wait for their set-up.
 const SSH_KEY: &str = "-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\" -var ssh_private_key_file=~/.ssh/id_ed25519";
-
-/// The key the machines let in, for a module whose machines set themselves up (the clouds).
-const PUBLIC_KEY: &str = "-var ssh_public_key=\"$(cat ~/.ssh/id_ed25519.pub)\"";
-
-/// What follows a module whose machines wait for the project.
-fn then_runner() -> String {
-    format!(
-        "# Then:   the machines wait for the project: run the environment through {RUNNER} beside this file,\n#         which delivers the project over SSH, waits for each set-up and runs the checks.\n"
-    )
-}
 
 /// How to start and stop a module, as its first comment lines say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,9 +20,6 @@ pub(crate) struct Usage<'a> {
     pub key: Option<&'a str>,
     /// A whole line after the stop, or nothing.
     pub after: &'a str,
-    /// The machines set themselves up from their user data, the runner delivering the
-    /// project: only the public key, and a line saying so.
-    pub runner: bool,
 }
 
 impl<'a> Usage<'a> {
@@ -44,26 +31,15 @@ impl<'a> Usage<'a> {
             apply: "",
             key: Some(settings),
             after: "",
-            runner: false,
-        }
-    }
-
-    /// The machines set themselves up: `settings` then the key they let in, and what follows.
-    pub(crate) const fn with_runner_key(folder: &'a str, settings: &'a str) -> Usage<'a> {
-        Usage {
-            runner: true,
-            ..Usage::with_key(folder, settings)
         }
     }
 
     /// The header, then the lines.
     pub(crate) fn text(&self) -> String {
         let chdir = format!("terraform -chdir={OUTPUT_DIR}/{}", self.folder);
-        let ssh = if self.runner { PUBLIC_KEY } else { SSH_KEY };
-        let key = self.key.map(|settings| format!(" \\\n#           {settings}{ssh}")).unwrap_or_default();
-        let then = if self.runner { then_runner() } else { String::new() };
+        let key = self.key.map(|settings| format!(" \\\n#           {settings}{SSH_KEY}")).unwrap_or_default();
         format!(
-            "{}{}# Start:  {chdir} init && {chdir} apply{}{key}\n# Stop:   {chdir} destroy (same variables)\n{}{then}",
+            "{}{}# Start:  {chdir} init && {chdir} apply{}{key}\n# Stop:   {chdir} destroy (same variables)\n{}",
             header("#"),
             self.before,
             self.apply,
@@ -93,7 +69,6 @@ mod tests {
             apply: " -var a=b",
             key: None,
             after: "# Auth:   none\n",
-            runner: false,
         };
         assert!(
             usage.text().ends_with("# Needs:  a server\n# Start:  terraform -chdir=.isoloom/proxmox init && terraform -chdir=.isoloom/proxmox apply -var a=b\n# Stop:   terraform -chdir=.isoloom/proxmox destroy (same variables)\n# Auth:   none\n"),

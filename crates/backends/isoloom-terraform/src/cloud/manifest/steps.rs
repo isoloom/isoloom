@@ -1,27 +1,21 @@
-//! What a cloud run does: Terraform's `init` then `apply` (and `destroy`); the project archived
-//! and piped into each machine over SSH, retried while the machine boots; when it counts as ready
-//! (the apply, then each machine's ready file); the seal (a second apply with `isoloom_sealed`);
-//! and the param saying whether the derived checks run.
+//! What a cloud run does: Terraform's `init` then `apply` (and `destroy`), the apply bringing
+//! the project into each machine, waiting for its set-up and sealing the networks without
+//! internet itself (`crate::ready`, `crate::cloud::vm::seal`); when it counts as ready (the
+//! apply, then each machine's ready file, which says so already); and the param saying whether
+//! the derived checks run.
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RunVar, Seal, Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, Placeholder, RunVar, Step, Template,
 };
-use isoloom_render::run_manifest::noted;
-use isoloom_render::steps::{Archive, PROJECT_DIR, TopFolder, project_unpack};
-use isoloom_spec::linux::STATE_DIR;
-use isoloom_spec::shell::quote;
+use isoloom_render::steps::PROJECT_DIR;
 
-use super::connection::SEALED;
-use crate::machine::user_data::{DELIVERED, SETUP_LOG};
+use crate::machine::user_data::SETUP_LOG;
 use crate::module::manifest::{self, id, secs, terraform, words};
 use crate::ssh::Login;
 
-/// The values the runner gives a cloud module: its key, which the machines let in.
-const VARS: &[(&str, RunVar)] = &[("TF_VAR_ssh_public_key", RunVar::SshPublicKey)];
-
-/// How long the runner retries a machine still booting before the delivery gives up, in
-/// seconds: within the time its set-up waits for the project.
-const BOOT_WAIT_S: u32 = 900;
+/// The values the runner gives a cloud module: its key, which the machines let in, and its
+/// private half's file, which Terraform signs in with to bring the project in and wait.
+const VARS: &[(&str, RunVar)] = &[("TF_VAR_ssh_public_key", RunVar::SshPublicKey), ("TF_VAR_ssh_private_key_file", RunVar::SshKey)];
 
 /// `0`: the checks derived from the spec are skipped.
 use isoloom_manifest::contract::DERIVED;
@@ -36,38 +30,6 @@ pub(crate) struct Guest {
     pub(crate) login: Login,
     /// How long its set-up may take after the delivery, in seconds.
     pub(crate) setup_s: u32,
-}
-
-impl Guest {
-    /// Its step id's suffix: its name, as a step id takes it.
-    fn id(&self) -> String {
-        self.machine.to_ascii_lowercase().replace(['_', '.'], "-")
-    }
-}
-
-/// The project archived in the run's state folder (from the project's folder, three levels up
-/// from the module's), none of Isoloom's outputs in: the machines read none.
-fn archive() -> Result<Step, ManifestError> {
-    isoloom_render::run_manifest::project_archive("../../..", &[])
-}
-
-/// The archive piped into `guest`'s `/opt/isoloom`, replacing an earlier copy, then the mark its
-/// set-up waits for. Retried while the machine boots (ssh can't connect yet); unpacking again is
-/// harmless.
-fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
-    let command = format!(
-        "{}sh -c {}",
-        guest.login.as_root().prefix(),
-        quote(&format!(
-            "{} && mkdir -p {STATE_DIR} && touch {DELIVERED}",
-            project_unpack(Archive::Stdin, TopFolder::Kept)
-        ))
-    );
-    let wait = [("wait_s", Template::text(&BOOT_WAIT_S.to_string()))];
-    let mut s = guest.login.step(&format!("deliver-{}", guest.id()), &Template::text(&command), &wait)?;
-    s.stdin = Some(PathTemplate::project_archive());
-    s.timeout_s = secs(BOOT_WAIT_S + 600);
-    Ok(noted(s, &format!("Copying the project into {}…", guest.machine)))
 }
 
 pub(crate) use manifest::clear_lock;
@@ -98,47 +60,27 @@ pub(crate) fn status_step() -> Result<Step, ManifestError> {
     Ok(Step::action(id("state")?, Action::TerraformReadState))
 }
 
-/// `up` (its steps already built) and `down`, sharing the lock, init and destroy; `seal` runs
-/// after a successful `up`.
-fn lifecycle_of(up: Vec<Step>, seal: Option<Seal>) -> Result<Lifecycle, ManifestError> {
+/// `up` (its steps already built) and `down`, sharing the lock, init and destroy.
+pub(crate) fn terraform_lifecycle(up: Vec<Step>) -> Result<Lifecycle, ManifestError> {
     Ok(Lifecycle {
         up: NonEmpty::new(up, "lifecycle.up")?,
         down: NonEmpty::new(vec![clear_lock()?, init_step()?, destroy_step()?], "lifecycle.down")?,
         park: None,
         resume: Vec::new(),
         provision: None,
-        seal,
+        seal: None,
         status: status_step()?,
     })
 }
 
-/// `up` (its steps already built) and `down`, sharing the lock, init and destroy.
-pub(crate) fn terraform_lifecycle(up: Vec<Step>) -> Result<Lifecycle, ManifestError> {
-    lifecycle_of(up, None)
-}
-
-/// A stale lock of a crashed run cleared, then `init`, then `apply` and the project delivered to
-/// each machine (or `destroy`); when the run has anything to seal (`sealed`), the seal: a second
-/// apply once the machines are set up.
-pub(crate) fn lifecycle(guests: &[Guest], sealed: bool) -> Result<Lifecycle, ManifestError> {
-    let mut up = vec![
+/// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`): the apply
+/// ends once every machine is set up and the networks without internet are sealed.
+pub(crate) fn lifecycle() -> Result<Lifecycle, ManifestError> {
+    terraform_lifecycle(vec![
         clear_lock()?,
         init_step()?,
-        apply_step("apply", "Creating the environment's machines in the cloud…")?,
-    ];
-    if !guests.is_empty() {
-        up.push(archive()?);
-        up.extend(guests.iter().map(deliver).collect::<Result<Vec<_>, _>>()?);
-    }
-    let seal = if sealed {
-        Some(Seal {
-            param: EnvName::parse(SEALED)?,
-            steps: NonEmpty::one(apply_step("seal", "Closing the internet to the networks without it…")?),
-        })
-    } else {
-        None
-    };
-    lifecycle_of(up, seal)
+        apply_step("apply", "Creating the environment's machines in the cloud and waiting for their set-up…")?,
+    ])
 }
 
 /// The apply succeeded, then each machine's set-up is done (its ready file, over SSH).
@@ -181,7 +123,6 @@ pub(crate) fn derived(runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestErr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use isoloom_manifest::Run;
 
     fn guest(user: &str) -> Guest {
         Guest {
@@ -192,40 +133,11 @@ mod tests {
     }
 
     #[test]
-    fn the_project_is_archived_once_then_piped_into_each_machine_while_it_boots() {
-        let l = lifecycle(
-            &[
-                guest("admin"),
-                Guest {
-                    machine: "db".into(),
-                    ..guest("root")
-                },
-            ],
-            false,
-        )
-        .unwrap();
+    fn the_one_apply_brings_the_project_in_waits_and_seals() {
+        let l = lifecycle().unwrap();
         let ids: Vec<&str> = l.up.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["clear-lock", "init", "apply", "archive", "deliver-web", "deliver-db"]);
-        let web = &l.up.as_slice()[4];
-        assert_eq!(web.stdin.as_ref().map(ToString::to_string).as_deref(), Some("${run.state_dir}/project.tgz"));
-        let Run::Action { with, .. } = &web.run else { panic!() };
-        let get = |k: &str| with.iter().find(|(n, _)| n.as_str() == k).map(|(_, v)| v.to_string());
-        assert_eq!(get("wait_s").as_deref(), Some("900"));
-        assert!(get("command").is_some_and(
-            |c| c.starts_with("sudo sh -c 'rm -rf /opt/isoloom && mkdir -p /opt/isoloom") && c.contains("touch /var/lib/isoloom/project-delivered")
-        ));
-        let Run::Action { with: db, .. } = &l.up.as_slice()[5].run else { panic!() };
-        assert!(db.values().any(|v| v.to_string().starts_with("sh -c 'rm -rf")), "root needs no sudo");
-    }
-
-    #[test]
-    fn the_seal_is_a_second_apply_switched_by_its_param() {
-        assert!(lifecycle(&[guest("admin")], false).unwrap().seal.is_none(), "nothing to seal");
-        let l = lifecycle(&[guest("admin")], true).unwrap();
-        let seal = l.seal.unwrap();
-        assert_eq!(seal.param.as_str(), SEALED);
-        let ids: Vec<&str> = seal.steps.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["seal"]);
+        assert_eq!(ids, ["clear-lock", "init", "apply"]);
+        assert!(l.seal.is_none(), "the module seals within the apply");
         let down: Vec<&str> = l.down.iter().map(|s| s.id.as_str()).collect();
         assert_eq!(down, ["clear-lock", "init", "destroy"]);
     }

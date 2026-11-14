@@ -194,12 +194,13 @@ Each tool's files run by hand (`docker compose up`, `kubectl apply -k`, `vagrant
 manifest instead: it checks the tools' versions, brings the environment up, delivers secrets
 (never written into a file), waits until it is ready, runs every check, and tears it down.
 
-- **A runner is required** for `cloud-vm` and `cloud-docker` (their machines wait for the project
-  and secrets the runner delivers over SSH) and for sealing `internet: false` networks on the
-  clouds once the machines are set up. It also enforces cloud expiry and reaps leftovers.
-- **It is optional** for `docker`, `vagrant`, `proxmox`, `esxi` and
-  `cloud-services`; on `proxmox` and `esxi` it also seals `internet: false` networks at the
-  router once the machines are set up.
+- **The tools alone bring an environment to ready.** `docker compose up -d --wait` waits for the
+  healthchecks and init jobs; `vagrant up` ends after each machine's last provisioner, its
+  readiness check; `terraform apply` brings the project into each cloud machine over SSH, waits
+  for every machine's set-up (its ready file) and seals `internet: false` networks in the same
+  apply. The values given at launch reach each tool from its environment: Compose interpolates
+  `${NAME}`, the Vagrantfile reads `ENV.fetch`, Terraform takes `TF_VAR_<NAME>`.
+- **A runner is optional** everywhere: it adds cloud expiry and reaps leftovers.
 - `kubernetes`, `external` and `hosted` have no run manifest: run them by hand.
 
 [Isothrum](https://github.com/Isothrum/isothrum) is the reference runner; any program that follows

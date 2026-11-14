@@ -48,6 +48,40 @@ pub(super) fn blocks(env: &Environment, module: &mut Module) {
                 .build(),
         );
     }
+    sealed(env, module);
+}
+
+/// The seal (`crate::seal`), when a network has no internet: a security group on those networks'
+/// subnets, associated once every machine is set up (`seal::after_set_up`), denying the internet
+/// out. What may come in at all is let in there (the virtual network, `allowed_cidr`: each
+/// machine's own group still decides), and a group is stateful, so the replies to SSH and the
+/// published ports still leave.
+fn sealed(env: &Environment, m: &mut Module) {
+    let closed: Vec<&String> = env.networks.keys().filter(|n| crate::seal::any(env) && crate::seal::closed(env, n)).collect();
+    if closed.is_empty() {
+        return;
+    }
+    let vnet_in = security_rule(("vnet-in", 100), ("Inbound", "Allow"), string("VirtualNetwork"), string("*")).into_block();
+    let allowed_in = security_rule(("allowed-in", 110), ("Inbound", "Allow"), reference("var.allowed_cidr"), string("*")).into_block();
+    let no_internet = security_rule(("no-internet-out", 100), ("Outbound", "Deny"), string("*"), string("Internet")).into_block();
+    m.commented(
+        "The seal: once every machine is set up, the networks without internet lose the internet out, at their subnets.",
+        placed("azurerm_network_security_group", "sealed", name_with("-sealed"))
+            .add_block(vnet_in)
+            .add_block(allowed_in)
+            .add_block(no_internet)
+            .build(),
+    );
+    for net in closed {
+        let id = ident(net);
+        m.block(
+            resource("azurerm_subnet_network_security_group_association", &format!("sealed_{id}"))
+                .add_attribute(("subnet_id", reference(&format!("azurerm_subnet.{id}.id"))))
+                .add_attribute(("network_security_group_id", reference("azurerm_network_security_group.sealed.id")))
+                .add_attribute(("depends_on", crate::cloud::vm::seal::after_set_up(env)))
+                .build(),
+        );
+    }
 }
 
 /// A resource in the environment's resource group and region, tagged.
@@ -61,12 +95,11 @@ pub(super) fn placed(kind: &str, name: &str, cloud_name: Expression) -> BlockBui
 
 /// A network security group: inbound rules numbered from 100 in the order given, then the rest
 /// of the virtual network denied (Azure's own `AllowVnetInBound` would let every subnet reach
-/// every port, `reach` notwithstanding), then everything out, or only the virtual network once
-/// the run is sealed for a machine that has no internet.
+/// every port, `reach` notwithstanding), then everything out (the seal closes the internet at the
+/// subnet: [`sealed`]).
 pub(super) struct Nsg {
     block: BlockBuilder,
     priority: u64,
-    sealed: bool,
 }
 
 /// Where the rest of the virtual network is denied inbound: after every allow rule.
@@ -78,15 +111,7 @@ impl Nsg {
         Nsg {
             block: placed("azurerm_network_security_group", id, name_with(&format!("-{who}"))),
             priority: 100,
-            sealed: false,
         }
-    }
-
-    /// The group of a machine the seal closes off (`crate::cloud::vm::seal`).
-    #[must_use]
-    pub(super) fn sealed(mut self, sealed: bool) -> Nsg {
-        self.sealed = sealed;
-        self
     }
 
     /// An inbound allow rule (`protocol`: `*`, `Tcp` or `Udp`; `port`: a port or `*`).
@@ -98,21 +123,15 @@ impl Nsg {
     }
 
     /// The group: the rest of the virtual network denied inbound, then everything out allowed
-    /// (Azure's default, made explicit as on AWS), or the internet denied once sealed (the
-    /// virtual network stays allowed out: Azure's `AllowVnetOutBound`).
+    /// (Azure's default, made explicit as on AWS).
     pub(super) fn build(self) -> Block {
         let deny_vnet = security_rule(("deny-rest-of-vnet", DENY_VNET), ("Inbound", "Deny"), string("VirtualNetwork"), string("*"));
-        let out = if self.sealed {
-            let when = |yes: &str, no: &str| crate::cloud::vm::seal::when_sealed(string(yes), string(no));
-            security_rule(("outbound", 100), ("Outbound", "Allow"), string("*"), when("Internet", "*")).with_access(when("Deny", "Allow"))
-        } else {
-            security_rule(("outbound", 100), ("Outbound", "Allow"), string("*"), string("*")).into_block()
-        };
+        let out = security_rule(("outbound", 100), ("Outbound", "Allow"), string("*"), string("*")).into_block();
         self.block.add_block(deny_vnet.into_block()).add_block(out).build()
     }
 }
 
-/// A `security_rule` on every protocol and port, being built: its access may still change.
+/// A `security_rule` on every protocol and port.
 struct SecurityRule {
     head: BlockBuilder,
     access: Expression,
@@ -120,11 +139,6 @@ struct SecurityRule {
 }
 
 impl SecurityRule {
-    /// The rule with `access` (an expression: the seal switches it).
-    fn with_access(self, access: Expression) -> Block {
-        SecurityRule { access, ..self }.into_block()
-    }
-
     fn into_block(self) -> Block {
         let [source, destination] = self.tail;
         self.head

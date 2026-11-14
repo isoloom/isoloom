@@ -39,7 +39,7 @@ use isoloom_render::steps;
 use isoloom_spec::shell::quote;
 
 /// The user Isoloom makes on the machines it sets up itself (a server's VMs and its router, an
-/// Azure VM, a Windows machine's administrator): it has `sudo`, and the runner's key.
+/// Azure VM, a Windows machine's administrator): it has `sudo`, and the operator's key.
 pub(crate) const USER: &str = "isoloom";
 
 /// What every VM target renders through this core; a target refuses one on its own, with its
@@ -51,7 +51,8 @@ pub(crate) const USER: &str = "isoloom";
 ///   further addresses (on the interface of its primary address), IPv6, link impairment (`tc`)
 ///   and the networks a machine routes (`gateway:`, refused by a target's limits where its
 ///   network can't).
-/// - Secrets, owners included, delivered by the runner over the machine's own connection (SSH,
+/// - Secrets, owners included: on a cloud, module variables its user data writes in place (a
+///   server refuses them); before, a runner delivered them over the machine's own connection (SSH,
 ///   or WinRM on Windows).
 /// - The private zone's names: the platform's DNS where it has one, else each VM's hosts file
 ///   under the zone's domain, its search domain.

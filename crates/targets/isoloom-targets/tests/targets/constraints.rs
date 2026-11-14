@@ -132,10 +132,10 @@ fn every_linux_vm_runs_the_preamble_first() -> Outcome {
         assert_eq!(tf.matches("running: system constraints").count(), set_ups, "{cloud}: {tf}");
         assert_eq!(tf.matches("{ sh -c 'set -e\\n# The proxy").count(), set_ups, "{cloud}: {tf}");
     }
-    // The cloud Docker host sets itself up from its shared setup.sh (over SSH, the run manifest),
-    // not from Terraform: the prelude leads it.
+    // The cloud Docker host sets itself up from its user data once the project is in: the
+    // prelude leads its Docker step.
     for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
-        let setup = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/setup.sh"))?;
+        let setup = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?;
         assert!(
             setup.contains("# The proxy") && setup.contains("mirror.corp/debian"),
             "the Docker host on {cloud}: {setup}"
@@ -242,9 +242,8 @@ fn isoloom_s_own_vms_trust_the_certificate_authority_before_they_install_anythin
     let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
     let router = between(&vf, "define \"isoloom-router\"", "config.vm.define")?;
     in_order(router, &["name: \"project\"", TRUST, "apt-get install -y -qq nftables"]);
-    // The containers' Docker host: the set-up script a cloud's run manifest pipes in once the
-    // project is copied.
-    let setup = file(&lab, Target::CloudDocker, "cloud-docker/aws/setup.sh")?;
+    // The containers' Docker host: its set-up from its user data, once the project is in.
+    let setup = file(&lab, Target::CloudDocker, "cloud-docker/aws/main.tf")?;
     in_order(&setup, &[TRUST, "download.docker.com"]);
     // The controller, before Ansible: on Vagrant and on the clouds.
     let paired = example_with_ca("ansible-pair")?;

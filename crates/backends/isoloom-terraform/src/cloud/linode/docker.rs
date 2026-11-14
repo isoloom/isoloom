@@ -20,6 +20,7 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
         sizes: HostSizes::Table(super::vm::PLANS),
     }),
     resources,
+    instance: "linode_instance",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read

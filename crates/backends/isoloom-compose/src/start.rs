@@ -1,89 +1,81 @@
-//! How to start a Compose file: `wait` for everything but its leaf jobs (`up -d --wait`), then
-//! run each of those jobs attached, in order, failing on its exit code. Computed from the typed
-//! file this backend renders, for the run manifests' start steps and, as one shell line
-//! ([`StartPlan::command`]), the start written atop the file.
+//! How a Compose file starts: one `docker compose up -d --wait`. Compose's `--wait` waits for a
+//! service to run (or to be healthy, with a healthcheck), and accepts a one-shot service's exit
+//! only when another service waits for it to complete (`service_completed_successfully`): a
+//! one-shot nothing waits for would fail `--wait` by exiting, even with 0. So the jobs nothing
+//! running waits for (a machine's `setup` scripts, run once it is up) are waited for by one
+//! small service of Isoloom's own, [`JOBS_DONE`], which starts once each of them exited 0: `up
+//! --wait` then ends well only when every job did, and a job that fails fails it.
 
-use crate::file::ComposeFile;
+use indexmap::IndexMap;
+use isoloom_plan::Environment;
+use isoloom_render::container::PROBE_IMAGE;
 
-/// How to start a Compose file: the services to wait for, then the jobs to run.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub(crate) struct StartPlan {
-    /// Services to bring up with `docker compose up -d --wait` (empty: all of them).
-    pub(crate) wait: Vec<String>,
-    /// One-shot jobs nothing running waits for, to run after `wait`, in order.
-    pub(crate) jobs: Vec<String>,
+use crate::file::{Condition, NetworkMode, Restart, Service};
+
+/// The service that runs once every job nothing else waits for exited 0, under the prefix an
+/// environment's machines can't take.
+pub(crate) const JOBS_DONE: &str = "isoloom-jobs-done";
+
+/// The line that starts the file with `compose` (e.g. `docker compose -f x`): everything built,
+/// started and waited for, its jobs included (at most `wait_timeout` seconds when given).
+pub(crate) fn command(compose: &str, wait_timeout: Option<u32>) -> String {
+    let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
+    format!("{compose} up -d --build --wait{timeout}")
 }
 
-/// A service as the start plan reads it: its name, what it waits for, whether it runs once
-/// (`restart: "no"`). Services in a profile aren't started, so they aren't read.
-struct Started {
-    name: String,
-    deps: Vec<String>,
-    one_shot: bool,
-}
-
-impl StartPlan {
-    /// The plan of a Compose file: one-shots (`restart: "no"`) outside profiles that no other
-    /// started service depends on are jobs; when there are none, `wait` is empty (start all).
-    pub(crate) fn of(file: &ComposeFile) -> StartPlan {
-        let started: Vec<Started> = file
-            .services
-            .iter()
-            .filter(|(_, s)| s.profiles.is_empty())
-            .map(|(name, s)| Started {
-                name: name.clone(),
-                deps: s.depends_on.keys().cloned().collect(),
-                one_shot: s.runs_once(),
-            })
-            .collect();
-        plan_of(&started)
+/// [`JOBS_DONE`] added to `services` when some started one-shot (`restart: "no"`) service is a
+/// job no long-running service waits for, even through other jobs; nothing otherwise. It waits
+/// for each such job to exit 0, then does nothing until stopped (the probe's busybox, with no
+/// network).
+pub(crate) fn wait_for_jobs(env: &Environment, services: &mut IndexMap<String, Service>) {
+    let jobs = leaf_jobs(services);
+    if jobs.is_empty() {
+        return;
     }
-
-    /// The shell line that starts the file by hand with `compose` (e.g. `docker compose -f x`):
-    /// everything but the jobs up, built and waited for (at most `wait_timeout` seconds when
-    /// given), then each job attached, its exit code failing the line.
-    pub(crate) fn command(&self, compose: &str, wait_timeout: Option<u32>) -> String {
-        let timeout = wait_timeout.map(|t| format!(" --wait-timeout {t}")).unwrap_or_default();
-        let services = self.wait.iter().map(|s| format!(" {s}")).collect::<Vec<_>>().concat();
-        let jobs = self
-            .jobs
-            .iter()
-            .map(|j| format!(" && {compose} up --no-deps --exit-code-from {j} {j}"))
-            .collect::<Vec<_>>()
-            .concat();
-        format!("{compose} up -d --build --wait{timeout}{services}{jobs}")
+    let mut done = Service {
+        image: Some(env.images.pull(PROBE_IMAGE)),
+        entrypoint: vec!["sleep".into(), "2147483647".into()],
+        // Stopped at once: the engine's init forwards the stop signal, which `sleep` as PID 1
+        // would ignore.
+        init: true,
+        network_mode: Some(NetworkMode::None),
+        restart: Some(Restart::UnlessStopped),
+        ..Service::default()
+    };
+    for job in jobs {
+        done.after(job, Condition::CompletedSuccessfully);
     }
+    services.insert(JOBS_DONE.to_owned(), done);
 }
 
-fn plan_of(started: &[Started]) -> StartPlan {
-    // What the long-running services need, through chains of one-shots: `--wait` accepts those
-    // exiting. The other one-shots are the jobs.
+/// The one-shots outside profiles (a profile's services don't start with `up`) that no
+/// long-running service needs, through chains of one-shots, in the file's order.
+fn leaf_jobs(services: &IndexMap<String, Service>) -> Vec<String> {
+    let started: Vec<(&String, &Service)> = services.iter().filter(|(_, s)| s.profiles.is_empty()).collect();
     let mut needed: Vec<&str> = Vec::new();
-    let mut todo: Vec<&str> = started.iter().filter(|s| !s.one_shot).flat_map(|s| s.deps.iter().map(String::as_str)).collect();
+    let mut todo: Vec<&str> = started
+        .iter()
+        .filter(|(_, s)| !s.runs_once())
+        .flat_map(|(_, s)| s.depends_on.keys().map(String::as_str))
+        .collect();
     while let Some(n) = todo.pop() {
         if needed.contains(&n) {
             continue;
         }
-        if let Some(s) = started.iter().find(|s| s.name == n) {
-            todo.extend(s.deps.iter().map(String::as_str));
+        if let Some(s) = services.get(n) {
+            todo.extend(s.depends_on.keys().map(String::as_str));
         }
         needed.push(n);
     }
-    let jobs: Vec<String> = started
+    started
         .iter()
-        .filter(|s| s.one_shot && !needed.contains(&s.name.as_str()))
-        .map(|s| s.name.clone())
-        .collect();
-    if jobs.is_empty() {
-        return StartPlan::default();
-    }
-    let wait = started.iter().map(|s| s.name.clone()).filter(|n| !jobs.contains(n)).collect();
-    StartPlan { wait, jobs }
+        .filter(|(name, s)| s.runs_once() && !needed.contains(&name.as_str()))
+        .map(|(name, _)| (*name).clone())
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::file::{Condition, Restart, Service};
 
@@ -100,57 +92,46 @@ mod tests {
         s
     }
 
-    fn file(services: &[(&str, Service)]) -> ComposeFile {
-        let mut f = ComposeFile::default();
-        f.services.extend(services.iter().map(|(n, s)| ((*n).to_owned(), s.clone())));
-        f
+    fn services(list: &[(&str, Service)]) -> IndexMap<String, Service> {
+        list.iter().map(|(n, s)| ((*n).to_owned(), s.clone())).collect()
     }
 
     #[test]
-    fn a_job_nothing_waits_for_runs_after_the_rest_is_up() {
-        let plan = StartPlan::of(&file(&[
+    fn a_job_nothing_waits_for_is_a_leaf_one_a_needed_one_and_a_profiles_are_not() {
+        let jobs = leaf_jobs(&services(&[
             ("web", service(false, &[], &["db", "isoloom-init-web-1"])),
-            ("isoloom-init-web-1", service(true, &[], &[])),
+            ("isoloom-init-web-1", service(true, &[], &["isoloom-probe"])),
+            ("isoloom-probe", service(true, &[], &[])),
             ("db", service(false, &[], &[])),
             ("seed", service(true, &[], &["db"])),
             ("isoloom-check", service(true, &["check"], &[])),
         ]));
-        assert_eq!(plan.jobs, ["seed"]);
-        assert_eq!(plan.wait, ["web", "isoloom-init-web-1", "db"]);
+        assert_eq!(jobs, ["seed"]);
+        assert_eq!(leaf_jobs(&services(&[("web", service(false, &[], &[]))])), Vec::<String>::new());
     }
 
     #[test]
-    fn without_leaf_jobs_everything_is_waited_for() {
-        assert_eq!(StartPlan::of(&file(&[("web", service(false, &[], &[]))])), StartPlan::default());
-        assert_eq!(StartPlan::of(&ComposeFile::default()), StartPlan::default());
-        assert_eq!(StartPlan::default().command("dc", Some(60)), "dc up -d --build --wait --wait-timeout 60");
+    fn the_command_is_one_up_that_waits() {
+        assert_eq!(command("dc", Some(60)), "dc up -d --build --wait --wait-timeout 60");
+        assert_eq!(command("dc", None), "dc up -d --build --wait");
     }
 
     #[test]
-    fn the_command_waits_for_the_rest_then_runs_each_job_attached() {
-        let plan = StartPlan {
-            wait: vec!["web".into(), "db".into()],
-            jobs: vec!["seed".into(), "warm".into()],
-        };
-        assert_eq!(
-            plan.command("dc", None),
-            "dc up -d --build --wait web db && dc up --no-deps --exit-code-from seed seed && dc up --no-deps --exit-code-from warm warm"
-        );
-    }
-
-    #[test]
-    fn a_rendered_file_waits_for_what_runs_and_runs_its_leaf_init_jobs_after() {
+    fn a_rendered_file_waits_for_its_leaf_init_jobs_through_one_service() {
         // The store's init job is waited for by the app; the app's by nothing.
         let env = crate::testing::environment(
             "version: 1\nname: leaves\nnetworks: { net: { cidr: 10.71.0.0/24 } }\nmachines:\n  store: { networks: { net: 5 }, app: { image: redis }, setup: [fill.sh] }\n  app: { networks: { net: 6 }, depends_on: [store], app: { image: nginx }, setup: [prime.sh] }\n",
         );
         let rendered = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).expect("renders");
-        let plan = StartPlan::of(&rendered.file);
-        assert_eq!(plan.jobs, ["isoloom-init-app-1"]);
-        assert!(
-            plan.wait.contains(&"app".to_owned()) && plan.wait.contains(&"isoloom-init-store-1".to_owned()),
-            "{plan:?}"
+        let done = rendered.file.services.get(JOBS_DONE).expect("the jobs' service");
+        let waits: Vec<(&String, Condition)> = done.depends_on.iter().map(|(n, d)| (n, d.condition)).collect();
+        assert_eq!(waits, [(&"isoloom-init-app-1".to_owned(), Condition::CompletedSuccessfully)]);
+        assert!(!done.runs_once() && done.profiles.is_empty(), "started and waited for by `up --wait`");
+        assert_eq!(leaf_jobs(&rendered.file.services), Vec::<String>::new(), "every job is waited for now");
+        let plain = crate::testing::environment(
+            "version: 1\nname: plain\nnetworks: { net: { cidr: 10.71.0.0/24 } }\nmachines:\n  web: { networks: { net: 5 }, app: { image: nginx } }\n",
         );
-        assert!(!plan.wait.iter().any(|w| w.starts_with("isoloom-check")), "profile services aren't started");
+        let plain = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &plain).expect("renders");
+        assert!(!plain.file.services.contains_key(JOBS_DONE), "no job: no such service");
     }
 }

@@ -62,9 +62,20 @@ terraform -chdir=.isoloom/proxmox apply \
   -var node=pve
 ```
 
-Or with a runner, which also gives the module the environment's inputs, waits for every set-up,
-seals offline networks and runs the checks (the machines take the project from their cloud-init;
-secrets are refused on Proxmox):
+Give it your key too (`-var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)" -var
+ssh_private_key_file=~/.ssh/id_ed25519`): the machines let it in, and Terraform signs in with it,
+through the router, to wait for each machine's set-up from its cloud-init
+(`terraform_data.isoloom_ready_<machine>` reads `/var/lib/isoloom/ready`, `isoloom-ready/1`, and
+fails the apply with the end of `/var/log/cloud-init-output.log` when a step failed). Once every
+machine is set up, `terraform_data.isoloom_seal` seals the `internet: false` networks at the
+router. So the apply ends with the environment ready. The environment's inputs are variables of
+their own names (`-var TOKEN=...`, or `TF_VAR_TOKEN`).
+
+Or with a runner, which also gives the module the environment's inputs and runs the checks (the
+machines take the project from their cloud-init; a Linux VM's secrets come from the module's
+`ISOLOOM_SECRET_<NAME>` variables in its cloud-init snippet, and Terraform stores sensitive values
+in its state, as it does for every variable; a Windows machine's or an LXC container's are
+refused):
 
 ```sh
 isothrum up . --target proxmox

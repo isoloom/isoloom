@@ -66,6 +66,7 @@ variables {
   proxmox_endpoint = "https://pve.test:8006/"
   node             = "pve-test"
   ssh_public_key   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_vnet_of_the_environment_s_zone" {
@@ -320,10 +321,10 @@ run "an_empty_node_is_refused" {
 }
 
 # The spec: `back` has `internet: false`. The router's base /etc/nftables.conf is always the
-# unsealed ruleset (asserted above: back is forwarded for set-up), and never depends on
-# `isoloom_sealed` — so the seal's second apply leaves the router's snippet untouched and does not
-# recreate the VM. The sealed ruleset lives in a second file, /etc/nftables.sealed.nft, which the
-# runner's seal-reload step applies live after the machines are ready: it keeps the reach rules
+# unsealed ruleset (asserted above: back is forwarded for set-up), and never depends on the seal,
+# so sealing leaves the router's snippet untouched and does not recreate the VM. The sealed ruleset
+# lives in a second file, /etc/nftables.sealed.nft, which terraform_data.isoloom_seal applies live
+# once every machine's readiness wait is done, in the same apply: it keeps the reach rules
 # but drops back from the internet forward and NAT, and drops what crosses into back, so back has
 # no way out — where root on a guest can't undo it (`crate::server::router`).
 run "the_router_carries_the_sealed_ruleset_for_the_live_seal_step" {

@@ -20,7 +20,7 @@ may still refuse some clouds).
 | `solo-web` | One Linux web server on one network: every cloud's `cloud-vm` takes it | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `workbench` | A machine to work from (its OS alone) next to a web server | docker, hosted, cloud-docker, kubernetes |
 | `configured-app` | An app written in the configuration model (steps rendered for VMs and image builds alike) | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
-| `supplier-portal-api` | A recipe per form for each machine; a launch token delivered to the database as a file | docker, hosted, cloud-docker, kubernetes, vagrant, cloud-vm |
+| `supplier-portal-api` | A recipe per form for each machine; a launch token delivered to the database as a file | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 
 ## Networks and isolation
 

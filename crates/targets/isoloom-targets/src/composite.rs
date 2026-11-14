@@ -7,7 +7,7 @@ use isoloom_compose::ComposeBackend;
 use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{self, Backend, Files, Placed};
-use isoloom_render::run_manifest::guest::GuestCompose;
+use isoloom_render::run_manifest::guest::{COMPOSE_OUTPUTS, GuestCompose};
 use isoloom_render::steps::AsRoot;
 use isoloom_spec::model::Target;
 
@@ -31,6 +31,23 @@ fn guest(env: &Environment, as_root: AsRoot) -> Result<GuestCompose, RenderError
     isoloom_compose::guest(&on_docker(env)?, as_root).map_err(|e| RenderError::from(e).on(env.target))
 }
 
+/// What the Docker host runs: the folders of the `docker` target's `files` it gets with the
+/// project, and the commands that start the Compose file there as root, with the values they
+/// read from their environment.
+fn host(env: &Environment, files: &Files) -> Result<isoloom_terraform::CloudDockerHost, RenderError> {
+    let in_vm = guest(env, AsRoot::Root)?;
+    let outputs = COMPOSE_OUTPUTS
+        .iter()
+        .filter(|dir| files.iter().any(|f| f.path.starts_with(&format!("{dir}/"))))
+        .map(|dir| (*dir).to_owned())
+        .collect();
+    Ok(isoloom_terraform::CloudDockerHost {
+        outputs,
+        start: in_vm.start.iter().map(|c| c.command.to_string()).collect(),
+        values: in_vm.forwarded(),
+    })
+}
+
 /// The `cloud-docker` backend: Compose on one cloud VM per cloud, built by Terraform.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct CloudDockerBackend;
@@ -41,19 +58,20 @@ impl Backend for CloudDockerBackend {
     }
 
     /// Compose's but existing networks: the VM runs the Compose file, so it can render what
-    /// Compose can, with the secrets the runner delivers to the VM; the Docker host is a
-    /// fresh VM with no existing network to join.
+    /// Compose can, with the secrets the module hands the VM; the Docker host is a fresh VM with
+    /// no existing network to join.
     fn capabilities(&self) -> Capabilities {
         isoloom_compose::capabilities_on_a_vm()
     }
 
-    /// The `docker` target's Compose file (and the files it mounts), a module per cloud, and the
-    /// host's set-up script the runner pipes into each VM.
+    /// The `docker` target's Compose file (and the files it mounts), then a module per cloud,
+    /// whose host gets those files with the project and starts the Compose file from its user
+    /// data.
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         backend::check(Target::CloudDocker, env, &self.capabilities())?;
         let mut files = docker_files(env)?;
-        files.extend(isoloom_terraform::cloud_docker_modules(env)?);
-        files.extend(isoloom_terraform::cloud_docker_setup(env)?);
+        let host = host(env, &files)?;
+        files.extend(isoloom_terraform::cloud_docker_modules(env, &host)?);
         Ok(files)
     }
 

@@ -67,15 +67,11 @@ fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
     let g = guest_of(WITH_SECRET);
     let start = g.start[1].command.to_string();
     assert!(start.starts_with("cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml up --detach --build --pull missing --remove-orphans --wait --wait-timeout 600"), "{start}");
-    // Each `up` after the pull of its images; web's set-up job runs attached once the rest is up.
+    // The one `up`, after the pull of its images: web's set-up job is in it (`--wait` waits for
+    // `isoloom-jobs-done`, which waits for the job).
     let ids: Vec<&str> = g.start.iter().map(|c| c.id.as_str()).collect();
-    assert_eq!(ids, ["pull-start", "start", "pull-job-isoloom-init-web-1", "job-isoloom-init-web-1"]);
-    assert!(
-        g.start[3]
-            .command
-            .to_string()
-            .ends_with("up --no-deps --exit-code-from isoloom-init-web-1 isoloom-init-web-1")
-    );
+    assert_eq!(ids, ["pull-start", "start"]);
+    assert!(!g.start.iter().any(|c| c.command.to_string().contains("--exit-code-from")));
     let ready: Vec<String> = g
         .ready
         .iter()
@@ -84,7 +80,7 @@ fn compose_runs_from_the_vms_copy_under_the_files_own_project() {
             _ => None,
         })
         .collect();
-    assert_eq!(ready, ["start", "job-isoloom-init-web-1"]);
+    assert_eq!(ready, ["start"]);
     assert_eq!(
         g.status.command.to_string(),
         "if command -v docker >/dev/null; then sudo docker compose --project-name shop ps --all --format json; fi"
@@ -113,20 +109,12 @@ fn each_up_in_the_vm_pulls_its_images_first_in_a_download_of_its_own() {
     let prefix = "cd /opt/isoloom && sudo -E env ISOLOOM_PUBLISH_ADDRESS=0.0.0.0 ISOLOOM_PUBLISH_FIXED=1 docker compose --project-name shop --file .isoloom/docker/compose.yml ";
     assert_eq!(
         pull.command.to_string(),
-        format!("{prefix}pull --policy missing --ignore-buildable --include-deps cache isoloom-routes-cache web isoloom-routes-web isoloom-probe")
+        format!("{prefix}pull --policy missing --ignore-buildable --include-deps")
     );
     assert!(up.command.to_string().starts_with(&format!("{prefix}up ")));
     assert!(pull.download && !up.download);
     assert_eq!((pull.timeout_s, pull.failure), (900, Failure::Fail));
     assert_eq!(pull.note.as_deref(), Some("Pulling the environment's images in the VM…"));
-    // A set-up job: its own service, no dependency.
-    assert!(
-        g.start[2]
-            .command
-            .to_string()
-            .ends_with("pull --policy missing --ignore-buildable isoloom-init-web-1")
-    );
-    assert!(g.start[2].download);
 }
 
 #[test]
@@ -160,7 +148,7 @@ fn the_secret_reaches_only_the_start_steps_and_is_forwarded_into_the_vm() {
     };
     assert_eq!(var.as_str(), "DEMO_SECRET");
     let steps: Vec<&str> = steps.iter().map(StepId::as_str).collect();
-    assert_eq!(steps, ["start", "job-isoloom-init-web-1"]);
+    assert_eq!(steps, ["start"]);
     assert_eq!(g.forwarded(), ["DEMO_SECRET"]);
 }
 

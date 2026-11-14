@@ -19,6 +19,7 @@ pub(crate) const DRIVER: DockerDriver = DockerDriver {
     requires: providers::OCI,
     size: None,
     resources,
+    instance: "oci_core_instance",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read

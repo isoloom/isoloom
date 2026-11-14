@@ -121,3 +121,14 @@ pub fn file<'a>(files: &'a [GeneratedFile], suffix: &str) -> Outcome<&'a str> {
         .map(|f| f.contents.as_str())
         .ok_or_else(|| format!("no file ending with {suffix}").into())
 }
+
+/// A Docker host as the `docker` target's files give it (`isoloom-targets` builds it): the
+/// Compose file's folder, its start, the values its containers read.
+#[must_use]
+pub fn docker_host(values: &[&str]) -> isoloom_terraform::CloudDockerHost {
+    isoloom_terraform::CloudDockerHost {
+        outputs: vec![".isoloom/docker".to_owned()],
+        start: vec!["cd /opt/isoloom && docker compose --project-name env --file .isoloom/docker/compose.yml up -d --build --wait".to_owned()],
+        values: values.iter().map(|v| (*v).to_owned()).collect(),
+    }
+}

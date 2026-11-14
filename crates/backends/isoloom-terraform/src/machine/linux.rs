@@ -3,9 +3,9 @@
 //! - **Over SSH by Terraform** ([`provisioner`], `remote-exec`): the project's archive and the
 //!   inputs file uploaded, then the steps. A `reboot` step ends a provisioner; Terraform restarts
 //!   the machine and the next one checks that it did before going on (ESXi).
-//! - **From its own user data** ([`set_up`], the clouds): the machine waits for the project the
-//!   runner delivers, then runs the same steps itself (`super::user_data`), a `reboot`
-//!   step ending a part.
+//! - **From its own user data** ([`set_up`], the clouds): the machine waits for the project
+//!   Terraform brings in over SSH (`crate::ready`), then runs the same steps itself
+//!   (`super::user_data`), a `reboot` step ending a part.
 
 use crate::hcl_builder::{Expression, Template, reference};
 use isoloom_plan::{Environment, MachinePlan, MachineShape, Step};
@@ -118,6 +118,12 @@ fn parts(m: &Machine) -> Vec<Vec<Expression>> {
                 next.extend(again.iter().cloned());
                 done.push(std::mem::replace(&mut part, next));
             }
+            At::Step(Step::Secrets) => {
+                if let Some(read) = inputs::secrets_from_file(plan, cloud_init::WRITTEN_SECRETS) {
+                    let c = steps::tracked("its secrets", &Shell::Sudo.command(&read), &|mark| Shell::Sudo.command(mark));
+                    part.push(c.into());
+                }
+            }
             At::Step(step) => {
                 let Some(c) = Shell::Sudo.tracked_step(env, name, step) else { continue };
                 if at_every_boot(step)
@@ -144,10 +150,10 @@ grep -q ' {name}$' /etc/hosts || echo '127.0.1.1 {name}' >> /etc/hosts; \
     ))
 }
 
-/// Machine `name`'s set-up from its own user data, logging in as `user`: the project the runner
-/// delivers, the controller's key, the launch inputs, `hooks.at_boot`, then the steps the
-/// platform doesn't do itself (`hooks.skip`), `hooks.before_egress` before the machine closes
-/// itself off. A `reboot` step ends a part; the next one starts with what a restart undid.
+/// Machine `name`'s set-up from its own user data, logging in as `user`: the project Terraform
+/// brings in, the controller's key, the launch inputs, `hooks.at_boot`, then the steps the
+/// platform doesn't do itself (`hooks.skip`), its secrets from the module's variables,
+/// `hooks.before_egress` before the machine closes itself off. A `reboot` step ends a part; the next one starts with what a restart undid.
 pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: &str, hooks: &Hooks) -> SetUp {
     let mut first = vec![Tracked::new("its host name", host_name(name)), project_wait()];
     if controller::needed(env) {
@@ -172,6 +178,12 @@ pub(crate) fn set_up(env: &Environment, (name, mp): (&str, &MachinePlan), user: 
         match at {
             At::Closing => part.extend(hooks.before_egress.iter().map(|c| Tracked::new("published ports", c.clone()))),
             At::Reboot => parts.push(std::mem::take(&mut part)),
+            At::Step(Step::Secrets) => {
+                // Terraform hands the values over in the user data: nothing to wait for.
+                if let Some(c) = inputs::secrets_step(mp) {
+                    part.push(Tracked::new("its secrets", c));
+                }
+            }
             At::Step(step) => {
                 let Some(c) = Shell::Root.step(env, name, step) else { continue };
                 if at_every_boot(step) {

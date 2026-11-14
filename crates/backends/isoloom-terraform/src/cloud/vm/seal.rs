@@ -1,32 +1,27 @@
-//! The seal on a cloud (`crate::seal`): a module variable, `isoloom_sealed`, switches each
-//! cloud's own rules; the runner applies the module again with it at `true` once every machine
-//! is ready (the run manifest's `seal`), and every later apply keeps it, so Terraform never sees
-//! the seal as drift. Inbound is unchanged: the runner's SSH and the published ports still
-//! answer from `allowed_cidr`, their replies let out by the clouds' stateful firewalls.
+//! The seal on a cloud (`crate::seal`): each cloud closes the internet to the machines of every
+//! `internet: false` network with resources of its own that wait for every machine's set-up
+//! ([`after_set_up`]: the readiness waits, `crate::ready`), so the one `terraform apply` makes
+//! the machines, waits for their set-up, then closes those networks. Each closing resource is
+//! made after the waits, and none is a switch on a resource the machines need first: AWS a
+//! network ACL on their subnets, Azure a security group on their subnets (a machine's own still
+//! applies), Google Cloud deny rules above its allow rules, Oracle Cloud a route table with no
+//! way to the internet attached to their subnets. Inbound is unchanged: SSH and the published
+//! ports still answer from `allowed_cidr`.
+//!
+//! DigitalOcean's and Linode's firewalls only allow, and a machine has one firewall made with it,
+//! so nothing made later can close it: those clouds refuse a network without internet
+//! ([`refusal`]).
 //!
 //! Each cloud's resolver stays reachable (AWS's at the VPC's `.2`, Azure's `168.63.129.16`,
 //! Google's metadata server, Oracle's VCN resolver): the clouds' firewalls don't filter them, so
-//! a sealed machine can still resolve names, a channel out the seal leaves open there. On
-//! DigitalOcean and Linode the resolvers are public addresses, which the seal closes.
+//! a sealed machine can still resolve names, a channel out the seal leaves open there.
 
-use crate::hcl_builder::{Expression, conditional, list, reference, string};
-use isoloom_plan::{Environment, MachinePlan};
+use crate::hcl_builder::{Expression, list, string};
+use isoloom_plan::Environment;
 
-use crate::module::variable::Variable;
-use crate::seal::{SEALED, any, sealed};
-
-/// The variable, when the run has anything to seal.
-pub(crate) fn variable(env: &Environment) -> Option<Variable> {
-    any(env).then(|| {
-        Variable::new(SEALED, "bool")
-            .default(crate::hcl_builder::boolean(false))
-            .describe("Close the internet to the machines of every `internet: false` network, at the network: the runner sets it once the machines are set up")
-    })
-}
-
-/// `var.isoloom_sealed ? <yes> : <no>`.
-pub(crate) fn when_sealed(yes: Expression, no: Expression) -> Expression {
-    conditional(reference(&format!("var.{SEALED}")), yes, no)
+/// What a closing resource waits for: every machine's readiness wait.
+pub(crate) fn after_set_up(env: &Environment) -> Expression {
+    list(crate::ready::all(super::outputs::waited(env)))
 }
 
 /// The environment's own blocks, every network's: where a sealed machine may still go.
@@ -34,14 +29,13 @@ pub(crate) fn environment_blocks(env: &Environment) -> Expression {
     list(env.networks.values().map(|p| string(p.cidr.to_string())))
 }
 
-/// `["0.0.0.0/0"]`, or the environment's blocks once sealed: where machine `mp` may go.
-pub(crate) fn destinations(env: &Environment, mp: &MachinePlan) -> Expression {
-    let anywhere = list([string("0.0.0.0/0")]);
-    if sealed(env, mp) {
-        when_sealed(environment_blocks(env), anywhere)
-    } else {
-        anywhere
-    }
+/// Why a cloud whose firewalls only allow (DigitalOcean, Linode: `cloud`, its name) can't run
+/// `env`: a network without internet, which it couldn't close once its machines are set up.
+pub(crate) fn refusal(env: &Environment, cloud: &str) -> Option<String> {
+    let (net, _) = env.networks.iter().find(|(n, _)| crate::seal::any(env) && crate::seal::closed(env, n))?;
+    Some(format!(
+        "network `{net}` has no internet: {cloud} can't seal an offline network (its firewalls only allow, and each machine's is made with it, so nothing made after the set-up can close its way out). Use `internet: true` (outbound only: nothing is reachable from outside but the published ports and SSH from allowed_cidr), or a provider that seals (AWS, Azure, GCP, OCI, Proxmox)"
+    ))
 }
 
 #[cfg(test)]
@@ -51,16 +45,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_variable_is_there_when_the_run_seals() {
+    fn a_cloud_whose_firewalls_only_allow_refuses_a_network_without_internet() {
         let env = crate::testing::planned(
             "version: 1\nname: s\nnetworks:\n  front: { cidr: 10.61.10.0/24 }\n  back: { cidr: 10.61.20.0/24, internet: false }\nmachines:\n  web: { os: debian@12, networks: { front: 10 } }\n  cache: { os: debian@12, networks: { back: 20 } }\n",
             Target::CloudVm,
         );
-        assert!(variable(&env).is_some());
+        assert!(refusal(&env, "Linode").is_some_and(|r| r.starts_with("network `back` has no internet")));
         let open = crate::testing::planned(
             "version: 1\nname: o\nnetworks:\n  front: { cidr: 10.61.10.0/24 }\nmachines:\n  web: { os: debian@12, networks: { front: 10 } }\n",
             Target::CloudVm,
         );
-        assert!(variable(&open).is_none());
+        assert!(refusal(&open, "Linode").is_none());
     }
 }

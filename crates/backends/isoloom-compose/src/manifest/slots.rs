@@ -13,10 +13,8 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::container::project_variables;
 use isoloom_render::run_manifest::{derived_switch, embedder_param, held_secrets, publish_fixed};
 
-use super::lifecycle::{job_step, owner};
 use super::machines::Member;
 use crate::error::Result;
-use crate::start::StartPlan;
 
 fn env_name(name: &str) -> Result<EnvName> {
     Ok(EnvName::parse(name)?)
@@ -68,14 +66,14 @@ impl Starts {
 
 /// The slots: each input a container reads, each secret a container gets, and on the host each
 /// project file Compose takes from its environment.
-pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, starts: Starts) -> Result<Vec<SecretSlot>> {
+pub(super) fn slots(env: &Environment, members: &[Member], starts: Starts) -> Result<Vec<SecretSlot>> {
     let containers: Vec<(&String, &isoloom_plan::MachinePlan)> = env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container).collect();
     let mut out = Vec::new();
     for input in &env.inputs {
         // A machine reads an input from its environment, or from a file Compose puts in place.
         let readers: Vec<&str> = containers.iter().filter(|(_, m)| m.reads_input(&input.name)).map(|(n, _)| n.as_str()).collect();
         if !readers.is_empty() {
-            let mut s = slot(&input.name, SlotKind::Input, None, &input.name, reach(&readers, members, plan, starts)?)?;
+            let mut s = slot(&input.name, SlotKind::Input, None, &input.name, reach(&readers, members, starts)?)?;
             s.sensitive = input.sensitive;
             // An input may be left out, but Compose won't create or start a container whose
             // secret's variable is unset: the runner delivers it empty instead (Compose keeps the
@@ -91,7 +89,7 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
             SlotKind::Secret,
             Some(held.source),
             &var,
-            reach(&held.holders, members, plan, starts)?,
+            reach(&held.holders, members, starts)?,
         )?);
     }
     if starts == Starts::Guest {
@@ -102,27 +100,26 @@ pub(super) fn slots(env: &Environment, members: &[Member], plan: &StartPlan, sta
             store: Store::File,
             reference: path,
         };
-        out.push(slot(&var, SlotKind::Secret, Some(source), &var, reach(&[], members, plan, starts)?)?);
+        out.push(slot(&var, SlotKind::Secret, Some(source), &var, reach(&[], members, starts)?)?);
     }
     Ok(out)
 }
 
 /// Who gets a value: some machines and their `init:` jobs, through the steps that create or
-/// start them ([`Starts`]): on the host `up` and `start` (resume: Compose writes a secret's file
-/// again from its variable each time it starts the container, and refuses to start without it;
-/// Compose 5.5.1), and the leaf jobs run on their own.
+/// start them ([`Starts`]): on the host `up` (the jobs included) and `start` (resume: Compose
+/// writes a secret's file again from its variable each time it starts the container, and refuses
+/// to start without it; Compose 5.5.1).
 struct Reach {
     machines: Vec<Name>,
     steps: StepSelection,
 }
 
-fn reach(machines: &[&str], members: &[Member], plan: &StartPlan, starts: Starts) -> Result<Reach> {
+fn reach(machines: &[&str], members: &[Member], starts: Starts) -> Result<Reach> {
     let jobs = members
         .iter()
         .filter(|m| m.role == Role::Job && m.of.as_deref().is_some_and(|o| machines.contains(&o)));
     let names = machines.iter().copied().chain(jobs.map(|j| j.name.as_str()));
-    let leaf_jobs = plan.jobs.iter().filter(|j| machines.contains(&owner(members, j))).map(|j| job_step(j));
-    let steps = starts.steps().iter().map(|s| (*s).to_owned()).chain(leaf_jobs);
+    let steps = starts.steps().iter().map(|s| (*s).to_owned());
     Ok(Reach {
         machines: names.map(Name::parse).collect::<Result<_, _>>()?,
         steps: StepSelection::Only(NonEmpty::new(steps.map(|s| StepId::parse(&s)).collect::<Result<_, _>>()?, "the steps")?),

@@ -45,7 +45,13 @@ fn instance_files_live_next_to_the_committed_ones() -> Outcome {
         compose.contents
     );
     // Paths inside the files follow the folder.
-    assert!(compose.contents.contains("# Checks: the runner (run.json), or by hand"));
+    assert!(
+        compose
+            .contents
+            .contains("# Checks: docker compose -f .isoloom-3/docker/compose.yml --profile check run --rm"),
+        "{}",
+        compose.contents
+    );
     assert!(
         files.iter().all(|f| f.path.starts_with(".isoloom-3/")),
         "{:?}",

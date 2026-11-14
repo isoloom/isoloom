@@ -37,16 +37,16 @@ fn esxi_segmented() -> Outcome {
     Ok(())
 }
 
-/// The router holds the sealed ruleset from its first boot, and the run manifest's seal applies
-/// that very file over SSH once the machines are set up: `internet: false` networks lose the
-/// internet on ESXi, as on Proxmox. An environment with nothing to seal has neither.
+/// The router holds the sealed ruleset from its first boot, and the module's seal applies that
+/// very file over SSH once the machines are set up, within the apply: `internet: false` networks
+/// lose the internet on ESXi, as on Proxmox. An environment with nothing to seal has neither.
 #[test]
 fn the_router_holds_the_sealed_ruleset_the_seal_applies() -> Outcome {
     let e = env("segmented")?;
     let sealed = module(&e)?;
     assert!(sealed.contains("/etc/nftables.sealed.nft"), "{sealed}");
     assert!(
-        sealed.contains("The run's seal closes the internet to the internet: false networks"),
+        sealed.contains("The module's seal (isoloom_seal) closes the internet to the internet: false networks"),
         "{sealed}"
     );
     // The `internet: false` networks' traffic from elsewhere dropped, and only the others
@@ -54,13 +54,14 @@ fn the_router_holds_the_sealed_ruleset_the_seal_applies() -> Outcome {
     let closed: Vec<String> = e.networks.values().filter(|n| !n.internet).map(|n| n.cidr.to_string()).collect();
     assert!(!closed.is_empty(), "segmented has an internet: false network");
     assert!(sealed.contains(&format!("ip daddr {{ {} }} drop", closed.join(", "))), "{sealed}");
-    let manifest = EsxiBackend.run_manifest(&e)?.ok_or("ESXi writes a run manifest")?;
-    let seal = serde_json::to_value(manifest.lifecycle.seal.ok_or("a seal")?)?;
-    let command = seal["steps"][0]["with"]["command"].as_str().unwrap_or_default();
-    assert!(command.starts_with("sudo sh -c 'nft -f /etc/nftables.sealed.nft "), "{seal:#}");
+    let (_, seal) = sealed.split_once("resource \"terraform_data\" \"isoloom_seal\"").ok_or("a seal")?;
+    assert!(seal.contains("\"sudo sh -c 'nft -f /etc/nftables.sealed.nft "), "{seal}");
     let open = env("ansible-pair")?;
-    assert!(!module(&open)?.contains("nftables.sealed"), "nothing to seal, no sealed ruleset");
-    assert!(EsxiBackend.run_manifest(&open)?.ok_or("a run manifest")?.lifecycle.seal.is_none());
+    let open = module(&open)?;
+    assert!(
+        !open.contains("nftables.sealed") && !open.contains("isoloom_seal"),
+        "nothing to seal, no sealed ruleset"
+    );
     Ok(())
 }
 

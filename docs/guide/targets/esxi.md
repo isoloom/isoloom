@@ -11,11 +11,10 @@ Tier 2, with a partial real run from macOS. It writes a run manifest
 [Vagrant](vagrant.md).)
 
 An `internet: false` network is sealed on ESXi as on Proxmox. The router gives every network the
-internet while the machines set themselves up; once they are, the runner seals those networks
-(the run manifest's seal): it applies the sealed ruleset the router keeps from its first boot, over
-SSH, and keeps it for later boots. Their internet is then closed at the router, where root in a
-machine can't reopen it. A module applied by hand with Terraform alone is never sealed: apply the
-seal yourself (below), or use a runner.
+internet while the machines set themselves up; once they are, the same `terraform apply` seals
+those networks: `terraform_data.isoloom_seal`, which waits for every machine's set-up, applies the
+sealed ruleset the router keeps from its first boot, over SSH, and keeps it for later boots. Their
+internet is then closed at the router, where root in a machine can't reopen it.
 
 ## Prerequisites
 
@@ -66,18 +65,13 @@ images = {
 }
 ```
 
-The checks are scripts under `.isoloom/esxi/checks/`, run from the machines. Without a runner,
-seal the `internet: false` networks yourself once the apply is done, on the router (its address is
-the `ip` output):
+The apply sets every machine up over SSH and seals the `internet: false` networks: when it ends,
+the environment is ready. The checks are scripts under `.isoloom/esxi/checks/`, piped to the
+machine the `checks` output names, through the router (`ssh -J isoloom@<ip> isoloom@<host> sh -s <
+.isoloom/esxi/checks/<position>.sh`).
 
-```sh
-ssh isoloom@"$(terraform -chdir=.isoloom/esxi output -raw ip)" \
-  "sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'"
-```
-
-Or with a runner, which gives the module its slot and key, waits for every set-up, seals offline
-networks and runs the checks (it runs Terraform, `ovftool` and `ssh` from the machine it runs on;
-secrets are refused on ESXi):
+Or with a runner, which gives the module its slot and key and runs the checks (it runs Terraform, `ovftool` and `ssh` from the machine it runs on;
+a Windows machine's secrets are refused on ESXi):
 
 ```sh
 isothrum up . --target esxi
@@ -89,8 +83,10 @@ isothrum down . --target esxi
 
 The ESXi provider connects over SSH with a password; prefer an account used only for this.
 Windows machines are set up over WinRM in plain HTTP on the environment's private networks (see
-[security considerations](../../explanation/security.md#winrm)). The ESXi target refuses secrets
-and inputs delivered as files.
+[security considerations](../../explanation/security.md#winrm)). A Linux machine's secrets and
+inputs delivered as files come from the module's variables (`ISOLOOM_SECRET_<NAME>`, sensitive,
+and each input under its name), written by cloud-init from the VM's guestinfo user data; Terraform stores sensitive values
+in its state, as it does for every variable. A Windows machine's are refused.
 
 ## Teardown
 

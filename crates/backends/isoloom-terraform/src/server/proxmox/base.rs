@@ -109,7 +109,8 @@ pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
             .describe("A datastore with 'snippets' content, for cloud-init"),
         s("uplink_bridge").default(string("vmbr0")).describe(uplink),
         server::slot_variable(MAX_SLOT, slot),
-        variable::ssh_public_key(variable::SignsIn::Runner).default(string("")),
+        variable::ssh_public_key(),
+        variable::ssh_private_key_file(),
     ]);
     v
 }

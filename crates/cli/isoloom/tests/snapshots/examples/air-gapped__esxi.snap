@@ -284,7 +284,7 @@ variable "images" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "The SSH public key the machines let in: whoever holds its private key signs in, as Terraform does to set them up (`ssh_private_key_file`), and the checks by hand"
+  description = "The SSH public key the machines let in: Terraform signs in with its private half (`ssh_private_key_file`) to set them up or wait for their set-up, and so can you, to run the checks"
 }
 
 variable "ssh_private_key_file" {
@@ -324,7 +324,7 @@ resource "esxi_portgroup" "lab" {
   vlan    = 4095
 }
 
-# The router: forwards between networks with the reach rules, and to the internet. The run's seal closes the internet to the internet: false networks once the machines are set up. VMware Tools reports its uplink address.
+# The router: forwards between networks with the reach rules, and to the internet. The module's seal (isoloom_seal) closes the internet to the internet: false networks once the machines are set up. VMware Tools reports its uplink address.
 resource "esxi_guest" "isoloom_router" {
   guest_name            = "iso${var.slot}-isoloom-router"
   notes                 = "isoloom: air-gapped"
@@ -537,6 +537,21 @@ resource "terraform_data" "app" {
     ]
   }
   depends_on = [terraform_data.store]
+}
+
+resource "terraform_data" "isoloom_seal" {
+  triggers_replace = [esxi_guest.isoloom_router.id]
+  connection {
+    type        = "ssh"
+    host        = local.router_address
+    user        = "isoloom"
+    private_key = file(pathexpand(var.ssh_private_key_file))
+    timeout     = "10m"
+  }
+  provisioner "remote-exec" {
+    inline = ["sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'"]
+  }
+  depends_on = [terraform_data.store, terraform_data.app]
 }
 
 locals {
@@ -763,22 +778,6 @@ resource "local_file" "isoloom_project" {
           ]
         }
       ]
-    },
-    {
-      "name": "isoloom_sealed",
-      "description": "true once the machines are set up: the internet is closed to the `internet: false` networks, at the router.",
-      "default": "false",
-      "values": [
-        "true",
-        "false"
-      ],
-      "set_by": "runner",
-      "deliver": [
-        {
-          "via": "tf_var",
-          "var": "isoloom_sealed"
-        }
-      ]
     }
   ],
   "secrets": [
@@ -960,21 +959,6 @@ resource "local_file" "isoloom_project" {
         "timeout_s": 1800
       }
     ],
-    "seal": {
-      "param": "isoloom_sealed",
-      "steps": [
-        {
-          "id": "seal-reload",
-          "action": "ssh.run",
-          "with": {
-            "command": "sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'",
-            "host": "${outputs.ip}",
-            "user": "isoloom"
-          },
-          "timeout_s": 600
-        }
-      ]
-    },
     "status": {
       "id": "state",
       "action": "terraform.read_state"

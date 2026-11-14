@@ -34,8 +34,8 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
-    // The access machine is defined but not started by `vagrant up`: the runner hot-adds it,
-    // overriding its box with one it is given.
+    // The access machine is defined but not started by `vagrant up`: `vagrant up <name>` starts
+    // it, its box overridable (`ISOLOOM_ACCESS_BOX`).
     let access = mp.is_access();
     let start = if access { Start::OnDemand } else { Start::WithUp };
     define(r, name, start, |r| {
@@ -64,10 +64,14 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         }
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
         crate::host_folders::render(r, "m", &shares);
-        transport::provisioners(r, env, name, os);
-        if let Some(g) = group {
-            checks::provisioner(r, name, g);
-        }
+        // Its checks installed (and their on-demand provisioner) before the readiness check,
+        // the last provisioner.
+        transport::provisioners(r, env, name, os, |r| {
+            if let Some(g) = group {
+                checks::installer(r, name);
+                checks::provisioner(r, name, g);
+            }
+        });
     });
     group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g))
 }
@@ -93,7 +97,7 @@ fn relays(published: &[(&PublishedPort, Value)]) -> Vec<(u16, Value)> {
 
 /// `config.vm.define "<name>" do |m| ... end`, after a blank line. A machine started
 /// [`Start::OnDemand`] (the access box) is defined `autostart: false`, so `vagrant up` skips it
-/// and the runner hot-adds it.
+/// and `vagrant up <name>` starts it.
 pub(crate) fn define(r: &mut Ruby, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) {
     r.blank();
     r.define(name, start, body);

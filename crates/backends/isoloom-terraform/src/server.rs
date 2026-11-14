@@ -96,7 +96,7 @@ impl Parts {
 
 /// A server module's start: the `terraform` block requiring the server's providers (`own`, and
 /// `random` for the Windows machines' password), the server's `variables` (its run manifest's
-/// params and slots too), the `inputs` variable, then its `provider`.
+/// params and slots too), the values given at launch (`inputs`), then its `provider`.
 pub(crate) fn head(env: &Environment, module: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
     let mut required = own.to_vec();
     if windows::any(env) {
@@ -104,8 +104,20 @@ pub(crate) fn head(env: &Environment, module: &mut Module, own: &[Provider], var
     }
     module.block(providers::terraform(&required));
     module.blocks(variables.into_iter().map(Variable::block));
-    module.blocks(inputs::variable(env));
+    module.blocks(inputs::variables(env));
     module.block(provider);
+}
+
+/// Why a server can't give a machine of `env` its secrets, if it can't: a Linux VM gets them from
+/// the module's variables (cloud-init: its snippet on Proxmox, its guestinfo user data on ESXi), but a
+/// Windows machine's set-up (cloudbase-init, the controller over WinRM) and a container's (an LXC
+/// container on Proxmox) have no step that takes them.
+pub(crate) fn secrets_refusal(env: &Environment) -> Option<String> {
+    env.machines.iter().find_map(|(name, mp)| {
+        let linux_vm = mp.shape == isoloom_plan::MachineShape::Vm && !mp.is_windows();
+        (!mp.secrets.is_empty() && !linux_vm)
+            .then(|| format!("machine `{name}` gets `secrets` (a secret's or an input's value as a file), which a server writes into a Linux VM only"))
+    })
 }
 
 /// A base OS image pinned to a dated release, with the checksum that verifies the download.

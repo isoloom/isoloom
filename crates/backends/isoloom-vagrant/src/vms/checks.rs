@@ -1,6 +1,9 @@
 //! The checks on Vagrant: a runner script per Linux VM that has some, run where the machine
-//! stands, and one for the controller (on every network), each run on demand
-//! (`vagrant provision --provision-with checks`).
+//! stands, and one for the controller (on every network). Each is installed in its VM at every
+//! provisioning ([`INSTALLED`]), so Vagrant alone runs them on demand: `vagrant ssh <vm> -c
+//! 'sudo sh /var/lib/isoloom/checks.sh'` ([`command`]). The `checks` provisioner
+//! (`vagrant provision <vm> --provision-with checks`) runs them too, the project's check scripts
+//! read from the host first.
 
 use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
@@ -8,6 +11,7 @@ use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::inventory::CONTROLLER_INVENTORY;
 use isoloom_render::steps::PROJECT_DIR;
+use isoloom_spec::linux::STATE_DIR;
 use isoloom_spec::shell::quote;
 
 use crate::ruby::{Ruby, Value};
@@ -65,6 +69,35 @@ pub(crate) fn in_their_place(env: &Environment) -> Vec<Resolved> {
         return Vec::new();
     }
     checks::from_networks(env.spec())
+}
+
+/// Where a VM keeps its checks' runner script, readable by root alone.
+pub(crate) const INSTALLED: &str = isoloom_spec::linux_state_path!("/checks.sh");
+
+/// The command that runs a VM's checks inside it, `vagrant ssh <vm> -c` running it: each check
+/// prints a PASS or FAIL line, and it exits non-zero when one failed. `ISOLOOM_DERIVED=0` after
+/// `sudo` leaves the checks Isoloom derives from the spec out.
+#[must_use]
+pub(crate) fn command() -> String {
+    format!("sudo sh {INSTALLED}")
+}
+
+/// The provisioner installing a position's runner (`checks/<file>.sh`, read when Vagrant reads
+/// the Vagrantfile) at [`INSTALLED`] in the VM, at every provisioning, so the copy in the VM is
+/// the one generated last.
+pub(crate) fn installer(r: &mut Ruby, file: &str) {
+    let open = format!("umask 077\nmkdir -p {STATE_DIR}\ncat > {INSTALLED}.new <<'ISOLOOM_CHECKS'\n");
+    // A line break first: the heredoc ends on a line of its own whatever the runner ends with.
+    let close = format!("\nISOLOOM_CHECKS\nmv -f {INSTALLED}.new {INSTALLED}\n");
+    // Each part on the provisioner's line, its line breaks written `\n`.
+    let one_line = |text: &str| crate::ruby::quote(text).replace('\n', "\\n");
+    let script = Value::raw(format!(
+        "{} + File.read(File.join(__dir__, {})) + {}",
+        one_line(&open),
+        Value::str(&format!("checks/{file}.sh")),
+        one_line(&close)
+    ));
+    r.provision(vagrantfile::shell("m", "checks script").kw("inline", script));
 }
 
 /// The runner script of a position's checks, next to the Vagrantfile as `checks/<file>.sh`.

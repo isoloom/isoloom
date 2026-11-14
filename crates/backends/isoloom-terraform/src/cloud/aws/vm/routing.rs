@@ -5,7 +5,7 @@
 //! source/destination check off). A routed network's own table sends every other network
 //! through its gateway, so traffic crosses the gateway both ways.
 //!
-//! The machines keep their own public addresses (the runner reaches them there over SSH, Terraform
+//! The machines keep their own public addresses (Terraform and the operator reach them there over SSH, Terraform
 //! a Windows one over WinRM), so a routed network still goes out to the internet directly rather
 //! than through its gateway.
 
@@ -13,7 +13,7 @@ use crate::hcl_builder::{Block, Expression, Module, string};
 use isoloom_plan::Environment;
 
 use super::resources::{self as res, RouteTable};
-use crate::cloud::aws::{route_out, sealed_route_out};
+use crate::cloud::aws::route_out;
 use crate::cloud::vm::gateways::{Hop, covering, routed, through, toward};
 
 /// Every network in one VPC block: a /16 at most (AWS's largest).
@@ -56,11 +56,10 @@ fn route(cidr: &str, target: (&str, Expression)) -> Block {
 /// gateway routes it to (all of them, on a routed network) through that gateway, and each
 /// routed network through its own.
 fn table(env: &Environment, net: &str) -> Block {
-    let closed = crate::seal::any(env) && crate::seal::closed(env, net);
     let b = res::route_table(RouteTable::Own(net))
         .block()
         .add_attribute(("vpc_id", res::vpc().attr("id")))
-        .add_block(if closed { sealed_route_out() } else { route_out() });
+        .add_block(route_out());
     through(env, net)
         .iter()
         .fold(b, |b, hop| {

@@ -111,13 +111,13 @@ fn firewalls(env: &Environment, (name, mp): (&str, &MachinePlan)) -> Vec<Block> 
     out
 }
 
-/// Once the run is sealed, a machine with no internet goes out to the environment's blocks only,
-/// in network `net`'s VPC: everything out denied, the environment's blocks allowed before it. A machine's
-/// replies to what came in are let out regardless (Google Cloud's firewall is stateful).
+/// The seal (`crate::seal`): once every machine is set up (`seal::after_set_up`), a machine
+/// with no internet goes out to the environment's blocks only, in network `net`'s VPC:
+/// everything out denied, the environment's blocks allowed before it. A machine's replies to
+/// what came in are let out regardless (Google Cloud's firewall is stateful).
 fn sealed((id, who): (&str, &str), env: &Environment, net: &str) -> [Block; 2] {
     let rule = |what: &str, priority: u64, to: Expression, verdict: Block| {
         resource("google_compute_firewall", &format!("{id}_{what}_{}", ident(net)))
-            .add_attribute(("count", seal::when_sealed(number(1), number(0))))
             .add_attribute(("project", reference("local.project")))
             .add_attribute(("name", name_with(&format!("-{who}-{what}-{net}"))))
             .add_attribute(("network", vpc(net)))
@@ -126,6 +126,7 @@ fn sealed((id, who): (&str, &str), env: &Environment, net: &str) -> [Block; 2] {
             .add_attribute(("destination_ranges", to))
             .add_attribute(("target_tags", list([name_with(&format!("-{who}"))])))
             .add_block(verdict)
+            .add_attribute(("depends_on", seal::after_set_up(env)))
             .build()
     };
     let all = |verdict: &str| Block::builder(verdict).add_attribute(("protocol", string("all"))).build();

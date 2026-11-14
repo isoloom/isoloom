@@ -45,6 +45,7 @@ mod hcl_builder;
 mod limits;
 mod machine;
 mod module;
+mod ready;
 mod seal;
 mod server;
 mod ssh;
@@ -54,8 +55,8 @@ mod testing;
 
 pub use cloud::Cloud;
 pub use cloud::docker::{
-    manifests as cloud_docker_manifests, modules as cloud_docker_modules, refusal as cloud_docker_refusal, refusals as cloud_docker_refusals,
-    setup as cloud_docker_setup,
+    Host as CloudDockerHost, manifests as cloud_docker_manifests, modules as cloud_docker_modules, refusal as cloud_docker_refusal,
+    refusals as cloud_docker_refusals,
 };
 pub use cloud::services::CloudServicesBackend;
 pub use cloud::vm::{CloudVmBackend, CloudVmModule};

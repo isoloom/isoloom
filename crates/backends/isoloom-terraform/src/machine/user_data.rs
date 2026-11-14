@@ -1,12 +1,12 @@
-//! A Linux machine that sets itself up from its user data, on a cloud. Terraform makes the VM and
-//! nothing else: no SSH from Terraform, no file it uploads. The user data writes the set-up
-//! script and a systemd unit running it at every boot, then starts the unit; the set-up waits
-//! for the project, which the runner delivers over SSH once the apply is done (an `ssh.run` step
-//! of the run manifest, piping the project's archive into `tar`), then runs the machine's steps.
+//! A Linux machine that sets itself up from its user data, on a cloud. The user data writes the
+//! set-up script and a systemd unit running it at every boot, then starts the unit; the set-up
+//! waits for the project, which Terraform brings in over SSH once the machine is up
+//! (`crate::ready`: the project's archive uploaded and unpacked, then the mark the set-up waits
+//! for), then runs the machine's steps.
 //!
-//! The set-up says how far it got in the ready file, in the `isoloom-ready/1` grammar the runner
-//! reads (`running: <step>`, `failed: <step>`, `ready`), and writes its output to
-//! [`SETUP_LOG`], whose tail explains a failed step. A `reboot` step ends a part: the set-up
+//! The set-up says how far it got in the ready file, in the `isoloom-ready/1` grammar the same
+//! resource reads to end the apply (`running: <step>`, `failed: <step>`, `ready`), and writes its
+//! output to [`SETUP_LOG`], whose tail explains a failed step. A `reboot` step ends a part: the set-up
 //! records the next part and restarts the machine, and the unit runs that part at the next boot.
 //! At every boot, before anything else, it schedules the expiry again (`each_boot`); at every
 //! boot after the first part (a `reboot` step's, or any later restart once the set-up is
@@ -15,12 +15,10 @@
 //! (cloud-init) and one that runs it at every boot (Google Cloud's startup script), and the
 //! script it is reading is never rewritten in place.
 
-use isoloom_render::boot::{self, Trigger};
 use isoloom_render::configure::cloud_init::gzip;
 
 use crate::cloud::user_data_limit::Limit;
 use crate::hcl_builder::{Expression, Piece, Template, reference};
-use isoloom_render::run_manifest::RUNNER;
 use isoloom_render::steps::wait_for_mark;
 use isoloom_spec::model::Target;
 
@@ -28,14 +26,14 @@ use crate::{Error, Result};
 use isoloom_manifest::ReadyLine;
 use isoloom_render::steps::{READY_FILE, failed_pattern, ready_mark};
 
-/// Where the set-up writes its output: the runner shows its tail when a step failed.
+/// Where the set-up writes its output: Terraform's wait shows its tail when a step failed.
 pub(crate) const SETUP_LOG: &str = "/var/log/isoloom-setup.log";
 
-/// The mark the runner's delivery leaves once the project is in [`isoloom_render::steps::PROJECT_DIR`].
+/// The mark Terraform's delivery leaves once the project is in [`isoloom_render::steps::PROJECT_DIR`].
 pub(crate) const DELIVERED: &str = isoloom_spec::linux_state_path!("/project-delivered");
 
 /// How long the set-up waits for the project, in seconds: the apply of the other machines, then
-/// the runner's delivery to each machine in turn.
+/// Terraform's delivery (it waits for SSH to answer first).
 pub(crate) const DELIVERY_WAIT_S: u32 = 2400;
 
 /// The set-up's own folder: the script, the part it is at.
@@ -75,37 +73,9 @@ pub(crate) struct SetUp {
     pub(crate) again: Vec<Template>,
 }
 
-/// Where a host whose user data only schedules its expiry keeps the run's end (Unix seconds, or
-/// nothing), for its boot script to read.
-const EXPIRES_AT: &str = isoloom_spec::linux_state_path!("/expires-at");
-
 /// The shutdown at the run's end, `$e` (Unix seconds, empty without an end): in `$m` minutes,
 /// at least one.
 const SHUTDOWN_AT_E: &str = "if [ -n \"$e\" ]; then m=$(( (e - $(date +%s)) / 60 )); [ \"$m\" -ge 1 ] || m=1; shutdown -h \"+$m\" >/dev/null 2>&1 || true; fi";
-
-/// A VM's whole user data when its only job is to shut itself down at the run's end
-/// (`var.expires_at`, in Unix seconds): `#!/bin/sh`, then the end kept in a file and a boot
-/// script scheduling the shutdown from it, now and at every boot (a cloud that runs its user
-/// data once still reschedules it after a restart). A cloud-docker host, set up over SSH, needs
-/// no more of its user data.
-pub(crate) fn expiry_only() -> Expression {
-    expiry_only_script().into_expression()
-}
-
-/// [`expiry_only`] as a template.
-fn expiry_only_script() -> Template {
-    let mut t = Template::text(format!("#!/bin/sh\nmkdir -p {DIR}\necho "));
-    t.push_expr(reference("var.expires_at"));
-    t.push_text(format!(" > {EXPIRES_AT}\n"));
-    t.push_text(boot::at_boot(
-        "expiry",
-        "The run's end: the machine shuts itself down",
-        &format!("e=$(cat {EXPIRES_AT} 2>/dev/null); {SHUTDOWN_AT_E}\n"),
-        Trigger::Boot,
-        &[],
-    ));
-    t
-}
 
 /// The expiry as a shell line scheduling `shutdown` at `var.expires_at`.
 pub(crate) fn expiry_shutdown() -> Template {
@@ -114,16 +84,16 @@ pub(crate) fn expiry_shutdown() -> Template {
         .with_text(format!("; {SHUTDOWN_AT_E}"))
 }
 
-/// The wait for the runner's delivery of the project: the first step of every set-up that reads
+/// The wait for Terraform's delivery of the project: the first step of every set-up that reads
 /// the project.
 pub(crate) fn project_wait() -> Tracked {
     Tracked::new(
-        "waiting for the project (the runner delivers it over SSH)",
+        "waiting for the project (Terraform brings it in over SSH)",
         wait_for_mark(
             DELIVERED,
             DELIVERY_WAIT_S,
-            &format!("waiting for the project, which {RUNNER} delivers over SSH"),
-            &format!("the project never came: start the environment through {RUNNER}, which delivers it over SSH"),
+            "waiting for the project, which Terraform brings in over SSH during its apply",
+            "the project never came: Terraform brings it in over SSH during its apply (its terraform_data.isoloom_ready_<machine>), with ssh_private_key_file",
         ),
     )
 }
@@ -202,7 +172,7 @@ pub(crate) fn script(s: &SetUp) -> Template {
         .collect();
     let tag = isoloom_spec::shell::here_tag("ISOLOOM_SETUP", &known);
     let mut t = Template::text(format!(
-        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from {RUNNER}.\nmkdir -p {DIR}\nrm -f {DIR}/setup.sh.new\n(umask 077 && cat > {DIR}/setup.sh.new) <<'{tag}'\n"
+        "#!/bin/sh\n# Isoloom: this machine sets itself up. Its progress is in {READY_FILE} (isoloom-ready/1), its output in {SETUP_LOG}. The project comes over SSH from Terraform.\nmkdir -p {DIR}\nrm -f {DIR}/setup.sh.new\n(umask 077 && cat > {DIR}/setup.sh.new) <<'{tag}'\n"
     ));
     t.append(body);
     t.push_text(format!(
@@ -329,17 +299,6 @@ mod tests {
         boot();
         let got = std::fs::read_to_string(dir.join("log")).unwrap();
         assert_eq!(got, "boot\nstep\nboot\nagain\nboot\nagain\n");
-    }
-
-    #[test]
-    fn a_host_that_only_expires_reschedules_it_at_every_boot() {
-        let s = text(&expiry_only_script());
-        assert!(
-            s.starts_with("#!/bin/sh\nmkdir -p /var/lib/isoloom\necho <expr> > /var/lib/isoloom/expires-at\n"),
-            "{s}"
-        );
-        assert!(s.contains("e=$(cat /var/lib/isoloom/expires-at 2>/dev/null); if [ -n \"$e\" ]"), "{s}");
-        assert!(s.contains("systemctl enable isoloom-expiry.service"), "a boot unit: {s}");
     }
 
     #[test]

@@ -19,6 +19,7 @@ use isoloom_plan::{Environment, MachinePlan, Route};
 use isoloom_render::boot::{self, Trigger};
 use isoloom_render::steps;
 
+use super::once::Once;
 use super::values;
 use crate::ruby::{Provision, Ruby, Value};
 use crate::vagrantfile;
@@ -39,17 +40,25 @@ impl Os {
     }
 }
 
-/// The `vm.provision` lines of environment machine `machine`, from its planned steps.
-pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
+/// The `vm.provision` lines of environment machine `machine`, from its planned steps, with what
+/// `before_ready` writes just before its readiness check, which comes last: `vagrant up` ends
+/// well only once the machine is ready.
+pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: Os, before_ready: impl FnOnce(&mut Ruby)) {
     let Some(mp) = env.machines.get(machine) else { return };
     let mut default: Option<(Vec<Route>, Ipv4Addr)> = None;
-    for step in &mp.lifecycle {
+    let mut before_ready = Some(before_ready);
+    for (at, step) in mp.lifecycle.iter().enumerate() {
         if matches!(step, Step::Egress | Step::Tc | Step::Ready)
             && let Some((routes, via)) = default.take()
         {
             default_route(r, env, machine, routes, via);
         }
-        step_provisioners(r, env, machine, step, os);
+        if matches!(step, Step::Ready)
+            && let Some(write) = before_ready.take()
+        {
+            write(r);
+        }
+        step_provisioners(r, env, machine, (at, step), os);
         if let Step::Routes { routes, default: Some(via) } = step
             && os == Os::Linux
         {
@@ -58,8 +67,15 @@ pub(crate) fn provisioners(r: &mut Ruby, env: &Environment, machine: &str, os: O
     }
 }
 
-/// The provisioners of one step, `machine` being an environment machine or one of Isoloom's own VMs.
-pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, step: &Step, os: Os) {
+/// The provisioners of one step, `step` the `at`th of the set-up of `machine`, an environment machine or
+/// one of Isoloom's own VMs. A step that must not run again when Vagrant provisions the machine
+/// again runs once ([`Once`]).
+pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, (at, step): (usize, &Step), os: Os) {
+    let once = |script: String| match (Once::of(step, os), os) {
+        (Some(once), Os::Linux) => once.linux(at, &label(step), &script),
+        (Some(once), Os::Windows) => once.windows(at, &label(step), &script),
+        (None, _) => script,
+    };
     match (os, step) {
         (_, Step::Project) => {
             r.provision(Provision::new("m", "isoloom_project").kw("name", Value::str("project")));
@@ -81,12 +97,12 @@ pub(crate) fn step_provisioners(r: &mut Ruby, env: &Environment, machine: &str, 
         (Os::Windows, Step::Run { .. } | Step::Setup { .. }) => {
             if let Some(script) = steps::windows(env, machine, step) {
                 let call = vagrantfile::shell("m", &label(step)).kw_opt("env", values::inputs_env(env, machine));
-                r.provision(call.script("inline", &format!("{}{script}", values::windows_decode(env, machine))));
+                r.provision(call.script("inline", &once(format!("{}{script}", values::windows_decode(env, machine)))));
             }
         }
         _ => {
             if let Some(script) = rendered(env, machine, step, os) {
-                shell(r, &label(step), &script);
+                shell(r, &label(step), &once(script));
             }
         }
     }

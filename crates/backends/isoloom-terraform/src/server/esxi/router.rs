@@ -52,7 +52,7 @@ pub(super) fn blocks(env: &Environment, module: &mut Module) {
         lifecycle: Some(uplink_checked(env)),
     };
     let sealed = if crate::seal::any(env) {
-        " The run's seal closes the internet to the internet: false networks once the machines are set up."
+        " The module's seal (isoloom_seal) closes the internet to the internet: false networks once the machines are set up."
     } else {
         ""
     };
