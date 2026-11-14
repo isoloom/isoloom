@@ -11,9 +11,75 @@ pub enum Service {
     /// A managed PostgreSQL database: RDS, Azure Database for PostgreSQL flexible server, Cloud
     /// SQL; the catalogue's `postgres` (a container or a Debian VM) everywhere else.
     Postgres(Postgres),
-    /// An object-storage bucket: S3, a GCS bucket, an Azure storage container; an S3 server
-    /// container everywhere else.
+    /// An object-storage bucket: S3, a GCS bucket, an Azure storage container; `SeaweedFS`'s S3
+    /// server everywhere else (a container, or a Debian VM).
     ObjectStorage(ObjectStorage),
+    /// A Kafka cluster and its topics: MSK, Event Hubs' Kafka endpoint, Google Cloud's Managed
+    /// Service for Apache Kafka; Apache Kafka (`KRaft`, one node) everywhere else.
+    Kafka(Kafka),
+}
+
+/// A Kafka cluster, its topics and its one SASL login.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Kafka {
+    /// The topics, by name, each with its partitions (default 1).
+    #[serde(default)]
+    pub topics: IndexMap<String, Topic>,
+    /// The network it answers on, with its address there on the targets that run it as a machine.
+    pub networks: IndexMap<String, u8>,
+    /// The login (spec secrets): the self-hosted broker's SCRAM user and MSK's; Event Hubs and
+    /// Google Cloud issue their own, delivered to the same files.
+    pub credentials: KafkaCredentials,
+    /// A portable size.
+    #[serde(default)]
+    pub size: Size,
+    /// Reached from outside the environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publish: Option<Publish>,
+    /// The machines that use it, by name.
+    #[serde(default)]
+    pub clients: IndexMap<String, Client>,
+}
+
+/// A Kafka topic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Topic {
+    /// Its partitions.
+    #[serde(default = "one")]
+    pub partitions: u16,
+}
+
+/// A Kafka login, each a spec secret's name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct KafkaCredentials {
+    /// The user's secret.
+    pub user: String,
+    /// The password's secret.
+    pub password: String,
+}
+
+/// A service reached from outside the environment, as a machine's published port is: only from
+/// the addresses an input gives (the player's own, `203.0.113.7/32`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Publish {
+    /// The input holding the CIDR allowed in (a `sensitive: false` input).
+    pub allow: String,
+}
+
+/// How a client authenticates to a service.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Access {
+    /// Keys in files: the spec's secrets, or those the platform issues.
+    #[default]
+    Keys,
+    /// The client machine's platform identity (an instance profile, a managed identity, a
+    /// service account): no key at all. Clouds only.
+    Identity,
 }
 
 /// A PostgreSQL database and its one login.
@@ -36,6 +102,9 @@ pub struct Postgres {
     /// A portable size, never an instance type.
     #[serde(default)]
     pub size: Size,
+    /// Reached from outside the environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publish: Option<Publish>,
     /// The machines that use it, by name.
     #[serde(default)]
     pub clients: IndexMap<String, Client>,
@@ -56,9 +125,12 @@ pub struct ObjectStorage {
     pub versioning: bool,
     /// The network it answers on, with its address there on the targets that run it as a machine.
     pub networks: IndexMap<String, u8>,
-    /// The keys of the self-hosted server (spec secrets): its clients get them as files. A cloud
-    /// issues its own.
+    /// The keys of the self-hosted server (spec secrets), which checks them: its clients get them
+    /// as files. A cloud issues its own, delivered to the same files.
     pub credentials: Credentials,
+    /// Reached from outside the environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publish: Option<Publish>,
     /// The machines that use it, by name.
     #[serde(default)]
     pub clients: IndexMap<String, Client>,
@@ -115,6 +187,9 @@ pub struct Client {
     /// default the service's name in upper snake case.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env_prefix: Option<String>,
+    /// How it authenticates: keys in files (the default), or its platform identity.
+    #[serde(default)]
+    pub access: Access,
 }
 
 impl Service {
@@ -124,6 +199,7 @@ impl Service {
         match self {
             Service::Postgres(_) => "postgres",
             Service::ObjectStorage(_) => "object-storage",
+            Service::Kafka(_) => "kafka",
         }
     }
 
@@ -133,6 +209,7 @@ impl Service {
         match self {
             Service::Postgres(p) => &p.networks,
             Service::ObjectStorage(o) => &o.networks,
+            Service::Kafka(k) => &k.networks,
         }
     }
 
@@ -142,7 +219,34 @@ impl Service {
         match self {
             Service::Postgres(p) => &p.clients,
             Service::ObjectStorage(o) => &o.clients,
+            Service::Kafka(k) => &k.clients,
         }
+    }
+
+    /// Its `publish`, when it is reached from outside.
+    #[must_use]
+    pub fn publish(&self) -> Option<&Publish> {
+        match self {
+            Service::Postgres(p) => p.publish.as_ref(),
+            Service::ObjectStorage(o) => o.publish.as_ref(),
+            Service::Kafka(k) => k.publish.as_ref(),
+        }
+    }
+
+    /// The port it answers on, on every platform but the clouds' own endpoints.
+    #[must_use]
+    pub fn port(&self) -> u16 {
+        match self {
+            Service::Postgres(_) => 5432,
+            Service::ObjectStorage(_) => 8333,
+            Service::Kafka(_) => 9092,
+        }
+    }
+
+    /// Whether a client uses its platform identity.
+    #[must_use]
+    pub fn uses_identity(&self) -> bool {
+        self.clients().values().any(|c| c.access == Access::Identity)
     }
 
     /// The spec secrets it reads, with the field naming each.
@@ -154,6 +258,10 @@ impl Service {
                 ("credentials.access_key", o.credentials.access_key.as_str()),
                 ("credentials.secret_key", o.credentials.secret_key.as_str()),
             ],
+            Service::Kafka(k) => vec![
+                ("credentials.user", k.credentials.user.as_str()),
+                ("credentials.password", k.credentials.password.as_str()),
+            ],
         }
     }
 }
@@ -164,6 +272,11 @@ impl Client {
     pub fn prefix(&self, service: &str) -> String {
         self.env_prefix.clone().unwrap_or_else(|| service.to_ascii_uppercase().replace('-', "_"))
     }
+}
+
+/// One partition, a topic's default.
+fn one() -> u16 {
+    1
 }
 
 /// `app`, the default database and user.

@@ -2,7 +2,8 @@ use isoloom_spec::model::Target;
 
 use crate::Lab;
 
-const SPEC: &str = "version: 1\nname: shop\ndns: { private: true }\nnetworks: { lab: { cidr: 10.30.0.0/24 } }\nsecrets:\n  db-password: { env: SHOP_DB_PASSWORD }\n  files-key: { env: SHOP_FILES_KEY }\n  files-secret: { env: SHOP_FILES_SECRET }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, app: { image: nginx, steps: [{ packages: [nginx] }] } }\nservices:\n  db:\n    kind: postgres\n    version: \"16\"\n    networks: { lab: 40 }\n    database: shop\n    user: shop\n    password: db-password\n    clients: { web: { env_prefix: DATABASE } }\n  files:\n    kind: object-storage\n    bucket: uploads\n    networks: { lab: 41 }\n    credentials: { access_key: files-key, secret_key: files-secret }\n";
+/// No `dns:` line: services turn the private zone on themselves.
+const SPEC: &str = "version: 1\nname: shop\nnetworks: { lab: { cidr: 10.30.0.0/24 } }\nsecrets:\n  db-password: { env: SHOP_DB_PASSWORD }\n  files-key: { env: SHOP_FILES_KEY }\n  files-secret: { env: SHOP_FILES_SECRET }\n  bus-user: { env: SHOP_BUS_USER }\n  bus-password: { env: SHOP_BUS_PASSWORD }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, app: { steps: [{ packages: [nginx] }, { service: nginx }] } }\nservices:\n  db:\n    kind: postgres\n    version: \"16\"\n    networks: { lab: 40 }\n    database: shop\n    user: shop\n    password: db-password\n    clients: { web: { env_prefix: DATABASE } }\n  files:\n    kind: object-storage\n    bucket: uploads\n    networks: { lab: 41 }\n    credentials: { access_key: files-key, secret_key: files-secret }\n    clients: { web: { env_prefix: STORAGE } }\n  bus:\n    kind: kafka\n    networks: { lab: 42 }\n    topics: { orders: { partitions: 3 } }\n    credentials: { user: bus-user, password: bus-password }\n    clients: { web: {} }\n";
 
 fn lab(yaml: &str) -> Lab {
     let lab = Lab::parse(yaml).unwrap();
@@ -10,53 +11,72 @@ fn lab(yaml: &str) -> Lab {
     lab
 }
 
+fn env<'a>(spec: &'a isoloom_spec::model::Spec, key: &str) -> Option<&'a str> {
+    spec.machines["web"].environment.get(key).map(String::as_str)
+}
+
+#[test]
+fn services_turn_the_private_zone_on() {
+    let spec = lab(SPEC).for_target(Target::Docker);
+    assert_eq!(spec.private_domain().as_deref(), Some("shop.internal"));
+}
+
 #[test]
 fn a_container_target_runs_each_service_as_a_machine_its_clients_wait_for() {
     let spec = lab(SPEC).for_target(Target::Docker);
     assert!(spec.services.is_empty(), "{:?}", spec.services);
-    let names: Vec<&str> = spec.machines.keys().map(String::as_str).collect();
-    assert_eq!(names, ["web", "db", "files"]);
+    assert_eq!(spec.machines.keys().map(String::as_str).collect::<Vec<_>>(), ["web", "db", "files", "bus"]);
     let web = &spec.machines["web"];
-    assert!(web.depends_on.iter().any(|d| d == "db"), "{:?}", web.depends_on);
-    let env = &web.environment;
-    assert_eq!(env.get("DATABASE_HOST").map(String::as_str), Some("db.shop.internal"));
-    assert_eq!(env.get("DATABASE_PORT").map(String::as_str), Some("5432"));
-    assert_eq!(env.get("DATABASE_PASSWORD_FILE").map(String::as_str), Some("/run/isoloom/services/db/password"));
-    assert_eq!(env.get("DATABASE_SSLMODE").map(String::as_str), Some("prefer"));
-    assert!(!env.values().any(|v| v.contains("SHOP_DB_PASSWORD")), "{env:?}");
+    for s in ["db", "files", "bus"] {
+        assert!(web.depends_on.iter().any(|d| d == s), "{:?}", web.depends_on);
+    }
+    assert_eq!(env(&spec, "DATABASE_HOST"), Some("db.shop.internal"));
+    assert_eq!(env(&spec, "DATABASE_PASSWORD_FILE"), Some("/etc/isoloom/services/db/password"));
+    assert_eq!(env(&spec, "STORAGE_BUCKET_FILE"), Some("/etc/isoloom/services/files/bucket"));
+    assert_eq!(env(&spec, "STORAGE_AUTH"), Some("keys"));
+    assert_eq!(env(&spec, "BUS_BOOTSTRAP_FILE"), Some("/etc/isoloom/services/bus/bootstrap"));
+    let files: Vec<String> = web.secrets.iter().map(isoloom_spec::model::MachineSecret::path).collect();
+    assert!(files.iter().any(|f| f == "/etc/isoloom/services/files/secret-key"), "{files:?}");
 }
 
 #[test]
-fn a_cloud_keeps_its_services_managed_and_its_clients_get_the_same_names() {
+fn a_cloud_keeps_its_services_and_leaves_the_files_it_issues_to_its_delivery() {
     let spec = lab(SPEC).for_target(Target::CloudVm);
-    assert_eq!(spec.services.keys().collect::<Vec<_>>(), ["db", "files"]);
+    assert_eq!(spec.services.keys().collect::<Vec<_>>(), ["db", "files", "bus"]);
     assert!(!spec.machines.contains_key("db"));
-    assert_eq!(
-        spec.machines["web"].environment.get("DATABASE_HOST").map(String::as_str),
-        Some("db.shop.internal")
+    assert_eq!(env(&spec, "DATABASE_HOST"), Some("db.shop.internal"));
+    assert_eq!(env(&spec, "STORAGE_BUCKET_FILE"), Some("/etc/isoloom/services/files/bucket"));
+    let files: Vec<String> = spec.machines["web"].secrets.iter().map(isoloom_spec::model::MachineSecret::path).collect();
+    assert_eq!(files, ["/etc/isoloom/services/db/password"], "only the database's password is the spec's own");
+}
+
+#[test]
+fn every_service_runs_as_a_vm_on_a_server() {
+    let spec = lab(SPEC).for_target(Target::Proxmox);
+    for s in ["db", "files", "bus"] {
+        assert!(spec.machines.contains_key(s), "{s}");
+    }
+    assert!(lab(SPEC).refusal(Target::Proxmox).is_none());
+}
+
+#[test]
+fn an_identity_is_refused_off_the_clouds() {
+    let identity = SPEC.replace(
+        "clients: { web: { env_prefix: STORAGE } }",
+        "clients: { web: { env_prefix: STORAGE, access: identity } }",
     );
-}
-
-#[test]
-fn a_target_that_cant_render_a_service_refuses_it_at_its_field() {
-    let l = lab(SPEC);
-    let refused = l.refusal(Target::Proxmox).unwrap();
+    let l = lab(&identity);
+    let refused = l.refusal(Target::Docker).unwrap();
     assert_eq!(refused.path.to_string(), "services.files");
-    assert!(refused.reason.contains("pinned VM form"), "{}", refused.reason);
-    assert!(l.refusal(Target::Docker).is_none(), "{:?}", l.refusal(Target::Docker));
-    let postgres_only = SPEC
-        .split("  files:\n")
-        .next()
-        .unwrap()
-        .replace("  files-key: { env: SHOP_FILES_KEY }\n  files-secret: { env: SHOP_FILES_SECRET }\n", "");
-    let pg = lab(&postgres_only);
-    assert!(pg.refusal(Target::Proxmox).is_none(), "{:?}", pg.refusal(Target::Proxmox));
-    assert!(pg.for_target(Target::Proxmox).machines.contains_key("db"));
+    assert!(l.refusal(Target::CloudVm).is_none());
+    assert_eq!(env(&l.for_target(Target::CloudVm), "STORAGE_AUTH"), Some("identity"));
 }
 
 #[test]
-fn an_object_storage_client_is_refused_on_the_clouds_until_they_can_deliver_its_facts() {
-    let used = SPEC.replace("credentials: {", "clients: { web: {} }\n    credentials: {");
-    let refused = lab(&used).refusal(Target::CloudVm).unwrap();
-    assert!(refused.reason.contains("once applied"), "{}", refused.reason);
+fn a_spec_of_services_alone_runs_and_publishes_them() {
+    let alone = "version: 1\nname: data\nnetworks: { lab: { cidr: 10.31.0.0/24 } }\ninputs:\n  PLAYER_IP: { sensitive: false }\nsecrets:\n  db-password: { env: DATA_DB_PASSWORD }\nservices:\n  db: { kind: postgres, version: \"16\", networks: { lab: 40 }, password: db-password, publish: { allow: PLAYER_IP } }\n";
+    let l = lab(alone);
+    assert!(l.possible().contains(&Target::Docker), "{:?}", l.possible());
+    let spec = l.for_target(Target::Docker);
+    assert!(spec.machines["db"].ports.iter().any(|p| p.port == 5432 && p.publish.is_some()), "{:?}", spec.machines["db"].ports);
 }

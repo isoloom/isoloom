@@ -2,7 +2,7 @@
 //! secrets, the client machines), the private zone its names live in, and the values each
 //! platform takes (a bucket's name, a login no platform reserves).
 
-use super::model::{ObjectStorage, Postgres, Service};
+use super::model::{Access, Kafka, ObjectStorage, Postgres, Service};
 use crate::contract::is_kebab;
 use crate::syntax::{Code, FieldPath, Problem, Problems, Spec};
 
@@ -27,16 +27,6 @@ pub fn check(spec: &Spec, out: &mut Problems) {
     if spec.services.is_empty() {
         return;
     }
-    if spec.dns.as_ref().and_then(|d| d.private_domain(&spec.name)).is_none() {
-        out.push(
-            Problem::new(
-                Code::MissingField,
-                FieldPath::new("dns").key("private"),
-                "a service is reached by its name in the environment's private zone",
-            )
-            .fix("`dns: { private: true }`"),
-        );
-    }
     for (name, service) in &spec.services {
         let at = FieldPath::new("services").key(name);
         names(spec, &at, name, out);
@@ -44,6 +34,10 @@ pub fn check(spec: &Spec, out: &mut Problems) {
         match service {
             Service::Postgres(p) => postgres(&at, p, out),
             Service::ObjectStorage(o) => object_storage(&at, o, out),
+            Service::Kafka(k) => kafka(&at, k, out),
+        }
+        if let Some(publish) = service.publish() {
+            allowed(spec, &at.key("publish").key("allow"), &publish.allow, out);
         }
     }
 }
@@ -134,6 +128,18 @@ fn postgres(at: &FieldPath, p: &Postgres, out: &mut Problems) {
             ));
         }
     }
+    for (machine, client) in &p.clients {
+        if client.access == Access::Identity {
+            out.push(
+                Problem::new(
+                    Code::InvalidValue,
+                    at.key("clients").key(machine).key("access"),
+                    "a database login is the spec's secret on every platform for now",
+                )
+                .fix("`access: keys`"),
+            );
+        }
+    }
     if RESERVED_USERS.contains(&p.user.as_str()) || p.user.starts_with("pg_") {
         out.push(
             Problem::new(
@@ -157,6 +163,48 @@ fn object_storage(at: &FieldPath, o: &ObjectStorage, out: &mut Problems) {
             at.key("bucket"),
             format!("`{b}`: 3 to 46 lowercase letters, digits and `-` (a cloud adds the copy's 17-character prefix)"),
         ));
+    }
+}
+
+/// A Kafka service's topics.
+fn kafka(at: &FieldPath, k: &Kafka, out: &mut Problems) {
+    for (name, topic) in &k.topics {
+        let ok = !name.is_empty() && name.len() <= 100 && name.bytes().all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c));
+        if !ok {
+            out.push(Problem::new(
+                Code::InvalidValue,
+                at.key("topics").key(name),
+                format!("`{name}`: letters, digits, `.`, `_` and `-`, 100 at most"),
+            ));
+        }
+        if !(1..=100).contains(&topic.partitions) {
+            out.push(Problem::new(
+                Code::InvalidValue,
+                at.key("topics").key(name).key("partitions"),
+                "1 to 100 partitions",
+            ));
+        }
+    }
+}
+
+/// The input a published service's allow-list comes from: declared, and not sensitive (a CIDR
+/// lands in firewall rules).
+fn allowed(spec: &Spec, at: &FieldPath, input: &str, out: &mut Problems) {
+    match spec.inputs.0.iter().find(|(n, _)| n.to_string() == input) {
+        None => out.push(
+            Problem::new(Code::UnknownReference, at.clone(), format!("no input is named `{input}`")).fix(format!(
+                "`inputs: {{ {input}: {{ sensitive: false, description: \"who may reach it, e.g. 203.0.113.7/32\" }} }}`"
+            )),
+        ),
+        Some((_, i)) if i.sensitive => out.push(
+            Problem::new(
+                Code::SensitiveValue,
+                at.clone(),
+                format!("`{input}` is sensitive, and an allow-list lands in firewall rules"),
+            )
+            .fix("`sensitive: false` on the input"),
+        ),
+        Some(_) => {}
     }
 }
 

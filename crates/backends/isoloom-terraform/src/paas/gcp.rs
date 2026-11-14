@@ -15,6 +15,7 @@ pub(super) fn write(at: &Each<'_>, m: &mut Module) {
     match at.service {
         Service::Postgres(p) => postgres(at, p, m),
         Service::ObjectStorage(o) => object_storage(at, o, m),
+        Service::Kafka(_) => {}
     }
 }
 
@@ -26,6 +27,7 @@ pub(super) fn apis(services: &[&Service], m: &mut Module) {
         let needs: &[&str] = match s {
             Service::Postgres(_) => &["sqladmin", "servicenetworking"],
             Service::ObjectStorage(_) => &["storage"],
+            Service::Kafka(_) => &["managedkafka"],
         };
         for api in needs {
             if !wanted.contains(api) {

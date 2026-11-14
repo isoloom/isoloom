@@ -14,6 +14,7 @@ pub(super) fn write(at: &Each<'_>, m: &mut Module) {
     match at.service {
         Service::Postgres(p) => postgres(at, p, m),
         Service::ObjectStorage(o) => object_storage(at, o, m),
+        Service::Kafka(_) => {}
     }
 }
 

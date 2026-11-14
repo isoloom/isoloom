@@ -340,7 +340,11 @@ impl Lab {
     #[must_use]
     pub fn not_possible(&self, target: Target) -> Option<NotPossible> {
         let spec = &self.source;
-        if spec.machines.is_empty() {
+        #[cfg(feature = "paas")]
+        let empty = spec.machines.is_empty() && !crate::paas::has_services(spec);
+        #[cfg(not(feature = "paas"))]
+        let empty = spec.machines.is_empty();
+        if empty {
             return Some(NotPossible::NoMachines);
         }
         if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.loaded.catalogue, target) {

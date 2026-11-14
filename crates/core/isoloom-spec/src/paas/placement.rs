@@ -20,26 +20,15 @@ pub enum Placement {
 /// How `target` renders `service`.
 #[must_use]
 pub fn placement(service: &Service, target: Target) -> Placement {
-    match target {
-        Target::External => Placement::Refused("`external` creates nothing: run the service as one of its machines".to_owned()),
-        Target::CloudVm => managed(service),
-        Target::Docker | Target::Hosted | Target::CloudDocker | Target::Kubernetes => container(service),
-        Target::Vagrant | Target::Proxmox | Target::Esxi => vm(service),
+    if target == Target::External {
+        return Placement::Refused("`external` creates nothing: run the service as one of its machines".to_owned());
     }
-}
-
-/// On the clouds: managed, but a bucket's facts are only known once applied.
-fn managed(service: &Service) -> Placement {
-    match service {
-        Service::ObjectStorage(o) if !o.clients.is_empty() => Placement::Refused(
-            "a cloud bucket's name and keys are only known once applied, and a cloud VM can't receive them yet: leave `clients` out (the module's outputs give them)".to_owned(),
-        ),
-        _ => Placement::Managed,
+    if target == Target::CloudVm {
+        return managed(service);
     }
-}
-
-/// On the container targets: the self-hosted server's container.
-fn container(service: &Service) -> Placement {
+    if service.uses_identity() {
+        return Placement::Refused(format!("a platform identity exists only on a cloud: `access: keys` for {}", target.id()));
+    }
     match service {
         Service::ObjectStorage(o) if o.versioning => {
             Placement::Refused("the self-hosted S3 server keeps no object versions: `versioning: false`, or a cloud".to_owned())
@@ -48,12 +37,12 @@ fn container(service: &Service) -> Placement {
     }
 }
 
-/// On the VM targets: a VM running the self-hosted server, where one has a pinned VM form.
-fn vm(service: &Service) -> Placement {
+/// On the clouds: their managed service (each cloud of `cloud-vm` may still refuse it).
+fn managed(service: &Service) -> Placement {
     match service {
-        Service::Postgres(_) => Placement::Machine,
-        Service::ObjectStorage(_) => {
-            Placement::Refused("no S3 server has a pinned VM form yet (MinIO no longer publishes builds): a container target, or a cloud".to_owned())
+        Service::Kafka(k) if k.publish.is_some() => {
+            Placement::Refused("a managed Kafka's brokers stay inside the cloud's network: publish it from a container or VM target".to_owned())
         }
+        _ => Placement::Managed,
     }
 }

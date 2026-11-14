@@ -56,17 +56,28 @@ fn references_names_and_values_are_checked() {
 }
 
 #[test]
-fn a_service_needs_the_private_zone_and_a_valid_bucket_name() {
-    let spec = syntax::parse(&format!("{}{SERVICES}", HEAD.replace("dns: { private: true }\n", ""))).unwrap();
-    let found = syntax::check(&spec);
-    assert!(
-        found.iter().any(|p| p.code == Code::MissingField && p.path.to_string() == "dns.private"),
-        "{found:?}"
-    );
+fn a_bucket_name_a_topic_and_a_published_allow_list_are_checked() {
     let bad = problems(
         "services:\n  files: { kind: object-storage, bucket: Up_Loads, networks: { lab: 41 }, credentials: { access_key: files-key, secret_key: files-secret } }\n",
     );
     assert!(bad.iter().any(|(_, p, _)| p == "services.files.bucket"), "{bad:?}");
+    let kafka = problems(
+        "services:\n  bus: { kind: kafka, networks: { lab: 42 }, topics: { \"or ders\": { partitions: 0 } }, credentials: { user: files-key, password: files-secret }, publish: { allow: NOPE } }\n",
+    );
+    let has = |path: &str| kafka.iter().any(|(_, p, _)| p == path);
+    assert!(has("services.bus.topics.or ders") && has("services.bus.topics.or ders.partitions"), "{kafka:?}");
+    assert!(
+        kafka.iter().any(|(c, p, _)| *c == Code::UnknownReference && p == "services.bus.publish.allow"),
+        "{kafka:?}"
+    );
+    let identity = problems(&SERVICES.replace("clients: { web: { env_prefix: DATABASE } }", "clients: { web: { access: identity } }"));
+    assert!(identity.iter().any(|(_, p, _)| p == "services.db.clients.web.access"), "{identity:?}");
+}
+
+#[test]
+fn a_spec_with_services_needs_no_dns_line() {
+    let spec = syntax::parse(&format!("{}{SERVICES}", HEAD.replace("dns: { private: true }\n", ""))).unwrap();
+    assert!(syntax::check(&spec).is_empty(), "{:?}", syntax::check(&spec));
 }
 
 #[test]
@@ -77,11 +88,16 @@ fn each_target_places_a_service_or_says_why_not() {
     assert_eq!(placement(files, Target::CloudVm), Placement::Managed);
     assert_eq!(placement(db, Target::Docker), Placement::Machine);
     assert_eq!(placement(files, Target::Kubernetes), Placement::Machine);
-    assert_eq!(placement(db, Target::Proxmox), Placement::Machine);
-    assert!(matches!(placement(files, Target::Proxmox), Placement::Refused(why) if why.contains("VM form")));
+    assert_eq!(placement(files, Target::Proxmox), Placement::Machine);
     assert!(matches!(placement(db, Target::External), Placement::Refused(_)));
-    let used = parsed(&SERVICES.replace("credentials: {", "clients: { web: {} }\n    credentials: {")).unwrap();
-    assert!(matches!(placement(&used.services["files"], Target::CloudVm), Placement::Refused(why) if why.contains("once applied")));
+    let identity = parsed(&SERVICES.replace("credentials: {", "clients: { web: { access: identity } }\n    credentials: {")).unwrap();
+    assert_eq!(placement(&identity.services["files"], Target::CloudVm), Placement::Managed);
+    assert!(matches!(placement(&identity.services["files"], Target::Docker), Placement::Refused(why) if why.contains("only on a cloud")));
+    let bus =
+        parsed("services:\n  bus: { kind: kafka, networks: { lab: 42 }, credentials: { user: files-key, password: files-secret }, publish: { allow: X } }\n")
+            .unwrap();
+    assert!(matches!(placement(&bus.services["bus"], Target::CloudVm), Placement::Refused(_)));
+    assert_eq!(placement(&bus.services["bus"], Target::Proxmox), Placement::Machine);
 }
 
 #[test]
