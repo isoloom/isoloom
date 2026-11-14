@@ -20,13 +20,12 @@ use super::Project;
 
 use super::checks::{Planned, inside, planned, stand_ins};
 use super::lifecycle::{self, ready};
-use super::machines::{Member, classify, machines};
+use super::machines::{classify, machines};
 use super::slots::{Starts, slots};
 use super::stand_ins::{STAND_INS_DOWN, STAND_INS_UP, StandInStep};
 use crate::error::Result;
 use crate::file::ComposeFile;
 use crate::layout::DIR;
-use crate::start::StartPlan;
 
 /// The commands of a project in the VM: `docker compose` as root under its name, with its file,
 /// its ports published on every address of the VM at their own numbers, and its containers' host
@@ -82,7 +81,6 @@ fn command(id: &str, note: Option<String>, command: Template, timeout_s: u32) ->
 /// run as root as `as_root` says.
 pub(crate) fn guest(env: &Environment, file: &ComposeFile, as_root: AsRoot) -> Result<GuestCompose> {
     let members = classify(env, file)?;
-    let plan = StartPlan::of(file);
     let project = Project::Named(file.name.clone());
     let folders: Vec<String> = host_folders::of_containers(env)
         .iter()
@@ -104,10 +102,10 @@ pub(crate) fn guest(env: &Environment, file: &ComposeFile, as_root: AsRoot) -> R
     Ok(GuestCompose {
         machines,
         networks: networks(env, |n| project.prefixed(n))?,
-        slots: slots(env, &members, &plan, Starts::Guest)?,
+        slots: slots(env, &members, Starts::Guest)?,
         params: derived_switch(derived)?.into_iter().collect(),
-        start: start(env, &vm, &plan, &members)?,
-        ready: ready(&plan, &members, START)?,
+        start: start(env, &vm)?,
+        ready: ready(START)?,
         check_setup: stand_in_command(file, &vm, &STAND_INS_UP)?,
         check_teardown: stand_in_command(file, &vm, &STAND_INS_DOWN)?,
         status: command("ps", None, vm.status(), 60)?,
@@ -123,16 +121,16 @@ const START: &str = "start";
 const PULL_STALL_S: u32 = 900;
 
 /// `up`'s options that take a value, as the start writes them.
-const UP_VALUED: [&str; 3] = ["--pull", "--wait-timeout", "--exit-code-from"];
+const UP_VALUED: [&str; 2] = ["--pull", "--wait-timeout"];
 
 /// The project's start ([`super::lifecycle::start`]), the project files Compose reads from its
 /// environment read from the VM's copy first. Each `up` that pulls comes after a step of its own
 /// pulling its images ([`pull_args`], `pull-<step>`), a download, so a runner gives the download
 /// a download's rule and the `up` its own limit with nothing left to pull.
-fn start(env: &Environment, vm: &InVm, plan: &StartPlan, members: &[Member]) -> Result<Vec<GuestCommand>> {
+fn start(env: &Environment, vm: &InVm) -> Result<Vec<GuestCommand>> {
     let files = host_environment(env);
     let mut out = Vec::new();
-    for s in lifecycle::start(env, plan, members, START, " in the VM") {
+    for s in lifecycle::start(env, START, " in the VM") {
         if let Some(pull) = pull_args(&s.args) {
             let note = Some("Pulling the environment's images in the VM…".to_owned());
             let mut c = command(&format!("pull-{}", s.id), note, vm.compose(&files, &text(&pull.join(" "))), PULL_STALL_S)?;

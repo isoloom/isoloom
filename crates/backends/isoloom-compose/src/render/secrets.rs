@@ -1,10 +1,10 @@
 //! Secrets as Compose writes them: each declared once at the top, read from a variable of
-//! Compose's own environment (`ISOLOOM_SECRET_<NAME>`, set by the runner from the secret's
-//! store), and mounted as a file in the containers that get it. The file never holds a value.
+//! Compose's own environment (`ISOLOOM_SECRET_<NAME>`, an input's file from the input's own
+//! variable), and mounted as a file in the containers that get it. The file never holds a value:
+//! whoever runs Compose sets the variables, from the secrets' stores or by hand.
 
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, MachineShape};
-use isoloom_render::run_manifest::RUNNER;
 use isoloom_spec::model::SecretSource;
 
 use crate::file::{ComposeFile, Secret, ServiceSecret};
@@ -38,20 +38,17 @@ pub(super) fn of_file(env: &Environment) -> IndexMap<String, Secret> {
         .collect()
 }
 
-/// The usage line saying where the secrets' values come from, when the file has any: a
-/// secret's from its store, an input's given at each start.
+/// The usage line saying where the secrets' values come from, when the file has any: the
+/// variables of Compose's environment that hold them, set for `up` and `start`.
 pub(super) fn usage(env: &Environment, file: &ComposeFile) -> String {
     if file.secrets.is_empty() {
         return String::new();
     }
     let vars: Vec<&str> = file.secrets.values().map(|s| s.environment.as_str()).collect();
     let inputs = file.secrets.keys().any(|n| matches!(env.secrets.get(n), Some(SecretSource::Input { .. })));
-    if inputs {
-        format!(
-            "# Secrets and inputs, delivered as files: set {} for `up` (each value, never in the file).\n",
-            vars.join(", ")
-        )
-    } else {
-        format!("# Secrets: {RUNNER} reads them from their stores; by hand, set {} for `up`.\n", vars.join(", "))
-    }
+    let what = if inputs { "Secrets and inputs, delivered as files" } else { "Secrets" };
+    format!(
+        "# {what}: set {} in Compose's environment for `up` and `start` (each value, never in this file).\n",
+        vars.join(", ")
+    )
 }

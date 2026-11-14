@@ -69,7 +69,7 @@ fn role_of(env: &Environment, file: &ComposeFile, name: &str) -> Option<(Role, O
 }
 
 /// Isoloom's own services: the stand-in and its routes, tools, the router, switches, the
-/// folders job and the probes.
+/// folders job, the probes and the service waiting for the set-up jobs.
 fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> {
     let spec = env.spec();
     if name == STAND_IN {
@@ -87,7 +87,8 @@ fn isoloom_own(env: &Environment, name: &str) -> Option<(Role, Option<String>)> 
             .into_iter()
             .any(|a| probe_service(a) == name)
     };
-    (name == router::NAME || name == FOLDERS_JOB || switch() || probe()).then_some((Role::Infra, None))
+    let own = name == router::NAME || name == FOLDERS_JOB || name == crate::start::JOBS_DONE;
+    (own || switch() || probe()).then_some((Role::Infra, None))
 }
 
 /// A check runner, belonging to the machine whose namespace it runs in.

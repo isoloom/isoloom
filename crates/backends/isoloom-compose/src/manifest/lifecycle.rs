@@ -5,10 +5,8 @@ use isoloom_manifest::{Action, Argv, Condition, HostArgv, Leftover, Lifecycle, N
 use isoloom_plan::{Environment, Image, Lifetime, MachineShape};
 use isoloom_render::run_manifest::{cleanup, noted, tolerated};
 
-use super::machines::Member;
 use super::{Project, compose, program};
 use crate::error::Result;
-use crate::start::StartPlan;
 
 /// How long `up --wait` waits for the services to answer, once they started (`--wait-timeout`,
 /// seconds): on this computer and in a VM.
@@ -24,21 +22,11 @@ fn act(id: &str, action: Action) -> Result<Step> {
     Ok(isoloom_render::run_manifest::act(id, action)?)
 }
 
-/// The id of the step that runs a leaf `init:` job.
-pub(super) fn job_step(job: &str) -> String {
-    format!("job-{job}")
-}
-
-/// The machine a job belongs to.
-pub(super) fn owner<'a>(members: &'a [Member], job: &'a str) -> &'a str {
-    members.iter().find(|m| m.name == job).and_then(|m| m.of.as_deref()).unwrap_or(job)
-}
-
 /// Up, down, park, resume and status, as Docker Compose commands and the driver's actions.
-pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Lifecycle> {
+pub(super) fn lifecycle(env: &Environment) -> Result<Lifecycle> {
     let stop = || run("stop", compose(&["stop"])?, 300);
     Ok(Lifecycle {
-        up: NonEmpty::new(up(env, plan, members)?, "lifecycle.up")?,
+        up: NonEmpty::new(up(env)?, "lifecycle.up")?,
         down: NonEmpty::new(down(env)?, "lifecycle.down")?,
         park: Some(Park {
             pause: Some(vec![stop()?]),
@@ -53,13 +41,13 @@ pub(super) fn lifecycle(env: &Environment, plan: &StartPlan, members: &[Member])
 
 /// Pin the host ports, check they are free, clear stale networks, then start the project
 /// ([`start`]).
-fn up(env: &Environment, plan: &StartPlan, members: &[Member]) -> Result<Vec<Step>> {
+fn up(env: &Environment) -> Result<Vec<Step>> {
     let mut steps = vec![
         noted(act("pin-ports", Action::ComposePinPorts)?, "Picking the environment's host ports…"),
         act("ports-free", Action::ComposeCheckPortsFree)?,
         tolerated(act("stale-networks", Action::ComposeRemoveStaleNetworks)?),
     ];
-    for s in start(env, plan, members, "up", "") {
+    for s in start(env, "up", "") {
         let args: Vec<&str> = s.args.iter().map(String::as_str).collect();
         let step = noted(run(&s.id, compose(&args)?, s.timeout_s)?, &s.note);
         steps.push(if s.tolerated { tolerated(step) } else { step });
@@ -82,9 +70,9 @@ pub(super) struct StartStep {
 }
 
 /// How a Compose project starts, on this computer and in a VM (`place` ends the notes: ` in the
-/// VM`): the published images pulled first when the lab publishes one it builds, everything but
-/// the leaf jobs up and healthy (the step `up_id`), then each leaf job attached.
-pub(super) fn start(env: &Environment, plan: &StartPlan, members: &[Member], up_id: &str, place: &str) -> Vec<StartStep> {
+/// VM`): the published images pulled first when the lab publishes one it builds, then everything
+/// up and healthy, the set-up jobs done (the step `up_id`, [`crate::start`]).
+pub(super) fn start(env: &Environment, up_id: &str, place: &str) -> Vec<StartStep> {
     let words = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
     // A lab that publishes a built image (the build+image combo) pulls it first, so a user runs
     // the published image rather than building it; `up` then builds only what could not be pulled.
@@ -96,7 +84,6 @@ pub(super) fn start(env: &Environment, plan: &StartPlan, members: &[Member], up_
     }
     // A service the lab no longer has (a machine taken out, then the run updated) goes.
     up.extend(["--pull", "missing", "--remove-orphans", "--wait", "--wait-timeout", WAIT_TIMEOUT]);
-    up.extend(plan.wait.iter().map(String::as_str));
     let mut out = Vec::new();
     if pull_published {
         // Pull the published images; a service with no published image, or one not pushed yet,
@@ -117,15 +104,6 @@ pub(super) fn start(env: &Environment, plan: &StartPlan, members: &[Member], up_
         timeout_s: 1800,
         tolerated: false,
     });
-    for job in &plan.jobs {
-        out.push(StartStep {
-            id: job_step(job),
-            note: format!("Running {}'s set-up script…", owner(members, job)),
-            args: words(&["up", "--no-deps", "--exit-code-from", job, job]),
-            timeout_s: 600,
-            tolerated: false,
-        });
-    }
     out
 }
 
@@ -192,20 +170,13 @@ fn dedup(mut keys: Vec<&str>) -> Vec<&str> {
     keys
 }
 
-/// The start step `up` succeeded (every long-running service answers), then each leaf job
+/// The start step `up` succeeded: every long-running service answers, and every set-up job
 /// exited 0.
-pub(super) fn ready(plan: &StartPlan, members: &[Member], up: &str) -> Result<Vec<Condition>> {
-    let up = Condition::StepOk {
+pub(super) fn ready(up: &str) -> Result<Vec<Condition>> {
+    Ok(vec![Condition::StepOk {
         step: StepId::parse(up)?,
         means: Some("every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)".into()),
-    };
-    let jobs = plan.jobs.iter().map(|job| {
-        Ok(Condition::StepOk {
-            step: StepId::parse(&job_step(job))?,
-            means: Some(format!("{}'s set-up script ({job}) exited 0", owner(members, job))),
-        })
-    });
-    std::iter::once(Ok(up)).chain(jobs).collect()
+    }])
 }
 
 /// A start that failed on a previous run's containers or networks (a name taken, a network left
