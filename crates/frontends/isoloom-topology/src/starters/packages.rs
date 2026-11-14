@@ -159,13 +159,19 @@ pub(super) fn start(wanted: &[&Package], family: Family) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use isoloom_spec::os::Kind;
 
+    /// An OS of `family` installing with `installer`; its release row is any of the table's, as
+    /// the family is what's read.
     fn os(family: &'static str, installer: Installer) -> Os {
+        let kind = if installer == Installer::Windows { Kind::Windows } else { Kind::Linux };
         Os {
             family,
             version: "1",
             name: family,
             installer,
+            kind,
+            release: &isoloom_spec::os::DISTROS[0].releases[0],
         }
     }
 
