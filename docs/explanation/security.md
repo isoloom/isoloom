@@ -94,10 +94,16 @@ on top.
 An `internet: false` network is a guarantee, not a convention. On Compose, the containers have no
 route out and a privileged container on such a network is refused unless it accepts a best-effort
 seal. On the clouds and the servers (Proxmox, ESXi), machines need the internet while they set
-themselves up, so the runner seals the network once they are ready, where root in a machine can't
-undo it: at the cloud's own level (a second apply with `isoloom_sealed`), or at a server's router
-(its sealed ruleset applied over SSH). Egress is then limited to the environment's networks. The
-seal fails closed, and every later apply keeps it. [ADR 0004](adr/0004-egress-seal.md) explains
+themselves up, so the module seals the network once they are ready, within the same `terraform
+apply`, where root in a machine can't undo it: at the cloud's own level (resources made after
+every machine's set-up: a network ACL, a subnet security group, deny rules, a route table), or at
+a server's router (its sealed ruleset applied over SSH). Egress is then limited to the
+environment's networks. The seal fails closed (the apply fails), and every later apply keeps it.
+DigitalOcean and Linode, whose firewalls can't be closed after the fact, refuse such a network.
+
+Values given at launch are module variables (`sensitive` for secrets), written into a machine by
+its user data or cloud-init: they are in the cloud's copy of the user data and in Terraform's
+state. Keep the state somewhere its secrets are safe. [ADR 0004](adr/0004-egress-seal.md) explains
 the design and its one residual channel (the cloud's DNS resolver).
 
 ## Expiry

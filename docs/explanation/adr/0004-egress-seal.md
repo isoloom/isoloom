@@ -39,3 +39,22 @@ it. See the [run manifest reference](../../reference/run-manifest.md).
 - The same mechanism is reused for the Proxmox and ESXi routers in a server follow-up.
 - A privileged container on an `internet: false` network is refused at validation, because a
   privileged container could re-add the local route the offline seal removes.
+
+## Update: one apply (2026-11)
+
+With no run manifest (Isoloom writes only the tools' own files), the seal is no longer a second
+apply with a variable: it is part of the module, made after the machines' set-up within the one
+`terraform apply`. Each module waits for every machine's set-up (`terraform_data.isoloom_ready_*`,
+which reads the ready file over SSH), and the closing resources `depends_on` those waits:
+
+- a server's router: `terraform_data.isoloom_seal` applies the sealed ruleset over SSH;
+- AWS: a network ACL on the offline subnets (out to the environment's networks and
+  `allowed_cidr` only);
+- Azure: a security group on the offline subnets (no internet out; each machine's own group
+  still filters what comes in);
+- Google Cloud: the deny and allow EGRESS rules, made once the machines are set up;
+- Oracle Cloud: a route table with no way to the internet, attached to the offline subnets.
+
+Nothing made later can switch a resource the machines needed first, so a cloud whose firewalls
+only allow and are made with the machine (DigitalOcean, Linode) can't seal an offline network in
+one apply: those clouds refuse it.

@@ -100,7 +100,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.tmpfs[].mode` | a memory-backed mount with its own mode | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.host_folders` | a folder of the computer that runs the environment, mounted both ways | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
 | `machines.*.host_folders[].read_only = true` | a folder of the computer that runs the environment, mounted read-only | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `networks.*.internet = false` | a network with no way out | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `networks.*.internet = false` | a network with no way out | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
 | `reach` | traffic allowed between two networks, the rest blocked | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `networks.*.gateway` | a network routed by one of the machines | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
 | `networks.*.vlans` | a LAN split into VLANs | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
@@ -427,6 +427,11 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 - `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
 - `vagrant/qemu`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): one is read-only (`read_only`), and the `qemu` provider (vagrant-qemu) mounts its VirtioFS shares read-write
 - `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
+
+### `networks.*.internet = false`
+
+- `cloud-vm/digitalocean`: cloud: network `lan` has no internet: DigitalOcean's firewalls only allow, and each machine's is made with it, so the apply couldn't close its way out once its machines are set up
+- `cloud-vm/linode`: cloud: network `lan` has no internet: Linode's firewalls only allow, and each machine's is made with it, so the apply couldn't close its way out once its machines are set up
 
 ### `reach`
 
