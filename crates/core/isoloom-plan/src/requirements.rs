@@ -53,6 +53,9 @@ pub enum Feature {
     OwnedProjectFiles,
     /// Files written on a host that already exists.
     ExistingHostFiles,
+    /// A machine's own settings (`environment`, `sysctls`, `ulimits`) on a host that already
+    /// exists, which Isoloom doesn't set up: no backend has it.
+    ExistingHostSettings,
     /// A check that runs a project script on a host that already exists, which has no copy of
     /// the project: no backend has it.
     ExistingHostScriptChecks,
@@ -196,6 +199,13 @@ pub enum Requirement {
         /// The machine.
         machine: String,
     },
+    /// An existing host has its own `environment`, `sysctls` or `ulimits`.
+    ExistingHostSettings {
+        /// The machine.
+        machine: String,
+        /// The field (`environment`, `sysctls`, `ulimits`).
+        field: &'static str,
+    },
     /// A check runs a project script on an existing host.
     ExistingHostScriptCheck {
         /// The check's name.
@@ -308,6 +318,7 @@ impl Requirement {
             Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
+            Requirement::ExistingHostSettings { .. } => Feature::ExistingHostSettings,
             Requirement::ExistingHostScriptCheck { .. } => Feature::ExistingHostScriptChecks,
             Requirement::ExistingHostCheckFromNoHost { .. } => Feature::ExistingHostChecksFromNoHost,
             Requirement::Tpm { .. } => Feature::Tpm,
@@ -371,6 +382,7 @@ impl fmt::Display for Requirement {
             Requirement::BridgedNetwork { network } => crate::outside::no_bridge(f, network),
             Requirement::OwnedProjectFile { machine, path } => crate::machine_files::no_owned_project_file(f, machine, path),
             Requirement::ExistingHostFiles { machine } => crate::machine_files::no_existing_host_files(f, machine),
+            Requirement::ExistingHostSettings { machine, field } => crate::machine_files::no_existing_host_settings(f, machine, field),
             Requirement::ExistingHostScriptCheck { check } => crate::existing_hosts::no_script_check(f, check),
             Requirement::ExistingHostCheckFromNoHost { check } => crate::existing_hosts::no_host_to_run_from(f, check),
             Requirement::Tpm { machine } => crate::hardware::no_tpm(f, machine),

@@ -138,6 +138,24 @@ mod tests {
     }
 
     #[test]
+    fn an_existing_hosts_own_settings_are_refused_not_dropped() {
+        let hosts = "overrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n";
+        for (settings, field) in [
+            ("environment: { MODE: lab }", "environment"),
+            ("sysctls: { net.core.somaxconn: '4096' }", "sysctls"),
+            ("ulimits: { nofile: 1024 }", "ulimits"),
+        ] {
+            let env = environment(&format!("  a: {{ networks: {{ lab: 5 }}, os: debian@12, {settings} }}\n{hosts}"));
+            let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+            assert!(
+                refusal.contains(&format!("machine `a` sets `{field}`: Isoloom doesn't set up a host that already exists")),
+                "{settings}: {refusal}"
+            );
+            assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })), "{settings}");
+        }
+    }
+
+    #[test]
     fn rendering_twice_gives_the_same_files() {
         let env = environment(
             "  a: { networks: { lab: 5 }, os: debian@12 }\n  b: { networks: { lab: 6 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } }, b: { ssh: { address: 10.0.0.6 } } } } }\n",

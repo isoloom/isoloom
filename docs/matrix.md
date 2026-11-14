@@ -64,14 +64,14 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.command` | its own command | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.healthcheck` | when it counts as healthy, beyond its ports answering | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.setup` | project scripts run once the machine is up | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.environment` | environment variables | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.environment` | environment variables | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.environment.*.input` | an environment variable from a non-sensitive input | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.depends_on` | a machine waiting for another | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `machines.*.depends_on` | a VM waiting for a container | – | – | – | – | – | ✗ | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – |
 | `machines.*.resources` | CPUs and memory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.privileged` | kernel-level access | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.dns` | its own resolver settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines` | several machines | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `machines.*.count` | clones of one machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
@@ -218,6 +218,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 
 - `external`: capability `machine-process`: machine `m` sets its own process (`command` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it
 
+### `machines.*.environment`
+
+- `external`: capability `existing-host-settings`: machine `m` sets `environment`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)
+
 ### `machines.*.depends_on`
 
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
@@ -226,9 +230,14 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 
 - `hybrid`: capability `vm-after-container`: VM `v` depends on container `c`: VMs start first in a hybrid environment
 
+### `machines.*.sysctls`
+
+- `external`: capability `existing-host-settings`: machine `m` sets `sysctls`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)
+
 ### `machines.*.ulimits`
 
 - `kubernetes`: capability `ulimits`: machine `m` sets `ulimits`: Kubernetes has no per-container process limits
+- `external`: capability `existing-host-settings`: machine `m` sets `ulimits`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)
 
 ### `machines`
 

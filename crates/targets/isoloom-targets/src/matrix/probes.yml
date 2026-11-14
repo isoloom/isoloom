@@ -96,6 +96,7 @@ rows:
     patch: { machines: { m: { setup: [seed.sh] } } }
   - field: machines.*.environment
     about: environment variables
+    features: [existing-host-settings]
     patch: { machines: { m: { environment: { MODE: lab } } } }
   - field: machines.*.environment.*.input
     about: an environment variable from a non-sensitive input
@@ -120,10 +121,11 @@ rows:
     patch: { machines: { m: { privileged: true } } }
   - field: machines.*.sysctls
     about: kernel parameters
+    features: [existing-host-settings]
     patch: { machines: { m: { sysctls: { net.core.somaxconn: 4096 } } } }
   - field: machines.*.ulimits
     about: process limits
-    features: [ulimits]
+    features: [ulimits, existing-host-settings]
     patch: { machines: { m: { ulimits: { nofile: 65536 } } } }
   - field: machines.*.dns
     about: its own resolver settings

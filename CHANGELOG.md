@@ -53,6 +53,9 @@ stable spec format.
 
 ### Fixed
 
+- **An external machine's `environment`, `sysctls` and `ulimits` are refused at validation (#311),**
+  naming the field and pointing to the environment's own provisioning, where they were dropped
+  without a word. An environment variable set from an input is still taken.
 - **An instance that would wrap a Docker block onto another is refused (#305):** instance 9 of
   `10.250.0.0/24` became `10.3.0.0/24`, a block another network or instance may hold; it now fails
   with `isoloom_spec::Error::InstanceDocker`.
