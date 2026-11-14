@@ -7,7 +7,7 @@
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::Arch;
 
-use super::{boot, bridged, hyperv, qemu, windows};
+use super::{boot, bridged, hyperv, qemu, utm, windows};
 
 /// A Vagrant provider Isoloom knows, as `vagrant up --provider` names it ([`Profile::id`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,8 +87,6 @@ pub(crate) struct Profile {
     pub(crate) id: &'static str,
     /// Its name in a refusal's prose (`Hyper-V`).
     pub(crate) label: &'static str,
-    /// Why the `vagrant` target has no block for it, when it has none.
-    pub(crate) no_vms: Option<&'static str>,
     /// Its two-way shared folder (`host_folders`).
     pub(crate) share: Share,
     /// Whether it gives a VM a virtual TPM 2.0.
@@ -98,7 +96,7 @@ pub(crate) struct Profile {
     /// Whether Isoloom bridges a network under it; `false` refuses a bridged network.
     pub(crate) bridges: bool,
     /// What else it refuses of the environment's networks and boxes (QEMU's links, Hyper-V's
-    /// boxes).
+    /// and UTM's boxes).
     pub(crate) networks: Option<fn(&Environment) -> Option<String>>,
     /// How it boots a machine that boots its own way.
     pub(crate) boot: OwnBoot,
@@ -123,7 +121,6 @@ fn qemu_networks(env: &Environment) -> Option<String> {
 const DESKTOP: Profile = Profile {
     id: "",
     label: "",
-    no_vms: None,
     share: Share::None(""),
     tpm: false,
     attaches_disks: true,
@@ -235,16 +232,15 @@ impl Provider {
             Provider::Utm => Profile {
                 id: "utm",
                 label: "UTM",
-                // `vagrant_utm` (0.1.6) gives a VM no private network, only forwarded ports on its
-                // shared network, and every machine of a spec is on a network (validation asks
-                // it), so UTM could run no environment's VMs.
-                no_vms: Some(
-                    "the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network (it only forwards ports), and every machine is on one",
-                ),
                 share: Share::Both {
                     kind: "utm",
                     ro_option: "mount_options",
                 },
+                // vagrant_utm attaches no data disk; its VMs' networks are Isoloom's own (each an
+                // isolated vmnet network, `utm`), on UTM boxes only, and it bridges none.
+                attaches_disks: false,
+                bridges: false,
+                networks: Some(utm::refusal),
                 ..DESKTOP
             },
             Provider::VmwareEsxi => Profile {
@@ -267,25 +263,21 @@ impl Provider {
     pub(crate) fn has_tpm(self) -> bool {
         self.profile().tpm
     }
-
 }
 
 /// Why the VMs of `env`, planned for the `vagrant` target, can't all run under Vagrant's
-/// `provider` (as `vagrant up --provider` names it), if they can't: a provider the target has no
-/// block for (UTM, which gives a VM no private network), a machine requiring a TPM the provider doesn't give, then QEMU's
-/// networks, Hyper-V's boxes and libvirt's bridged networks, then a machine's own boot, which
+/// `provider` (as `vagrant up --provider` names it), if they can't: a machine requiring a TPM the
+/// provider doesn't give, then QEMU's networks, Hyper-V's and UTM's boxes and the bridged
+/// networks of libvirt, QEMU, Hyper-V and UTM, then a machine's own boot, which
 /// only libvirt (and QEMU, for UEFI's format) boots, then a machine's host folders, which Hyper-V
 /// and ESXi don't share (nor QEMU read-only), then a machine of another architecture than ESXi's
-/// on ESXi, then a machine's data disks, which QEMU's and Parallels' plugins don't attach.
+/// on ESXi, then a machine's data disks, which QEMU's, Parallels' and UTM's plugins don't attach.
 /// A spec that can't be planned at all (a machine's configuration that doesn't resolve) is
 /// refused with why.
 #[must_use]
 pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     // A provider Isoloom doesn't know has no block to refuse anything in.
     let provider = Provider::parse(provider)?;
-    if let Some(why) = provider.profile().no_vms {
-        return Some(why.to_owned());
-    }
     windows::tpm_refusal(env, provider)
         .or_else(|| networks_refusal(env, provider))
         .or_else(|| boot::refusal(env, provider))
@@ -311,8 +303,8 @@ fn arch_refusal(env: &Environment, provider: Provider) -> Option<String> {
     ))
 }
 
-/// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's and
-/// Parallels' plugins attach none.
+/// Why `provider` can't give this environment's VMs their data disks, if it can't: QEMU's,
+/// Parallels' and UTM's plugins attach none.
 fn disk_refusal(env: &Environment, provider: Provider) -> Option<String> {
     if provider.profile().attaches_disks {
         return None;
@@ -325,8 +317,8 @@ fn disk_refusal(env: &Environment, provider: Provider) -> Option<String> {
 }
 
 /// What `provider` can't give the VMs of their networks and boxes: QEMU links a VM on one
-/// network only, Hyper-V needs a Hyper-V build of each box, and Isoloom bridges no network on
-/// QEMU, Hyper-V or libvirt.
+/// network only, Hyper-V needs a Hyper-V build of each box and UTM a UTM box, and Isoloom bridges
+/// no network on QEMU, Hyper-V, libvirt or UTM.
 fn networks_refusal(env: &Environment, provider: Provider) -> Option<String> {
     let profile = provider.profile();
     profile

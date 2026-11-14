@@ -151,7 +151,7 @@ fn machine_field(recorded: &Trail, m: &str, rest: &str) -> String {
         match key {
             "vagrant" => v.key("box"),
             "vagrant_version" => v.key("box_version"),
-            "qemu" | "hyperv" => v.key("boxes").key(key),
+            "qemu" | "hyperv" | "utm" => v.key("boxes").key(key),
             "box_url" | "box_server_url" | "winrm" | "winssh" => v.key(key),
             "proxmox" => recorded.written("proxmox", m).key("image"),
             "" => v,

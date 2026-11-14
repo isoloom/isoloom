@@ -23,6 +23,7 @@ use super::machine::{define, private_network};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
+use super::utm::Utm;
 use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
 use crate::ruby::{Ruby, Start, Value};
 
@@ -79,7 +80,8 @@ fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, 
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
         boot: None,
         qemu: Qemu::helper(link),
-        hyperv: HyperV::helper(env, at),
+        hyperv: HyperV::helper(env, at.iter().copied()),
+        utm: Utm::helper(env, at),
         tpm: None,
         esxi_guestos: None,
         esxi_box: None,

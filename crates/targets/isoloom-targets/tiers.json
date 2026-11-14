@@ -243,6 +243,14 @@
       "runs": []
     },
     {
+      "entry": "vagrant/utm",
+      "goal": 1,
+      "exists_on": [
+        "macos"
+      ],
+      "runs": []
+    },
+    {
       "entry": "vagrant/vmware_esxi",
       "goal": 1,
       "exists_on": [

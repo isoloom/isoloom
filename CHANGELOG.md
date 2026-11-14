@@ -12,6 +12,21 @@ stable spec format.
 
 ### Added
 
+- **UTM runs an environment's VMs again, each on its networks (the `vagrant` target's `utm`
+  provider).** vagrant_utm (0.2.0) makes no adapter for a private network and sets no address,
+  so the Vagrantfile does both: each network is an isolated vmnet network (QEMU's `vmnet-host`
+  with an id made from the copy's folder and the network's name: its VMs only, not the Mac nor
+  another network, no DHCP), a VM's adapters there are set before each boot (a typed action
+  trigger on the plugin's `Boot`, virtio cards with fixed MACs, Isoloom's earlier QEMU arguments
+  replaced and the plugin's own kept), and its addresses are set once it answers, by MAC, with
+  Hyper-V's scripts. A VM boots a UTM box: `utm/bookworm` for Debian 12 and Isoloom's own VMs,
+  `utm/ubuntu-24.04`; another OS takes `overrides.vagrant.machines.<m>.boxes.utm` (the spec
+  schema's `boxes.utm`), else UTM refuses the spec saying so. UTM refuses data disks, bridged
+  networks, a TPM and a machine's own boot, stops `vagrant up` on nested virtualization, and
+  offers no console (SPICE). `vagrant/utm` is a matrix
+  column again (tier 2, goal 1 on macOS). Breaking for the Rust API: `ProviderBoxes` and
+  `VmImage` have a new public field, `utm`.
+
 - **A machine built from a Dockerfile has a true VM form (#295).** On a target that runs VMs, a
   machine written as `app.build` with no `app.steps` of its own takes the VM form its Dockerfile
   translates to: the base image's OS, its `RUN`, `COPY`, `ENV`, `USER` and `WORKDIR` as steps, and

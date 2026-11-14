@@ -10,7 +10,6 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/vagrant/checks/api.sh
 ✓ .isoloom/vagrant/checks/isoloom-controller.sh
 ✓ .isoloom/configure/lib/configure.sh
-✓ .isoloom/vagrant/run.json
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
 
@@ -23,7 +22,6 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/vagrant/checks/api.sh
 .isoloom/vagrant/checks/isoloom-controller.sh
 .isoloom/vagrant/checks/web.sh
-.isoloom/vagrant/run.json
 
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
@@ -452,6 +450,78 @@ module IsoloomHyperV
   # After a VM is deleted: the networks' switches no VM uses any more.
   def self.prune(names)
     ps(names.map { |n| "if ((Hyper-V\\Get-VMSwitch -Name #{q(n)} -ErrorAction SilentlyContinue) -and -not (Hyper-V\\Get-VMNetworkAdapter -All | Where-Object { $_.SwitchName -eq #{q(n)} })) { Hyper-V\\Remove-VMSwitch -Name #{q(n)} -Force }" }.join("; "))
+  end
+end
+# UTM (`vagrant up --provider utm`, vagrant_utm 0.2.0 or later, UTM from GitHub or Homebrew: the
+# App Store build has no vmnet). The plugin makes no adapter for a private network and sets no
+# address in the guest, so Isoloom does it:
+# - each network is an isolated vmnet network (QEMU's `vmnet-host` with a `net-uuid`): the VMs
+#   on it see each other and nothing else, not the host, not another network, and get no DHCP.
+#   Its id is made from this copy's folder and the network's name (`net_uuid`): two copies of an
+#   environment never share a network, and a reload finds its own again;
+# - before each boot (the VM stopped, its configuration editable), the VM's adapters on them, with
+#   the MACs Isoloom gives them, as QEMU arguments of its UTM configuration, the earlier ones of
+#   Isoloom's replaced and the plugin's own (its shared folders) kept (`attach`);
+# - once the guest answers, before its provisioning, each adapter's address set in the guest, found
+#   by its MAC (`address`), as on Hyper-V.
+# Every call to UTM is an Apple event: UTM must be open in this session, and this app allowed to
+# control it (System Settings, Privacy & Security, Automation).
+module IsoloomUtm
+  def self.fail!(message)
+    raise Class.new(Vagrant::Errors::VagrantError) { define_method(:error_message) { "UTM: #{message}" } }
+  end
+
+  # Network `net`'s vmnet id: a UUID (version 4 layout) made from this copy's folder and the
+  # network's name.
+  def self.net_uuid(net)
+    require "digest"
+    h = Digest::SHA256.hexdigest("#{__dir__}\0#{net}")
+    variant = ((h[16].to_i(16) & 0x3) | 0x8).to_s(16)
+    "#{h[0, 8]}-#{h[8, 4]}-4#{h[13, 3]}-#{variant}#{h[17, 3]}-#{h[20, 12]}"
+  end
+
+  # The marker of the QEMU arguments Isoloom puts in a VM's UTM configuration: its netdevs' ids.
+  MARK = "isoloomnet"
+
+  # Replaces the VM's QEMU arguments marked `MARK` with `args`, the others kept (AppleScript, read
+  # from stdin; the VM is stopped).
+  SET_ARGS = <<~'APPLESCRIPT'
+    on run argv
+      set vmId to item 1 of argv
+      set mark to item 2 of argv
+      tell application "UTM"
+        set vm to virtual machine id vmId
+        set config to configuration of vm
+        set kept to {}
+        repeat with arg in (qemu additional arguments of config)
+          if (argument string of arg) does not contain mark then set end of kept to (contents of arg)
+        end repeat
+        repeat with i from 3 to (count of argv)
+          set end of kept to {argument string:(item i of argv)}
+        end repeat
+        set qemu additional arguments of config to kept
+        update configuration of vm with config
+      end tell
+    end run
+  APPLESCRIPT
+
+  # Before the VM boots: an adapter on each network of `nics` (`[[network, mac], ...]`), in
+  # order, a virtio card on the network's vmnet network.
+  def self.attach(machine, nics)
+    require "open3"
+    args = nics.each_with_index.flat_map do |(net, mac), i|
+      ["-netdev vmnet-host,id=#{MARK}#{i},net-uuid=#{net_uuid(net)}",
+       "-device virtio-net-pci,netdev=#{MARK}#{i},mac=#{mac}"]
+    end
+    out, status = Open3.capture2e("osascript", "-", machine.id.to_s, MARK, *args, stdin_data: SET_ARGS)
+    fail!("#{machine.name}'s adapters on the environment's networks couldn't be set: #{out.strip}") unless status.success?
+  end
+
+  # Once the guest answers (a UTM step, so this runs on UTM only), before its provisioning: its
+  # addresses on the networks.
+  def self.address(machine, script)
+    fail!("#{machine.name} didn't answer within #{machine.config.vm.boot_timeout} s") unless machine.communicate.wait_for_ready(machine.config.vm.boot_timeout)
+    machine.communicate.sudo(script)
   end
 end
 # Vagrant's own check of a host port before forwarding it (`Vagrant::Util::IsPortOpen`) asks
@@ -912,7 +982,7 @@ Vagrant.configure("2") do |config|
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -963,6 +1033,72 @@ Vagrant.configure("2") do |config|
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web/http", 8086)]]); IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "configured-app-#{ISOLOOM_KEY} - web"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["lab", "02:15:83:fe:e5:e0"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:83:fe:e5:e0 10.66.0.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:83:fe:e5:e0\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 # nmcli translates its states (`connecting`) even in its terse output: read them in C.
@@ -1484,7 +1620,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1534,6 +1670,72 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/ubuntu-24.04"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "configured-app-#{ISOLOOM_KEY} - api"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["lab", "02:15:b8:46:c7:8a"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:b8:46:c7:8a 10.66.0.20/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:b8:46:c7:8a\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 # nmcli translates its states (`connecting`) even in its terse output: read them in C.
@@ -1901,7 +2103,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1951,6 +2153,72 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "configured-app-#{ISOLOOM_KEY} - isoloom-controller"
+      v.cpus = 1
+      v.memory = 512
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["lab", "02:15:db:57:fb:d1"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:db:57:fb:d1 10.66.0.253/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:db:57:fb:d1\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.66.0.10 web' '10.66.0.20 api' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
@@ -2247,1072 +2515,3 @@ fi
 
 echo "isoloom-check: END $passed passed, $failed failed"
 [ "$failed" -eq 0 ]
-
-## .isoloom/vagrant/run.json
-{
-  "$schema": "https://raw.githubusercontent.com/isoloom/isoloom/main/schemas/run-manifest-v1.schema.json",
-  "manifest_version": 1,
-  "generator": {
-    "name": "isoloom",
-    "version": "[version]"
-  },
-  "environment": {
-    "name": "configured-app",
-    "instance": null,
-    "message": null
-  },
-  "target": "vagrant",
-  "driver": "vagrant",
-  "hosts": [
-    "linux",
-    "macos",
-    "windows"
-  ],
-  "tools": [
-    {
-      "name": "vagrant",
-      "probe": [
-        "vagrant",
-        "--version"
-      ],
-      "min_version": "2.4.0"
-    },
-    {
-      "name": "virtualbox",
-      "probe": [
-        "VBoxManage",
-        "--version"
-      ],
-      "providers": [
-        "virtualbox"
-      ]
-    },
-    {
-      "name": "vmware",
-      "probe": [
-        "vmrun",
-        "list"
-      ],
-      "providers": [
-        "vmware_desktop"
-      ]
-    },
-    {
-      "name": "parallels",
-      "probe": [
-        "prlctl",
-        "--version"
-      ],
-      "hosts": [
-        "macos"
-      ],
-      "providers": [
-        "parallels"
-      ]
-    },
-    {
-      "name": "libvirt",
-      "probe": [
-        "virsh",
-        "--version"
-      ],
-      "hosts": [
-        "linux"
-      ],
-      "providers": [
-        "libvirt"
-      ]
-    },
-    {
-      "name": "qemu",
-      "probe": [
-        "qemu-img",
-        "--version"
-      ],
-      "providers": [
-        "qemu"
-      ]
-    },
-    {
-      "name": "mkisofs",
-      "probe": [
-        "mkisofs",
-        "-version"
-      ],
-      "hosts": [
-        "linux"
-      ],
-      "providers": [
-        "qemu"
-      ]
-    }
-  ],
-  "identity": {
-    "vagrant": {
-      "providers": [
-        {
-          "id": "virtualbox",
-          "hosts": [
-            "linux",
-            "macos",
-            "windows"
-          ],
-          "elevation": "none",
-          "refusal": null
-        },
-        {
-          "id": "vmware_desktop",
-          "hosts": [
-            "linux",
-            "macos",
-            "windows"
-          ],
-          "plugin": "vagrant-vmware-desktop",
-          "elevation": "none",
-          "refusal": null
-        },
-        {
-          "id": "hyperv",
-          "hosts": [
-            "windows"
-          ],
-          "elevation": "hyperv",
-          "refusal": null
-        },
-        {
-          "id": "parallels",
-          "hosts": [
-            "macos"
-          ],
-          "plugin": "vagrant-parallels",
-          "elevation": "none",
-          "refusal": null
-        },
-        {
-          "id": "libvirt",
-          "hosts": [
-            "linux"
-          ],
-          "plugin": "vagrant-libvirt",
-          "elevation": "none",
-          "refusal": null
-        },
-        {
-          "id": "qemu",
-          "hosts": [
-            "linux",
-            "macos"
-          ],
-          "plugin": "vagrant-qemu",
-          "elevation": "none",
-          "refusal": null
-        },
-        {
-          "id": "vmware_esxi",
-          "hosts": [
-            "linux",
-            "macos",
-            "windows"
-          ],
-          "plugin": "vagrant-vmware-esxi",
-          "elevation": "none",
-          "remote": true,
-          "refusal": null
-        }
-      ],
-      "dotfile": "${run.state_dir}/vagrant"
-    }
-  },
-  "params": [
-    {
-      "name": "ISOLOOM_HYPERV_SWITCH",
-      "description": "The Hyper-V virtual switch each VM's first adapter (Vagrant's connection, and the internet) goes on.",
-      "default": "Default Switch",
-      "hosts": [
-        "windows"
-      ],
-      "providers": [
-        "hyperv"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ISOLOOM_HYPERV_SWITCH",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ISOLOOM_PUBLISH_FIXED",
-      "description": "Set: each published port takes its own `publish` number on the host, instead of a free one.",
-      "values": [
-        "1"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ISOLOOM_PUBLISH_FIXED",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ISOLOOM_SSH_PROXY_COMMAND",
-      "description": "The command Vagrant's SSH to the VMs goes through (an SSH `ProxyCommand`), when this computer can't reach them directly; unset, it connects straight to them.",
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "runner",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ISOLOOM_SSH_PROXY_COMMAND",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ESXI_HOSTNAME",
-      "description": "The ESXi host.",
-      "required": true,
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ESXI_HOSTNAME",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ESXI_HOSTPORT",
-      "description": "Its SSH port.",
-      "default": "22",
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ESXI_HOSTPORT",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ESXI_USERNAME",
-      "description": "The ESXi user.",
-      "default": "root",
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ESXI_USERNAME",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ESXI_DATASTORE",
-      "description": "The datastore the VMs' disks go on (default: ESXi's first).",
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ESXI_DATASTORE",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ESXI_VIRTUAL_NETWORK",
-      "description": "Port groups, comma-separated: the management network, then one per environment network.",
-      "default": "VM Network",
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ESXI_VIRTUAL_NETWORK",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "VAGRANT_HOST_ARCHITECTURE",
-      "description": "The architecture Vagrant picks each box's build for: the ESXi host's (x86-64), not this computer's.",
-      "default": "amd64",
-      "values": [
-        "amd64"
-      ],
-      "providers": [
-        "vmware_esxi"
-      ],
-      "set_by": "runner",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "VAGRANT_HOST_ARCHITECTURE",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "ISOLOOM_DERIVED",
-      "description": "0: the checks derived from the spec (reachability, no internet) are skipped.",
-      "default": "1",
-      "values": [
-        "0",
-        "1"
-      ],
-      "set_by": "embedder",
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ISOLOOM_DERIVED",
-          "steps": [
-            "check-web",
-            "check-api",
-            "check-isoloom-controller"
-          ]
-        }
-      ]
-    }
-  ],
-  "secrets": [
-    {
-      "name": "ESXI_PASSWORD",
-      "kind": "connection",
-      "required": true,
-      "sensitive": true,
-      "providers": [
-        "vmware_esxi"
-      ],
-      "deliver": [
-        {
-          "via": "env",
-          "var": "ESXI_PASSWORD",
-          "steps": [
-            "*"
-          ]
-        }
-      ]
-    }
-  ],
-  "networks": [
-    {
-      "name": "lab",
-      "cidr": "10.66.0.0/24",
-      "internet": true
-    }
-  ],
-  "machines": [
-    {
-      "name": "web",
-      "role": "member",
-      "os": "debian-12",
-      "arch": "amd64",
-      "resources": {
-        "cpus": 1,
-        "memory_mb": 1024
-      },
-      "addresses": {
-        "lab": "10.66.0.10"
-      },
-      "native": {
-        "vagrant": "web",
-        "vm_names": {},
-        "boot_digest": "sha256:b7d12b1905321c9987276bb48016e1848636d4350597dd7bbfdf9cf7eb208bab",
-        "boxes": [
-          {
-            "provider": "virtualbox",
-            "box": "bento/debian-12"
-          },
-          {
-            "provider": "vmware_desktop",
-            "box": "bento/debian-12"
-          },
-          {
-            "provider": "hyperv",
-            "box": "generic/debian12",
-            "version": "4.3.12"
-          },
-          {
-            "provider": "parallels",
-            "box": "bento/debian-12"
-          },
-          {
-            "provider": "libvirt",
-            "box": "generic/debian12",
-            "architecture": "amd64"
-          },
-          {
-            "provider": "qemu",
-            "box": "cloud-image/debian-12",
-            "architecture": "amd64"
-          },
-          {
-            "provider": "vmware_esxi",
-            "box": "bento/debian-12",
-            "architecture": "amd64"
-          }
-        ]
-      },
-      "ports": [
-        {
-          "name": "http",
-          "port": 80,
-          "protocol": "tcp",
-          "http": true,
-          "publish": {
-            "mode": "ephemeral",
-            "preferred": 8086,
-            "address": "127.0.0.1"
-          }
-        }
-      ],
-      "consoles": [
-        {
-          "providers": [
-            "virtualbox"
-          ],
-          "protocol": "rdp",
-          "source": {
-            "from": "vrde"
-          },
-          "note": "on only when the Oracle VM VirtualBox Extension Pack is installed as the VM boots (VirtualBox has no remote display server without it)"
-        },
-        {
-          "providers": [
-            "vmware_desktop"
-          ],
-          "protocol": "vnc",
-          "source": {
-            "from": "runner"
-          }
-        },
-        {
-          "providers": [
-            "hyperv"
-          ],
-          "protocol": "none",
-          "note": "Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port"
-        },
-        {
-          "providers": [
-            "parallels"
-          ],
-          "protocol": "none",
-          "note": "Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"
-        },
-        {
-          "providers": [
-            "libvirt"
-          ],
-          "protocol": "vnc",
-          "source": {
-            "from": "libvirt"
-          }
-        },
-        {
-          "providers": [
-            "qemu"
-          ],
-          "protocol": "vnc",
-          "source": {
-            "from": "qemu_monitor"
-          }
-        },
-        {
-          "providers": [
-            "vmware_esxi"
-          ],
-          "protocol": "none",
-          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
-        }
-      ]
-    },
-    {
-      "name": "api",
-      "role": "member",
-      "os": "ubuntu-24.04",
-      "arch": "amd64",
-      "resources": {
-        "cpus": 1,
-        "memory_mb": 1024
-      },
-      "addresses": {
-        "lab": "10.66.0.20"
-      },
-      "native": {
-        "vagrant": "api",
-        "vm_names": {},
-        "boot_digest": "sha256:ff70168765dd907ad7197e8cded0ee2d79f3377d24b1761e2094fc09d67ccc79",
-        "boxes": [
-          {
-            "provider": "virtualbox",
-            "box": "bento/ubuntu-24.04"
-          },
-          {
-            "provider": "vmware_desktop",
-            "box": "bento/ubuntu-24.04"
-          },
-          {
-            "provider": "hyperv",
-            "box": "gusztavvargadr/ubuntu-server-2404-lts",
-            "version": "2607.0.0"
-          },
-          {
-            "provider": "parallels",
-            "box": "bento/ubuntu-24.04"
-          },
-          {
-            "provider": "libvirt",
-            "box": "bento/ubuntu-24.04"
-          },
-          {
-            "provider": "qemu",
-            "box": "bento/ubuntu-24.04",
-            "architecture": "amd64"
-          },
-          {
-            "provider": "vmware_esxi",
-            "box": "bento/ubuntu-24.04",
-            "architecture": "amd64"
-          }
-        ]
-      },
-      "ports": [
-        {
-          "name": "status",
-          "port": 8080,
-          "protocol": "tcp",
-          "http": true
-        },
-        {
-          "name": "health",
-          "port": 8081,
-          "protocol": "tcp",
-          "http": true
-        }
-      ],
-      "consoles": [
-        {
-          "providers": [
-            "virtualbox"
-          ],
-          "protocol": "rdp",
-          "source": {
-            "from": "vrde"
-          },
-          "note": "on only when the Oracle VM VirtualBox Extension Pack is installed as the VM boots (VirtualBox has no remote display server without it)"
-        },
-        {
-          "providers": [
-            "vmware_desktop"
-          ],
-          "protocol": "vnc",
-          "source": {
-            "from": "runner"
-          }
-        },
-        {
-          "providers": [
-            "hyperv"
-          ],
-          "protocol": "none",
-          "note": "Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port"
-        },
-        {
-          "providers": [
-            "parallels"
-          ],
-          "protocol": "none",
-          "note": "Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"
-        },
-        {
-          "providers": [
-            "libvirt"
-          ],
-          "protocol": "vnc",
-          "source": {
-            "from": "libvirt"
-          }
-        },
-        {
-          "providers": [
-            "qemu"
-          ],
-          "protocol": "vnc",
-          "source": {
-            "from": "qemu_monitor"
-          }
-        },
-        {
-          "providers": [
-            "vmware_esxi"
-          ],
-          "protocol": "none",
-          "note": "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use"
-        }
-      ]
-    },
-    {
-      "name": "isoloom-controller",
-      "role": "infra",
-      "resources": {
-        "cpus": 1,
-        "memory_mb": 512
-      },
-      "addresses": {
-        "lab": "10.66.0.253"
-      },
-      "native": {
-        "vagrant": "isoloom-controller",
-        "vm_names": {},
-        "boot_digest": "sha256:21134dbe1f9d3b49fd99a1e7d3a11be2db023ab931d97f7b038cc7ea09fe6d3f",
-        "boxes": [
-          {
-            "provider": "virtualbox",
-            "box": "generic/alpine319",
-            "host_architecture": "amd64"
-          },
-          {
-            "provider": "virtualbox",
-            "box": "bento/debian-12",
-            "host_architecture": "arm64"
-          },
-          {
-            "provider": "vmware_desktop",
-            "box": "generic/alpine319",
-            "host_architecture": "amd64"
-          },
-          {
-            "provider": "vmware_desktop",
-            "box": "bento/debian-12",
-            "host_architecture": "arm64"
-          },
-          {
-            "provider": "hyperv",
-            "box": "generic/alpine319",
-            "host_architecture": "amd64"
-          },
-          {
-            "provider": "hyperv",
-            "box": "bento/debian-12",
-            "host_architecture": "arm64"
-          },
-          {
-            "provider": "parallels",
-            "box": "generic/alpine319",
-            "host_architecture": "amd64"
-          },
-          {
-            "provider": "parallels",
-            "box": "bento/debian-12",
-            "host_architecture": "arm64"
-          },
-          {
-            "provider": "libvirt",
-            "box": "generic/alpine319"
-          },
-          {
-            "provider": "qemu",
-            "box": "cloud-image/debian-12"
-          },
-          {
-            "provider": "vmware_esxi",
-            "box": "bento/debian-12",
-            "architecture": "amd64"
-          }
-        ]
-      }
-    }
-  ],
-  "lifecycle": {
-    "up": [
-      {
-        "id": "reconcile",
-        "note": "Clearing the state of a run on another provider, if any…",
-        "action": "vagrant.reconcile_provider"
-      },
-      {
-        "id": "discard-saved",
-        "action": "vagrant.discard_aborted_saved",
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox"
-        ]
-      },
-      {
-        "id": "up",
-        "note": "Building the environment's VMs (Windows machines take a while)…",
-        "argv": [
-          "vagrant",
-          "up",
-          "--provider",
-          "${run.provider}"
-        ],
-        "timeout_s": 21600,
-        "verdict": "fatal: \\[[^\\]]+\\]: (UNREACHABLE|FAILED)!.*"
-      },
-      {
-        "id": "park-controller",
-        "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
-        "action": "vagrant.park_controller",
-        "timeout_s": 300,
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox",
-          "vmware_desktop",
-          "hyperv",
-          "parallels",
-          "libvirt",
-          "utm",
-          "vmware_esxi"
-        ]
-      }
-    ],
-    "down": [
-      {
-        "id": "destroy",
-        "argv": [
-          "vagrant",
-          "destroy",
-          "--force"
-        ],
-        "timeout_s": 1800,
-        "when": "always"
-      },
-      {
-        "id": "orphans",
-        "action": "vagrant.remove_orphans",
-        "when": "always",
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox",
-          "parallels"
-        ]
-      },
-      {
-        "id": "reset",
-        "action": "vagrant.reset_state"
-      }
-    ],
-    "park": {
-      "pause": [
-        {
-          "id": "suspend",
-          "argv": [
-            "vagrant",
-            "suspend",
-            "web",
-            "api"
-          ],
-          "timeout_s": 1800
-        }
-      ],
-      "shutdown": [
-        {
-          "id": "halt",
-          "argv": [
-            "vagrant",
-            "halt"
-          ],
-          "timeout_s": 1800
-        }
-      ]
-    },
-    "resume": [
-      {
-        "id": "discard-saved",
-        "action": "vagrant.discard_aborted_saved",
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox"
-        ]
-      },
-      {
-        "id": "resume",
-        "argv": [
-          "vagrant",
-          "up",
-          "--no-provision",
-          "--provider",
-          "${run.provider}",
-          "web",
-          "api"
-        ],
-        "timeout_s": 3600,
-        "failure": "tolerate"
-      },
-      {
-        "id": "discard-cut-off",
-        "action": "vagrant.discard_aborted_saved",
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox"
-        ]
-      },
-      {
-        "id": "boot",
-        "argv": [
-          "vagrant",
-          "up",
-          "--no-provision",
-          "--provider",
-          "${run.provider}",
-          "web",
-          "api"
-        ],
-        "timeout_s": 3600
-      }
-    ],
-    "provision": {
-      "all": [
-        {
-          "id": "provision",
-          "argv": [
-            "vagrant",
-            "provision",
-            "web",
-            "api"
-          ],
-          "timeout_s": 7200
-        }
-      ],
-      "machine": [
-        {
-          "id": "provision-machine",
-          "argv": [
-            "vagrant",
-            "provision",
-            "${machine}"
-          ],
-          "timeout_s": 7200
-        }
-      ]
-    },
-    "status": {
-      "id": "status",
-      "argv": [
-        "vagrant",
-        "status",
-        "--machine-readable"
-      ],
-      "timeout_s": 25,
-      "provider_timeout_s": {
-        "virtualbox": 100,
-        "hyperv": 150,
-        "vmware_esxi": 150
-      }
-    }
-  },
-  "ready": [
-    {
-      "kind": "step_ok",
-      "step": "up",
-      "means": "every VM booted and ran its provisioners, the controller's playbooks included"
-    },
-    {
-      "kind": "machines_running",
-      "machines": [
-        "web",
-        "api"
-      ]
-    }
-  ],
-  "outputs": [
-    {
-      "name": "web__http",
-      "description": "web's http (port 80).",
-      "role": "entry",
-      "sensitive": false,
-      "format": "http://${host.web}:${value}/",
-      "from": {
-        "kind": "published_port",
-        "machine": "web",
-        "port": "http"
-      }
-    }
-  ],
-  "checks": {
-    "protocol": "isoloom-check/1",
-    "setup": [
-      {
-        "id": "wake-controller",
-        "note": "Booting the setup machine for the checks…",
-        "action": "vagrant.wake_controller",
-        "timeout_s": 1800
-      }
-    ],
-    "runners": [
-      {
-        "id": "web",
-        "from": "from web",
-        "checks": [
-          {
-            "name": "api:8080 from web",
-            "kind": "http",
-            "wait_s": 30,
-            "derived": true
-          },
-          {
-            "name": "api:8081 from web",
-            "kind": "http",
-            "wait_s": 30,
-            "derived": true
-          }
-        ],
-        "step": {
-          "id": "check-web",
-          "argv": [
-            "vagrant",
-            "provision",
-            "web",
-            "--provision-with",
-            "checks"
-          ],
-          "timeout_s": 150
-        }
-      },
-      {
-        "id": "api",
-        "from": "from api",
-        "checks": [
-          {
-            "name": "web:80 from api",
-            "kind": "http",
-            "wait_s": 30,
-            "derived": true
-          }
-        ],
-        "step": {
-          "id": "check-api",
-          "argv": [
-            "vagrant",
-            "provision",
-            "api",
-            "--provision-with",
-            "checks"
-          ],
-          "timeout_s": 105
-        }
-      },
-      {
-        "id": "isoloom-controller",
-        "from": "from the environment's networks",
-        "checks": [
-          {
-            "name": "checks/web-answers.sh",
-            "kind": "script",
-            "wait_s": 60,
-            "derived": false
-          },
-          {
-            "name": "checks/api-answers.sh",
-            "kind": "script",
-            "wait_s": 60,
-            "derived": false
-          }
-        ],
-        "step": {
-          "id": "check-isoloom-controller",
-          "argv": [
-            "vagrant",
-            "provision",
-            "isoloom-controller",
-            "--provision-with",
-            "checks"
-          ],
-          "timeout_s": 210
-        }
-      }
-    ],
-    "teardown": [
-      {
-        "id": "park-controller",
-        "note": "Powering off the setup machine (it comes back for provisioning and checks)…",
-        "action": "vagrant.park_controller",
-        "timeout_s": 300,
-        "when": "always",
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox",
-          "vmware_desktop",
-          "hyperv",
-          "parallels",
-          "libvirt",
-          "utm",
-          "vmware_esxi"
-        ]
-      }
-    ]
-  },
-  "recovery": {
-    "leftovers": [
-      "virtualbox_name_taken",
-      "machine_locked",
-      "other_provider"
-    ],
-    "steps": [
-      {
-        "id": "destroy",
-        "note": "Clearing what an earlier run left, then starting again…",
-        "argv": [
-          "vagrant",
-          "destroy",
-          "--force"
-        ],
-        "timeout_s": 180
-      },
-      {
-        "id": "orphans",
-        "action": "vagrant.remove_orphans",
-        "when": "always",
-        "failure": "tolerate",
-        "providers": [
-          "virtualbox",
-          "parallels"
-        ]
-      },
-      {
-        "id": "reset",
-        "action": "vagrant.reset_state"
-      }
-    ],
-    "retries": 1
-  }
-}

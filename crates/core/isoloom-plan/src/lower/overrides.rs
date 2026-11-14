@@ -115,6 +115,7 @@ pub(super) fn vm_image(source: &syntax::Spec, name: &str) -> Option<VmImage> {
         image.box_server_url.clone_from(&v.box_server_url);
         image.qemu = v.boxes.as_ref().and_then(|b| b.qemu.clone());
         image.hyperv = v.boxes.as_ref().and_then(|b| b.hyperv.clone());
+        image.utm = v.boxes.as_ref().and_then(|b| b.utm.clone());
         image.winrm = v.winrm;
         image.winssh = v.winssh;
     }

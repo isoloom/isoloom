@@ -4,31 +4,31 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
 ---
     # This computer's folders (`host_folders`), both ways: each provider's own shared folder.
     m.vm.provider "virtualbox" do |_, o|
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "virtualbox", create: true, mount_options: ["dmode=0775", "fmode=0664"]
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "virtualbox", create: true, mount_options: ["ro"]
       o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "virtualbox", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtualbox", create: true, mount_options: ["dmode=0775", "fmode=0664"]
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtualbox", create: true, mount_options: ["ro"]
     end
     m.vm.provider "vmware_desktop" do |_, o|
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "vmware", create: true
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "vmware", create: true, mount_options: ["ro"]
       o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "vmware", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "vmware", create: true
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "vmware", create: true, mount_options: ["ro"]
     end
     m.vm.provider "parallels" do |_, o|
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "parallels", create: true
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "parallels", create: true, mount_options: ["ro"]
       o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "parallels", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "parallels", create: true
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "parallels", create: true, mount_options: ["ro"]
     end
     m.vm.provider "libvirt" do |v, o|
       v.memorybacking :access, mode: "shared"
       v.memorybacking :source, type: "memfd"
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "virtiofs", create: true
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "virtiofs", create: true, mount_opts: "ro"
       o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "virtiofs", create: true, mount_opts: "ro"
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtiofs", create: true
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtiofs", create: true, mount_opts: "ro"
     end
     m.vm.provider "utm" do |_, o|
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "utm", create: true
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "utm", create: true, mount_options: ["ro"]
       o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "utm", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "utm", create: true
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "utm", create: true, mount_options: ["ro"]
     end
     m.trigger.before :up do |t|
       t.ruby do |_, machine|

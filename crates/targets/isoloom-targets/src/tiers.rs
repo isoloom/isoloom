@@ -270,8 +270,8 @@ pub fn of(entries: &[TierEntry], target: Target) -> Vec<&TierEntry> {
 }
 
 /// The Vagrant providers the Vagrantfile has a block for, as `vagrant up --provider` names them,
-/// in the order a runner offers them (no UTM: it gives a VM no private network).
-pub(crate) const VAGRANT_PROVIDERS: [&str; 7] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "vmware_esxi"];
+/// in the order a runner offers them.
+pub(crate) const VAGRANT_PROVIDERS: [&str; 8] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "utm", "vmware_esxi"];
 
 /// The clouds `cloud-services` reads (`cloud.provider`).
 const CLOUD_SERVICES: [&str; 3] = ["aws", "azure", "gcp"];

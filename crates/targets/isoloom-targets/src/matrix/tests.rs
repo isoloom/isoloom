@@ -222,8 +222,7 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
 }
 
 /// A column that generates nothing has no place in the matrix nor a tier: a provider or cloud
-/// every row refuses isn't a way to run an environment. `vagrant/utm` was such a column (UTM
-/// gives a VM no private network, and every machine is on one) and sat at tier 2.
+/// every row refuses isn't a way to run an environment.
 #[test]
 fn every_column_generates_some_row() {
     let m = built();
