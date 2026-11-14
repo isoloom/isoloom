@@ -294,13 +294,13 @@ const DEV_FOLDERS: [&str; 2] = ["adr", "dev"];
 
 /// Whether `text` at byte `at` starts a word (no letter or digit just before it).
 fn starts_word(text: &str, at: usize) -> bool {
-    !text[..at].chars().next_back().is_some_and(char::is_alphanumeric)
+    !text.get(..at).and_then(|s| s.chars().next_back()).is_some_and(char::is_alphanumeric)
 }
 
 /// Whether `marker`, found in `text` at byte `at`, is whole words there: a word starts at it and,
 /// when it ends with a letter, a word (or its plural) ends with it.
 fn is_whole(text: &str, at: usize, marker: &str) -> bool {
-    let rest = &text[at + marker.len()..];
+    let rest = text.get(at + marker.len()..).unwrap_or_default();
     let rest = rest.strip_prefix('s').unwrap_or(rest);
     let ends = !marker.ends_with(char::is_alphanumeric) || !rest.starts_with(char::is_alphanumeric);
     starts_word(text, at) && ends
@@ -316,18 +316,19 @@ fn dev_markers(text: &str) -> Vec<String> {
         .map(|m| (*m).to_owned())
         .collect();
     for (at, _) in lower.match_indices("adr") {
-        let rest = &lower[at + 3..];
-        let number = rest.strip_prefix([' ', '-']).unwrap_or_default();
-        if starts_word(&lower, at) && number.len() >= 4 && number[..4].bytes().all(|b| b.is_ascii_digit()) {
-            found.push(format!("adr {}", &number[..4]));
+        let rest = lower.get(at + 3..).unwrap_or_default();
+        let number = rest.strip_prefix([' ', '-']).and_then(|n| n.get(..4)).unwrap_or_default();
+        if starts_word(&lower, at) && number.len() == 4 && number.bytes().all(|b| b.is_ascii_digit()) {
+            found.push(format!("adr {number}"));
         }
     }
     for kind in ["/blob/", "/tree/"] {
         for (at, _) in lower.match_indices(kind) {
-            let rest = &lower[at + kind.len()..];
+            let rest = lower.get(at + kind.len()..).unwrap_or_default();
             let hex = rest.bytes().take_while(u8::is_ascii_hexdigit).count();
-            if (7..=40).contains(&hex) && rest[hex..].starts_with('/') {
-                found.push(format!("a link pinned to commit {}", &rest[..hex]));
+            let (commit, after) = rest.split_at_checked(hex).unwrap_or_default();
+            if (7..=40).contains(&hex) && after.starts_with('/') {
+                found.push(format!("a link pinned to commit {commit}"));
             }
         }
     }
