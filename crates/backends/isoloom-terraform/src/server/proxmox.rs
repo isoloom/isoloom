@@ -222,7 +222,7 @@ fn guests(env: &Environment, module: &mut Module) {
 /// Each Linux VM's readiness wait, then the controller's (`crate::ready`): Terraform signs in
 /// through the router as `isoloom` and waits for the set-up cloud-init runs. The machines it
 /// waits for.
-fn waits(env: &Environment, m: &mut Module) -> Vec<String> {
+fn waits(env: &Environment, module: &mut Module) -> Vec<String> {
     let mut waited = Vec::new();
     let mut wait = |name: &str, id: &str, at: std::net::Ipv4Addr, within_s: u32, reboots: usize| {
         let at = crate::machine::provisioner::Connection::SshVia {
@@ -230,7 +230,7 @@ fn waits(env: &Environment, m: &mut Module) -> Vec<String> {
             user: crate::machine::USER.to_owned(),
             bastion: reference("local.router_address"),
         };
-        m.block(
+        module.block(
             crate::ready::Wait {
                 machine: name.to_owned(),
                 connection: at,

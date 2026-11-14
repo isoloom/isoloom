@@ -16,9 +16,9 @@ pub(super) fn declared(spec: &Spec, problems: &mut Problems) {
 
 /// Every problem of the LANs split into VLANs. Lowering refuses on the first of them and leaves
 /// the VLANs unflattened, so the spec validated here still has them and the author sees them all.
-pub(super) fn vlans(spec: &Spec, p: &mut Problems) {
+pub(super) fn vlans(spec: &Spec, problems: &mut Problems) {
     for found in crate::vlans::problems(spec) {
-        p.0.push(super::Problem::new(found.code, found.path.to_string(), found.reason));
+        problems.0.push(super::Problem::new(found.code, found.path.to_string(), found.reason));
     }
 }
 
