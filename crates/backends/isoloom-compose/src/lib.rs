@@ -1,6 +1,5 @@
 //! Isoloom's Docker Compose backend: the Compose file the `docker` and `hosted` targets run (and
-//! the Docker-on-a-VM targets carry), at `.isoloom/docker/compose.yml`, with the files it mounts
-//! and the `docker` target's run manifest.
+//! the Docker-on-a-VM targets carry), at `.isoloom/docker/compose.yml`, with the files it mounts.
 //!
 //! - Each network becomes a Compose network with its subnet (Docker at `.1`, or at the last
 //!   address when a machine is the network's gateway); `internet: false` makes it `internal`
@@ -84,5 +83,5 @@ mod testing;
 mod trunks;
 
 pub use backend::{ComposeBackend, capabilities_on_a_vm};
-pub use in_vm::{VmStart, vm_start};
 pub use error::{Error, Result};
+pub use in_vm::{VmStart, vm_start};

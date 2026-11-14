@@ -57,7 +57,7 @@ pub struct Spec {
     /// The version of the `isoloom.yml` format the file is written in: `1`, the only one so far.
     pub version: u32,
     /// The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs,
-    /// networks and cloud resources, and the environment in the run manifest.
+    /// networks and cloud resources.
     pub name: String,
     /// The environment's networks, by name: each an address block the machines on it share.
     #[serde(default)]

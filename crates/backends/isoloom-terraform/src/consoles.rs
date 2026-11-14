@@ -10,8 +10,8 @@
 //!   port = 3389, host, via, user }`: `host` the VM's address as the jump host reaches it, `via`
 //!   the jump host's address this computer reaches, `user` the SSH user on the jump host.
 //!
-//! On a cloud the jump host is a Linux machine of the lab on a network the Windows one is on: the
-//! first, in the lab's order, then the controller (on every network); a Windows VM no Linux
+//! On a cloud the jump host is a Linux machine of the environment on a network the Windows one is on: the
+//! first, in the environment's order, then the controller (on every network); a Windows VM no Linux
 //! machine shares a network with has no entry (nothing refused: its Remote Desktop is only out
 //! of the tunnel's reach). On a server it is the router, on every network. With no entry, the
 //! `consoles` output is left out: a present one is the whole list.
@@ -86,7 +86,7 @@ pub(crate) fn outputs(env: &Environment, module: &mut Module, tunnel: &dyn Fn(Vm
     }
 }
 
-/// The first of `guests` (Linux machines by name, in the lab's order; `controller`, when given,
+/// The first of `guests` (Linux machines by name, in the environment's order; `controller`, when given,
 /// last and on every network) on a network `vm` is on, with `vm`'s address there.
 pub(crate) fn jump<'g>(env: &Environment, vm: Vm<'_>, guests: &[&'g str], controller: Option<&'g str>) -> Option<(&'g str, String)> {
     let shared = |guest: &str| {

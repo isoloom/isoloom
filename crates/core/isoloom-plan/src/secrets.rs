@@ -37,8 +37,7 @@ pub struct SecretFile {
 
 impl SecretFile {
     /// The name its value is delivered and kept under on a VM (`/var/lib/isoloom/secrets/<name>`):
-    /// an input's file, the input's own name (the slot a run manifest gives the input); a
-    /// secret, its name.
+    /// an input's file, the input's own name; a secret, its name.
     #[must_use]
     pub fn kept(&self) -> &str {
         match &self.source {

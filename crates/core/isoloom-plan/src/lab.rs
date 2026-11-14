@@ -169,8 +169,7 @@ impl Lab {
 
     /// The lab with the region each cloud's module defaults to, by the cloud's id (`aws`), as the
     /// person's defaults set it (`isoloom_spec::defaults::Defaults::regions`): written into the
-    /// module's `region` variable and the run manifest's `region` param alike. A cloud left out
-    /// keeps its own.
+    /// module's `region` variable. A cloud left out keeps its own.
     #[must_use]
     pub fn with_regions(mut self, regions: BTreeMap<String, String>) -> Lab {
         self.regions = regions;

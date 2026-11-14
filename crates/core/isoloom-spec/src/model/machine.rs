@@ -266,7 +266,7 @@ pub struct Machine {
 #[serde(deny_unknown_fields)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "the lowered form keeps a port's switches as the spec writes them (`http`, `tls`, `fixed`, `dormant`); the run manifest joins `http` and `tls` with the protocol into one `PortKind`"
+    reason = "the lowered form keeps a port's switches as the spec writes them (`http`, `tls`, `fixed`, `dormant`), each a choice of its own"
 )]
 pub struct Port {
     /// The port the machine listens on (what the other machines and the

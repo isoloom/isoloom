@@ -19,7 +19,7 @@ use crate::machine::controller;
 use crate::module::output;
 use crate::seal;
 
-/// The router's name: its host name, its VM's and snippet's, and its machine in a run manifest.
+/// The router's name: its host name, its VM's and snippet's, and its machine in the module's outputs.
 /// A machine of the environment can't take it (`isoloom-` names are Isoloom's own).
 pub(crate) const NAME: &str = "isoloom-router";
 

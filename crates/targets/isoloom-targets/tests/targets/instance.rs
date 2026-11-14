@@ -117,8 +117,8 @@ fn an_instance_that_cant_be_made_is_its_own_error_not_the_target_refusing_the_la
 
 /// The names a VM target's Vagrantfile gives on the host for instance `n` of the environment
 /// `lab` (none: the environment as written), as written in it, the copy's key still to read
-/// (`#{ISOLOOM_KEY}`): the libvirt prefix and the internal networks. The run manifest names none:
-/// each holds the copy's key, which only the Vagrantfile reads.
+/// (`#{ISOLOOM_KEY}`): the libvirt prefix and the internal networks. Each holds the copy's
+/// key, which only the Vagrantfile reads.
 fn host_names(lab: &isoloom_targets::Lab, target: Target, n: Option<u8>) -> Outcome<std::collections::BTreeSet<String>> {
     let files = match n {
         Some(n) => generate_instance(lab, target, n)?,

@@ -94,8 +94,8 @@ impl Parts {
 }
 
 /// A server module's start: the `terraform` block requiring the server's providers (`own`, and
-/// `random` for the Windows machines' password), the server's `variables` (its run manifest's
-/// params and slots too), the values given at launch (`inputs`), then its `provider`.
+/// `random` for the Windows machines' password), the server's `variables` (the values a runner
+/// passes at launch too), the values given at launch (`inputs`), then its `provider`.
 pub(crate) fn head(env: &Environment, module: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
     let mut required = own.to_vec();
     if windows::any(env) {

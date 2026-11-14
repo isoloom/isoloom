@@ -74,7 +74,7 @@ fn applier(vnets: Vec<Expression>) -> Block {
         .build()
 }
 
-/// The module's variables, the run manifest's params and slots among them.
+/// The module's variables, the values a runner passes at launch among them.
 pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     // No `isoloom_sealed` variable: the router's snippet never depends on it (a changed snippet
     // would recreate the router VM), so the seal is applied live by the manifest's seal-reload
