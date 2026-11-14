@@ -20,6 +20,11 @@
 //! [`QualityConfig`]: what differs between the repositories (the jscpd temporary folder's
 //! prefix, the command named in the "went down" hint, and where the baseline lives).
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the ratchet drives its tools (cargo clippy, jscpd, cargo machete): this crate is their adapter"
+)]
+
 mod baseline;
 mod clippy;
 mod dup;

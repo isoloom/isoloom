@@ -6,6 +6,8 @@
 //! `vendor/bases/index.yml`; the fetched Dockerfiles' own bases follow, until every chain ends
 //! in the matrix or can't be fetched (said, never guessed).
 
+#![expect(clippy::disallowed_methods, reason = "the adapter of `git`: the one module that runs it")]
+
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

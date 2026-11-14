@@ -19,3 +19,11 @@ doc-valid-idents = [
     "OrbStack", "PCIe", "SeaBIOS", "SELinux", "StefanScherer", "VirtIO", "VirtualBox", "VMware", "VNet",
     "WinFsp", "WinRM", "..",
 ]
+
+# A process starts only in an adapter: the module that owns the tool it runs (the CLI's git,
+# graph renderer and Ruby; the development tasks; the tests' helpers). Isoloom generates files and
+# runs nothing, so any other `Command::new` is a tool call outside its adapter: an
+# `#[expect(clippy::disallowed_methods, reason = "…")]` names the adapter that owns it.
+disallowed-methods = [
+    { path = "std::process::Command::new", reason = "start a process only in the adapter module that owns its tool (clippy.toml)" },
+]

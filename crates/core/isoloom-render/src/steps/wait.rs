@@ -1,6 +1,8 @@
 //! Waiting for a machine a VM depends on ([`Step::WaitFor`](isoloom_plan::Step::WaitFor)):
 //! until it answers on every port it serves, up to [`TIMEOUT`] seconds.
 
+use isoloom_spec::shell::quote;
+
 use crate::powershell;
 
 /// Seconds a machine waits for one it depends on.
@@ -11,7 +13,12 @@ const TIMEOUT: u32 = 900;
 pub(super) fn linux(host: &str, ports: &[u16]) -> String {
     let probes = ports
         .iter()
-        .map(|p| format!("(bash -c '</dev/tcp/{host}/{p}' 2>/dev/null || nc -z -w 2 {host} {p} 2>/dev/null)"))
+        .map(|p| {
+            format!(
+                "(bash -c {} 2>/dev/null || nc -z -w 2 {host} {p} 2>/dev/null)",
+                quote(&format!("</dev/tcp/{host}/{p}"))
+            )
+        })
         .collect::<Vec<_>>()
         .join(" && ");
     format!(

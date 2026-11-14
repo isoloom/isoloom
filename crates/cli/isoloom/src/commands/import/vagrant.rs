@@ -1,5 +1,10 @@
 //! `isoloom import vagrant`: a draft from a Vagrantfile, run against a stand-in `Vagrant` module.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the adapter of Ruby, which runs the Vagrantfile: the one module that runs it"
+)]
+
 use std::path::{Path, PathBuf};
 
 use isoloom_import::vagrant::Recording;

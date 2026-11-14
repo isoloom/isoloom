@@ -6,6 +6,9 @@
 //! serde-only contract the runner reads too, whose names the spec uses), and nothing depends on
 //! the xtask (which may use
 //! any crate: the catalogue's refresh reads the catalogue's types).
+//!
+//! The product boundary too: no crate of the runner (`isothrum`, `isothrum-*`) is anywhere in the
+//! resolved graph, directly or transitively.
 
 use serde_json::Value;
 
@@ -156,6 +159,45 @@ pub(crate) fn violations(metadata: &Value) -> Vec<String> {
     problems
 }
 
+/// The other product, the runner: Isoloom converts specs into files and never builds on it, not
+/// even through another crate (it is Isothrum that reads Isoloom's output).
+const RUNNER_PREFIX: &str = "isothrum";
+
+/// Every crate of the runner (`isothrum`, `isothrum-*`) in the resolved dependency graph of
+/// `cargo metadata` (with its dependencies, so the transitive ones count), each with the crates
+/// that pull it in.
+pub(crate) fn runner_crates(metadata: &Value) -> Vec<String> {
+    let id_name = |id: &str| {
+        metadata["packages"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|p| p["id"].as_str() == Some(id))
+            .and_then(|p| p["name"].as_str())
+            .unwrap_or(id)
+            .to_owned()
+    };
+    let nodes = metadata["resolve"]["nodes"].as_array().cloned().unwrap_or_default();
+    let mut found = Vec::new();
+    for node in &nodes {
+        let id = node["id"].as_str().unwrap_or("");
+        let name = id_name(id);
+        if name != RUNNER_PREFIX && !name.starts_with(&format!("{RUNNER_PREFIX}-")) {
+            continue;
+        }
+        let by: Vec<String> = nodes
+            .iter()
+            .filter(|n| n["dependencies"].as_array().into_iter().flatten().any(|d| d.as_str() == Some(id)))
+            .map(|n| id_name(n["id"].as_str().unwrap_or("")))
+            .collect();
+        found.push(format!(
+            "{name} is in Isoloom's dependency graph (pulled in by {}): Isoloom never depends on the runner",
+            if by.is_empty() { "nothing named".to_owned() } else { by.join(", ") }
+        ));
+    }
+    found
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,6 +319,57 @@ mod tests {
         let metadata: Value = serde_json::from_slice(&out.stdout).expect("cargo metadata prints JSON");
         assert!(metadata["packages"].as_array().is_some_and(|p| p.len() > 10), "the workspace's crates");
         let found = violations(&metadata);
+        assert!(found.is_empty(), "{}", found.join("\n"));
+    }
+
+    fn resolved(packages: &[(&str, &[&str])]) -> Value {
+        let pkgs: Vec<Value> = packages
+            .iter()
+            .map(|(n, _)| serde_json::json!({ "id": format!("{n} 1.0.0"), "name": n }))
+            .collect();
+        let nodes: Vec<Value> = packages
+            .iter()
+            .map(|(n, deps)| {
+                let deps: Vec<String> = deps.iter().map(|d| format!("{d} 1.0.0")).collect();
+                serde_json::json!({ "id": format!("{n} 1.0.0"), "dependencies": deps })
+            })
+            .collect();
+        serde_json::json!({ "packages": pkgs, "resolve": { "nodes": nodes } })
+    }
+
+    #[test]
+    fn a_runner_crate_anywhere_in_the_graph_is_named_with_who_pulls_it_in() {
+        let clean = resolved(&[("isoloom", &["isoloom-spec"]), ("isoloom-spec", &["serde"]), ("serde", &[])]);
+        assert!(runner_crates(&clean).is_empty());
+        // Transitive: isoloom → some-lib → isothrum-core.
+        let pulled = resolved(&[
+            ("isoloom", &["some-lib"]),
+            ("some-lib", &["isothrum-core"]),
+            ("isothrum-core", &[]),
+            ("isothrum", &[]),
+        ]);
+        let found = runner_crates(&pulled);
+        assert_eq!(found.len(), 2, "{found:?}");
+        assert!(found[0].starts_with("isothrum-core is in") && found[0].contains("some-lib"), "{found:?}");
+        // A name that only starts like it is not the runner.
+        assert!(runner_crates(&resolved(&[("isothrumbus", &[])])).is_empty());
+    }
+
+    /// The product boundary: nothing in Isoloom's resolved graph is the runner's, not even
+    /// transitively.
+    #[test]
+    fn isoloom_never_depends_on_the_runner() {
+        let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../Cargo.toml");
+        let out = std::process::Command::new(cargo)
+            .args(["metadata", "--format-version", "1", "--offline", "--manifest-path"])
+            .arg(manifest)
+            .output()
+            .expect("cargo metadata runs");
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        let metadata: Value = serde_json::from_slice(&out.stdout).expect("cargo metadata prints JSON");
+        assert!(metadata["resolve"]["nodes"].as_array().is_some_and(|n| n.len() > 50), "the resolved graph");
+        let found = runner_crates(&metadata);
         assert!(found.is_empty(), "{}", found.join("\n"));
     }
 }

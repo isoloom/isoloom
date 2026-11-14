@@ -40,6 +40,14 @@
 //! assert!(ready.ends_with("echo ready > /var/lib/isoloom/ready\n"));
 //! ```
 
+#![cfg_attr(
+    test,
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
 pub mod backend;
 pub mod boot;
 pub mod checks;
