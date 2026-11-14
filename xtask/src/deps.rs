@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn a_runner_crate_anywhere_in_the_graph_is_named_with_who_pulls_it_in() {
         let clean = resolved(&[("isoloom", &["isoloom-spec"]), ("isoloom-spec", &["serde"]), ("serde", &[])]);
-        assert!(runner_crates(&clean).is_empty());
+        assert_eq!(runner_crates(&clean), Vec::<String>::new());
         // Transitive: isoloom → some-lib → isothrum-core.
         let pulled = resolved(&[
             ("isoloom", &["some-lib"]),
@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(found.len(), 2, "{found:?}");
         assert!(found[0].starts_with("isothrum-core is in") && found[0].contains("some-lib"), "{found:?}");
         // A name that only starts like it is not the runner.
-        assert!(runner_crates(&resolved(&[("isothrumbus", &[])])).is_empty());
+        assert_eq!(runner_crates(&resolved(&[("isothrumbus", &[])])), Vec::<String>::new());
     }
 
     /// The product boundary: nothing in Isoloom's resolved graph is the runner's, not even

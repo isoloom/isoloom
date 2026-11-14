@@ -10,7 +10,7 @@
 //! - a tool's JSON output is parsed only in the adapter that runs the tool.
 //!
 //! The product's sources are the crates' `src/` folders, tests left out (`tests/`, `tests.rs`, a
-//! file's `#[cfg(test)] mod tests`, the tests' helpers).
+//! file from its first `#[cfg(test)]` on, the tests' helpers).
 
 use std::path::{Path, PathBuf};
 
@@ -105,7 +105,7 @@ fn sources(extensions: &[&str]) -> Vec<Source> {
                 return None;
             }
             let text = std::fs::read_to_string(&f).ok()?;
-            let text = text.split("#[cfg(test)]\nmod tests").next().unwrap_or_default().to_owned();
+            let text = text.split("#[cfg(test)]").next().unwrap_or_default().to_owned();
             Some(Source { path, text })
         })
         .collect();
@@ -214,7 +214,7 @@ mod tests {
         );
         let mut wrong = Vec::new();
         for s in &sources {
-            let rust = s.path.ends_with(".rs");
+            let rust = Path::new(&s.path).extension().is_some_and(|e| e == "rs");
             let chains: Vec<String> = s
                 .text
                 .lines()
@@ -266,6 +266,6 @@ mod tests {
     fn the_output_rule_fires_on_json_read_from_stdout() {
         let code = "let out = cmd.output()?;\nlet v: Value = serde_json::from_slice(&out.stdout)?;\n";
         assert_eq!(parses_tool_output(code), [2]);
-        assert!(parses_tool_output("let v: Value = serde_json::from_str(text)?;\n").is_empty());
+        assert_eq!(parses_tool_output("let v: Value = serde_json::from_str(text)?;\n"), Vec::<usize>::new());
     }
 }
