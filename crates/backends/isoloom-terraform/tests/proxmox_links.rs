@@ -147,11 +147,12 @@ fn an_lxc_machine_is_a_container_from_its_oci_image() -> Outcome {
 fn an_lxc_container_is_the_size_its_run_manifest_says() -> Outcome {
     use isoloom_render::backend::Backend as _;
     let tf = proxmox(LXC)?;
-    let web = testing::resource_body(&tf, "resource \"proxmox_virtual_environment_container\" \"web\"");
-    // A container's default size, as in the run manifest: 1 CPU, 512 MB, 5 GB.
-    for (block, line) in [("cpu", "cores = 1"), ("memory", "dedicated = 512"), ("disk", "size         = 5")] {
-        let body = web.split(&format!("{block} {{")).nth(1).unwrap_or_default();
-        assert!(body.split('}').next().unwrap_or_default().contains(line), "{block}: {web}");
+    let web = isoloom_test_support::hcl_resource(&tf, "proxmox_virtual_environment_container", "web");
+    // A container's default size, as in the run manifest: 1 CPU, 512 MB, 5 GB, each in its block.
+    for (block, key, value) in [("cpu", "cores", "1"), ("memory", "dedicated", "512"), ("disk", "size", "5")] {
+        let blocks = isoloom_test_support::hcl_blocks(&web, block, &[]);
+        let values: Vec<String> = blocks.iter().flat_map(|b| isoloom_test_support::hcl_values(b.body(), key)).collect();
+        assert_eq!(values, [value], "{block}.{key}: {web:?}");
     }
     let placed = ProxmoxBackend.run_manifests(&testing::plan(LXC, Target::Proxmox)?)?;
     let machine = placed
