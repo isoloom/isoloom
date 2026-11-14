@@ -64,7 +64,7 @@ fn the_checks_are_helm_tests_and_the_scripts_come_from_the_chart() -> Outcome {
 }
 
 #[test]
-fn a_missing_script_fails_with_the_read_error() -> Outcome {
+fn a_missing_script_fails_saying_which_and_why_once() -> Outcome {
     let (dir, lab, files) = kubernetes("dmz-jump")?;
     assert_eq!(project_copies(&lab, &files, &dir).unwrap().len(), 2, "its two check scripts");
     let elsewhere = dir.join("a folder without the scripts");
@@ -75,12 +75,15 @@ fn a_missing_script_fails_with_the_read_error() -> Outcome {
         chain.push(cause.to_string());
         next = cause.source();
     }
-    let chain = chain.join(": ");
-    // The system's own words for a file in a folder that isn't there: "No such file or
-    // directory" on Unix, "The system cannot find the path specified." on Windows.
-    let missing = std::fs::read(elsewhere.join("checks").join("any.sh")).map_or_else(|read| read.to_string(), |_| String::new());
-    assert!(missing.contains("os error"), "the folder is missing: {missing}");
-    assert!(chain.contains("checks/") && chain.contains(&missing), "{chain}");
+    // Each cause says its own part, so the chain names the script and why once each.
+    assert_eq!(
+        chain,
+        [
+            "a project file the output copies can't be read",
+            "checks/dmz-reachable.sh (copied into the Helm chart)",
+            "it doesn't exist in the project folder",
+        ],
+    );
     Ok(())
 }
 
