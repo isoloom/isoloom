@@ -105,6 +105,13 @@ fn about_storage() -> Vec<(Requirement, &'static str)> {
         ),
         (Requirement::ExistingHostFiles { machine: web() }, "machine `web` has `files`"),
         (
+            Requirement::ExistingHostSettings {
+                machine: web(),
+                field: "sysctls",
+            },
+            "machine `web` sets `sysctls`: Isoloom doesn't set up a host that already exists",
+        ),
+        (
             Requirement::ExistingHostScriptCheck { check: "c1".into() },
             "check \"c1\" runs a project script, and an existing host has no copy of the project",
         ),
