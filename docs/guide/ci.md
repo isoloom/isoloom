@@ -57,14 +57,15 @@ Validate every spec of a repository without writing anything:
 
 ## Run an environment in a job
 
-Generate the files in the job, then hand them to a runner:
+Generate the files in the job, then hand the target's folder to a runner (Isothrum runs the
+native files as they are):
 
 ```yaml
   - run: isoloom generate --target docker
-  - run: isothrum up . --target docker
+  - run: isothrum up .isoloom/docker
   - run: your-tests-against-the-environment
   - if: always()
-    run: isothrum down . --target docker
+    run: isothrum down .isoloom/docker
 ```
 
 Isothrum's own [CI guide](https://github.com/Isothrum/isothrum/blob/main/docs/how-to/ci.md)
