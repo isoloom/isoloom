@@ -124,9 +124,9 @@ fn the_provision_script_can_be_limited_to_machines() -> Outcome {
     let all = isoloom_render::controller::provision_script(&spec.spec(), &[]);
     // (The retry of unreachable hosts limits itself, from the retry file: only the runs count.)
     let runs = |s: &str| s.lines().filter(|l| l.starts_with("run_play ")).map(String::from).collect::<Vec<_>>();
-    assert!(runs(&all).iter().all(|l| !l.contains("--limit")), "{all}");
+    assert!(!runs(&all).is_empty() && runs(&all).iter().all(|l| !l.contains("--limit")), "{all}");
     let some = isoloom_render::controller::provision_script(&spec.spec(), &["web".into(), "cache".into()]);
-    assert!(runs(&some).iter().all(|l| l.contains(" --limit 'web,cache' ")), "{some}");
+    assert!(!runs(&some).is_empty() && runs(&some).iter().all(|l| l.contains(" --limit 'web,cache' ")), "{some}");
     Ok(())
 }
 

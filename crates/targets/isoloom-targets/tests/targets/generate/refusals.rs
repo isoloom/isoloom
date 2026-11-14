@@ -72,7 +72,7 @@ fn refusal_of_an_undeclared_network_does_not_panic() -> Outcome {
 #[test]
 fn checks_plan_of_an_undeclared_network_does_not_panic() -> Outcome {
     let planned = isoloom_plan::checks::plan(&lab(UNDECLARED_NETWORK)?.spec());
-    assert!(planned.iter().all(|c| !c.name.is_empty()), "{planned:?}");
+    assert!(!planned.is_empty() && planned.iter().all(|c| !c.name.is_empty()), "{planned:?}");
     Ok(())
 }
 
