@@ -406,16 +406,9 @@ pub struct Resources {
     pub disk_gb: Option<u32>,
 }
 
-/// A machine's address on a network, as written: one last octet, or several (the first the
-/// primary one).
-#[derive(JsonSchema)]
-#[serde(untagged)]
-pub enum Octets {
-    /// The last octet of its address.
-    One(u8),
-    /// Several addresses on the network, the first its primary one.
-    Several(Vec<u8>),
-}
+/// A machine's address on a network, as written: the spec's own type, which the model's schema
+/// names too.
+pub use crate::syntax::Octets;
 
 /// A text, a number or a boolean, read as text (environment values, sysctl values).
 #[derive(JsonSchema)]
