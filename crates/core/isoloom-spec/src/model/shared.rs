@@ -182,7 +182,7 @@ pub struct SharedVolume {
 }
 
 /// A process limit (see [`Machine::ulimits`]): one value for the soft and hard limits, or both.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Ulimit {
     /// One value for both the soft and the hard limit.
@@ -194,6 +194,34 @@ pub enum Ulimit {
         /// The ceiling a process may raise its soft limit to.
         hard: u64,
     },
+}
+
+/// A limit's two values, as `{ soft, hard }` writes them.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UlimitPair {
+    soft: u64,
+    hard: u64,
+}
+
+impl<'de> Deserialize<'de> for Ulimit {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Ulimit, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = Ulimit;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a number for both limits (65536), or `{ soft, hard }`")
+            }
+            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Ulimit, E> {
+                Ok(Ulimit::Both(n))
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<Ulimit, A::Error> {
+                let UlimitPair { soft, hard } = UlimitPair::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+                Ok(Ulimit::Pair { soft, hard })
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 impl Ulimit {
