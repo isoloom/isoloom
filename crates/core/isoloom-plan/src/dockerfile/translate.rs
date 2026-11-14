@@ -346,7 +346,7 @@ impl<'a> Run<'a> {
     /// The image `image_ref` (a `FROM` at `line` of `f`) as a VM: the matrix's entry, else a
     /// fetched Dockerfile translated first.
     fn base(&mut self, f: &File<'_>, line: &Line, image_ref: &str) -> Result<Image, Untranslatable> {
-        match matrix::of(image_ref, self.wanted) {
+        match matrix::of(image_ref) {
             Ok(mut base) => {
                 // A base that takes the VM's OS (kCTF's): the stages before made it.
                 if base.jail {

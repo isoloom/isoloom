@@ -1175,16 +1175,16 @@
                 "type": "object",
                 "description": "postgres's settings.",
                 "properties": {
-                  "database": {
-                    "type": "string",
-                    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
-                    "description": "The application database the image creates at first start.",
-                    "default": "app"
-                  },
                   "user": {
                     "type": "string",
                     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
                     "description": "The superuser the image creates at first start.",
+                    "default": "app"
+                  },
+                  "database": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
+                    "description": "The application database the image creates at first start.",
                     "default": "app"
                   },
                   "password": {
