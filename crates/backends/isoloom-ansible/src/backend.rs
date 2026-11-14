@@ -30,8 +30,30 @@ impl Backend for ExternalBackend {
     }
 
     fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
+        if let Some(what) = windows_secrets(env) {
+            return Err(RenderError::Unsupported {
+                target: Target::External,
+                what,
+            });
+        }
         Ok(render(env)?)
     }
+
+    /// The plan's refusal, then a Windows host's secret files.
+    fn refusal(&self, env: &Environment) -> Option<String> {
+        isoloom_plan::refusal(&env.requirements, &capabilities())
+            .map(|r| r.to_string())
+            .or_else(|| windows_secrets(env))
+    }
+}
+
+/// A Windows host that gets secret files: the play writes them with `ansible.builtin.copy`,
+/// which runs on Linux and other POSIX hosts only.
+fn windows_secrets(env: &Environment) -> Option<String> {
+    let (name, _) = env.machines.iter().find(|(_, m)| m.is_windows() && !m.secrets.is_empty())?;
+    Some(format!(
+        "machine `{name}` is Windows and gets secret files, which the `external` target writes with `ansible.builtin.copy` on Linux hosts only"
+    ))
 }
 
 /// What hosts that already exist can run. Provisioning runs from the project with the
@@ -54,8 +76,10 @@ fn capabilities() -> Capabilities {
         // The hosts are already on their networks, outside ones included.
         Feature::ExternalNetworks,
         Feature::BridgedNetworks,
-        // No secrets: no secret value goes into the generated files, and the target has no run
-        // manifest, so nothing would deliver one to a host.
+        // Secret files: `site.yml` delivers each from where `ansible-playbook` runs, a lookup of
+        // its source, never its value, in the generated files; as the owner the spec gives.
+        Feature::Secrets,
+        Feature::SecretOwners,
     ])
 }
 
@@ -154,14 +178,56 @@ mod tests {
         }
     }
 
+    /// A secret file reaches an existing host through `site.yml`: its value read where
+    /// `ansible-playbook` runs (an environment variable, a file, `vault`, `sops`), written at its
+    /// path with its owner and mode, the task out of the log; the files hold the lookup, never
+    /// the value.
     #[test]
-    fn a_secret_file_is_refused_not_dropped() {
+    fn a_secret_file_is_delivered_by_a_lookup_where_ansible_runs() {
         let env = environment(
-            "  a: { networks: { lab: 5 }, os: debian@12, files: [{ path: /run/secrets/api-key, secret: api-key }] }\ninputs: { TOKEN: { sensitive: true } }\nsecrets: { api-key: { env: TOKEN } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+            "  a: { networks: { lab: 5 }, os: debian@12, files: [{ path: /run/secrets/api-key, secret: api-key, uid: 33, mode: '0440' }, { path: /run/lab/token, input: TOKEN }, { path: /etc/db, secret: db }, { path: /etc/s, secret: s }] }\ninputs: { TOKEN: { sensitive: true } }\nsecrets: { api-key: { env: API_KEY }, db: { vault: 'secret/app#db_password' }, s: { sops: 'secrets.enc.yaml#db.password' } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        assert_eq!(ExternalBackend.refusal(&env), None);
+        let files = render(&env).expect("renders");
+        let site = files.iter().find(|f| f.path.ends_with("external/site.yml")).expect("site.yml");
+        let plays: serde_yaml_ng::Value = serde_yaml_ng::from_str(&site.contents).expect("YAML");
+        let tasks = &plays[0]["tasks"];
+        assert_eq!(plays[0]["name"], "Deliver a's secrets");
+        let copies: Vec<&serde_yaml_ng::Value> = tasks
+            .as_sequence()
+            .expect("tasks")
+            .iter()
+            .filter(|t| t.get("ansible.builtin.copy").is_some())
+            .collect();
+        assert_eq!(copies.len(), 4);
+        let key = copies[0];
+        assert_eq!(key["no_log"], true);
+        assert_eq!(key["ansible.builtin.copy"]["dest"], "/run/secrets/api-key");
+        assert_eq!(key["ansible.builtin.copy"]["owner"], "33");
+        assert_eq!(key["ansible.builtin.copy"]["mode"], "0440");
+        assert_eq!(
+            key["ansible.builtin.copy"]["content"],
+            "{{ lookup('ansible.builtin.env', isoloom_secret_env) }}"
+        );
+        assert_eq!(key["vars"]["isoloom_secret_env"], "API_KEY");
+        assert_eq!(copies[1]["vars"]["isoloom_secret_env"], "TOKEN");
+        assert_eq!(copies[1]["ansible.builtin.copy"]["mode"], "0400");
+        assert_eq!(copies[2]["vars"]["isoloom_secret_command"], "vault kv get -field='db_password' 'secret/app'");
+        assert_eq!(
+            copies[3]["vars"]["isoloom_secret_command"],
+            "sops -d --extract '[\"db\"][\"password\"]' {project}/'secrets.enc.yaml'"
+        );
+        assert!(!site.contents.contains("db_password\n"), "{}", site.contents);
+    }
+
+    #[test]
+    fn a_windows_hosts_secret_file_is_refused_not_dropped() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: windows-server@2022, files: [{ path: 'C:\\secrets\\key', secret: key }] }\nsecrets: { key: { env: KEY } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
         );
         let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
-        assert!(refusal.contains("nothing delivers them"), "{refusal}");
-        assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })));
+        assert!(refusal.contains("machine `a` is Windows and gets secret files"), "{refusal}");
+        assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Unsupported { .. })));
     }
 
     #[test]

@@ -15,6 +15,7 @@
 //! writes files. No vendor or `community.*` module is ever named (the maintainer's rule).
 
 mod role;
+mod secrets;
 mod services;
 mod task;
 mod tasks;
@@ -40,16 +41,19 @@ fn project_var(base: &str) -> String {
 
 /// The Ansible project for `env`, its files under `base` (`.isoloom/external`): `site.yml` running
 /// each host's role, the roles themselves, and `requirements.yml` when a role names a pinned
-/// collection. A host without a recipe (a bare user machine) gets no role and no play.
+/// collection. A host without a recipe (a bare user machine) gets no role and no play; one with
+/// secret files gets the play that delivers them first ([`secrets::play`]).
 pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<GeneratedFile>> {
     let configured: Vec<(String, Configured<'_>)> = hosts(env)
         .into_iter()
         .filter_map(|h| Some((h.name.to_owned(), Configured::of(env, h.name)?)))
         .collect();
-    if configured.is_empty() {
+    let project = task::jinja(&project_var(base));
+    let delivered: Vec<Value> = hosts(env).into_iter().filter_map(|h| secrets::play(env, h.name, &project)).collect();
+    if configured.is_empty() && delivered.is_empty() {
         return Ok(Vec::new());
     }
-    let mut out = vec![site(base, &configured)];
+    let mut out = vec![site(base, delivered, &configured)];
     for (name, c) in &configured {
         out.extend(role_files(c, &format!("{base}/roles/{}", role_name(name)))?);
     }
@@ -62,13 +66,14 @@ pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<Genera
     Ok(out)
 }
 
-/// `site.yml`: one play per configured host, applying its role as `isoloom` the host over the
-/// inventory, each play setting [`project_var`].
-fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
+/// `site.yml`: the plays that deliver the hosts' secret files (`delivered`), then one play per
+/// configured host, applying its role as `isoloom` the host over the inventory, each play setting
+/// [`project_var`].
+fn site(base: &str, delivered: Vec<Value>, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
     let project = project_var(base);
-    let plays: Vec<Value> = configured
-        .iter()
-        .map(|(name, _)| {
+    let plays: Vec<Value> = delivered
+        .into_iter()
+        .chain(configured.iter().map(|(name, _)| {
             json!({
                 "name": format!("Configure {name}"),
                 "hosts": name,
@@ -76,7 +81,7 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
                 "vars": { "isoloom_project": task::jinja(&project) },
                 "roles": [role_name(name)],
             })
-        })
+        }))
         .collect();
     GeneratedFile {
         path: format!("{base}/site.yml"),
