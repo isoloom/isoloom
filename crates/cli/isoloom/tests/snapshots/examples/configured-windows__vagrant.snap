@@ -1258,7 +1258,7 @@ Vagrant.configure("2") do |config|
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "10.67.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-windows-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-configured-windows-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
-    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("iis/http", 8087), host_ip: "127.0.0.1"
+    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("iis/http", 8087), host_ip: "127.0.0.1", auto_correct: true
     m.vm.provider "virtualbox" do |v|
       v.name = "configured-windows-#{ISOLOOM_KEY} - iis"
       v.linked_clone = true
@@ -2280,7 +2280,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "iis",
         "vm_names": {},
-        "boot_digest": "sha256:da78760c0f3287476aec50f0d605424cef0c121ba9fd9951f012ab6bbb216b94",
+        "boot_digest": "sha256:aa8fc76dec3a888477fd39a4d0444b1897e306d2cc8d92cbe8010891e06aa1ef",
         "boxes": [
           {
             "provider": "virtualbox",

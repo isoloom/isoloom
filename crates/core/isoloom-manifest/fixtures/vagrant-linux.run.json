@@ -422,7 +422,7 @@
       "native": {
         "vagrant": "web",
         "vm_names": {},
-        "boot_digest": "sha256:6446cc285795e130ed4fb0b47b89dbffe0b270400ad807aac3d54c1a46721f40",
+        "boot_digest": "sha256:0313bc68dc24ed083648b5d30b773b5c2c6948745827172bea9d055e981fc74c",
         "boxes": [
           {
             "provider": "virtualbox",

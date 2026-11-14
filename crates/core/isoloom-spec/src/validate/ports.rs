@@ -27,6 +27,8 @@ pub(super) fn of_machine(s: &Subject, published: &mut HashMap<(u16, Protocol), S
         }
         match svc.publish {
             Some(0) => problems.add(format!("{at}.ports[{i}].publish"), "port 0 isn't a port"),
+            // `publish: true` asks for a free host port: another machine may prefer the same number.
+            Some(_) if svc.free => {}
             Some(port) => {
                 if let Some(other) = published.insert((port, svc.protocol), s.name.to_owned()) {
                     problems.add(format!("{at}.ports[{i}].publish"), format!("port {port} is already published by `{other}`"));

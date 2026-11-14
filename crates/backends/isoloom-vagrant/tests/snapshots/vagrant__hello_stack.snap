@@ -1008,7 +1008,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.60.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-hello-stack-#{ISOLOOM_KEY}-app", libvirt__network_name: "isoloom-hello-stack-#{ISOLOOM_KEY}-app", libvirt__dhcp_enabled: false
-    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1"
+    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/web", 8080), host_ip: "127.0.0.1", auto_correct: true
     m.vm.provider "virtualbox" do |v|
       v.name = "hello-stack-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
