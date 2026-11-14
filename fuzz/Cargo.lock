@@ -281,7 +281,6 @@ version = "3.0.0"
 dependencies = [
  "flate2",
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-spec",
  "serde_json",
@@ -309,7 +308,6 @@ version = "3.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -336,7 +334,6 @@ name = "isoloom-vagrant"
 version = "3.0.0"
 dependencies = [
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",

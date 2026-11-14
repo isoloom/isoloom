@@ -5,8 +5,6 @@
 //! A machine on several VLANs of one LAN gets an access device per VLAN, each tagged: the
 //! addresses and the routing are the same as over a trunk, and the guest needs no VLAN set-up.
 
-use std::collections::BTreeMap;
-
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, boolean, number, reference};
 use isoloom_plan::{Environment, MachinePlan};
 
@@ -48,16 +46,6 @@ pub(super) fn vnet_ids(env: &Environment) -> Vec<(&str, String)> {
 
 /// What starts a VNet's id, before the slot: Proxmox takes 8 characters at most.
 pub(super) const VNET: &str = "i";
-
-/// The id ([`vnet_ids`]) of the VNet each network's devices are bridged to ([`on`]): its own, or
-/// its LAN's for a VLAN.
-pub(super) fn vnet_of(env: &Environment) -> BTreeMap<&str, String> {
-    let ids: BTreeMap<&str, String> = vnet_ids(env).into_iter().collect();
-    env.networks
-        .keys()
-        .filter_map(|net| Some((net.as_str(), ids.get(segment(env, net).0.as_str())?.clone())))
-        .collect()
-}
 
 /// A VNet per network that is no VLAN, then one per LAN that is only the frame around its
 /// VLANs ([`vnet_ids`]). Their references, for the applier to wait on.

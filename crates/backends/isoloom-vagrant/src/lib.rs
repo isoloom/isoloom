@@ -41,12 +41,10 @@
 )]
 
 mod backend;
-mod boot_digest;
 mod boxes;
 mod console;
 mod error;
 mod host_folders;
-mod manifest;
 mod ruby;
 mod settings;
 #[cfg(test)]

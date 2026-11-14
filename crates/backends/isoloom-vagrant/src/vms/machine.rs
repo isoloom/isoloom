@@ -3,8 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use crate::boxes::{self, MainBox, ProviderBox, VagrantBox};
-use isoloom_manifest as manifest;
+use crate::boxes::{self, MainBox, VagrantBox};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, PublishedPort, Vm};
 use isoloom_render::GeneratedFile;
@@ -121,21 +120,11 @@ fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
     let fetched = access.then(|| {
         Value::raw(format!(
             "ENV.fetch({}, {})",
-            Value::str(manifest::contract::ACCESS_BOX),
+            Value::str(isoloom_spec::contract::ACCESS_BOX),
             Value::str(&image.name)
         ))
     });
     main_box(image, arch).render(r, "m", fetched);
-}
-
-/// The boxes environment machine `name`'s VM boots, provider by provider (none when it has no
-/// Vagrant box), as [`vm`] writes them.
-pub(crate) fn boxes(env: &Environment, name: &str, providers: &[manifest::Provider]) -> Vec<(manifest::Provider, ProviderBox)> {
-    let Some(planned) = env.vm(name) else { return Vec::new() };
-    let Some(image) = boxes::vagrant(planned) else { return Vec::new() };
-    let guest = guest(env, planned, &image, &Link::None);
-    let choice = guest.choice(main_box(&image, planned.plan.arch));
-    providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
 }
 
 /// The guest's hostname, set from `name` on Linux. Windows: no hostname here — Vagrant renames

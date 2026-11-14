@@ -1,11 +1,10 @@
 //! An environment's files for a target: lowered for the target, planned, rendered by the target's
-//! backend, with its run manifest and the resolved snapshot beside them.
+//! backend, with the resolved snapshot beside them.
 
 use std::path::Path;
 
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::Placed;
 use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::{Spec, Target};
 
@@ -156,27 +155,16 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     let spec = lowered(lab, target, instance)?;
     let env = planned(lab, &spec, target, instance)?;
     let rendered = backend.render(&env)?;
-    let manifests = backend
-        .run_manifests(&env)?
-        .into_iter()
-        .map(|placed| run_manifest(lab, instance, target, placed))
-        .collect::<Result<Vec<_>, _>>()?;
-    assembled(target, rendered, isoloom_render::configure::files(&env), manifests)
+    assembled(target, rendered, isoloom_render::configure::files(&env))
 }
 
 /// A target's files: its backend's, then the configuration renderers' own (the libraries a VM's
 /// set-up embeds, a container's runner and templates; once each, since a backend may have
-/// written some already), then its run manifests. Two at one path, the second of which would
-/// replace the first, is a bug of the backend: an error.
-fn assembled(
-    target: Target,
-    mut files: Vec<GeneratedFile>,
-    configure: Vec<GeneratedFile>,
-    manifests: Vec<GeneratedFile>,
-) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
+/// written some already). Two at one path, the second of which would replace the first, is a
+/// bug of the backend: an error.
+fn assembled(target: Target, mut files: Vec<GeneratedFile>, configure: Vec<GeneratedFile>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
     let own: Vec<GeneratedFile> = configure.into_iter().filter(|f| !files.iter().any(|x| x.path == f.path)).collect();
     files.extend(own);
-    files.extend(manifests);
     match written_twice(&files) {
         Some(path) => Err(GenerateError::Internal {
             target,
@@ -199,28 +187,6 @@ fn written_twice(files: &[GeneratedFile]) -> Option<&str> {
     files.iter().map(|f| f.path.as_str()).find(|p| !seen.insert(*p))
 }
 
-/// A backend's run manifest as the file it is written to (`.isoloom/<target>/[<sub>/]run.json`),
-/// its message filled from the resolved snapshot, checked across its fields.
-fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed) -> std::result::Result<GeneratedFile, GenerateError> {
-    let refused = |e: isoloom_manifest::Error| GenerateError::Internal {
-        target,
-        what: "the run manifest refused a value of this backend".to_owned(),
-        source: std::sync::Arc::new(e),
-    };
-    let mut manifest = placed.manifest;
-    manifest.environment.message = resolved::manifest_message(lab, instance, target).map_err(|e| GenerateError::Internal {
-        target,
-        what: "the run manifest's message couldn't be filled in".to_owned(),
-        source: std::sync::Arc::new(e),
-    })?;
-    manifest.validate().map_err(refused)?;
-    let folder = placed.sub.map_or_else(|| target.id().to_owned(), |sub| format!("{}/{sub}", target.id()));
-    Ok(GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{folder}/run.json"),
-        contents: isoloom_manifest::to_json(&manifest).map_err(refused)?,
-    })
-}
-
 /// Each cloud's id and the region its modules default to when the person's defaults set none
 /// (`isoloom defaults --system`), in the order the modules are written.
 #[must_use]
@@ -233,31 +199,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_run_manifest_or_a_backend_file_written_twice_is_an_error() {
+    fn a_backend_file_written_twice_is_an_error() {
         let compose = GeneratedFile::new(".isoloom/docker/compose.yml", "a");
-        let manifest = GeneratedFile::new(".isoloom/docker/run.json", "{}");
         // A configuration file the backend wrote already is the backend's, once.
-        let fine = assembled(
-            Target::Docker,
-            vec![compose.clone()],
-            vec![GeneratedFile::new(".isoloom/docker/compose.yml", "b")],
-            vec![manifest.clone()],
-        );
-        assert_eq!(fine.map(|f| f.len()).ok(), Some(2));
-        // A run manifest at a path the backend wrote is caught, as two of the backend's are.
-        for (rendered, manifests) in [
-            (
-                vec![compose.clone(), GeneratedFile::new(".isoloom/docker/run.json", "x")],
-                vec![manifest.clone()],
-            ),
-            (vec![compose.clone(), compose.clone()], vec![]),
-        ] {
-            let e = assembled(Target::Docker, rendered, vec![], manifests)
-                .err()
-                .map(|e| e.to_string())
-                .unwrap_or_default();
-            assert!(e.contains("twice"), "{e}");
-        }
+        let fine = assembled(Target::Docker, vec![compose.clone()], vec![GeneratedFile::new(".isoloom/docker/compose.yml", "b")]);
+        assert_eq!(fine.map(|f| f.len()).ok(), Some(1));
+        let e = assembled(Target::Docker, vec![compose.clone(), compose], vec![])
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_default();
+        assert!(e.contains("twice"), "{e}");
     }
 
     #[test]

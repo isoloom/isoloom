@@ -17,7 +17,6 @@ publish = true
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
 isoloom-render.workspace = true
-isoloom-manifest.workspace = true
 hcl.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true

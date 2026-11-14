@@ -25,16 +25,12 @@
 //!   `ssh <ssh_user>@<ip> 'cd /opt/isoloom && sudo docker compose -f .isoloom/docker/compose.yml
 //!   --profile check run --rm <runner>'`.
 
-pub(crate) mod manifest;
-
 use crate::hcl_builder::{Expression, Module, string};
 use crate::machine::user_data::{SetUp, Tracked};
 use isoloom_plan::Environment;
-use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::{Files, Placed};
+use isoloom_render::backend::Files;
 use isoloom_render::container::HostSize;
-use isoloom_render::run_manifest::guest::GuestCompose;
 use isoloom_render::steps::AsRoot;
 use isoloom_spec::model::Target;
 
@@ -234,7 +230,7 @@ pub(crate) fn module(cloud: Cloud, env: &Environment, host: &Host) -> Result<Gen
             replace_on: crate::hcl_builder::reference(&format!("{}.env.id", driver.instance)),
             as_root: AsRoot::of(user),
             log: crate::machine::user_data::SETUP_LOG,
-            within_s: crate::module::manifest::SETUP_S,
+            within_s: crate::ready::SETUP_S,
             reboots: 0,
             project: true,
             outputs: host.outputs.clone(),
@@ -314,29 +310,6 @@ fn values_then(values: &[String], command: &str) -> crate::hcl_builder::Template
     }
     t.push_text(format!("sh -c {}", isoloom_spec::shell::quote(command)));
     t
-}
-
-/// The run manifest of `env`'s containers on each cloud that can host them, beside its module.
-/// `guest` is the Compose-in-a-VM plan as a host's user gets root (`isoloom-targets` passes it):
-/// a cloud whose image signs in as root (Linode) runs its commands without `sudo`.
-///
-/// # Errors
-///
-/// The [`refusal`], a failure of `guest`, or [`Error::Manifest`] when a manifest can't be built.
-pub fn manifests(env: &Environment, guest: &dyn Fn(AsRoot) -> std::result::Result<GuestCompose, RenderError>) -> std::result::Result<Vec<Placed>, RenderError> {
-    hosted(env)?;
-    hosting(env)
-        .map(|cloud| {
-            let driver = driver(cloud);
-            let refused = |source| Error::Manifest {
-                target: Target::CloudDocker,
-                source,
-            };
-            let login = manifest::login(&driver).map_err(refused)?;
-            let m = manifest::manifest(env, cloud, &driver, &login, &guest(login.as_root())?).map_err(refused)?;
-            Ok(Placed::under(cloud.id(), m))
-        })
-        .collect()
 }
 
 #[cfg(test)]

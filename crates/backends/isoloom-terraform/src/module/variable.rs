@@ -6,8 +6,6 @@ use crate::hcl_builder::{Block, Expression, boolean, reference, string};
 #[derive(Debug, Clone)]
 pub(crate) struct Variable {
     name: String,
-    /// Its type as written (`string`, `number`, `bool`, `map(string)`).
-    kind: String,
     ty: Expression,
     default: Option<Expression>,
     sensitive: bool,
@@ -20,7 +18,6 @@ impl Variable {
     pub(crate) fn new(name: &str, ty: &str) -> Variable {
         Variable {
             name: name.to_owned(),
-            kind: ty.to_owned(),
             ty: reference(ty),
             default: None,
             sensitive: false,
@@ -66,37 +63,19 @@ impl Variable {
     }
 
     /// Its name.
+    #[cfg(test)]
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    /// Its description, when it has one.
-    pub(crate) fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-
     /// Whether it is sensitive.
+    #[cfg(test)]
     pub(crate) fn is_sensitive(&self) -> bool {
         self.sensitive
     }
 
-    /// Whether it is a `bool`.
-    pub(crate) fn is_bool(&self) -> bool {
-        self.kind == "bool"
-    }
-
-    /// Its default as text (`"local"` is `local`, `true`, `1`); none when it has none (it is
-    /// required) or when the default isn't a plain value.
-    pub(crate) fn default_text(&self) -> Option<String> {
-        match self.default.as_ref()? {
-            Expression::String(s) => Some(s.clone()),
-            Expression::Number(n) => Some(n.to_string()),
-            Expression::Bool(b) => Some(b.to_string()),
-            _ => None,
-        }
-    }
-
     /// Whether it has a default.
+    #[cfg(test)]
     pub(crate) fn has_default(&self) -> bool {
         self.default.is_some()
     }

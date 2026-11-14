@@ -66,15 +66,8 @@ fn a_placeholder_pointing_at_nothing_is_an_error_and_syntax_is_validated() {
 }
 
 #[test]
-fn a_cloud_output_is_the_runners_in_the_manifest_and_stays_as_written_until_then() -> Outcome {
-    use isoloom_spec::Target;
+fn a_cloud_output_stays_as_written_until_the_module_gives_it() -> Outcome {
     let lab = example("cloud-bucket")?;
-    let files = isoloom_targets::generate(&lab, Target::CloudServices)?;
-    let manifest = isoloom_manifest::parse(crate::testing::file(&files, "cloud-services/run.json")?)?;
-    assert_eq!(
-        manifest.environment.message.map(|m| m.to_string()).as_deref(),
-        Some("The website answers at ${outputs.site}.\n")
-    );
     let shown = render_message(&lab, None)?.unwrap_or_default();
     assert_eq!(shown, "The website answers at {{ cloud.outputs.site }}.\n");
     assert_eq!(resolve(&lab)["message"].as_str(), Some(shown.as_str()));

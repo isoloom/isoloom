@@ -4,7 +4,6 @@
 //! new provider is a new variant whose row the compiler asks for. A provider that can't run the
 //! VMs as the spec asks says so here (`provider_refusal`) instead of ignoring it.
 
-use isoloom_manifest::{HostOs, Provider as ManifestProvider};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::Arch;
 
@@ -84,16 +83,10 @@ pub(crate) enum OwnBoot {
 /// Everything Isoloom knows of one provider.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Profile {
-    /// The provider.
-    pub(crate) provider: Provider,
     /// The name Vagrant knows it by (`vagrant up --provider <id>`, `config.vm.provider`).
     pub(crate) id: &'static str,
     /// Its name in a refusal's prose (`Hyper-V`).
     pub(crate) label: &'static str,
-    /// Its id in the run manifest.
-    pub(crate) manifest: ManifestProvider,
-    /// The hosts it exists on.
-    pub(crate) hosts: &'static [HostOs],
     /// Why the `vagrant` target has no block for it, when it has none.
     pub(crate) no_vms: Option<&'static str>,
     /// Its two-way shared folder (`host_folders`).
@@ -114,15 +107,10 @@ pub(crate) struct Profile {
     pub(crate) remote_arch: Option<Arch>,
     /// Its nested virtualization switch.
     pub(crate) nested: Nested,
-    /// Why it gives a VM no graphical console Isoloom offers, when it gives none.
-    pub(crate) no_console: Option<&'static str>,
 }
-
-const EVERY_HOST: &[HostOs] = &[HostOs::Linux, HostOs::Macos, HostOs::Windows];
 
 /// The architecture of an ESXi host, which runs the VMs of `vmware_esxi` (not the computer
 /// Vagrant runs on): ESXi is x86-64 (ESXi-Arm is a rare, separate build Isoloom doesn't target).
-/// Vagrant picks the boxes' builds for it ([`crate::manifest`]'s `VAGRANT_HOST_ARCHITECTURE`).
 pub(crate) const ESXI_ARCH: Arch = Arch::Amd64;
 
 /// QEMU's links (one network per VM) and bridges.
@@ -131,13 +119,10 @@ fn qemu_networks(env: &Environment) -> Option<String> {
 }
 
 /// The defaults of a row: a desktop hypervisor on this computer that shares, nests, attaches
-/// disks and gives a console, and bridges.
+/// disks, and bridges.
 const DESKTOP: Profile = Profile {
-    provider: Provider::VirtualBox,
     id: "",
     label: "",
-    manifest: ManifestProvider::Virtualbox,
-    hosts: EVERY_HOST,
     no_vms: None,
     share: Share::None(""),
     tpm: false,
@@ -147,12 +132,11 @@ const DESKTOP: Profile = Profile {
     boot: OwnBoot::BoxAsIs,
     remote_arch: None,
     nested: Nested::None,
-    no_console: None,
 };
 
 impl Provider {
-    /// Every provider the Vagrantfile has a block for, in the order a runner offers them (the
-    /// run manifest's) and the Vagrantfile writes their shared folders.
+    /// Every provider the Vagrantfile has a block for, in the order the Vagrantfile writes
+    /// their shared folders.
     pub(crate) const ALL: [Provider; 8] = [
         Provider::VirtualBox,
         Provider::VmwareDesktop,
@@ -179,10 +163,8 @@ impl Provider {
     pub(crate) const fn profile(self) -> Profile {
         match self {
             Provider::VirtualBox => Profile {
-                provider: self,
                 id: "virtualbox",
                 label: "VirtualBox",
-                manifest: ManifestProvider::Virtualbox,
                 share: Share::Both {
                     kind: "virtualbox",
                     ro_option: "mount_options",
@@ -192,10 +174,8 @@ impl Provider {
                 ..DESKTOP
             },
             Provider::VmwareDesktop => Profile {
-                provider: self,
                 id: "vmware_desktop",
                 label: "VMware Desktop",
-                manifest: ManifestProvider::VmwareDesktop,
                 share: Share::Both {
                     kind: "vmware",
                     ro_option: "mount_options",
@@ -204,11 +184,8 @@ impl Provider {
                 ..DESKTOP
             },
             Provider::HyperV => Profile {
-                provider: self,
                 id: "hyperv",
                 label: "Hyper-V",
-                manifest: ManifestProvider::Hyperv,
-                hosts: &[HostOs::Windows],
                 share: Share::None(
                     "the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`",
                 ),
@@ -216,32 +193,22 @@ impl Provider {
                 bridges: false,
                 networks: Some(hyperv::refusal),
                 nested: Nested::Flag("enable_virtualization_extensions"),
-                no_console: Some(
-                    "Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port",
-                ),
                 ..DESKTOP
             },
             Provider::Parallels => Profile {
-                provider: self,
                 id: "parallels",
                 label: "Parallels",
-                manifest: ManifestProvider::Parallels,
-                hosts: &[HostOs::Macos],
                 share: Share::Both {
                     kind: "parallels",
                     ro_option: "mount_options",
                 },
                 attaches_disks: false,
                 nested: Nested::Customize("set", "--nested-virt"),
-                no_console: Some("Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"),
                 ..DESKTOP
             },
             Provider::Libvirt => Profile {
-                provider: self,
                 id: "libvirt",
                 label: "libvirt",
-                manifest: ManifestProvider::Libvirt,
-                hosts: &[HostOs::Linux],
                 share: Share::Both {
                     kind: "virtiofs",
                     ro_option: "mount_opts",
@@ -253,11 +220,8 @@ impl Provider {
                 ..DESKTOP
             },
             Provider::Qemu => Profile {
-                provider: self,
                 id: "qemu",
                 label: "QEMU",
-                manifest: ManifestProvider::Qemu,
-                hosts: &[HostOs::Linux, HostOs::Macos],
                 share: Share::ReadWrite {
                     kind: "qemu_virtiofs",
                     why: "one is read-only (`read_only`), and the `qemu` provider (vagrant-qemu) mounts its VirtioFS shares read-write",
@@ -269,11 +233,8 @@ impl Provider {
                 ..DESKTOP
             },
             Provider::Utm => Profile {
-                provider: self,
                 id: "utm",
                 label: "UTM",
-                manifest: ManifestProvider::Utm,
-                hosts: &[HostOs::Macos],
                 // `vagrant_utm` (0.1.6) gives a VM no private network, only forwarded ports on its
                 // shared network, and every machine of a spec is on a network (validation asks
                 // it), so UTM could run no environment's VMs.
@@ -284,18 +245,14 @@ impl Provider {
                     kind: "utm",
                     ro_option: "mount_options",
                 },
-                no_console: Some("UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"),
                 ..DESKTOP
             },
             Provider::VmwareEsxi => Profile {
-                provider: self,
                 id: "vmware_esxi",
                 label: "ESXi",
-                manifest: ManifestProvider::VmwareEsxi,
                 share: Share::None("the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer"),
                 remote_arch: Some(ESXI_ARCH),
                 nested: Nested::CustomVmx,
-                no_console: Some(isoloom_render::esxi::NO_CONSOLE),
                 ..DESKTOP
             },
         }
@@ -311,10 +268,6 @@ impl Provider {
         self.profile().tpm
     }
 
-    /// Whether the `vagrant` target has a block for it: every provider but UTM.
-    pub(crate) fn runs_vms(self) -> bool {
-        self.profile().no_vms.is_none()
-    }
 }
 
 /// Why the VMs of `env`, planned for the `vagrant` target, can't all run under Vagrant's
@@ -389,7 +342,6 @@ mod tests {
     #[test]
     fn a_provider_reads_back_as_vagrant_names_it_and_has_its_own_row() {
         for p in Provider::ALL {
-            assert_eq!(p.profile().provider, p);
             assert_eq!(Provider::parse(p.id()), Some(p));
         }
         assert_eq!(Provider::parse("docker"), None);

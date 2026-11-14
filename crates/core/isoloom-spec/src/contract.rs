@@ -14,6 +14,10 @@ pub const OUTPUT_DIR: &str = ".isoloom";
 /// Kubernetes Service) do.
 pub const RESERVED_PREFIX: &str = "isoloom-";
 
+/// The Compose profile an on-demand access machine's service sits in, so `docker compose up`
+/// skips it and `docker compose --profile access up -d <service>` starts it.
+pub const ACCESS_PROFILE: &str = "access";
+
 /// The longest kebab-case name ([`is_kebab`]): an environment's name is a DNS label and a
 /// Kubernetes namespace.
 pub const KEBAB_MAX: usize = 63;

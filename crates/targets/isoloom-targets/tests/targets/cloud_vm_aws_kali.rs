@@ -29,19 +29,6 @@ machines:
     assert!(tf.contains("hostnamectl set-hostname workstation"), "{tf}");
     // Kali's image is a 25 GB snapshot: AWS refuses a smaller root volume (the default is 20).
     assert!(tf.contains("volume_size = 25"), "{tf}");
-    // The access machine keeps its role in the run manifest.
-    let run = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/run.json")?;
-    let run: serde_json::Value = serde_json::from_str(&run).unwrap();
-    let role = |name: &str| {
-        run["machines"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|m| m["name"] == name)
-            .map(|m| m["role"].clone())
-    };
-    assert_eq!(role("workstation"), Some("access".into()));
-    assert_eq!(role("web"), Some("member".into()));
     Ok(())
 }
 

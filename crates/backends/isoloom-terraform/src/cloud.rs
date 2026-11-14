@@ -12,7 +12,6 @@ pub(crate) mod docker;
 pub(crate) mod gcp;
 pub(crate) mod instance;
 pub(crate) mod linode;
-pub(crate) mod manifest;
 pub(crate) mod oci;
 pub(crate) mod operator;
 pub(crate) mod services;

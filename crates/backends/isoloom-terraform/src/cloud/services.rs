@@ -2,17 +2,14 @@
 //! module applied into the user's own cloud account ([`CloudServicesBackend`]).
 //!
 //! The module is the project's own and stays untouched: Isoloom writes, under
-//! `.isoloom/cloud-services/`, its fixed variables (`terraform.tfvars.json`) and the run manifest
-//! the runner executes ([`manifest`]): the module copied into the run's own folder,
-//! applied there with the state and the plugins kept with the run, never in the project. The
-//! cloud's credentials come from the environment, as Terraform expects.
-
-mod manifest;
+//! `.isoloom/cloud-services/`, its fixed variables (`terraform.tfvars.json`); a variable taking a
+//! launch-time input is given the native way, as `TF_VAR_<name>`, by whoever applies the
+//! module. The cloud's credentials come from the environment, as Terraform expects.
 
 use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::{self, Backend, Files, Placed};
+use isoloom_render::backend::{self, Backend, Files};
 use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::{CloudServices, Target};
 
@@ -40,19 +37,6 @@ impl Backend for CloudServicesBackend {
         })?;
         Ok(vec![vars_file(cloud)])
     }
-
-    /// The run manifest, beside the variables, unless the services need what a manifest can't
-    /// hold (then the environment is converted, not run).
-    fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
-        let Some(cloud) = env.spec().cloud.as_ref().filter(|c| manifest::refusal(c).is_none()) else {
-            return Ok(Vec::new());
-        };
-        let m = manifest::manifest(env, cloud).map_err(|source| crate::Error::Manifest {
-            target: Target::CloudServices,
-            source,
-        })?;
-        Ok(vec![Placed::here(m)])
-    }
 }
 
 /// The fixed variables, `.isoloom/cloud-services/terraform.tfvars.json`.
@@ -64,8 +48,7 @@ fn vars_file(cloud: &CloudServices) -> GeneratedFile {
 }
 
 /// The fixed variables only: a variable taking a launch-time input, whole or inside a string,
-/// is written by `run`, from the environment, to `inputs.tfvars.json` next to the state (kept
-/// for `down`).
+/// is left out, for whoever applies the module to give.
 fn vars_json(cloud: &CloudServices) -> String {
     let vars: serde_json::Map<String, serde_json::Value> = cloud
         .vars

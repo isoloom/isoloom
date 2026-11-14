@@ -100,7 +100,6 @@ mod tests {
             "cloud-vm/aws/.terraform.lock.hcl",
             "cloud-vm/aws/main.tf",
             "docker/compose.yml",
-            "docker/run.json",
         ] {
             assert!(!ignores(&text, path), "{path}:\n{text}");
         }

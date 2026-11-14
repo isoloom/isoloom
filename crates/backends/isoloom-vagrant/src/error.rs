@@ -1,6 +1,5 @@
 //! Why a Vagrantfile isn't rendered, and how a backend reports it.
 
-use isoloom_manifest::Error as ManifestError;
 use isoloom_plan::Refusal;
 use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
@@ -26,70 +25,18 @@ pub enum Error {
         /// Why, as the refusal reads.
         reason: String,
     },
-    /// A VM the Vagrantfile defines without a record of what it applies to it at boot, so the
-    /// run manifest has no boot digest for it: a bug of this backend, which writes both.
-    #[error("{}: the Vagrantfile records nothing it applies at boot to `{machine}`", target.id())]
-    NoBootDigest {
-        /// The target whose Vagrantfile it is.
-        target: Target,
-        /// The VM's define.
-        machine: String,
-    },
-    /// A value of the run manifest was refused by the manifest's own types: a bug of this
-    /// backend, which builds every one of them.
-    #[error("{}: {MANIFEST_REFUSED}", target.id())]
-    Manifest {
-        /// The target whose manifest it is (`vagrant`, unless the error is reported as another target's).
-        target: Target,
-        /// What the manifest's types refused.
-        #[source]
-        source: ManifestError,
-    },
-}
-
-/// What a manifest error is, after its target.
-const MANIFEST_REFUSED: &str = "the run manifest refused a value of this backend";
-
-impl From<ManifestError> for Error {
-    /// The `vagrant` target's manifest error.
-    fn from(source: ManifestError) -> Error {
-        Error::Manifest {
-            target: Target::Vagrant,
-            source,
-        }
-    }
 }
 
 /// A result whose error is this crate's [`Error`].
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-impl Error {}
-
 impl From<Error> for RenderError {
-    /// The error as every backend reports it: the plan's refusal, what the target doesn't
-    /// support, or a failure of this backend with its cause.
+    /// The error as every backend reports it: the plan's refusal, or what the target doesn't
+    /// support.
     fn from(e: Error) -> RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unsupported { target, reason } => RenderError::Unsupported { target, what: reason },
-            e @ Error::NoBootDigest { target, .. } => RenderError::internal(target, "the run manifest has no boot digest for a VM", e),
-            Error::Manifest { target, source } => RenderError::internal(target, MANIFEST_REFUSED, source),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_manifest_bug_is_a_failure_of_the_vagrant_target() {
-        use std::error::Error as _;
-
-        let source = isoloom_manifest::EnvironmentName::parse("Not A Name").expect_err("refused");
-        let e = RenderError::from(Error::from(source));
-        assert_eq!(e.to_string(), format!("vagrant: {MANIFEST_REFUSED}"));
-        assert!(e.source().is_some());
-        assert_eq!(e.refusal(), None);
     }
 }

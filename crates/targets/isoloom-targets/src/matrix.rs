@@ -10,7 +10,6 @@
 //! applicable. Tests hold every feature of the plan to a row, and every example's refusals to
 //! the matrix's, so it can't claim more than the generators do.
 
-mod consoles;
 #[cfg(test)]
 mod examples;
 mod probe;
@@ -39,8 +38,6 @@ pub struct Matrix {
     pub tiers: Vec<TierEntry>,
     /// The rows.
     pub(crate) rows: Vec<Row>,
-    /// What each VM target gives a VM for its graphical console.
-    pub(crate) consoles: Vec<consoles::ConsoleRow>,
 }
 
 /// A row: a spec field (or a value of it), and what each column decides.
@@ -124,7 +121,6 @@ pub fn matrix() -> Result<Matrix> {
     let columns = columns();
     let rows = probes.rows.iter().map(|p| row(&probes, p, &columns)).collect::<Result<_>>()?;
     Ok(Matrix {
-        consoles: consoles::rows(&columns),
         columns,
         tiers: tiers()?,
         rows,

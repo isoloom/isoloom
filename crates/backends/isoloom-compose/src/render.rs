@@ -53,7 +53,7 @@ fn usage(env: &Environment, file: &ComposeFile) -> String {
             inputs.join(", ")
         ));
     }
-    let access = isoloom_manifest::access::PROFILE;
+    let access = isoloom_spec::contract::ACCESS_PROFILE;
     let on_demand = file
         .services
         .iter()

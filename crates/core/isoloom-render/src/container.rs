@@ -81,8 +81,13 @@ pub fn check_runner(pos: &Position, default: &Position) -> String {
     }
 }
 
-/// The VM the containers run in (`cloud-docker`'s), as run manifests name it: Isoloom's own, under the prefix an environment's machines can't
-/// take, so it never collides with one (a machine named `docker` included).
+/// Isoloom's outputs a Docker host VM gets with the project (`cloud-docker`): the `docker`
+/// target's Compose file's folder and the configuration files it mounts.
+pub const COMPOSE_OUTPUTS: [&str; 2] = [".isoloom/docker", crate::configure::DIR];
+
+/// The VM the containers run in (`cloud-docker`'s): Isoloom's own, under the prefix an
+/// environment's machines can't take, so it never collides with one (a machine named `docker`
+/// included).
 pub const DOCKER_HOST: &str = "isoloom-docker-host";
 
 #[cfg(test)]

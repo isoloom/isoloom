@@ -6,8 +6,7 @@ use isoloom_spec::contract::HALTING;
 use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
-use crate::boxes::{HyperVBox, MainBox, ProviderBox};
-use isoloom_manifest::Provider;
+use crate::boxes::{HyperVBox, MainBox};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
@@ -24,7 +23,7 @@ use super::machine::{define, private_network};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
-use super::{CONTROLLER, Ctx, Kind, TOOL_SHELL, checks};
+use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
 use crate::ruby::{Ruby, Start, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
@@ -199,17 +198,6 @@ fn controller_guest<'a>(env: &'a Environment, link: &'a Link) -> (Guest<'a>, Mai
         ..MainBox::plain(bx)
     };
     (guest, main)
-}
-
-/// The boxes Isoloom's own VM `kind` boots, provider by provider, as this file writes them.
-pub(crate) fn boxes(env: &Environment, kind: Kind, providers: &[Provider]) -> Vec<(Provider, ProviderBox)> {
-    let (guest, main) = match kind {
-        Kind::Controller => controller_guest(env, &Link::None),
-        Kind::Router | Kind::ToolShell => (helper(env, router::NAME, Size::HELPER, Vec::new(), &Link::None), MainBox::plain(HELPER_BOX)),
-        Kind::Machine => return Vec::new(),
-    };
-    let choice = guest.choice(main);
-    providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
 }
 
 /// The controller: a small VM (Alpine by default) on every network at its controller address,

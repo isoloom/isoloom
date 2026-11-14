@@ -3,7 +3,6 @@
 //! their own modules.
 
 use indexmap::IndexMap;
-use isoloom_manifest as manifest;
 use isoloom_plan::{Environment, Image, PublishedPort};
 use isoloom_render::configure::dockerfile;
 use isoloom_render::constraints;
@@ -34,7 +33,7 @@ pub(super) fn machine(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk], o
         // The access box's route keeper follows it into the `access` profile: a non-profiled
         // service that depends on a profiled one would drag it into the initial `up`.
         if m.plan.is_access() {
-            routes.profiles = vec![manifest::access::PROFILE.to_owned()];
+            routes.profiles = vec![isoloom_spec::contract::ACCESS_PROFILE.to_owned()];
         }
         out.services.insert(routes_service(m.name), routes);
     }
@@ -138,11 +137,11 @@ fn dns(spec: &model::Machine, svc: &mut Service) {
 /// builds its own image for it (a `build`) keeps it; otherwise it runs its planned image, which
 /// the runner can override with one it is given.
 fn access_box(plan: &isoloom_plan::MachinePlan, svc: &mut Service) {
-    svc.profiles = vec![manifest::access::PROFILE.to_owned()];
+    svc.profiles = vec![isoloom_spec::contract::ACCESS_PROFILE.to_owned()];
     svc.init = true;
     svc.entrypoint = vec!["sleep".into(), "infinity".into()];
     if let (None, Some(Image::Container { reference, .. })) = (&svc.build, &plan.image) {
-        svc.image = Some(format!("${{{}:-{reference}}}", manifest::contract::ACCESS_IMAGE));
+        svc.image = Some(format!("${{{}:-{reference}}}", isoloom_spec::contract::ACCESS_IMAGE));
     }
 }
 

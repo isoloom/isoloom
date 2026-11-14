@@ -27,6 +27,12 @@ use crate::hcl_builder::{Block, Expression, list, reference, string};
 use crate::machine::provisioner::{self, Connection, Upload};
 use crate::module::ident;
 
+/// How long a machine's set-up may take once it can run (after the apply, the project in).
+pub(crate) const SETUP_S: u32 = 2400;
+
+/// How long the controller's playbooks may take.
+pub(crate) const PLAYBOOKS_S: u32 = 7200;
+
 /// How many lines of the set-up's output a failed wait prints.
 const LOG_LINES: u32 = 40;
 

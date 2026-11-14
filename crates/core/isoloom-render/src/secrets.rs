@@ -16,7 +16,6 @@ use isoloom_spec::model::SecretSource;
 use isoloom_spec::shell::quote;
 
 use crate::boot;
-use crate::run_manifest::RUNNER;
 
 pub mod windows;
 
@@ -83,8 +82,8 @@ pub(crate) fn wait(who: &str) -> String {
 /// target's own tool, Terraform, can't), and what to do.
 fn messages(who: &str) -> (String, String) {
     (
-        format!("{who}: waiting for its secrets, which {RUNNER} delivers"),
-        format!("{who}: its secrets never came; start the environment with {RUNNER}, which reads them from their stores and delivers them"),
+        format!("{who}: waiting for its secrets, which the tool that runs it delivers"),
+        format!("{who}: its secrets never came; start the environment with a tool that delivers them"),
     )
 }
 
