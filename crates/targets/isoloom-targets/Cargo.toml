@@ -28,6 +28,10 @@ serde_json.workspace = true
 serde_yaml_ng.workspace = true
 thiserror.workspace = true
 
+[features]
+# The platform level (`services:`): a draft, off by default.
+paas = ["isoloom-spec/paas", "isoloom-plan/paas", "isoloom-terraform/paas"]
+
 [dev-dependencies]
 insta.workspace = true
 proptest.workspace = true

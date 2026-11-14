@@ -65,7 +65,7 @@ fn postgres(env: &Environment, at: &Each<'_>, p: &Postgres, m: &mut Module) {
             .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
             .add_block(
                 Block::builder("ingress")
-                    .add_attribute(("description", string("its clients' networks")))
+                    .add_attribute(("description", string("from the networks of its clients")))
                     .add_attribute(("from_port", number(5432)))
                     .add_attribute(("to_port", number(5432)))
                     .add_attribute(("protocol", string("tcp")))

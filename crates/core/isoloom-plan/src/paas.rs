@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 
 use crate::lower::Scope;
 
-/// The self-hosted S3 server's image: SeaweedFS's S3 gateway (MinIO no longer publishes builds).
+/// The self-hosted S3 server's image: `SeaweedFS`'s S3 gateway (`MinIO` no longer publishes builds).
 pub const S3_SERVER_IMAGE: &str = "chrislusf/seaweedfs:4.53";
 
 /// The port the self-hosted S3 server answers on.
@@ -152,7 +152,7 @@ fn postgres(p: &Postgres) -> Value {
     })
 }
 
-/// SeaweedFS's server with its S3 gateway, its data in a volume. It runs without authentication
+/// `SeaweedFS`'s server with its S3 gateway, its data in a volume. It runs without authentication
 /// (its clients' keys are accepted, not checked: the draft's known gap) and creates a bucket on
 /// its first upload.
 fn object_storage(name: &str, o: &ObjectStorage) -> Value {

@@ -34,7 +34,7 @@ resource "aws_security_group" "isoloom_service_db" {
   name   = "${local.name}-service-db"
   vpc_id = aws_vpc.env.id
   ingress {
-    description = "its clients' networks"
+    description = "from the networks of its clients"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"

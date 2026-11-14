@@ -81,9 +81,7 @@ fn inputs(source: &syntax::Spec) -> Vec<model::Input> {
 #[must_use]
 pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowered {
     #[cfg(feature = "paas")]
-    let placed = crate::paas::source_for(source, scope);
-    #[cfg(feature = "paas")]
-    let source: &syntax::Spec = &placed;
+    let source: &syntax::Spec = &crate::paas::source_for(source, scope);
     let mut trail = Trail::default();
     let mut secrets = source.secrets.clone();
     let mut machines = IndexMap::new();
