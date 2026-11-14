@@ -57,9 +57,9 @@ fn compose_has_addresses_healthchecks_init_and_checks() -> Outcome {
     assert_eq!(yaml_str(&c, "services.cache.networks.app.ipv4_address"), "10.60.0.20");
     assert_eq!(yaml_str(&c, "networks.app.ipam.config.0.gateway"), "10.60.0.1");
     // The healthcheck runs Isoloom's own busybox (exec form): no shell needed in the image.
-    let test = yaml_strs(&c, "services.cache.healthcheck.test");
-    assert_eq!(test.first().map(String::as_str), Some("CMD"));
-    assert_eq!(test.last().map(String::as_str), Some("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379"));
+    let health = yaml_strs(&c, "services.cache.healthcheck.test");
+    assert_eq!(health.first().map(String::as_str), Some("CMD"));
+    assert_eq!(health.last().map(String::as_str), Some("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 6379"));
     assert!(yaml_strs(&c, "services.cache.volumes").contains(&"isoloom-probe:/.isoloom-probe:ro".to_owned()));
     assert!(yaml_str(&c, "services.isoloom-probe.image").starts_with("busybox:1.37.0-musl@sha256:"));
     // The init job waits for its machine; the machine that depends on it waits for the job.
@@ -213,14 +213,14 @@ fn an_idle_container_is_kept_running() -> Outcome {
     )?;
     let image = spec.source().machines["box"].os.unwrap().os().container_image().unwrap();
     let (c, _) = compose(&spec)?;
-    assert_eq!(yaml_str(&c, "services.box.image"), image.to_string());
+    assert_eq!(yaml_str(&c, "services.box.image"), image);
     assert_eq!(yaml_str(&c, "services.box.init"), "true");
     assert_eq!(yaml_strs(&c, "services.box.entrypoint"), ["sleep", "infinity"]);
     // A machine that runs its own service keeps its image's command.
     assert!(yaml_at(&c, "services.web.entrypoint").is_none());
     let k8s: Vec<Value> = generate(&spec, Target::Kubernetes)?
         .iter()
-        .filter(|f| f.path.ends_with(".yaml"))
+        .filter(|f| std::path::Path::new(&f.path).extension().is_some_and(|e| e == "yaml"))
         .flat_map(|f| serde_yaml_ng::Deserializer::from_str(&f.contents).map(Value::deserialize).collect::<Vec<_>>())
         .collect::<Result<_, _>>()?;
     let deployment = k8s
@@ -268,7 +268,7 @@ machines:
     assert!(
         done.iter()
             .filter(|(job, _)| job.starts_with("isoloom-init-"))
-            .all(|(_, c)| c == "service_completed_successfully")
+            .all(|(_, condition)| condition == "service_completed_successfully")
     );
     // Nothing left over: the one command it always was.
     let (_, plain) = compose(&example("hello-stack")?)?;

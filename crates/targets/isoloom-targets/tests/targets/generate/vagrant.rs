@@ -49,8 +49,11 @@ fn libvirt_domains_are_named_after_the_environment() -> Outcome {
     assert_eq!(libvirt.statements("v.default_prefix"), ["v.default_prefix = \"hello-stack-#{ISOLOOM_KEY}_\""]);
     let second = file(&generate_instance(&spec, Target::Vagrant, 2)?, ".isoloom-2/vagrant/Vagrantfile")?.to_owned();
     let second = isoloom_test_support::ruby_blocks(&second);
-    let libvirt = second.block("config.vm.provider \"libvirt\"");
-    assert_eq!(libvirt.statements("v.default_prefix"), ["v.default_prefix = \"hello-stack-2-#{ISOLOOM_KEY}_\""]);
+    let libvirt_two = second.block("config.vm.provider \"libvirt\"");
+    assert_eq!(
+        libvirt_two.statements("v.default_prefix"),
+        ["v.default_prefix = \"hello-stack-2-#{ISOLOOM_KEY}_\""]
+    );
     Ok(())
 }
 
@@ -116,7 +119,7 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap(), None);
     let text = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     let vf = isoloom_test_support::ruby_blocks(&text);
-    assert!(!vf.statements("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]").is_empty());
+    assert_eq!(vf.statements("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]").len(), 1);
     // QEMU boots machines in parallel unless told not to: the controller would run its play
     // before the DC is up, and the connecting side of the link could start before the listener.
     assert!(vf.statements.contains(&"ENV[\"VAGRANT_NO_PARALLEL\"] = \"1\"".to_owned()));
@@ -209,13 +212,13 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
         "{web}"
     );
     assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-#{ISOLOOM_KEY}-front\"])"), "{web}");
-    hyperv_router_and_macs(&v, spec.source().networks.len())?;
+    hyperv_router_and_macs(&v, spec.source().networks.len());
     Ok(())
 }
 
 /// On Hyper-V the router is on every network (`networks` of them), with an adapter on each;
 /// every adapter of the Vagrantfile `v` has its own MAC.
-fn hyperv_router_and_macs(v: &str, networks: usize) -> Outcome {
+fn hyperv_router_and_macs(v: &str, networks: usize) {
     let router = define(&isoloom_test_support::ruby_blocks(v), "isoloom-router").every_statement().join("\n");
     assert_eq!(router.matches("\", \"0215").count(), networks, "{router}");
     let macs: Vec<&str> = v.match_indices("\"0215").filter_map(|(i, _)| v.get(i..i + 14)).collect();
@@ -223,7 +226,6 @@ fn hyperv_router_and_macs(v: &str, networks: usize) -> Outcome {
     unique.sort_unstable();
     unique.dedup();
     assert!(macs.len() > networks && macs.len() == unique.len(), "{macs:?}");
-    Ok(())
 }
 
 #[test]

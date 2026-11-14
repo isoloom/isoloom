@@ -7,7 +7,7 @@ pub mod testing;
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
-use isoloom_test_support::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_text, hcl_values};
+use isoloom_test_support::{hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 use testing::{Outcome, plan};
 
 /// The plan of `yaml`, a valid spec, on `cloud-vm`.
@@ -49,10 +49,7 @@ fn parsed(cloud: Cloud, e: &Environment) -> Outcome<hcl::Body> {
 
 /// The one `resource "<kind>" "<name>"` of `tf`.
 fn resource<'b>(tf: &'b hcl::Body, kind: &str, name: &str) -> &'b hcl::Body {
-    match hcl_blocks(tf, "resource", &[kind, name]).as_slice() {
-        [one] => one.body(),
-        found => panic!("{} resource \"{kind}\" \"{name}\"", found.len()),
-    }
+    hcl_one(tf, kind, name)
 }
 
 /// Whether one of the strings `body` holds anywhere (its user data, its scripts) holds `what`.
@@ -74,7 +71,7 @@ fn aws_routes_a_network_through_its_gateway_both_ways() -> Outcome {
     let tf = parsed(Cloud::Aws, &env(EDGE)?)?;
     // One VPC block holds both networks, so routes to each can be more specific than it.
     assert_eq!(hcl_text(resource(&tf, "aws_vpc", "env"), "cidr_block"), "10.70.0.0/20");
-    assert!(hcl_names(&tf, "resource", "aws_vpc_ipv4_cidr_block_association").is_empty());
+    assert_eq!(hcl_names(&tf, "resource", "aws_vpc_ipv4_cidr_block_association"), Vec::<String>::new());
     // dmz -> out through fw's dmz interface, out -> dmz through its out interface.
     assert_eq!(
         aws_routes(&tf, "dmz"),
@@ -141,7 +138,7 @@ fn google_cloud_routes_a_network_through_its_gateway_in_a_vpc_of_its_own() -> Ou
     assert_eq!(hcl_text(route("dmz_out"), "next_hop_ip"), "10.70.10.252");
     assert_eq!(hcl_text(route("dmz_out"), "network"), "google_compute_network.dmz.id");
     assert_eq!(hcl_text(route("out_dmz"), "next_hop_ip"), "10.70.0.5");
-    assert!(hcl_names(&tf, "resource", "google_compute_network_peering").is_empty());
+    assert_eq!(hcl_names(&tf, "resource", "google_compute_network_peering"), Vec::<String>::new());
     // Its second interface comes up by the MAC Google derives from its address.
     assert!(carries(fw, "42:01:0a:46:0a:fc"));
     Ok(())
@@ -208,8 +205,8 @@ machines:
 #[test]
 fn google_cloud_sets_the_mtu_and_the_others_refuse_it() -> Outcome {
     let e = env(MTU)?;
-    let mtus = |e: &Environment| -> Outcome<Vec<String>> {
-        let tf = parsed(Cloud::Gcp, e)?;
+    let mtus = |planned: &Environment| -> Outcome<Vec<String>> {
+        let tf = parsed(Cloud::Gcp, planned)?;
         Ok(hcl_names(&tf, "resource", "google_compute_network")
             .iter()
             .map(|n| hcl_text(resource(&tf, "google_compute_network", n), "mtu"))

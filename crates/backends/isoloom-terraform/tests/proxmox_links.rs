@@ -5,15 +5,12 @@ pub mod testing;
 
 use isoloom_spec::model::Target;
 use isoloom_terraform::ProxmoxBackend;
-use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_text};
+use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text};
 use testing::{Outcome, proxmox};
 
 /// The one `resource "<kind>" "<name>"` of `tf`.
 fn resource<'b>(tf: &'b hcl::Body, kind: &str, name: &str) -> &'b hcl::Body {
-    match hcl_blocks(tf, "resource", &[kind, name]).as_slice() {
-        [one] => one.body(),
-        found => panic!("{} resource \"{kind}\" \"{name}\"", found.len()),
-    }
+    hcl_one(tf, kind, name)
 }
 
 /// Attribute `key` of every `kind` block directly in `body`, in order (an absent one: empty).

@@ -42,7 +42,7 @@ fn kubernetes_turns_networks_and_reach_into_network_policies() -> Outcome {
     assert_eq!(yaml_str(manifest(&docs, "Deployment", "web"), "spec.template.spec.hostname"), "web");
     assert_eq!(yaml_str(manifest(&docs, "Service", "web"), "spec.selector.`isoloom.com/machine`"), "web");
     // A volume is a claim.
-    assert!(!manifest_names(&docs, "PersistentVolumeClaim").is_empty());
+    assert_ne!(manifest_names(&docs, "PersistentVolumeClaim").len(), 0);
     // Checks: a Job per position, the user's with the access network's label (its policies apply),
     // the others carrying their machine's networks; each runs its own runner script.
     let jobs = yaml_documents(file(&files, ".isoloom/kubernetes/checks/job.yaml")?);

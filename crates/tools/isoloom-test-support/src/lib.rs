@@ -326,6 +326,18 @@ pub fn hcl_names(body: &hcl::Body, block: &str, kind: &str) -> Vec<String> {
         .collect()
 }
 
+/// The body of the one `resource "<kind>" "<name>"` of a parsed module.
+///
+/// # Panics
+/// When the module doesn't have exactly one such resource.
+#[must_use]
+pub fn hcl_one<'b>(body: &'b hcl::Body, kind: &str, name: &str) -> &'b hcl::Body {
+    match hcl_blocks(body, "resource", &[kind, name]).as_slice() {
+        [one] => one.body(),
+        found => panic!("{} resource \"{kind}\" \"{name}\"", found.len()),
+    }
+}
+
 /// The body of the one `resource "<kind>" "<name>"` of `tf`, parsed.
 ///
 /// # Panics
@@ -489,7 +501,6 @@ fn scan(line: &str, mut quote: Option<char>) -> (Option<char>, Option<String>) {
                 chars.next();
             }
             Some(q) if c == q => quote = None,
-            Some(_) => {}
             None if c == '"' || c == '\'' => quote = Some(c),
             None if c == '#' => break,
             None if tag.is_none() && line.get(at..).is_some_and(|r| r.starts_with("<<")) => {
@@ -498,9 +509,9 @@ fn scan(line: &str, mut quote: Option<char>) -> (Option<char>, Option<String>) {
                 let name: String = after
                     .trim_start_matches(['\'', '"'])
                     .chars()
-                    .take_while(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || *c == '_')
+                    .take_while(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || *ch == '_')
                     .collect();
-                if name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+                if name.chars().next().is_some_and(|ch| ch.is_ascii_uppercase()) {
                     // Past the opener, its quoted tag included, so its quotes open no string.
                     let skip = (line.len() - at - after.len()) + name.len() + if quoted { 2 } else { 0 } - 1;
                     for _ in 0..skip {
@@ -509,7 +520,7 @@ fn scan(line: &str, mut quote: Option<char>) -> (Option<char>, Option<String>) {
                     tag = Some(name);
                 }
             }
-            None => {}
+            _ => {}
         }
     }
     (quote, tag)
@@ -751,7 +762,8 @@ mod tests {
     #[test]
     #[should_panic(expected = "never closed")]
     fn an_unclosed_ruby_block_fails() {
-        let _ = ruby_blocks("config.vm.define \"web\" do |m|\n  m.vm.box = \"x\"\n");
+        let read = ruby_blocks("config.vm.define \"web\" do |m|\n  m.vm.box = \"x\"\n");
+        assert!(read.blocks.is_empty(), "{read:?}");
     }
 
     #[test]
