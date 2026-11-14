@@ -1,0 +1,12 @@
+{
+  "name": "windows-domain",
+  "networks": {
+    "corp": { "cidr": "10.50.1.0/24" }
+  },
+  "nodes": {
+    "dc01": { "kind": { "vm": { "os": "windows-server@2022", "provision": ["provision/dc01.ps1"] } }, "services": [{ "port": 53 }, { "port": 53, "protocol": "udp" }, { "port": 389 }, { "port": 445 }], "networks": { "corp": 10 } },
+    "ws01": { "kind": { "vm": { "os": "windows@11" } }, "services": [{ "port": 3389 }], "networks": { "corp": null } },
+    "workstation": { "kind": { "vm": { "os": "debian" } }, "access": true, "networks": { "corp": 50 } },
+    "intranet": { "kind": { "vm": { "os": "ubuntu@24.04", "provision": ["provision/intranet.sh", "provision/intranet.yml"] } }, "services": [{ "port": 443, "protocol": "https" }, { "port": 8080, "protocol": "http" }], "networks": { "corp": null } }
+  }
+}

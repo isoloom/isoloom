@@ -243,7 +243,8 @@ isoloom-manifest = "2"   # the run manifest's types, for a runner
 
 Those three are the supported API. `isoloom-catalogue`, `isoloom-plan`, `isoloom-render`, the
 backends (`isoloom-compose`, `isoloom-kubernetes`, `isoloom-vagrant`, `isoloom-terraform`,
-`isoloom-ansible`), `isoloom-import` and `isoloom` (the command line) are published so the
+`isoloom-ansible`), `isoloom-import`, `isoloom` (the command line), `isoloom-topology` and
+`isoloom-wasm` (a topology editor's compiler and its WebAssembly engine) are published so the
 supported crates build from crates.io; their API is not a promise. Get the model's types by
 parsing a spec rather than writing struct literals: a new spec key is then not a breaking change.
 [ARCHITECTURE.md](ARCHITECTURE.md) maps the crates.

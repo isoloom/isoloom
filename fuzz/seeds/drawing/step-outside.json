@@ -1,0 +1,1 @@
+{"name":"step-outside","nodes":{"web":{"kind":{"vm":{"os":"debian@12","provision":["../x.sh","/x.sh"]}}}}}

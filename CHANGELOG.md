@@ -29,6 +29,11 @@ stable spec format.
   `hybrid` targets now read them there, so the two can't drift apart, and a test holds two
   instances of the VM examples to disjoint VM, network and prefix names (#285). Two copies of
   one environment are also told apart by their key (below).
+- **`isoloom-topology` and `isoloom-wasm`, the topology editor's compiler and its WebAssembly
+  engine, moved here from Isothrum** (where they were `isothrum-compiler` and `isothrum-wasm`):
+  a network drawn in an editor becomes an `isoloom.yml` and its project files, and in the
+  browser every target's files and the zips to download. `cargo xtask wasm` builds the engine
+  (`isoloom_wasm.js`, `isoloom_wasm_bg.wasm`); the JavaScript exports keep their names.
 
 ### Changed
 

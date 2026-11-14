@@ -6,6 +6,7 @@ members = [
   "crates/tools/*",
   "crates/targets/*",
   "crates/cli/*",
+  "crates/frontends/*",
   "xtask",
 ]
 # The fuzz targets are a workspace of their own (nightly, libFuzzer): `cargo xtask fuzz`.
@@ -34,6 +35,7 @@ isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "3.0.0" 
 isoloom-targets = { path = "crates/targets/isoloom-targets", version = "3.0.0" }
 isoloom-import = { path = "crates/tools/isoloom-import", version = "3.0.0" }
 isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "3.0.0" }
+isoloom-topology = { path = "crates/frontends/isoloom-topology", version = "3.0.0" }
 xtask-quality = { path = "crates/tools/xtask-quality" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
@@ -62,6 +64,11 @@ sha2 = "0.11"
 # The catalogue's refresh (xtask): a GPG key's fingerprint, and the gzip of package indexes.
 sha1 = "0.11"
 flate2 = "1"
+# The topology editor's engine in the browser (isoloom-wasm): the JavaScript bindings, their
+# tests, and the project's zip.
+wasm-bindgen = "0.2"
+wasm-bindgen-test = "0.3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Every crate inherits these (`[lints] workspace = true`): the strictest set. A lint is at "deny"
 # once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts its

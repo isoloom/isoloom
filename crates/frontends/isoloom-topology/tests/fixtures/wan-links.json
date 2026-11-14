@@ -1,0 +1,16 @@
+{
+  "name": "wan-links",
+  "networks": {
+    "hq": { "cidr": "10.40.1.0/24", "tc": { "delay": "5ms" } },
+    "branch": { "cidr": "10.40.2.0/28", "internet": false, "tc": { "delay": "40ms", "jitter": "5ms", "loss": 0.5, "rate": "10mbit" } }
+  },
+  "nodes": {
+    "edge": { "kind": { "container": { "image": "frrouting/frr:v8.5.2" } }, "networks": { "hq": 2, "branch": null } },
+    "hq-pc": { "kind": { "container": { "image": "alpine:3.20", "idle": true } }, "access": true, "networks": { "hq": null } },
+    "files": { "kind": { "vm": { "os": "rocky@9", "provision": ["provision/files.sh"] } }, "services": [{ "port": 21 }, { "port": 22 }], "networks": { "branch": null } },
+    "cache": { "kind": { "container": { "image": "redis:7-alpine" } }, "services": [{ "port": 6379 }] }
+  },
+  "links": [
+    { "a": { "node": "files", "port": "eth1" }, "b": { "node": "cache", "port": "eth0" }, "tc": { "delay": "1ms", "rate": "512kbit" } }
+  ]
+}

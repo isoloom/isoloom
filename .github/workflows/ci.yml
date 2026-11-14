@@ -255,6 +255,38 @@ jobs:
           done
           diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
 
+  # The topology editor's engine (isoloom-wasm) builds for the browser, and its exports work as
+  # JavaScript calls them.
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # wasm-pack uses a wasm-bindgen on PATH when its version is the one Cargo.lock locks, so
+      # both come from install-action, which checks each download's SHA-256.
+      - name: wasm-bindgen version (from Cargo.lock)
+        id: bindgen
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: wasm-pack@0.13.1,wasm-bindgen@${{ steps.bindgen.outputs.version }}
+      - run: cargo run -p xtask --locked -- wasm
+      # The exports as JavaScript calls them (wasm-bindgen-test, on Node).
+      - run: wasm-pack test --node crates/frontends/isoloom-wasm
+
   # The generated Terraform (Proxmox, ESXi, docker-vm on Proxmox, cloud-docker, cloud-vm,
   # cloud-services) is valid for its providers, with the latest Terraform.
   terraform:

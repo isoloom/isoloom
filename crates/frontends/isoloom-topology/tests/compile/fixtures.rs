@@ -1,0 +1,68 @@
+//! The fixture drawings, compiled: each spec as written (a snapshot), Isoloom's validation finds
+//! nothing wrong with it, and Isoloom generates the files of the targets the drawing is for.
+
+use std::path::Path;
+
+use isoloom_topology::{Topology, compile};
+
+use crate::testing::{Outcome, accepted, yaml};
+
+/// The drawing in `tests/fixtures/<name>.json`.
+fn fixture(name: &str) -> Outcome<Topology> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(format!("{name}.json"));
+    Ok(serde_json::from_str(&std::fs::read_to_string(&path)?)?)
+}
+
+/// The compiled spec's text, after checking Isoloom accepts it and generates the files of each
+/// of `targets` (`docker`, `vagrant`...).
+fn compiled(name: &str, targets: &[&str]) -> Outcome<String> {
+    let compiled = accepted(&fixture(name)?)?;
+    let project = isoloom_targets::Lab::parse(&yaml(&compiled)).map_err(|p| format!("{name}: {p:?}"))?;
+    let (files, skipped) = isoloom_targets::generate_all(&project);
+    for target in targets {
+        let dir = format!(".isoloom/{target}/");
+        if !files.iter().any(|f| f.path.starts_with(&dir)) {
+            let skipped: Vec<String> = skipped.iter().map(ToString::to_string).collect();
+            return Err(format!("{name}: nothing for {target}: {skipped:?}").into());
+        }
+    }
+    Ok(yaml(&compiled))
+}
+
+#[test]
+fn the_office_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
+    insta::assert_snapshot!("office", compiled("office", &["hybrid"])?);
+    Ok(())
+}
+
+#[test]
+fn the_vlan_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
+    insta::assert_snapshot!("vlans", compiled("vlans", &["docker"])?);
+    Ok(())
+}
+
+#[test]
+fn the_cisco_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
+    insta::assert_snapshot!("cisco-ospf", compiled("cisco-ospf", &["docker"])?);
+    Ok(())
+}
+
+#[test]
+fn the_wan_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
+    insta::assert_snapshot!("wan-links", compiled("wan-links", &["hybrid"])?);
+    Ok(())
+}
+
+#[test]
+fn the_windows_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
+    insta::assert_snapshot!("windows-domain", compiled("windows-domain", &["vagrant"])?);
+    Ok(())
+}
+
+#[test]
+fn every_provisioning_step_gets_its_starter() -> Outcome {
+    let compiled = compile(&fixture("windows-domain")?)?;
+    let paths: Vec<String> = compiled.into_parts().2.into_iter().map(|f| f.path).collect();
+    assert_eq!(paths, ["provision/dc01.ps1", "provision/intranet.sh", "provision/intranet.yml"]);
+    Ok(())
+}
