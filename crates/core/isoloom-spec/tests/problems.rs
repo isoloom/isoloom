@@ -145,3 +145,13 @@ fn problems_read_as_json_too() {
     ));
     insta::assert_snapshot!(serde_json::to_string_pretty(&found).unwrap_or_else(|e| panic!("{e}")));
 }
+
+#[test]
+fn clones_past_the_last_address() {
+    let shown = rendered(&spec("machines:\n  m: { app: { image: nginx }, networks: { lab: 250 }, count: 10 }\n"));
+    assert!(shown.starts_with("error[invalid-value] machines.m.networks.lab  (isoloom.yml:6:"), "{shown}");
+    assert!(
+        shown.ends_with("\n  10 machines from .250 run past .255 (the last would be .259): start lower or count fewer"),
+        "one problem, saying why: {shown}"
+    );
+}
