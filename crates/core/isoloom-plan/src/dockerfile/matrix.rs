@@ -3,8 +3,7 @@
 //! official service image is a catalogue entry ([`EntryCall`]: `mysql:5.7` is the catalogue's
 //! `mysql`, its newest 5.7 release), resolved by the translation with the settings the image's
 //! environment gives (`MYSQL_ROOT_PASSWORD` and the like); the images whose entries have no VM
-//! recipe yet (php) are still the install written here, with their image's conventions (its
-//! helper commands). Either wins over a fetched Dockerfile.
+//! recipe yet are still the install written here. Either wins over a fetched Dockerfile.
 //!
 //! An entry's release goes on the machine's own `os` when the release runs there, else on the
 //! first OS it lists.
@@ -64,6 +63,10 @@ pub enum Fallback {
 /// MySQL's image creates no application user when `MYSQL_USER` is unset; the entry's
 /// entrypoint reads the user `root` the same way, so the image's behaviour is kept.
 const MYSQL_UNSET: &[(&str, Fallback)] = &[("user", Fallback::Value("root")), ("user_password", Fallback::Setting("password"))];
+
+/// The php image's variants: the entry's `server`.
+const PHP_APACHE: &[(&str, Fallback)] = &[("server", Fallback::Value("apache"))];
+const PHP_FPM: &[(&str, Fallback)] = &[("server", Fallback::Value("fpm"))];
 
 /// PostgreSQL's image makes its superuser `postgres` when `POSTGRES_USER` is unset, and names the
 /// database after the user when `POSTGRES_DB` is.
@@ -233,61 +236,24 @@ fn version_and_variants(tag: &str) -> (String, Vec<String>) {
     (version, words.map(str::to_owned).collect())
 }
 
-/// `major.minor` of a version (`8.5.1` → `8.5`); a bare major stays as it is.
-fn minor(version: &str) -> String {
-    version.split('.').take(2).collect::<Vec<_>>().join(".")
-}
-
-const PHP: &str = include_str!("matrix/php.sh");
 const KCTF: &str = include_str!("matrix/kctf.sh");
-const PHP_SHIMS: &str = include_str!("matrix/php-shims.sh");
 
-/// `php:<version>[-apache|-fpm|-cli]`: PHP of that version from the Debian PHP archive
-/// (`packages.sury.org`), Apache with `mod_php` for `-apache`, FPM on port 9000 for `-fpm`, and the
-/// image's helpers (`docker-php-ext-install` installs the extension's package,
-/// `apache2-foreground`).
+/// `php:<version>[-apache|-fpm]`: the catalogue's php at that version, its `server` the variant
+/// (none for the CLI image), with the image's `PHP_INI_DIR` and folder.
 fn php(tag: &str) -> Base {
-    let (version, variants) = version_and_variants(tag);
-    let version = match minor(&version).as_str() {
-        "5" => "5.6".to_owned(),
-        "7" => "7.4".to_owned(),
-        "8" | "latest" => "8.4".to_owned(),
-        v => v.to_owned(),
-    };
-    let apache = variants.iter().any(|v| v == "apache");
-    let fpm = variants.iter().any(|v| v == "fpm");
-    let sapi = if apache {
-        "apache2"
-    } else if fpm {
-        "fpm"
+    let (_, variants) = version_and_variants(tag);
+    let unset = if variants.iter().any(|v| v == "apache") {
+        PHP_APACHE
+    } else if variants.iter().any(|v| v == "fpm") {
+        PHP_FPM
     } else {
-        "cli"
-    };
-    let fill = |s: &str| s.replace("{VERSION}", &version).replace("{SAPI}", sapi);
-    // The CLI image's command is PHP's interactive shell: on a VM, nothing runs.
-    let cmd = if apache {
-        Some(exec(&["apache2-foreground"]))
-    } else if fpm {
-        Some(exec(&["php-fpm"]))
-    } else {
-        None
+        &[]
     };
     Base {
-        os: "debian@12".to_owned(),
-        prelude: vec![fill(PHP), fill(PHP_SHIMS)],
         env: vec![("PHP_INI_DIR".into(), "/usr/local/etc/php".into())],
         workdir: Some("/var/www/html".into()),
-        user: None,
-        entrypoint: None,
-        cmd,
-        entry: None,
-        jail: false,
+        ..Base::entry("php", tag, unset, &[])
     }
-}
-
-/// The exec form of `argv`.
-fn exec(argv: &[&str]) -> Command {
-    Command::Exec(argv.iter().map(|a| (*a).to_owned()).collect())
 }
 
 #[cfg(test)]
@@ -319,8 +285,12 @@ mod tests {
     #[test]
     fn service_images_pin_their_version() {
         let php = of("php:7.4-apache").unwrap();
-        assert!(php.prelude[0].contains("php7.4-cli") && php.prelude[0].contains("libapache2-mod-php7.4"));
-        assert_eq!(php.cmd, Some(exec(&["apache2-foreground"])));
+        let call = php.entry.expect("the catalogue's php");
+        assert_eq!((call.entry, call.version.as_deref()), ("php", Some("7.4")));
+        assert_eq!(call.unset, PHP_APACHE);
+        assert_eq!(of("php:8.2-fpm").unwrap().entry.map(|c| c.unset), Some(PHP_FPM));
+        assert_eq!(of("php:8.2-cli").unwrap().entry.map(|c| c.unset.len()), Some(0));
+        assert_eq!(php.workdir.as_deref(), Some("/var/www/html"));
     }
 
     #[test]

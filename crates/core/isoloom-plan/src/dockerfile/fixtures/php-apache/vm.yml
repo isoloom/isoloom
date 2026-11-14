@@ -47,86 +47,7 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - command: |
-      set -eu
-      # PHP 8.5 from the Debian PHP archive (packages.sury.org), as the php:8.5 image has it.
-      export DEBIAN_FRONTEND=noninteractive
-      apt-get update
-      apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release
-      curl -fsSL https://packages.sury.org/php/apt.gpg -o /usr/share/keyrings/sury-php.gpg
-      echo "deb [signed-by=/usr/share/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/sury-php.list
-      apt-get update
-      apt-get install -y --no-install-recommends php8.5-cli php8.5-common
-      if [ "apache2" = apache2 ]; then
-        apt-get install -y --no-install-recommends apache2 libapache2-mod-php8.5
-        # The image runs Apache's prefork MPM with mod_php, serving /var/www/html.
-        a2dismod -q mpm_event || true
-        a2enmod -q mpm_prefork php8.5
-        rm -f /var/www/html/index.html
-      fi
-      if [ "apache2" = fpm ]; then
-        apt-get install -y --no-install-recommends php8.5-fpm
-        # The image's FPM listens on port 9000 and stays in the foreground.
-        sed -i 's|^listen = .*|listen = 9000|' /etc/php/8.5/fpm/pool.d/www.conf
-        printf '#!/bin/sh\nmkdir -p /run/php\nexec /usr/sbin/php-fpm8.5 -F -R "$@"\n' > /usr/local/sbin/php-fpm
-        chmod 755 /usr/local/sbin/php-fpm
-      fi
-      # The image has no php.ini (PHP's own defaults) and reads $PHP_INI_DIR/conf.d: the same here.
-      mkdir -p /usr/local/etc/php/conf.d
-      cp /usr/lib/php/8.5/php.ini-development /usr/lib/php/8.5/php.ini-production /usr/local/etc/php/ 2>/dev/null || true
-      for sapi in cli apache2; do
-        [ -d /etc/php/8.5/$sapi ] || continue
-        rm -f /etc/php/8.5/$sapi/php.ini
-        ln -sf /usr/local/etc/php/php.ini /etc/php/8.5/$sapi/php.ini
-      done
-      touch /usr/local/etc/php/php.ini
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
-    creates: /var/lib/isoloom/dockerfile/003
-  - command: |
-      set -eu
-      # The php image's helpers, as commands of the VM: an extension is its package from the archive.
-      cat > /usr/local/bin/docker-php-ext-install <<'SHIM'
-      #!/bin/sh
-      set -e
-      pkgs=
-      for a in "$@"; do
-        case $a in
-          -*|[0-9]*) ;;
-          pdo|json|tokenizer|ctype|fileinfo|filter|hash|iconv|session|sockets|posix|pcntl|exif|calendar|ftp|gettext|shmop|sysvmsg|sysvsem|sysvshm) ;;
-          pdo_mysql|mysqli|mysql) pkgs="$pkgs php8.5-mysql" ;;
-          pdo_pgsql|pgsql) pkgs="$pkgs php8.5-pgsql" ;;
-          pdo_sqlite|sqlite3) pkgs="$pkgs php8.5-sqlite3" ;;
-          opcache) pkgs="$pkgs php8.5-opcache" ;;
-          *) pkgs="$pkgs php8.5-$a" ;;
-        esac
-      done
-      [ -z "$pkgs" ] || DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $pkgs
-      SHIM
-      cat > /usr/local/bin/docker-php-ext-configure <<'SHIM'
-      #!/bin/sh
-      # The archive's extensions come built: nothing to configure.
-      exit 0
-      SHIM
-      cat > /usr/local/bin/docker-php-ext-enable <<'SHIM'
-      #!/bin/sh
-      for a in "$@"; do case $a in -*) ;; *) phpenmod -v 8.5 "$a" || true ;; esac; done
-      SHIM
-      cat > /usr/local/bin/docker-php-source <<'SHIM'
-      #!/bin/sh
-      exit 0
-      SHIM
-      cat > /usr/local/bin/apache2-foreground <<'SHIM'
-      #!/bin/sh
-      set -e
-      . /etc/apache2/envvars
-      export PHP_INI_SCAN_DIR="/etc/php/8.5/apache2/conf.d:/usr/local/etc/php/conf.d"
-      mkdir -p "$APACHE_RUN_DIR" "$APACHE_LOCK_DIR" "$APACHE_LOG_DIR"
-      rm -f "$APACHE_PID_FILE"
-      exec apache2 -DFOREGROUND "$@"
-      SHIM
-      chmod 755 /usr/local/bin/docker-php-ext-install /usr/local/bin/docker-php-ext-configure /usr/local/bin/docker-php-ext-enable /usr/local/bin/docker-php-source /usr/local/bin/apache2-foreground
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
-    creates: /var/lib/isoloom/dockerfile/004
+  - catalogue: php@8.5.12 on debian@12
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -135,8 +56,8 @@ app:
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p /var/www/html && cd /var/www/html
       mkdir -p /var/www/html
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
-    creates: /var/lib/isoloom/dockerfile/005
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
+    creates: /var/lib/isoloom/dockerfile/003
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -145,8 +66,8 @@ app:
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p /var/www/html && cd /var/www/html
       apt-get update  && export DEBIAN_FRONTEND=noninteractive  && apt-get install -y zlib1g-dev libpng-dev libjpeg-dev libfreetype6-dev iputils-ping  && apt-get clean -y && rm -rf /var/lib/apt/lists/*  && docker-php-ext-configure gd --with-jpeg --with-freetype  && docker-php-ext-install gd mysqli pdo pdo_mysql
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/006
-    creates: /var/lib/isoloom/dockerfile/006
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
+    creates: /var/lib/isoloom/dockerfile/004
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -161,8 +82,8 @@ app:
       dest=/var/www/html
       for s in /opt/isoloom/build/php-apache/app; do isoloom_copy_into "$s" "$dest"; done
       chown -R www-data:www-data "$dest"
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/007
-    creates: /var/lib/isoloom/dockerfile/007
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
+    creates: /var/lib/isoloom/dockerfile/005
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -177,8 +98,8 @@ app:
       dest=/var/www/html/config/config.inc.php
       for s in /opt/isoloom/build/php-apache/app/config/config.inc.php.dist; do isoloom_copy_to "$s" "$dest"; done
       chown -R www-data:www-data "$dest"
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/008
-    creates: /var/lib/isoloom/dockerfile/008
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/006
+    creates: /var/lib/isoloom/dockerfile/006
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -192,8 +113,8 @@ app:
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/local/bin/dvwa-setup-db
       for s in /opt/isoloom/build/php-apache/setup-db.sh; do isoloom_copy_to "$s" "$dest"; done
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/009
-    creates: /var/lib/isoloom/dockerfile/009
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/007
+    creates: /var/lib/isoloom/dockerfile/007
   - command: |
       set -e
       keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom)'
@@ -209,15 +130,15 @@ app:
           rc-update del "$u" default || true
         done
       fi
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/010
-    creates: /var/lib/isoloom/dockerfile/010
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/008
+    creates: /var/lib/isoloom/dockerfile/008
   - command: |
       set -e
       mkdir -p /usr/local/lib/isoloom
       printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS91c3IvbG9jYWwvc2JpbjovdXNyL2xvY2FsL2JpbjovdXNyL3NiaW46L3Vzci9iaW46L3NiaW46L2JpbgpleHBvcnQgUEhQX0lOSV9ESVI9L3Vzci9sb2NhbC9ldGMvcGhwCmV4cG9ydCBEQl9TRVJWRVI9ZGIKY2QgL3Zhci93d3cvaHRtbApleGVjIHNoIC1jICdzaCAvdXNyL2xvY2FsL2Jpbi9kdndhLXNldHVwLWRiICYgZXhlYyBhcGFjaGUyLWZvcmVncm91bmQnCg== | base64 -d > /usr/local/lib/isoloom/app-start
       chmod 755 /usr/local/lib/isoloom/app-start
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/011
-    creates: /var/lib/isoloom/dockerfile/011
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/009
+    creates: /var/lib/isoloom/dockerfile/009
   - service:
       name: isoloom-app
       run:

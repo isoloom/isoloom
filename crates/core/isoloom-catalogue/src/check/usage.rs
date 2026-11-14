@@ -76,6 +76,7 @@ fn uses_of_step(entry: &Entry, step: &EntryStep, used: &mut BTreeSet<String>) {
         when.and_then(|w| w.set.as_ref())
             .into_iter()
             .chain(when.and_then(|w| w.unset.as_ref()))
+            .chain(when.and_then(|w| w.is.as_ref()).into_iter().flat_map(indexmap::IndexMap::keys))
             .chain(step.for_each.as_ref())
             .map(ToString::to_string),
     );

@@ -102,10 +102,19 @@ fn the_translation_is_an_explicit_vm_form_a_spec_can_hold() {
     };
     let t = translate(&build, &Sources::default()).unwrap();
     assert_eq!(t.os.to_string(), "debian@12");
-    // The YAML's `app.steps` are the spec's own steps: they parse as an authored spec's.
+    // The YAML's `app.steps` are the spec's own steps: they parse as an authored spec's, but
+    // for the catalogue entry's recipe, which shows as one `catalogue:` line where its steps go.
     let reparsed: serde_yaml_ng::Value = serde_yaml_ng::from_str(&t.yaml).unwrap();
-    let steps: Vec<Step> = serde_yaml_ng::from_value(reparsed["app"]["steps"].clone()).unwrap();
-    assert_eq!(steps, t.steps);
+    let written = reparsed["app"]["steps"].as_sequence().unwrap();
+    assert_eq!(written.iter().filter(|s| s.get("catalogue").is_some()).count(), 1, "{}", t.yaml);
+    let own: Vec<Step> = written
+        .iter()
+        .filter(|s| s.get("catalogue").is_none())
+        .map(|s| serde_yaml_ng::from_value(s.clone()).unwrap())
+        .collect();
+    // Each in order among the translation's steps, the recipe's around them.
+    let mut rest = t.steps.iter();
+    assert!(own.iter().all(|s| rest.any(|made| made == s)), "{}", t.yaml);
     // The image's command is the VM's service, as the image's user and in its folder.
     assert!(matches!(t.steps.last(), Some(Step::Service(_))));
 }
@@ -182,4 +191,23 @@ fn a_catalogue_image_brings_its_entrys_recipe_with_the_images_settings() {
     assert!(t.files.values().any(|v| v == "trading_platform"), "{files:?}");
     // The entry's own service runs: the Dockerfile keeps the image's command.
     assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
+}
+
+#[test]
+fn a_php_image_installs_its_series_release_and_its_variants_server() {
+    let build = |text: &'static str| Build {
+        path: "build/web/Dockerfile",
+        text,
+        context: "build/web",
+        args: &[],
+        os: None,
+    };
+    let fpm = translate(&build("FROM php:7.4-fpm\nRUN docker-php-ext-install pdo_mysql\n"), &Sources::default()).unwrap();
+    assert_eq!(fpm.os.to_string(), "debian@12");
+    assert!(fpm.yaml.contains("catalogue: php@7.4.33 on debian@12"), "{}", fpm.yaml);
+    let files: Vec<&str> = fpm.files.keys().map(ProjectPath::as_str).collect();
+    assert!(files.iter().any(|f| f.ends_with("files/php-fpm")), "{files:?}");
+    // A patch release the archive no longer carries: refused, naming the releases it has.
+    let old = translate(&build("FROM php:7.1.3-apache\n"), &Sources::default()).unwrap_err().to_string();
+    assert!(old.contains("no release 7.1.3") && old.contains("7.1.33"), "{old}");
 }
