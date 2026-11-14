@@ -16,7 +16,7 @@
 use std::borrow::Cow;
 
 use indexmap::IndexMap;
-use isoloom_spec::model::EnvironmentDns;
+use isoloom_spec::model::{EnvironmentDns, Target};
 use isoloom_spec::paas::{Access, Client, Kafka, ObjectStorage, Placement, Postgres, Service, placement};
 use isoloom_spec::syntax::{self, Code, EnvValue, FieldPath, Problem};
 use serde_json::{Value, json};
@@ -105,12 +105,19 @@ pub(crate) fn source_for(source: &syntax::Spec, scope: Scope) -> Cow<'_, syntax:
         return Cow::Borrowed(source);
     }
     let mut spec = source.clone();
-    let dns = spec.dns.get_or_insert_with(EnvironmentDns::default);
-    dns.private = true;
-    let domain = dns.private_domain(&source.name).unwrap_or_default();
+    // A cluster names Services under its own domain and refuses a zone of Isoloom's: there, a
+    // service is reached at its Service name (unless the author asked for the zone anyway).
+    let written = source.dns.as_ref().is_some_and(|d| d.private);
+    let domain = if scope.target() == Some(Target::Kubernetes) && !written {
+        None
+    } else {
+        let dns = spec.dns.get_or_insert_with(EnvironmentDns::default);
+        dns.private = true;
+        dns.private_domain(&source.name)
+    };
     let mut managed = IndexMap::new();
     for (name, service) in &source.services {
-        let host = format!("{name}.{domain}");
+        let host = domain.as_ref().map_or_else(|| name.clone(), |d| format!("{name}.{d}"));
         let placed = scope.target().map_or(Placement::Machine, |t| placement(service, t));
         let as_machine = placed == Placement::Machine;
         if as_machine && let Some(machine) = machine(name, &host, service) {
@@ -120,7 +127,7 @@ pub(crate) fn source_for(source: &syntax::Spec, scope: Scope) -> Cow<'_, syntax:
         }
         for (client, how) in service.clients() {
             let Some(m) = spec.machines.get_mut(client) else { continue };
-            give(m, name, &host, service, how, as_machine);
+            give(m, (name, &host), service, how, as_machine);
             if as_machine && !m.depends_on.contains(name) {
                 m.depends_on.push(name.clone());
             }
@@ -156,7 +163,7 @@ pub(crate) fn refusals(source: &syntax::Spec, scope: Scope) -> Vec<Problem> {
 
 /// Service `name` (at `host`) given to client `m` as `how` says; its facts' files written here
 /// when it runs as a machine (a cloud delivers them once applied).
-fn give(m: &mut syntax::Machine, name: &str, host: &str, service: &Service, how: &Client, as_machine: bool) {
+fn give(m: &mut syntax::Machine, (name, host): (&str, &str), service: &Service, how: &Client, as_machine: bool) {
     let prefix = how.prefix(name);
     let mut env = |key: &str, value: String| {
         m.environment.insert(format!("{prefix}_{key}"), EnvValue::Text(value));

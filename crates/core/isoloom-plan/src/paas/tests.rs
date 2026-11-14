@@ -78,5 +78,9 @@ fn a_spec_of_services_alone_runs_and_publishes_them() {
     let l = lab(alone);
     assert!(l.possible().contains(&Target::Docker), "{:?}", l.possible());
     let spec = l.for_target(Target::Docker);
-    assert!(spec.machines["db"].ports.iter().any(|p| p.port == 5432 && p.publish.is_some()), "{:?}", spec.machines["db"].ports);
+    assert!(
+        spec.machines["db"].ports.iter().any(|p| p.port == 5432 && p.publish.is_some()),
+        "{:?}",
+        spec.machines["db"].ports
+    );
 }

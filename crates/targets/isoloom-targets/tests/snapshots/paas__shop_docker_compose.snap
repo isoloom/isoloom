@@ -9,9 +9,10 @@ expression: compose
 #         docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check-web
 #         docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check-db
 #         docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check-files
+#         docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check-bus
 #         Each prints a PASS or FAIL line per check, and fails when one does (`run -e ISOLOOM_DERIVED=0` leaves the derived checks out).
 # Stop:   docker compose -f .isoloom/docker/compose.yml --profile check down -v
-# Secrets: set ISOLOOM_SECRET_DB_PASSWORD, ISOLOOM_SECRET_FILES_KEY, ISOLOOM_SECRET_FILES_SECRET in Compose's environment for `up` and `start` (each value, never in this file).
+# Secrets: set ISOLOOM_SECRET_DB_PASSWORD, ISOLOOM_SECRET_FILES_KEY, ISOLOOM_SECRET_FILES_SECRET, ISOLOOM_SECRET_BUS_USER, ISOLOOM_SECRET_BUS_PASSWORD in Compose's environment for `up` and `start` (each value, never in this file).
 
 name: shop
 services:
@@ -36,15 +37,62 @@ services:
       DATABASE_NAME: shop
       DATABASE_USER: shop
       DATABASE_SSLMODE: prefer
-      DATABASE_PASSWORD_FILE: /run/isoloom/services/db/password
+      DATABASE_PASSWORD_FILE: /etc/isoloom/services/db/password
+      STORAGE_AUTH: keys
+      STORAGE_ENDPOINT_FILE: /etc/isoloom/services/files/endpoint
+      STORAGE_BUCKET_FILE: /etc/isoloom/services/files/bucket
+      STORAGE_REGION_FILE: /etc/isoloom/services/files/region
+      STORAGE_API_FILE: /etc/isoloom/services/files/api
+      STORAGE_ACCESS_KEY_FILE: /etc/isoloom/services/files/access-key
+      STORAGE_SECRET_KEY_FILE: /etc/isoloom/services/files/secret-key
+      BUS_AUTH: keys
+      BUS_BOOTSTRAP_FILE: /etc/isoloom/services/bus/bootstrap
+      BUS_SECURITY_PROTOCOL_FILE: /etc/isoloom/services/bus/security-protocol
+      BUS_SASL_MECHANISM_FILE: /etc/isoloom/services/bus/sasl-mechanism
+      BUS_USER_FILE: /etc/isoloom/services/bus/user
+      BUS_PASSWORD_FILE: /etc/isoloom/services/bus/password
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+8080}:80
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     secrets:
     - source: db-password
-      target: /run/isoloom/services/db/password
+      target: /etc/isoloom/services/db/password
       mode: '0400'
+    - source: files-key
+      target: /etc/isoloom/services/files/access-key
+      mode: '0400'
+    - source: files-secret
+      target: /etc/isoloom/services/files/secret-key
+      mode: '0400'
+    - source: bus-user
+      target: /etc/isoloom/services/bus/user
+      mode: '0400'
+    - source: bus-password
+      target: /etc/isoloom/services/bus/password
+      mode: '0400'
+    configs:
+    - source: web-file-0
+      target: /etc/isoloom/services/files/endpoint
+      mode: '0644'
+    - source: web-file-1
+      target: /etc/isoloom/services/files/bucket
+      mode: '0644'
+    - source: web-file-2
+      target: /etc/isoloom/services/files/region
+      mode: '0644'
+    - source: web-file-3
+      target: /etc/isoloom/services/files/api
+      mode: '0644'
+    - source: web-file-4
+      target: /etc/isoloom/services/bus/bootstrap
+      mode: '0644'
+    - source: web-file-5
+      target: /etc/isoloom/services/bus/security-protocol
+      mode: '0644'
+    - source: web-file-6
+      target: /etc/isoloom/services/bus/sasl-mechanism
+      mode: '0644'
     healthcheck:
       test:
       - CMD
@@ -60,6 +108,10 @@ services:
       isoloom-probe:
         condition: service_completed_successfully
       db:
+        condition: service_healthy
+      files:
+        condition: service_healthy
+      bus:
         condition: service_healthy
     deploy:
       resources:
@@ -89,6 +141,8 @@ services:
       POSTGRES_DB: shop
       POSTGRES_USER: shop
       POSTGRES_PASSWORD_FILE: /run/isoloom/with/password
+    ports:
+    - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+5432}:5432
     volumes:
     - db-data:/var/lib/postgresql/data
     - isoloom-probe:/.isoloom-probe:ro
@@ -116,11 +170,14 @@ services:
       isoloom.environment: shop
     restart: unless-stopped
   files:
-    image: chrislusf/seaweedfs:4.53
-    command:
-    - server
-    - -s3
-    - -s3.port=8333
+    build:
+      context: ../..
+      dockerfile: .isoloom/docker/build/files/Dockerfile
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: shop
+    image: localhost/isoloom/shop-files
+    init: true
     hostname: files
     networks:
       lab:
@@ -128,14 +185,14 @@ services:
         aliases:
         - files.shop.internal
     volumes:
-    - files-files-data:/data
+    - files-files-data:/var/lib/seaweedfs
     - isoloom-probe:/.isoloom-probe:ro
     secrets:
     - source: files-key
-      target: /run/isoloom/services/files/access-key
+      target: /etc/isoloom/services/files/access-key
       mode: '0400'
     - source: files-secret
-      target: /run/isoloom/services/files/secret-key
+      target: /etc/isoloom/services/files/secret-key
       mode: '0400'
     healthcheck:
       test:
@@ -151,8 +208,62 @@ services:
     depends_on:
       isoloom-probe:
         condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1024M
     labels:
       isoloom.port.s3: tcp:8333
+      isoloom.managed: 'true'
+      isoloom.environment: shop
+    restart: unless-stopped
+  bus:
+    build:
+      context: ../..
+      dockerfile: .isoloom/docker/build/bus/Dockerfile
+      labels:
+        isoloom.managed: 'true'
+        isoloom.environment: shop
+    image: localhost/isoloom/shop-bus
+    init: true
+    hostname: bus
+    networks:
+      lab:
+        ipv4_address: 10.30.0.42
+        aliases:
+        - bus.shop.internal
+    volumes:
+    - bus-bus-data:/var/lib/kafka
+    - isoloom-probe:/.isoloom-probe:ro
+    secrets:
+    - source: bus-user
+      target: /etc/isoloom/services/bus/user
+      mode: '0400'
+    - source: bus-password
+      target: /etc/isoloom/services/bus/password
+      mode: '0400'
+    healthcheck:
+      test:
+      - CMD
+      - /.isoloom-probe/busybox
+      - sh
+      - -c
+      - /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 9092
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+    depends_on:
+      isoloom-probe:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1536M
+    labels:
+      isoloom.port.kafka: tcp:9092
       isoloom.managed: 'true'
       isoloom.environment: shop
     restart: unless-stopped
@@ -174,6 +285,8 @@ services:
         condition: service_healthy
       files:
         condition: service_healthy
+      bus:
+        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shop
@@ -193,6 +306,8 @@ services:
       db:
         condition: service_healthy
       files:
+        condition: service_healthy
+      bus:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -214,6 +329,8 @@ services:
         condition: service_healthy
       files:
         condition: service_healthy
+      bus:
+        condition: service_healthy
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shop
@@ -233,6 +350,30 @@ services:
       db:
         condition: service_healthy
       files:
+        condition: service_healthy
+      bus:
+        condition: service_healthy
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: shop
+  isoloom-check-bus:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    profiles:
+    - check
+    entrypoint:
+    - /bin/sh
+    - /isoloom/run.sh
+    network_mode: service:bus
+    volumes:
+    - ./checks/bus.sh:/isoloom/run.sh:ro,z
+    depends_on:
+      web:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      files:
+        condition: service_healthy
+      bus:
         condition: service_healthy
     labels:
       isoloom.managed: 'true'
@@ -268,6 +409,10 @@ volumes:
     labels:
       isoloom.managed: 'true'
       isoloom.environment: shop
+  bus-bus-data:
+    labels:
+      isoloom.managed: 'true'
+      isoloom.environment: shop
   isoloom-probe:
     labels:
       isoloom.managed: 'true'
@@ -279,3 +424,22 @@ secrets:
     environment: ISOLOOM_SECRET_FILES_KEY
   files-secret:
     environment: ISOLOOM_SECRET_FILES_SECRET
+  bus-user:
+    environment: ISOLOOM_SECRET_BUS_USER
+  bus-password:
+    environment: ISOLOOM_SECRET_BUS_PASSWORD
+configs:
+  web-file-0:
+    content: http://files.shop.internal:8333
+  web-file-1:
+    content: uploads
+  web-file-2:
+    content: us-east-1
+  web-file-3:
+    content: s3
+  web-file-4:
+    content: bus.shop.internal:9092
+  web-file-5:
+    content: SASL_PLAINTEXT
+  web-file-6:
+    content: SCRAM-SHA-512

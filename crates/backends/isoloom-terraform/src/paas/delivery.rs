@@ -54,16 +54,13 @@ pub(super) fn write(cloud: Cloud, env: &Environment, at: &Each<'_>, m: &mut Modu
 fn block(service: &str, client: &str, facts: &[(String, bool, Expression)], (host, user, instance): (Expression, &str, &str)) -> Block {
     let tmp = |file: &str| format!("/tmp/isoloom-service-{service}-{file}");
     let dir = fact_path(service, "");
-    let mut install = format!("install -d -m 0755 {}", quote(dir.trim_end_matches('/')));
+    let mut steps = vec![format!("install -d -m 0755 {}", quote(dir.trim_end_matches('/')))];
     for (file, secret, _) in facts {
         let mode = if *secret { "0400" } else { "0444" };
-        install.push_str(&format!(
-            " && install -m {mode} {} {} && rm -f {}",
-            quote(&tmp(file)),
-            quote(&fact_path(service, file)),
-            quote(&tmp(file))
-        ));
+        let (from, to) = (quote(&tmp(file)), quote(&fact_path(service, file)));
+        steps.push(format!("install -m {mode} {from} {to} && rm -f {from}"));
     }
+    let install = steps.join(" && ");
     let values = list(facts.iter().map(|(_, _, v)| v.clone()));
     let connection = Block::builder("connection")
         .add_attribute(("type", string("ssh")))

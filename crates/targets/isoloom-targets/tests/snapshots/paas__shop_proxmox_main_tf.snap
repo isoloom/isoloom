@@ -122,6 +122,30 @@ variable "ISOLOOM_SECRET_DB_PASSWORD" {
   description = "The secret `db-password` (the spec's `secrets`), which the machines get as a file"
 }
 
+variable "ISOLOOM_SECRET_FILES_KEY" {
+  type        = string
+  sensitive   = true
+  description = "The secret `files-key` (the spec's `secrets`), which the machines get as a file"
+}
+
+variable "ISOLOOM_SECRET_FILES_SECRET" {
+  type        = string
+  sensitive   = true
+  description = "The secret `files-secret` (the spec's `secrets`), which the machines get as a file"
+}
+
+variable "ISOLOOM_SECRET_BUS_USER" {
+  type        = string
+  sensitive   = true
+  description = "The secret `bus-user` (the spec's `secrets`), which the machines get as a file"
+}
+
+variable "ISOLOOM_SECRET_BUS_PASSWORD" {
+  type        = string
+  sensitive   = true
+  description = "The secret `bus-password` (the spec's `secrets`), which the machines get as a file"
+}
+
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
@@ -220,7 +244,7 @@ resource "proxmox_virtual_environment_file" "isoloom_router" {
         },
         {
           path    = "/etc/nftables.conf"
-          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.30.0.10 tcp dport 80 ct status dnat accept\n    ip saddr { 10.30.0.0/24 } ip daddr != { 10.30.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.30.0.0/24 } tcp dport 8080 dnat ip to 10.30.0.10:80\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.30.0.0/24 } ip daddr != { 10.30.0.0/24 } masquerade\n  }\n}\n"
+          content = "flush ruleset\ntable inet isoloom {\n  chain forward {\n    type filter hook forward priority 0; policy drop;\n    ct state established,related accept\n    ip daddr 10.30.0.10 tcp dport 80 ct status dnat accept\n    ip daddr 10.30.0.40 tcp dport 5432 ct status dnat accept\n    ip saddr { 10.30.0.0/24 } ip daddr != { 10.30.0.0/24 } accept\n  }\n  chain prerouting {\n    type nat hook prerouting priority -100;\n    ip saddr != { 10.30.0.0/24 } tcp dport 8080 dnat ip to 10.30.0.10:80\n    ip saddr != { 10.30.0.0/24 } tcp dport 5432 dnat ip to 10.30.0.40:5432\n  }\n  chain postrouting {\n    type nat hook postrouting priority 100;\n    ip saddr { 10.30.0.0/24 } ip daddr != { 10.30.0.0/24 } masquerade\n  }\n}\n"
         },
         { path = "/etc/sysctl.d/90-isoloom.conf", content = "net.ipv4.ip_forward=1\n" },
         {
@@ -325,7 +349,7 @@ resource "proxmox_virtual_environment_file" "db" {
       ]
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.30.0.10 web web.shop.internal'\\'' '\\''10.30.0.40 db db.shop.internal'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.30.0.10 web web.shop.internal'\\'' '\\''10.30.0.40 db db.shop.internal'\\'' '\\''10.30.0.41 files files.shop.internal'\\'' '\\''10.30.0.42 bus bus.shop.internal'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: volume folders' > /var/lib/isoloom/ready; sh -c 'mkdir -p '\\''/var/lib/postgresql/data'\\''' || { echo 'failed: volume folders' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for its secrets' > /var/lib/isoloom/ready; set -a && . /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env && sh -c 'set -e\numask 077\nmkdir -p /var/lib/isoloom/secrets\nchmod 700 /var/lib/isoloom/secrets\nv=\"$(printenv ISOLOOM_SECRET_DB_PASSWORD || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/db-password ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/db-password.new; mv -f /var/lib/isoloom/secrets/db-password.new /var/lib/isoloom/secrets/db-password; fi\ntouch /var/lib/isoloom/secrets/.delivered\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/db-password '\\''/run/isoloom/with/password'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi' || { echo 'failed: waiting for its secrets' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
@@ -396,6 +420,219 @@ resource "proxmox_virtual_environment_firewall_rules" "db" {
     comment = "network lab"
     source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
   }
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "published"
+    proto   = "tcp"
+    dport   = "5432"
+  }
+}
+
+# Machine `files`.
+resource "proxmox_virtual_environment_file" "files" {
+  node_name    = var.node
+  datastore_id = var.snippets_datastore
+  content_type = "snippets"
+  source_raw {
+    file_name = "iso${var.slot}-files.yaml"
+    data = format("#cloud-config\n%s", yamlencode({
+      hostname = "files"
+      users    = local.users
+      packages = ["nftables", "curl", "netcat-openbsd"]
+      write_files = [
+        {
+          path        = "/var/lib/isoloom/secrets.env"
+          permissions = "0600"
+          content = join("", [
+            format("%s\n", "ISOLOOM_SECRET_FILES_KEY='${base64encode(var.ISOLOOM_SECRET_FILES_KEY)}'"),
+            format("%s\n", "ISOLOOM_SECRET_FILES_SECRET='${base64encode(var.ISOLOOM_SECRET_FILES_SECRET)}'")
+          ])
+        },
+        {
+          path        = "/var/lib/isoloom/configure/configure-0.sh"
+          encoding    = "gz+b64"
+          permissions = "0700"
+          content     = "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"
+        }
+      ]
+      runcmd = [
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.30.0.10 web web.shop.internal'\\'' '\\''10.30.0.40 db db.shop.internal'\\'' '\\''10.30.0.41 files files.shop.internal'\\'' '\\''10.30.0.42 bus bus.shop.internal'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: volume folders' > /var/lib/isoloom/ready; sh -c 'mkdir -p '\\''/var/lib/seaweedfs'\\''' || { echo 'failed: volume folders' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for its secrets' > /var/lib/isoloom/ready; set -a && . /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env && sh -c 'set -e\numask 077\nmkdir -p /var/lib/isoloom/secrets\nchmod 700 /var/lib/isoloom/secrets\nv=\"$(printenv ISOLOOM_SECRET_FILES_KEY || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/files-key ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/files-key.new; mv -f /var/lib/isoloom/secrets/files-key.new /var/lib/isoloom/secrets/files-key; fi\nv=\"$(printenv ISOLOOM_SECRET_FILES_SECRET || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/files-secret ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/files-secret.new; mv -f /var/lib/isoloom/secrets/files-secret.new /var/lib/isoloom/secrets/files-secret; fi\ntouch /var/lib/isoloom/secrets/.delivered\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/files-key '\\''/etc/isoloom/services/files/access-key'\\''\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/files-secret '\\''/etc/isoloom/services/files/secret-key'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi' || { echo 'failed: waiting for its secrets' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: its configuration' > /var/lib/isoloom/ready; sh /var/lib/isoloom/configure/configure-0.sh || { echo 'failed: its configuration' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
+      ]
+    }))
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "files" {
+  name      = "iso${var.slot}-files"
+  node_name = var.node
+  tags      = ["isoloom", "shop"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
+  on_boot   = false
+  cpu {
+    cores = 1
+    type  = "host"
+  }
+  memory {
+    dedicated = 1024
+  }
+  disk {
+    datastore_id = var.datastore
+    file_id      = proxmox_download_file.debian_12.id
+    interface    = "virtio0"
+    size         = 20
+  }
+  network_device {
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
+  }
+  initialization {
+    datastore_id      = var.datastore
+    user_data_file_id = proxmox_virtual_environment_file.files.id
+    dns {
+      servers = ["1.1.1.1"]
+      domain  = "shop.internal"
+    }
+    ip_config {
+      ipv4 {
+        address = "10.30.0.41/24"
+        gateway = "10.30.0.254"
+      }
+    }
+  }
+  operating_system {
+    type = "l26"
+  }
+  serial_device {}
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `files`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "files" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.files.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "files" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.files.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
+}
+
+# Machine `bus`.
+resource "proxmox_virtual_environment_file" "bus" {
+  node_name    = var.node
+  datastore_id = var.snippets_datastore
+  content_type = "snippets"
+  source_raw {
+    file_name = "iso${var.slot}-bus.yaml"
+    data = format("#cloud-config\n%s", yamlencode({
+      hostname = "bus"
+      users    = local.users
+      packages = ["nftables", "curl", "netcat-openbsd"]
+      write_files = [
+        {
+          path        = "/var/lib/isoloom/secrets.env"
+          permissions = "0600"
+          content = join("", [
+            format("%s\n", "ISOLOOM_SECRET_BUS_USER='${base64encode(var.ISOLOOM_SECRET_BUS_USER)}'"),
+            format("%s\n", "ISOLOOM_SECRET_BUS_PASSWORD='${base64encode(var.ISOLOOM_SECRET_BUS_PASSWORD)}'")
+          ])
+        },
+        {
+          path        = "/var/lib/isoloom/configure/configure-0.sh"
+          encoding    = "gz+b64"
+          permissions = "0700"
+          content     = "H4sIAAAAAAAC/70aaXPbtvK7fgXCyJHlGtRhO47tMq9ukraZunEnbl87Y+VpYBKSWFEgQ5A+6vq/v10cvETbSdOp21FEYnexF/aCNjuSZ4TyvBPKOIrj1dRfMDHnwWaf3HYI4f4iJo5ZOyRmkXS3HFgMZ+ScUEGc7u3bs9OT09Ofpq9+OH73/ZvXh/TOIR+OSLbgAgAJWS2DMCU0aYHdGGwB8LNn5JC8dLqNRdxmFnbuCvZmLIzaeQOeyMtnY1hIeZangowqaMnKIM3ilMATCQVhSUbnIH0gZuQmX8Hz8ogEseIXRPPj1YqJgNBLYBpQgPog4JcDkUcRGb98NqqIZ5np3gLgBlK9c8yCYWaoHkEUAlsIjtqrSEQcEZOE+Us25wR2hX9S8lYDkKWIryTZNOxuI7/byPA2ctx3KlKGQmYsigrrTQVbca97O97Y8Lbu8MUlT2UYCw+++0xy0h2jJra8rX65BvBPt7w7cnREuGR+AToCUCUFcNI30j0lcsGjyF9wf0mCULKLiHtnr8bD0XNYC5LlnH7MeXrTkyS+EiA/jwK5TUScofI0ck+6htp0wS6B380Sj9DfCJ15ve7tWcayXN6R7u1/NZ93PbQLSuiAOQrT9Mlff5UeoOlq/hV1FNcxeiLxkhQqIw7oAESGT4td0QD+ga//iVsaPYGD41bnyupI+mkrWfBtr45lyB0dqS/ofX+hOa1K9alq7FTzNXAq8GD6kVB6tWBZksaXYcBlqY6Go1oXjSRvUjAotLJXO7Ly3Arb6HqfwTCAg05mMYSaz2IT8aJQQoiiFUu1mB10OE95omT6X1Mo4twjRd3YGFPQ3GsHyh6nZOV1kU25CGdZcS50OGmeDBtd8iRgGQe+PkKMK+R6/ebbt8fvpt+9P333y5t3rz0Ri1BkPGV+FoKTWmTrUfRGEaBUxFYPNOUYobgI0PDf1LRZ2chS8iPOBEbZFOyezsjgkqWDKLwYAMAANSwHW484pgqdMuG+DZL4Z1VRO2gKKCytT3SEUamGam7x0CCYikzUPGDYcez+BrGJpgBrQJUjakIr/pmYXdNgi6IsnNYPQpbL6x6v/JEFgbaEzyDuFWQ/0aVMlJdVn9os01QzfK0pvVT4WtS3shRKAlJtyitzEAavpw4cyo9kCOEM3aNMVw36JfVvFOV6/jJAoZhDIib4jgdOQ5ZGiUEcqwtVT5QqErzMYP4qaJy5WlqG5bU40hDjMQ1/gZibaB3FRP8LRZYLNt57boTWDxJKEqc7AorEz8GIAenBf3RWq2tmPPMXBg3i8JOqevw8jdp0UwG5wtBwf1mjljHPnAInY0ex0ymLmo4JqFW76V31B6M+T7NwFvoQAWVTM5g1nhAqyQBkGEgZDRBaDhporp9m2jWr4MkyHGSRLFEuchFEXANXJHjM+Peav4X5ez2hCdvuCg85Q4OCYzWr9Ehn8uwEDjHQgoJoh9C4Yo1KYMmz0hHO0VEUVKm6k9oLp1SL9jdFr6+rlfWlMS5VNVs5YYrVSoW/Cd8wAVu0MusoBtAFE+3a6nlNtVdpmKkTNv7UUwVkKprI+LVVxTRbJeAAq2XGV0nT+EkKOXdGehuypzmB/gMRFIsVtRL72vj/VKpa1Ov+B5uNlVa1giibD4y1CqrKWAA1cBSz4AE73at7NMvO3zZBXXClFVhxzVbUMuZU+xIMLdZMWn6gcqt3bgjd7GYsPWXFkbVilWlkQ3Uk8zjzWmRWlPtWSfAMcA550qaFR3iB/RdMkrMfjimSVpR0B9LdOVRdyAy4K1rbPJFZyhl0VxDbcTWBjiGU5CqNxXxNBK33ywoHhY8/4qQsy9KiCAB18dTrjpVC0jgHn92pNdgaovASXW0ryLoyLPZmCPF9XsFcqyvCh+iDA6H3EuqTjV9tYFDKLwArm0LrC70dXVSWdeJ6LP4pYBLPiD5XTZ6sfOs8fV/nqUUR/mKeJoYns/xpPCnge3nabaj7iglw39vdp1DP7m5snD8ZfoBpxl2n6IuqXLMa17cK+ZAO75rtkr9YxYHerJXnFq4BgZdMG7brgxNw8qLmZNkCqiqiXhbOZx6t/5lHpOx1d3XQg297thYje2UHpNZsxQ+hh/tZnN7UGsQnWMFgcoW9i9ZZ5ST7qtnj2pRh1sEJKgHOvFxXTVt20MD3dbIXkous3szyL+L0M5gCwFV8aWNjhbna2KjgFcqNZVOrJ2u8gs9BBAsQuFizXjdaZ789bRRo1exdmiISWIvZ7PCPGcMmjj5p5szGXrZyqPdaqv1aG6yp+K5d1LhqC6rpImvhubpd5ayUj0VkKc9KNcanHHZLs2mQ26P34LzUxHbUfnMMClOjkmwuQlvflEM8JX3v6ZOBvAjFIE64SH2a5qK31W8EDSyPiKPK6BAoucGgKMUqacsooAmWxpA41cdwf2+vOU2xczzk0NN1/Y2E0isw/wIJV/L0MvRtmz6No8ArBmxPTCJFfOPOCqCtQFAw7bJZAk0nqZ4czFVRYE7FveRLqwRkANpsyLN2lvRrP4tIwOBkCyja0Xlbvb0xGDB6qdWGj29aYGsQ1bYi7ag+wQZfMPTbOsJyJ+03rTuYpWIDM6VrTOHhuKG3GEUQoCnJgqf8UM2PJYk4ZI4sVpWVH4uMhXCgYDos8wT5k3G6NvI3olUVowzr4WY1TmcV/YeScoHjaBzWfMxDnukIUpkZ1mxXsZweY9fRPiEHg4AGNagk4XW2zIyvSv4eTmQWJ5+zPcInjd2bTYKaEvxdNZV4GulhHbWxaDZz7mfnYfVUlQOhVW/cWm2PNITeS52HlrDcStmsF7QbLm6W8RpstOas+pTYQstIC/ELDqCZBEuolknAZyyPMpjtsKslHtDcU7v1gG3PIzm51d0pcW5gHEDuev1HXd9WzVbDjdhUMgADnYBHWrqCjy9y70p0UdNQIKyb3wevzFqxwOH/UV+3vVKrVmo6wbHugzr5ZHf+O+poxwEn/Ed8u4W6dfLP9O9ZmMpiuCLqo9lp6A3tyJql85aJtUm8IYycI5Wny6ui5qQaCMC5N4YFyt3NzWlIviKjfr+cX6tkVDJnEp5lb56zNFB9jtC9te5bxmXfoiBs8eRD0QzDt76twUZOfSRuy5xcRFwC2GZNJ0Ya5Kj/0ET6oUJVs2PYur9G1WKo/YwO1mdoOr/q/F9OYB6bo5UYqNZGEeqpCsHgDCB5z8J5nsLMVWN37CBm7Qrfh+Iihmsmg7p2FUJ6jfknDLpx8gn/YDj9I1jS0T79I+V0gW0NKL9Xa2tJr0p+sGSzJXOz+Z+AX/xv2wj4usiyRB4OBiz1F5BpXJbgPY4bp/MBBLhM4w923R13rL9Px+5oh6oXhuxwvMN2XzwfHoz2xsGBz56PR/vDg93dF3wcXOyPfDZ8Mbw4eD7ee7G7u8/2g52DYLx/8MIfPx+zF3vj572my4LA2vuA+KhnBNKMYDmvvqkjzFOqTqcrFwCmPqgPH0UTV2Ki1wEoodd/zki7hgh9VUWgQDsNEwpMJXDARCa9Ua/zwB1/rSUhPUUFmDn/FR4/dF5z6QO5DH9UoJa2MbZCwReQixv784bObwz3ETy7itMljQW0rdwFvuHuoXM8gzvRe9Y652c6pH3ovLnm/hlqxXOUuiR2bBQuwBzz65aJyL1udxOcS18fWEWYoCgHF7kc5PDUPyLJ45AJkxI4CvoTsfSKm1Ql4hHxAX850LZy4W4+QcfmciIKE+E6ZB0GXK2YXEIntT8RuONLWPLJ11+/Of1uIgAV9pNuGoPHexdpvOTpNpbM8CLi6UQI6DbdMPBGgFy8dj/mcZqv3MsYNAfm+2Y03neH8N/o8GB4sDMReNfLBa6dHZ+dTH8+OX4LV9C//wIHYqgAhwg43n4FN9PvT09O3ryHlSYRFlyiVJIH7gP0QFXgpnHiqqttwSJFuWQBWkE45mF2g2rKYj+O3BVLmnTqj1W+ipc1BRTUcZAhvRJ+oq/YXa3KOlxj04mQTEauye7uimOMC+UKhHz1/vgnisPkvdHYgBXLbm0DK1QTp7axixSmScQQ9RqOtZ+yFYU2FGHVovsHY3ALpsKtB0HKxit9iDF+xKLUpMJ3z/DzJJ6H4qc4yCFCphyq6RTH25KrCY83cbrdfOIQ68vqRTJxjoDBeO6Cq0qvdNR4NoOjJF0oukLfTXkSYaSGg+3OGM760AmzlIE+fPVWTVlcJPQ5sKtQwJWEAmB5Frs6JupNpbGGN2PQek6EOiP20CwHfhRCvKqcN3uM1nys3dSFDVst/K+bQLGuLoesDQYrnrGqfGo60p4nQMmQV+HsYS22wulzRpD25mPgYJUAroPyPITY5uDQGgMSpVAbUyUWkKnpxzvXPzHr5tuFFCDDh4kzEep2HH/DAjcpAQSIwx3C8iDMDkf4MzsCNVn3NtuAv8OtuyMipol68XTrEJ6gkjyCQiuDUqaVZ+MSwDKlFzCNgrzFEpMgSS1ajQHCJFmqLXiPvwCYcjf8qdGMwv0Q5df4uxh4VrspDQrUCk0g1YTou1K/nILR1mt7kDHEXLIZfgVF6xGUld1uqArfg6G23gVsuDwiMuI8IeMjVdXqzz55NhH8OomhQv/x+Lsfj6c/vDn+eXr68y9nXm/S69HfVxLUDxXX76tr/IIvEYP75FNqB7Sr03mvK30P5lRYIEIxB1n1rb7Y/qASMw++vfFW0A2FFN3W5t5ec2pV5n7oV3udfuf/GJ1XPVkqAAA="
+        }
+      ]
+      runcmd = [
+        "mkdir -p /var/lib/isoloom",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.30.0.10 web web.shop.internal'\\'' '\\''10.30.0.40 db db.shop.internal'\\'' '\\''10.30.0.41 files files.shop.internal'\\'' '\\''10.30.0.42 bus bus.shop.internal'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: volume folders' > /var/lib/isoloom/ready; sh -c 'mkdir -p '\\''/var/lib/kafka'\\''' || { echo 'failed: volume folders' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for its secrets' > /var/lib/isoloom/ready; set -a && . /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env && sh -c 'set -e\numask 077\nmkdir -p /var/lib/isoloom/secrets\nchmod 700 /var/lib/isoloom/secrets\nv=\"$(printenv ISOLOOM_SECRET_BUS_USER || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/bus-user ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/bus-user.new; mv -f /var/lib/isoloom/secrets/bus-user.new /var/lib/isoloom/secrets/bus-user; fi\nv=\"$(printenv ISOLOOM_SECRET_BUS_PASSWORD || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/bus-password ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/bus-password.new; mv -f /var/lib/isoloom/secrets/bus-password.new /var/lib/isoloom/secrets/bus-password; fi\ntouch /var/lib/isoloom/secrets/.delivered\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/bus-user '\\''/etc/isoloom/services/bus/user'\\''\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/bus-password '\\''/etc/isoloom/services/bus/password'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi' || { echo 'failed: waiting for its secrets' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: its configuration' > /var/lib/isoloom/ready; sh /var/lib/isoloom/configure/configure-0.sh || { echo 'failed: its configuration' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
+      ]
+    }))
+  }
+}
+
+resource "proxmox_virtual_environment_vm" "bus" {
+  name      = "iso${var.slot}-bus"
+  node_name = var.node
+  tags      = ["isoloom", "shop"]
+  pool_id   = proxmox_virtual_environment_pool.env.pool_id
+  on_boot   = false
+  cpu {
+    cores = 1
+    type  = "host"
+  }
+  memory {
+    dedicated = 1536
+  }
+  disk {
+    datastore_id = var.datastore
+    file_id      = proxmox_download_file.debian_12.id
+    interface    = "virtio0"
+    size         = 20
+  }
+  network_device {
+    bridge   = proxmox_sdn_vnet.lab.id
+    firewall = true
+  }
+  initialization {
+    datastore_id      = var.datastore
+    user_data_file_id = proxmox_virtual_environment_file.bus.id
+    dns {
+      servers = ["1.1.1.1"]
+      domain  = "shop.internal"
+    }
+    ip_config {
+      ipv4 {
+        address = "10.30.0.42/24"
+        gateway = "10.30.0.254"
+      }
+    }
+  }
+  operating_system {
+    type = "l26"
+  }
+  serial_device {}
+  depends_on = [proxmox_virtual_environment_vm.isoloom_router]
+}
+
+# Machine `bus`'s firewall: what reaches it, outside the guest.
+resource "proxmox_virtual_environment_firewall_options" "bus" {
+  node_name     = var.node
+  vm_id         = proxmox_virtual_environment_vm.bus.vm_id
+  enabled       = true
+  input_policy  = "DROP"
+  output_policy = "ACCEPT"
+}
+
+resource "proxmox_virtual_environment_firewall_rules" "bus" {
+  node_name = var.node
+  vm_id     = proxmox_virtual_environment_vm.bus.vm_id
+  rule {
+    type    = "in"
+    action  = "ACCEPT"
+    comment = "network lab"
+    source  = "+${proxmox_virtual_environment_firewall_ipset.lab.name}"
+  }
 }
 
 # Machine `web`.
@@ -413,7 +650,13 @@ resource "proxmox_virtual_environment_file" "web" {
         {
           path        = "/var/lib/isoloom/secrets.env"
           permissions = "0600"
-          content     = join("", [format("%s\n", "ISOLOOM_SECRET_DB_PASSWORD='${base64encode(var.ISOLOOM_SECRET_DB_PASSWORD)}'")])
+          content = join("", [
+            format("%s\n", "ISOLOOM_SECRET_DB_PASSWORD='${base64encode(var.ISOLOOM_SECRET_DB_PASSWORD)}'"),
+            format("%s\n", "ISOLOOM_SECRET_FILES_KEY='${base64encode(var.ISOLOOM_SECRET_FILES_KEY)}'"),
+            format("%s\n", "ISOLOOM_SECRET_FILES_SECRET='${base64encode(var.ISOLOOM_SECRET_FILES_SECRET)}'"),
+            format("%s\n", "ISOLOOM_SECRET_BUS_USER='${base64encode(var.ISOLOOM_SECRET_BUS_USER)}'"),
+            format("%s\n", "ISOLOOM_SECRET_BUS_PASSWORD='${base64encode(var.ISOLOOM_SECRET_BUS_PASSWORD)}'")
+          ])
         },
         {
           path        = "/var/lib/isoloom/configure/configure-0.sh"
@@ -424,10 +667,13 @@ resource "proxmox_virtual_environment_file" "web" {
       ]
       runcmd = [
         "mkdir -p /var/lib/isoloom",
-        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.30.0.10 web web.shop.internal'\\'' '\\''10.30.0.40 db db.shop.internal'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: system settings' > /var/lib/isoloom/ready; sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(DATABASE_HOST|DATABASE_PORT|DATABASE_NAME|DATABASE_USER|DATABASE_SSLMODE|DATABASE_PASSWORD_FILE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''DATABASE_HOST=db.shop.internal\nDATABASE_PORT=5432\nDATABASE_NAME=shop\nDATABASE_USER=shop\nDATABASE_SSLMODE=prefer\nDATABASE_PASSWORD_FILE=/run/isoloom/services/db/password\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"DATABASE_HOST=db.shop.internal\" \"DATABASE_PORT=5432\" \"DATABASE_NAME=shop\" \"DATABASE_USER=shop\" \"DATABASE_SSLMODE=prefer\" \"DATABASE_PASSWORD_FILE=/run/isoloom/services/db/password\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nsystemctl daemon-reexec 2>/dev/null || true' || { echo 'failed: system settings' > /var/lib/isoloom/ready; exit 1; }",
-        "echo 'running: waiting for its secrets' > /var/lib/isoloom/ready; set -a && . /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env && sh -c 'set -e\numask 077\nmkdir -p /var/lib/isoloom/secrets\nchmod 700 /var/lib/isoloom/secrets\nv=\"$(printenv ISOLOOM_SECRET_DB_PASSWORD || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/db-password ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/db-password.new; mv -f /var/lib/isoloom/secrets/db-password.new /var/lib/isoloom/secrets/db-password; fi\ntouch /var/lib/isoloom/secrets/.delivered\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/db-password '\\''/run/isoloom/services/db/password'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi' || { echo 'failed: waiting for its secrets' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: hosts file' > /var/lib/isoloom/ready; sh -c 'printf '\\''%s\\n'\\'' '\\''10.30.0.10 web web.shop.internal'\\'' '\\''10.30.0.40 db db.shop.internal'\\'' '\\''10.30.0.41 files files.shop.internal'\\'' '\\''10.30.0.42 bus bus.shop.internal'\\'' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '\\''%s\\n'\\'' \"$l\" >> /etc/hosts; done' || { echo 'failed: hosts file' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: system settings' > /var/lib/isoloom/ready; sh -c 'set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '\\''^(DATABASE_HOST|DATABASE_PORT|DATABASE_NAME|DATABASE_USER|DATABASE_SSLMODE|DATABASE_PASSWORD_FILE|STORAGE_AUTH|STORAGE_ENDPOINT_FILE|STORAGE_BUCKET_FILE|STORAGE_REGION_FILE|STORAGE_API_FILE|STORAGE_ACCESS_KEY_FILE|STORAGE_SECRET_KEY_FILE|BUS_AUTH|BUS_BOOTSTRAP_FILE|BUS_SECURITY_PROTOCOL_FILE|BUS_SASL_MECHANISM_FILE|BUS_USER_FILE|BUS_PASSWORD_FILE)='\\'' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s '\\''DATABASE_HOST=db.shop.internal\nDATABASE_PORT=5432\nDATABASE_NAME=shop\nDATABASE_USER=shop\nDATABASE_SSLMODE=prefer\nDATABASE_PASSWORD_FILE=/etc/isoloom/services/db/password\nSTORAGE_AUTH=keys\nSTORAGE_ENDPOINT_FILE=/etc/isoloom/services/files/endpoint\nSTORAGE_BUCKET_FILE=/etc/isoloom/services/files/bucket\nSTORAGE_REGION_FILE=/etc/isoloom/services/files/region\nSTORAGE_API_FILE=/etc/isoloom/services/files/api\nSTORAGE_ACCESS_KEY_FILE=/etc/isoloom/services/files/access-key\nSTORAGE_SECRET_KEY_FILE=/etc/isoloom/services/files/secret-key\nBUS_AUTH=keys\nBUS_BOOTSTRAP_FILE=/etc/isoloom/services/bus/bootstrap\nBUS_SECURITY_PROTOCOL_FILE=/etc/isoloom/services/bus/security-protocol\nBUS_SASL_MECHANISM_FILE=/etc/isoloom/services/bus/sasl-mechanism\nBUS_USER_FILE=/etc/isoloom/services/bus/user\nBUS_PASSWORD_FILE=/etc/isoloom/services/bus/password\n'\\'' >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '\\''[Manager]\\nDefaultEnvironment=%s\\n'\\'' '\\''\"DATABASE_HOST=db.shop.internal\" \"DATABASE_PORT=5432\" \"DATABASE_NAME=shop\" \"DATABASE_USER=shop\" \"DATABASE_SSLMODE=prefer\" \"DATABASE_PASSWORD_FILE=/etc/isoloom/services/db/password\" \"STORAGE_AUTH=keys\" \"STORAGE_ENDPOINT_FILE=/etc/isoloom/services/files/endpoint\" \"STORAGE_BUCKET_FILE=/etc/isoloom/services/files/bucket\" \"STORAGE_REGION_FILE=/etc/isoloom/services/files/region\" \"STORAGE_API_FILE=/etc/isoloom/services/files/api\" \"STORAGE_ACCESS_KEY_FILE=/etc/isoloom/services/files/access-key\" \"STORAGE_SECRET_KEY_FILE=/etc/isoloom/services/files/secret-key\" \"BUS_AUTH=keys\" \"BUS_BOOTSTRAP_FILE=/etc/isoloom/services/bus/bootstrap\" \"BUS_SECURITY_PROTOCOL_FILE=/etc/isoloom/services/bus/security-protocol\" \"BUS_SASL_MECHANISM_FILE=/etc/isoloom/services/bus/sasl-mechanism\" \"BUS_USER_FILE=/etc/isoloom/services/bus/user\" \"BUS_PASSWORD_FILE=/etc/isoloom/services/bus/password\"'\\'' > /etc/systemd/system.conf.d/90-isoloom-environment.conf\nsystemctl daemon-reexec 2>/dev/null || true' || { echo 'failed: system settings' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: files' > /var/lib/isoloom/ready; sh -c 'set -e\nmkdir -p '\\''/etc/isoloom/services/files'\\'' && printf '\\''%s'\\'' '\\''http://files.shop.internal:8333'\\'' > '\\''/etc/isoloom/services/files/endpoint'\\'' && chown 0:0 '\\''/etc/isoloom/services/files/endpoint'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/files/endpoint'\\''\nmkdir -p '\\''/etc/isoloom/services/files'\\'' && printf '\\''%s'\\'' '\\''uploads'\\'' > '\\''/etc/isoloom/services/files/bucket'\\'' && chown 0:0 '\\''/etc/isoloom/services/files/bucket'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/files/bucket'\\''\nmkdir -p '\\''/etc/isoloom/services/files'\\'' && printf '\\''%s'\\'' '\\''us-east-1'\\'' > '\\''/etc/isoloom/services/files/region'\\'' && chown 0:0 '\\''/etc/isoloom/services/files/region'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/files/region'\\''\nmkdir -p '\\''/etc/isoloom/services/files'\\'' && printf '\\''%s'\\'' '\\''s3'\\'' > '\\''/etc/isoloom/services/files/api'\\'' && chown 0:0 '\\''/etc/isoloom/services/files/api'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/files/api'\\''\nmkdir -p '\\''/etc/isoloom/services/bus'\\'' && printf '\\''%s'\\'' '\\''bus.shop.internal:9092'\\'' > '\\''/etc/isoloom/services/bus/bootstrap'\\'' && chown 0:0 '\\''/etc/isoloom/services/bus/bootstrap'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/bus/bootstrap'\\''\nmkdir -p '\\''/etc/isoloom/services/bus'\\'' && printf '\\''%s'\\'' '\\''SASL_PLAINTEXT'\\'' > '\\''/etc/isoloom/services/bus/security-protocol'\\'' && chown 0:0 '\\''/etc/isoloom/services/bus/security-protocol'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/bus/security-protocol'\\''\nmkdir -p '\\''/etc/isoloom/services/bus'\\'' && printf '\\''%s'\\'' '\\''SCRAM-SHA-512'\\'' > '\\''/etc/isoloom/services/bus/sasl-mechanism'\\'' && chown 0:0 '\\''/etc/isoloom/services/bus/sasl-mechanism'\\'' && chmod '\\''0644'\\'' '\\''/etc/isoloom/services/bus/sasl-mechanism'\\''' || { echo 'failed: files' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for its secrets' > /var/lib/isoloom/ready; set -a && . /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env && sh -c 'set -e\numask 077\nmkdir -p /var/lib/isoloom/secrets\nchmod 700 /var/lib/isoloom/secrets\nv=\"$(printenv ISOLOOM_SECRET_DB_PASSWORD || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/db-password ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/db-password.new; mv -f /var/lib/isoloom/secrets/db-password.new /var/lib/isoloom/secrets/db-password; fi\nv=\"$(printenv ISOLOOM_SECRET_FILES_KEY || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/files-key ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/files-key.new; mv -f /var/lib/isoloom/secrets/files-key.new /var/lib/isoloom/secrets/files-key; fi\nv=\"$(printenv ISOLOOM_SECRET_FILES_SECRET || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/files-secret ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/files-secret.new; mv -f /var/lib/isoloom/secrets/files-secret.new /var/lib/isoloom/secrets/files-secret; fi\nv=\"$(printenv ISOLOOM_SECRET_BUS_USER || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/bus-user ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/bus-user.new; mv -f /var/lib/isoloom/secrets/bus-user.new /var/lib/isoloom/secrets/bus-user; fi\nv=\"$(printenv ISOLOOM_SECRET_BUS_PASSWORD || true)\"; if [ -n \"$v\" ] || [ ! -e /var/lib/isoloom/secrets/bus-password ]; then printf '\\''%s'\\'' \"$v\" | base64 -d > /var/lib/isoloom/secrets/bus-password.new; mv -f /var/lib/isoloom/secrets/bus-password.new /var/lib/isoloom/secrets/bus-password; fi\ntouch /var/lib/isoloom/secrets/.delivered\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'\\''APPLY-SECRETS'\\''\n#!/bin/sh\n# The machine'\\''s secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/db-password '\\''/etc/isoloom/services/db/password'\\''\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/files-key '\\''/etc/isoloom/services/files/access-key'\\''\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/files-secret '\\''/etc/isoloom/services/files/secret-key'\\''\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/bus-user '\\''/etc/isoloom/services/bus/user'\\''\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/bus-password '\\''/etc/isoloom/services/bus/password'\\''\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'\\''UNIT'\\''\n[Unit]\nDescription=The machine'\\''s secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi' || { echo 'failed: waiting for its secrets' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: waiting for db' > /var/lib/isoloom/ready; sh -c 'i=0; until (bash -c '\\''</dev/tcp/db/5432'\\'' 2>/dev/null || nc -z -w 2 db 5432 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"db didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"db answers\"' || { echo 'failed: waiting for db' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for files' > /var/lib/isoloom/ready; sh -c 'i=0; until (bash -c '\\''</dev/tcp/files/8333'\\'' 2>/dev/null || nc -z -w 2 files 8333 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"files didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"files answers\"' || { echo 'failed: waiting for files' > /var/lib/isoloom/ready; exit 1; }",
+        "echo 'running: waiting for bus' > /var/lib/isoloom/ready; sh -c 'i=0; until (bash -c '\\''</dev/tcp/bus/9092'\\'' 2>/dev/null || nc -z -w 2 bus 9092 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"bus didn'\\''t answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"bus answers\"' || { echo 'failed: waiting for bus' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: its configuration' > /var/lib/isoloom/ready; sh /var/lib/isoloom/configure/configure-0.sh || { echo 'failed: its configuration' > /var/lib/isoloom/ready; exit 1; }",
         "echo 'running: health check' > /var/lib/isoloom/ready; sh -c 'mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready' || { echo 'failed: health check' > /var/lib/isoloom/ready; exit 1; }"
       ]
@@ -476,7 +722,12 @@ resource "proxmox_virtual_environment_vm" "web" {
     type = "l26"
   }
   serial_device {}
-  depends_on = [proxmox_virtual_environment_vm.isoloom_router, proxmox_virtual_environment_vm.db]
+  depends_on = [
+    proxmox_virtual_environment_vm.isoloom_router,
+    proxmox_virtual_environment_vm.db,
+    proxmox_virtual_environment_vm.files,
+    proxmox_virtual_environment_vm.bus
+  ]
 }
 
 # Machine `web`'s firewall: what reaches it, outside the guest.
@@ -525,6 +776,44 @@ resource "terraform_data" "isoloom_ready_db" {
   }
 }
 
+resource "terraform_data" "isoloom_ready_files" {
+  triggers_replace = [proxmox_virtual_environment_vm.files.id]
+  connection {
+    type                = "ssh"
+    host                = "10.30.0.41"
+    user                = "isoloom"
+    private_key         = file(pathexpand(var.ssh_private_key_file))
+    bastion_host        = local.router_address
+    bastion_user        = "isoloom"
+    bastion_private_key = file(pathexpand(var.ssh_private_key_file))
+    timeout             = "10m"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "sh -c 't=0\nif command -v cloud-init >/dev/null 2>&1; then sudo cloud-init status --wait >/dev/null 2>&1 || true; fi\nwhile :; do\ns=$(sudo head -n1 /var/lib/isoloom/ready 2>/dev/null)\ncase \"$s\" in\nready) echo \"files: set up\"; exit 0 ;;\n\"failed: \"*) echo \"files: its set-up stopped ($s); the end of /var/log/cloud-init-output.log:\"; sudo tail -n 40 /var/log/cloud-init-output.log 2>/dev/null; exit 1 ;;\nesac\nif [ \"$t\" -ge 2400 ]; then echo \"files: not set up after 2400 s ($${s:-no ready file}); the end of /var/log/cloud-init-output.log:\"; sudo tail -n 40 /var/log/cloud-init-output.log 2>/dev/null; exit 1; fi\nsleep 5; t=$((t + 5))\ndone'"
+    ]
+  }
+}
+
+resource "terraform_data" "isoloom_ready_bus" {
+  triggers_replace = [proxmox_virtual_environment_vm.bus.id]
+  connection {
+    type                = "ssh"
+    host                = "10.30.0.42"
+    user                = "isoloom"
+    private_key         = file(pathexpand(var.ssh_private_key_file))
+    bastion_host        = local.router_address
+    bastion_user        = "isoloom"
+    bastion_private_key = file(pathexpand(var.ssh_private_key_file))
+    timeout             = "10m"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "sh -c 't=0\nif command -v cloud-init >/dev/null 2>&1; then sudo cloud-init status --wait >/dev/null 2>&1 || true; fi\nwhile :; do\ns=$(sudo head -n1 /var/lib/isoloom/ready 2>/dev/null)\ncase \"$s\" in\nready) echo \"bus: set up\"; exit 0 ;;\n\"failed: \"*) echo \"bus: its set-up stopped ($s); the end of /var/log/cloud-init-output.log:\"; sudo tail -n 40 /var/log/cloud-init-output.log 2>/dev/null; exit 1 ;;\nesac\nif [ \"$t\" -ge 2400 ]; then echo \"bus: not set up after 2400 s ($${s:-no ready file}); the end of /var/log/cloud-init-output.log:\"; sudo tail -n 40 /var/log/cloud-init-output.log 2>/dev/null; exit 1; fi\nsleep 5; t=$((t + 5))\ndone'"
+    ]
+  }
+}
+
 resource "terraform_data" "isoloom_ready_web" {
   triggers_replace = [proxmox_virtual_environment_vm.web.id]
   connection {
@@ -560,12 +849,12 @@ output "ready_file" {
 
 # Published services, from the router's uplink address.
 output "published" {
-  value = { "web/shop" = "${local.router_address}:8080" }
+  value = { "web/shop" = "${local.router_address}:8080", "db/postgres" = "${local.router_address}:5432" }
 }
 
 # The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.
 output "machines" {
-  value = { web = "10.30.0.10", db = "10.30.0.40" }
+  value = { web = "10.30.0.10", db = "10.30.0.40", files = "10.30.0.41", bus = "10.30.0.42" }
 }
 
 output "ssh_user" {
@@ -575,6 +864,13 @@ output "ssh_user" {
 # The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).
 output "checks" {
   value = [
+    {
+      position = "isoloom-networks"
+      machine  = "db"
+      host     = "10.30.0.40"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/isoloom-networks.sh"
+    },
     {
       position = "web"
       machine  = "web"
@@ -588,6 +884,20 @@ output "checks" {
       host     = "10.30.0.40"
       user     = "isoloom"
       script   = ".isoloom/proxmox/checks/db.sh"
+    },
+    {
+      position = "files"
+      machine  = "files"
+      host     = "10.30.0.41"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/files.sh"
+    },
+    {
+      position = "bus"
+      machine  = "bus"
+      host     = "10.30.0.42"
+      user     = "isoloom"
+      script   = ".isoloom/proxmox/checks/bus.sh"
     }
   ]
 }
@@ -595,6 +905,16 @@ output "checks" {
 # db's VM id: its console is asked for by it (Proxmox's vncproxy).
 output "vm_id_db" {
   value = proxmox_virtual_environment_vm.db.vm_id
+}
+
+# files's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_files" {
+  value = proxmox_virtual_environment_vm.files.vm_id
+}
+
+# bus's VM id: its console is asked for by it (Proxmox's vncproxy).
+output "vm_id_bus" {
+  value = proxmox_virtual_environment_vm.bus.vm_id
 }
 
 # web's VM id: its console is asked for by it (Proxmox's vncproxy).

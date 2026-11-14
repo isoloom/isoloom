@@ -7,7 +7,6 @@ use crate::model::Target;
 
 /// How a target renders a service.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum Placement {
     /// As the cloud's managed service, beside the machines' module (`services.tf`).
     Managed,

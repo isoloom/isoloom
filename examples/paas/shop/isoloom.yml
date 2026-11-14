@@ -1,24 +1,29 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
 # A shop and the platform services it uses (`services:`, the `paas` feature, a draft): its
-# PostgreSQL database and a bucket. One spec: on containers the database is the official image
-# and the bucket an S3 server's container; on a VM target the database is a Debian VM; on AWS,
-# Azure and Google Cloud each is the cloud's own managed service. The shop reaches the database
-# at db.shop.internal on every target, with its password as a file, never a variable.
+# PostgreSQL database, a bucket and Kafka. One spec: on containers and on a server each service
+# is a machine of its own (the official postgres image or a Debian VM; SeaweedFS's S3 server;
+# Apache Kafka), on AWS, Azure and Google Cloud the cloud's own managed service. The shop reads
+# the same variables and files everywhere: the database at db.shop.internal (the services turn
+# the private zone on), its password as a file; the bucket's and the brokers' facts as files
+# under /etc/isoloom/services/, which a cloud delivers once it has made them.
 #
 # Not one of the examples every target generates: it needs Isoloom built with `--features paas`.
 version: 1
 name: shop
 
-# A service is reached by its name in the environment's private zone.
-dns: { private: true }
-
 networks:
   lab: { cidr: 10.30.0.0/24 }
+
+inputs:
+  # The player's own address: the database is published to it alone.
+  PLAYER_IP: { sensitive: false, description: "Who may reach the published database, e.g. 203.0.113.7/32." }
 
 secrets:
   db-password: { env: SHOP_DB_PASSWORD }
   files-key: { env: SHOP_FILES_KEY }
   files-secret: { env: SHOP_FILES_SECRET }
+  bus-user: { env: SHOP_BUS_USER }
+  bus-password: { env: SHOP_BUS_PASSWORD }
 
 machines:
   web:
@@ -38,17 +43,29 @@ services:
     database: shop
     user: shop
     password: db-password
+    publish: { allow: PLAYER_IP }
     # DATABASE_HOST, _PORT, _NAME, _USER, _SSLMODE, and _PASSWORD_FILE (the secret, as a file).
     clients: { web: { env_prefix: DATABASE } }
 
-  # Read from outside for now: a cloud bucket's name is known only once applied (the module's
-  # outputs give it), so no machine is its client yet.
   files:
     kind: object-storage
     bucket: uploads
-    api: platform               # Azure has no S3 API: each platform's own, so all three clouds take it
+    api: platform               # each platform's own API (Azure has no S3): STORAGE_API_FILE says which
     networks: { lab: 41 }
     credentials: { access_key: files-key, secret_key: files-secret }
+    # STORAGE_AUTH, and STORAGE_ENDPOINT_FILE, _BUCKET_FILE, _REGION_FILE, _API_FILE,
+    # _ACCESS_KEY_FILE, _SECRET_KEY_FILE. `access: identity` instead gives a cloud client its
+    # platform identity and no key (refused off the clouds).
+    clients: { web: { env_prefix: STORAGE } }
+
+  bus:
+    kind: kafka
+    networks: { lab: 42 }
+    topics: { orders: { partitions: 3 }, audit: {} }
+    credentials: { user: bus-user, password: bus-password }
+    # BUS_AUTH, and BUS_BOOTSTRAP_FILE, _SECURITY_PROTOCOL_FILE, _SASL_MECHANISM_FILE, _USER_FILE,
+    # _PASSWORD_FILE.
+    clients: { web: {} }
 
 checks:
   - name: the shop answers
