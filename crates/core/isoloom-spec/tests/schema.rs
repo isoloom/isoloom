@@ -96,6 +96,23 @@ fn the_schema_holds_names_to_the_lengths_validate_does() -> Outcome {
     Ok(())
 }
 
+/// Regression: the schema took a VLAN id up to 9999 while validation refuses past 4094.
+#[test]
+fn the_schema_holds_vlan_ids_to_the_range_validate_does() -> Outcome {
+    let v = validator()?;
+    let spec = |id: u16| -> Outcome<serde_json::Value> {
+        let text = format!("version: 1\nname: v\nnetworks: {{ lan: {{ cidr: 10.0.0.0/16, vlans: {{ {id}: {{ cidr: 10.0.1.0/24 }} }} }} }}\n");
+        Ok(serde_yaml_ng::from_str(&text)?)
+    };
+    for id in [1, 9, 10, 99, 100, 999, 1000, 3999, 4000, 4089, 4090, 4094] {
+        assert!(v.is_valid(&spec(id)?), "{id} is a VLAN id");
+    }
+    for id in [0, 4095, 4099, 4100, 5000, 9999] {
+        assert!(!v.is_valid(&spec(id)?), "{id} isn't a VLAN id");
+    }
+    Ok(())
+}
+
 #[test]
 fn examples_point_editors_to_the_schema() -> Outcome {
     for (name, text) in examples()? {

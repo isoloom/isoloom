@@ -279,3 +279,10 @@ fn the_specs_text_reaches_ansible_unsafe_so_jinja_in_it_is_never_evaluated() {
     assert!(t.contains("cmd: \"{{ isoloom_project }}/{{ isoloom_machine_m_file }}\""), "{t}");
     assert!(t.contains("isoloom_machine_m_file: !unsafe \"setup/{{ y }}.sh\""), "{t}");
 }
+
+#[test]
+fn each_play_climbs_from_its_folder_back_to_the_project() {
+    assert_eq!(super::project_var(".isoloom/external"), "{{ (playbook_dir + '/../..') | realpath }}");
+    assert_eq!(super::project_var("./.isoloom-2/external/"), "{{ (playbook_dir + '/../..') | realpath }}");
+    assert_eq!(super::project_var("a/b/c"), "{{ (playbook_dir + '/../../..') | realpath }}");
+}

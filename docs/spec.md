@@ -111,7 +111,7 @@ A machine of the environment that routes this network (an edge firewall): it tak
 The VLANs this LAN is split into, by id (1-4094), each with its own block inside the LAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming the LAN covers all of its VLANs. Each VLAN becomes a network of its own, `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
 
 - **Type:** map of name to mapping
-- **Limits:** names match `^[1-9][0-9]{0,3}$`
+- **Limits:** names match `^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$`
 
 ### `networks.*.vlans.*.cidr`
 

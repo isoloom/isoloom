@@ -53,6 +53,10 @@ stable spec format.
 
 ### Fixed
 
+- **`/data` and `/DATA` are two mount points on a Linux machine (#304):** the duplicate-mount
+  check folds case for Windows drives only.
+- **The schema's `vlans:` keys are exactly 1 to 4094 (#306),** as validation takes them.
+- **A catalogue copy's source written `{{with.root}}/`, without spaces, is taken (#310).**
 - **A Kubernetes container's command, arguments and environment values reach it as written
   (#300).** The kubelet expands `$(VAR)` in them, so `pa$$word` arrived as `pa$word`; every `$` is
   doubled now, so it expands nothing. Probe commands, which it doesn't expand, are left as they are.
