@@ -21,11 +21,11 @@ use crate::error::{Error, Result};
 /// project folder), so `copy` and `script` find it wherever the playbook is run from, joined to the
 /// task's `<vars>_file` variable, which [`project_var`] sets to the file's path. The path stays a
 /// variable, never part of the template, so Ansible evaluates none of the Jinja it may hold.
-pub(super) fn project(vars: &str) -> Value {
+pub(super) fn project_file(vars: &str) -> Value {
     jinja(format!("{{{{ isoloom_project }}}}/{{{{ {vars}_file }}}}"))
 }
 
-/// The task's `vars` that [`project`] reads: `<vars>_file` set to `path`.
+/// The task's `vars` that [`project_file`] reads: `<vars>_file` set to `path`.
 pub(super) fn project_var(vars: &str, path: &str) -> Value {
     json!({ format!("{vars}_file"): path })
 }
@@ -253,7 +253,7 @@ fn apk_argv(specs: &[String]) -> Vec<Value> {
 /// The `copy` step: a project file or folder at its destination, with owner and mode.
 fn copy(cp: &CopyPlan, notify: &[String], vars: &str) -> Value {
     let mut args = serde_json::Map::new();
-    args.insert("src".to_owned(), project(vars));
+    args.insert("src".to_owned(), project_file(vars));
     args.insert("dest".to_owned(), Value::String(cp.to.to_string()));
     put(&mut args, "owner", cp.owner.as_ref());
     // An explicit mode, or `preserve` (the source's), which `cp` keeps too and `ansible-lint`'s

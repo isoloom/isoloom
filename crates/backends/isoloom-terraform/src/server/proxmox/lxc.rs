@@ -116,7 +116,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
 }
 
 /// Each container: its image, pulled as a template, then the container and its firewall.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     for c in containers(env) {
         let name = c.name;
         let reference_of = c.machine.docker.as_ref().and_then(|d| d.image.clone()).unwrap_or_default();
@@ -129,9 +129,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("file_name", slotted(&format!("-{name}.tar"))))
             .add_attribute(("overwrite_unmanaged", boolean(true)))
             .build();
-        m.commented(&format!("Machine `{name}`: an LXC container (`overrides.proxmox`), from its image."), image);
-        m.block(container(env, c));
-        firewall::guest(env, name, Guest::Container, m);
+        module.commented(&format!("Machine `{name}`: an LXC container (`overrides.proxmox`), from its image."), image);
+        module.block(container(env, c));
+        firewall::guest(env, name, Guest::Container, module);
     }
 }
 

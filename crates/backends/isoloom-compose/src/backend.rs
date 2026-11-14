@@ -117,7 +117,9 @@ pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
         Feature::ExternalVolumes,
     ]);
     if target == ComposeTarget::Docker {
-        caps.with(Feature::HostFolders)
+        // Docker picks each published port's free host port on the user's own host (unless
+        // `ISOLOOM_PUBLISH_FIXED` pins them, which only a cloud VM's forward does).
+        caps.with(Feature::HostFolders).with(Feature::FreeHostPorts)
     } else {
         caps
     }

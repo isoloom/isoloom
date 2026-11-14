@@ -18,7 +18,7 @@ use std::fmt::Write as _;
 
 /// The prefix of every sentinel secret value the generator plants (a `user` step's password), so
 /// the leak check and the regression corpus can both recognise one on sight.
-pub(crate) const SENTINEL_PREFIX: &str = "P6FUZZ-SENTINEL-";
+pub(crate) const SENTINEL_PREFIX: &str = "ISOLOOM-FUZZ-SENTINEL-";
 
 /// The Linux OS references the generator draws from: they have both a container and a VM form, so
 /// most targets can generate them.

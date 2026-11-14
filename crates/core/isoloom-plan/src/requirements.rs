@@ -58,6 +58,9 @@ pub enum Feature {
     /// A machine's own settings (`environment`, `sysctls`, `ulimits`) on a host that already
     /// exists, which Isoloom doesn't set up: no backend has it.
     ExistingHostSettings,
+    /// Two machines (or a counted machine's clones) asking for one host port, one of them for a
+    /// free one (`publish: true`): only a format that picks each host port itself gives it.
+    FreeHostPorts,
     /// A check that runs a project script on a host that already exists, which has no copy of
     /// the project: no backend has it.
     ExistingHostScriptChecks,
@@ -213,6 +216,15 @@ pub enum Requirement {
         /// The field (`environment`, `sysctls`, `ulimits`).
         field: &'static str,
     },
+    /// Two machines ask for one host port, at least one of them for a free one.
+    SharedHostPort {
+        /// The machine that asked first.
+        first: String,
+        /// The machine that asked again.
+        second: String,
+        /// The host port.
+        port: u16,
+    },
     /// A check runs a project script on an existing host.
     ExistingHostScriptCheck {
         /// The check's name.
@@ -327,6 +339,7 @@ impl Requirement {
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
             Requirement::ExistingHostSettings { .. } => Feature::ExistingHostSettings,
+            Requirement::SharedHostPort { .. } => Feature::FreeHostPorts,
             Requirement::ExistingHostScriptCheck { .. } => Feature::ExistingHostScriptChecks,
             Requirement::ExistingHostCheckFromNoHost { .. } => Feature::ExistingHostChecksFromNoHost,
             Requirement::Tpm { .. } => Feature::Tpm,
@@ -395,6 +408,7 @@ impl fmt::Display for Requirement {
             Requirement::OwnedProjectFile { machine, path } => crate::machine_files::no_owned_project_file(f, machine, path),
             Requirement::ExistingHostFiles { machine } => crate::machine_files::no_existing_host_files(f, machine),
             Requirement::ExistingHostSettings { machine, field } => crate::machine_files::no_existing_host_settings(f, machine, field),
+            Requirement::SharedHostPort { first, second, port } => crate::published::no_shared_host_port(f, first, second, *port),
             Requirement::ExistingHostScriptCheck { check } => crate::existing_hosts::no_script_check(f, check),
             Requirement::ExistingHostCheckFromNoHost { check } => crate::existing_hosts::no_host_to_run_from(f, check),
             Requirement::Tpm { machine } => crate::hardware::no_tpm(f, machine),

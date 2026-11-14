@@ -15,8 +15,10 @@ use crate::kustomize::key;
 use crate::machine::Machine;
 use crate::objects::{Container, EmptyDir, Image, Manifest, Text, Volume, VolumeMount, VolumeSource};
 
-/// The `emptyDir` holding the files as placed, and the init container filling it.
+/// The `emptyDir` holding the files as placed.
 pub(crate) const FILES_VOLUME: &str = "isoloom-files";
+/// The init container filling [`FILES_VOLUME`].
+const FILES_CONTAINER: &str = "isoloom-files";
 /// The volume of the machine's own `ConfigMap` (the text written in the spec).
 const TEXT_VOLUME: &str = "isoloom-files-text";
 /// Where the init container sees the `emptyDir` and the `ConfigMap`s.
@@ -88,7 +90,7 @@ pub(crate) fn init_container(m: &Machine, project: &str) -> Option<Container> {
             )
         })
         .collect();
-    let mut c = Container::new(FILES_VOLUME, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
+    let mut c = Container::new(FILES_CONTAINER, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
     c.command = vec!["sh".into(), "-c".into(), script.join(" && ")];
     // Root, to give each file its owner.
     c.security_context = Some(crate::security::image_user());

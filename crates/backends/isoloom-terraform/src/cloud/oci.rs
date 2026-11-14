@@ -38,8 +38,8 @@ pub(crate) const SHAPE: &str = "VM.Standard.E4.Flex";
 
 /// The provider, in the region, signing in with the OCI CLI configuration's profile, and the
 /// free-form tags every resource carries (`local.tags`).
-pub(crate) fn provider(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
-    m.block(
+pub(crate) fn provider(env: &Environment, module: &mut Module) -> Vec<(&'static str, Expression)> {
+    module.block(
         Block::builder("provider")
             .add_label("oci")
             .add_attribute(("region", reference("var.region")))

@@ -28,7 +28,7 @@ pub(super) fn vpc(net: &str) -> Expression {
 
 /// The VPC networks and their subnetworks, the peerings between the networks no machine routes
 /// and the routes through the gateways.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let mut first = true;
     for (net, p) in &env.networks {
         let id = ident(net);
@@ -39,14 +39,14 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("mtu", number(u64::from(mtu(p)))))
             .build();
         if std::mem::take(&mut first) {
-            m.commented(
+            module.commented(
                 "The environment's networks: a VPC network each, holding a subnetwork with its exact range.",
                 vpc,
             );
         } else {
-            m.block(vpc);
+            module.block(vpc);
         }
-        m.block(
+        module.block(
             resource("google_compute_subnetwork", &id)
                 .add_attribute(("project", reference("local.project")))
                 .add_attribute(("name", name_with(&format!("-{net}"))))
@@ -56,14 +56,14 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                 .build(),
         );
     }
-    peerings(env, m);
-    routes(env, m);
+    peerings(env, module);
+    routes(env, module);
 }
 
 /// Every pair of the networks no machine routes, peered both ways and exchanging their routes
 /// through the gateways. Google Cloud runs one peering change on a network at a time, so each
 /// peering waits for the one before it.
-fn peerings(env: &Environment, m: &mut Module) {
+fn peerings(env: &Environment, module: &mut Module) {
     let gateways = routed(env);
     let open: Vec<&str> = env
         .networks
@@ -85,7 +85,7 @@ fn peerings(env: &Environment, m: &mut Module) {
                 if let Some(prev) = before.replace(format!("google_compute_network_peering.{id}")) {
                     peering = peering.add_attribute(("depends_on", list([reference(&prev)])));
                 }
-                m.block(peering.build());
+                module.block(peering.build());
             }
         }
     }
@@ -93,16 +93,16 @@ fn peerings(env: &Environment, m: &mut Module) {
 
 /// A route in each VPC the gateway is on, for each network it reaches through that gateway: to
 /// the gateway's address in that VPC.
-fn routes(env: &Environment, m: &mut Module) {
+fn routes(env: &Environment, module: &mut Module) {
     let mut first = true;
     for net in env.networks.keys() {
         for hop in through(env, net) {
             let Some(at) = hop.machine.addresses.get(net) else { continue };
             let route = route(net, (hop.network, &hop.plan.cidr.to_string()), hop.gateway, &at.to_string());
             if std::mem::take(&mut first) {
-                m.commented("The networks a machine routes: each VPC sends them to the gateway's address in it.", route);
+                module.commented("The networks a machine routes: each VPC sends them to the gateway's address in it.", route);
             } else {
-                m.block(route);
+                module.block(route);
             }
         }
     }

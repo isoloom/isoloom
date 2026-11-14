@@ -83,7 +83,7 @@ fn hyperv_switch() -> Result<Param> {
         &Wanted {
             name: settings::HYPERV_SWITCH.name,
             description: "The Hyper-V virtual switch each VM's first adapter (Vagrant's connection, and the internet) goes on.",
-            default: settings::HYPERV_SWITCH.default(),
+            default: settings::HYPERV_SWITCH.fallback_text(),
             values: &[],
             required: false,
             hosts: &[HostOs::Windows],
@@ -101,7 +101,7 @@ pub(super) fn remote_params() -> Result<Vec<Param>> {
         &Wanted {
             name: settings::SSH_PROXY_COMMAND.name,
             description: "The command Vagrant's SSH to the VMs goes through (an SSH `ProxyCommand`), when this computer can't reach them directly; unset, it connects straight to them.",
-            default: settings::SSH_PROXY_COMMAND.default(),
+            default: settings::SSH_PROXY_COMMAND.fallback_text(),
             values: &[],
             required: false,
             hosts: &[],
@@ -114,7 +114,7 @@ pub(super) fn remote_params() -> Result<Vec<Param>> {
         let spec = Wanted {
             name: setting.name,
             description,
-            default: setting.default(),
+            default: setting.fallback_text(),
             values: &[],
             required,
             hosts: &[],

@@ -6,22 +6,22 @@ use crate::images::is_windows;
 use crate::model::Spec;
 
 /// The machines' and the controller's `winssh`.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
         let Some(image) = vm.image.as_ref().filter(|i| i.winssh) else { continue };
         let at = format!("machines.{name}.vm.image.winssh");
         if !vm.os.is_empty() && !is_windows(&vm.os) {
-            p.add(
+            problems.add(
                 &at,
                 format!("`{}` is reached over SSH already: `winssh` says how a Windows box is reached", vm.os),
             );
         } else if image.winrm.is_some() {
-            p.add(&at, "a box answers WinRM or OpenSSH: drop `winrm` or `winssh`");
+            problems.add(&at, "a box answers WinRM or OpenSSH: drop `winrm` or `winssh`");
         }
     }
     if spec.controller.as_ref().and_then(|c| c.image.as_ref()).is_some_and(|i| i.winssh) {
-        p.add("controller.image.winssh", "the controller is a Linux VM: no OpenSSH for Windows");
+        problems.add("controller.image.winssh", "the controller is a Linux VM: no OpenSSH for Windows");
     }
 }
 

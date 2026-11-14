@@ -135,6 +135,12 @@ rows:
   - field: machines.*.count
     about: clones of one machine
     patch: { machines: { m: { count: 2 } } }
+  - field: machines.*.ports.*.publish
+    value: "true"
+    also: [count]
+    about: clones each publishing a port on a free host port
+    features: [free-host-ports]
+    patch: { machines: { m: { count: 2, ports: { redis: { port: 6379, publish: true } } } } }
   - field: machines.*.access
     about: the machine the user lands on, supplied by the runner's image table (no OS)
     also: [access]

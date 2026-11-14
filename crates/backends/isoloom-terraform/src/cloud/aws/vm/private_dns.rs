@@ -9,9 +9,9 @@ use crate::cloud::vm::private_dns::{TTL, address, records};
 use crate::module::resource;
 
 /// The zone and its records, when the environment has one.
-pub(super) fn write(env: &Environment, m: &mut Module) {
+pub(super) fn write(env: &Environment, module: &mut Module) {
     let Some(zone) = &env.private_dns else { return };
-    m.commented(
+    module.commented(
         "The environment's names, served by Route 53 inside the VPC (`dns.private`).",
         resource("aws_route53_zone", "private")
             .add_attribute(("name", string(zone.domain.as_str())))
@@ -19,7 +19,7 @@ pub(super) fn write(env: &Environment, m: &mut Module) {
             .build(),
     );
     for (id, r) in records(zone) {
-        m.block(
+        module.block(
             resource("aws_route53_record", &id)
                 .add_attribute(("zone_id", reference("aws_route53_zone.private.zone_id")))
                 .add_attribute(("name", string(r.name.as_str())))

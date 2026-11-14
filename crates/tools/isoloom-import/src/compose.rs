@@ -208,6 +208,25 @@ fn machine_names(services: &Mapping) -> IndexMap<String, String> {
     names
 }
 
+/// A network a service joins: its name, the address it asks for there, if any, and the aliases
+/// it has there.
+struct WantedNetwork {
+    network: String,
+    ip: Option<String>,
+    aliases: Vec<String>,
+}
+
+impl WantedNetwork {
+    /// Network `network`, with no address asked for and no aliases.
+    fn named(network: String) -> WantedNetwork {
+        WantedNetwork {
+            network,
+            ip: None,
+            aliases: Vec::new(),
+        }
+    }
+}
+
 impl<'a> Import<'a> {
     fn new(services: &'a Mapping, notes: Notes) -> Self {
         Import {
@@ -240,8 +259,8 @@ impl<'a> Import<'a> {
             self.note_rename(&svc, &m.name);
         }
         let wanted = self.wanted_networks(&svc);
-        for (n, ip, _) in &wanted {
-            self.join(&svc, &mut m, n, ip.as_deref())?;
+        for w in &wanted {
+            self.join(&svc, &mut m, &w.network, w.ip.as_deref())?;
         }
         self.aliases(&svc, &mut m, &wanted);
         for (k, v) in &svc.keys {
@@ -297,13 +316,13 @@ impl<'a> Import<'a> {
 
     /// The networks a service joins, each with the address it asks for, if any, and the aliases
     /// it has there.
-    fn wanted_networks(&mut self, svc: &Service) -> Vec<(String, Option<String>, Vec<String>)> {
-        let mut wanted: Vec<(String, Option<String>, Vec<String>)> = Vec::new();
+    fn wanted_networks(&mut self, svc: &Service) -> Vec<WantedNetwork> {
+        let mut wanted: Vec<WantedNetwork> = Vec::new();
         match svc.keys.get("networks") {
-            Some(Value::Sequence(list)) => wanted.extend(list.iter().filter_map(str_of).map(|n| (n, None, Vec::new()))),
+            Some(Value::Sequence(list)) => wanted.extend(list.iter().filter_map(str_of).map(WantedNetwork::named)),
             Some(Value::Mapping(map)) => {
                 for (key, opts) in map {
-                    let n = str_of(key).unwrap_or_default();
+                    let network = str_of(key).unwrap_or_default();
                     let ip = opts.get("ipv4_address").and_then(str_of);
                     let aliases = opts
                         .get("aliases")
@@ -312,10 +331,10 @@ impl<'a> Import<'a> {
                         .flatten()
                         .filter_map(str_of)
                         .collect();
-                    wanted.push((n, ip, aliases));
+                    wanted.push(WantedNetwork { network, ip, aliases });
                 }
             }
-            _ => wanted.push((DEFAULT_NETWORK.to_owned(), None, Vec::new())),
+            _ => wanted.push(WantedNetwork::named(DEFAULT_NETWORK.to_owned())),
         }
         if matches!(svc.keys.get("network_mode").and_then(str_of).as_deref(), Some(mode) if mode != "bridge") {
             self.notes.add(
@@ -323,7 +342,7 @@ impl<'a> Import<'a> {
                 NoteKind::ByDesign,
                 "a machine has its own addresses; attached to the default network instead",
             );
-            wanted = vec![(DEFAULT_NETWORK.to_owned(), None, Vec::new())];
+            wanted = vec![WantedNetwork::named(DEFAULT_NETWORK.to_owned())];
         }
         wanted
     }
@@ -332,10 +351,11 @@ impl<'a> Import<'a> {
     /// to them on every network it is on, which is said when the service had them on some of its
     /// networks only. One that isn't a DNS name the spec takes, or names a machine, is left out
     /// and said; the service's own name is its machine's already.
-    fn aliases(&mut self, svc: &Service, m: &mut Machine, wanted: &[(String, Option<String>, Vec<String>)]) {
-        for (n, _, aliases) in wanted.iter().filter(|(_, _, a)| !a.is_empty()) {
+    fn aliases(&mut self, svc: &Service, m: &mut Machine, wanted: &[WantedNetwork]) {
+        for w in wanted.iter().filter(|w| !w.aliases.is_empty()) {
+            let n = &w.network;
             let at = format!("{}.networks.{n}.aliases", svc.at);
-            for alias in aliases {
+            for alias in &w.aliases {
                 let name = alias.to_ascii_lowercase();
                 if name == svc.name || name == m.name || m.aliases.contains(&name) {
                     continue;

@@ -30,7 +30,7 @@ use isoloom_plan::{Environment, Vm};
 
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
-use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image, windows};
+use crate::cloud::vm::{self, VmDriver, gateways, gpus::GpuSizes, own_image, windows};
 use crate::limits::Limits;
 use crate::module::providers;
 
@@ -143,7 +143,7 @@ fn refusal(env: &Environment) -> Option<String> {
 }
 
 /// Its `cloud-vm` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::AZURERM], &[providers::RANDOM, providers::LOCAL]),
     refusal,
@@ -151,12 +151,12 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
-    network::blocks(env, m);
-    routing::blocks(env, m);
-    private_dns::write(env, m);
-    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
+    network::blocks(env, module);
+    routing::blocks(env, module);
+    private_dns::write(env, module);
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, module)
 }
 
 /// The address Terraform reaches a machine at (`id`: its resource name).

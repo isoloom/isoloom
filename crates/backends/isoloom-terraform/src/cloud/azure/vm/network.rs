@@ -11,8 +11,8 @@ use crate::module::{ident, resource};
 
 /// The resource group and the networks: one virtual network, a subnet per network with its
 /// exact range, with no default way out when the network is offline.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    m.block(
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    module.block(
         resource("azurerm_resource_group", "env")
             .add_attribute(("name", reference("local.name")))
             .add_attribute(("location", reference("var.region")))
@@ -22,14 +22,14 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     // A dual-stack network's IPv6 block too: Azure takes unique local blocks.
     let v6 = env.networks.values().filter_map(|n| n.ipv6.as_ref()).map(|v| string(v.cidr.to_string()));
     let spaces = env.networks.values().map(|n| string(n.cidr.to_string())).chain(v6);
-    m.commented(
+    module.commented(
         "The environment's networks: one virtual network, a subnet per network with its exact range.",
         placed("azurerm_virtual_network", "env", reference("local.name"))
             .add_attribute(("address_space", list(spaces)))
             .build(),
     );
     for (net, p) in &env.networks {
-        m.block(
+        module.block(
             resource("azurerm_subnet", &ident(net))
                 .add_attribute(("name", string(net.as_str())))
                 .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))

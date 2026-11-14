@@ -875,3 +875,38 @@ fn an_environment_value_reaches_every_format_as_written() -> Outcome {
     }
     Ok(())
 }
+
+#[test]
+fn clones_publishing_a_free_host_port_are_generated_where_the_format_picks_one() -> Outcome {
+    let dir = project(
+        "free-host-ports",
+        "version: 1\nname: free\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\nmachines:\n  web:\n    app: { image: nginx, steps: [{ packages: [nginx] }] }\n    os: debian@12\n    count: 2\n    networks: { lan: 10 }\n    ports: { web: { port: 80, publish: true } }\n",
+    )?;
+    let checked = isoloom(&dir, &[&"validate", &dir])?;
+    assert_eq!(checked.code, Some(0), "{}{}", checked.stdout, checked.stderr);
+    for target in ["docker", "vagrant"] {
+        let generated = isoloom(&dir, &[&"generate", &"--target", &target, &dir])?;
+        assert_eq!(generated.code, Some(0), "{target}: {}{}", generated.stdout, generated.stderr);
+    }
+    let read = |file: &str| std::fs::read_to_string(dir.join(".isoloom").join(file));
+    // Docker picks each clone's host port: none is written.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
+    for clone in ["web-01", "web-02"] {
+        let ports = compose["services"][clone]["ports"].as_sequence().cloned().unwrap_or_default();
+        let [port] = &ports[..] else { panic!("{clone}: one published port: {ports:?}") };
+        let port = port.as_str().unwrap_or_default();
+        assert!(port.ends_with(":${ISOLOOM_PUBLISH_FIXED:+80}:80"), "{clone}: {port}");
+    }
+    // Vagrant moves a taken host port to a free one.
+    let vagrantfile = read("vagrant/Vagrantfile")?;
+    let forwards: Vec<&str> = vagrantfile.lines().filter(|l| l.contains("\"forwarded_port\"")).collect();
+    assert_eq!(forwards.len(), 2, "{vagrantfile}");
+    assert!(forwards.iter().all(|l| l.contains("auto_correct: true")), "{forwards:?}");
+    // A target publishing every port at its number says so once, for the spec.
+    let refused = isoloom(&dir, &[&"generate", &"--target", &"kubernetes", &dir])?;
+    assert_ne!(refused.code, Some(0));
+    let said = format!("{}{}", refused.stdout, refused.stderr);
+    assert_eq!(said.matches("both publish on host port 80").count(), 1, "{said}");
+    assert!(said.contains("machines `web-01` and `web-02`"), "{said}");
+    Ok(())
+}

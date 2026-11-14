@@ -7,14 +7,14 @@ use super::machines::dns_name;
 use crate::model::Spec;
 
 /// The top-level `dns`: a domain of two labels or more, and only with `private: true`.
-pub(super) fn private(spec: &Spec, p: &mut Problems) {
+pub(super) fn private(spec: &Spec, problems: &mut Problems) {
     let Some(dns) = &spec.dns else { return };
     let Some(domain) = &dns.domain else { return };
     if !dns.private {
-        p.add("dns.domain", "the domain names the private zone: set `dns.private: true`, or drop `domain`");
+        problems.add("dns.domain", "the domain names the private zone: set `dns.private: true`, or drop `domain`");
     }
     if !dns_name(domain) || !domain.contains('.') {
-        p.add(
+        problems.add(
             "dns.domain",
             format!("`{domain}` isn't a domain of two labels or more like lab.internal (lowercase, no trailing dot)"),
         );
@@ -22,12 +22,12 @@ pub(super) fn private(spec: &Spec, p: &mut Problems) {
 }
 
 /// Every machine's `dns.options`.
-pub(super) fn options(spec: &Spec, p: &mut Problems) {
+pub(super) fn options(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let Some(dns) = &m.dns else { continue };
         for (i, o) in dns.options.iter().enumerate() {
             if !option(o) {
-                p.add(
+                problems.add(
                     format!("machines.{name}.dns.options[{i}]"),
                     format!("`{o}` isn't a resolver option: write `name` or `name:value`, as resolv.conf's `options` line (ndots:2, timeout:1, rotate)"),
                 );
@@ -37,7 +37,7 @@ pub(super) fn options(spec: &Spec, p: &mut Problems) {
         for (i, o) in dns.options.iter().enumerate() {
             let key = o.split(':').next().unwrap_or(o);
             if seen.contains(&key) {
-                p.add(format!("machines.{name}.dns.options[{i}]"), format!("`{key}` is set twice: keep one"));
+                problems.add(format!("machines.{name}.dns.options[{i}]"), format!("`{key}` is set twice: keep one"));
             }
             seen.push(key);
         }

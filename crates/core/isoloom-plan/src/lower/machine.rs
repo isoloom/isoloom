@@ -265,11 +265,11 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
                 return None;
             };
             let port = number.get();
-            let (publish, fixed) = match p.publish {
-                None => (None, false),
-                Some(Publish::Free) => (Some(port), false),
-                Some(Publish::Preferred(h)) => (Some(h.get()), false),
-                Some(Publish::Fixed(h)) => (Some(h.get()), true),
+            let (publish, fixed, free) = match p.publish {
+                None => (None, false, false),
+                Some(Publish::Free) => (Some(port), false, true),
+                Some(Publish::Preferred(h)) => (Some(h.get()), false, false),
+                Some(Publish::Fixed(h)) => (Some(h.get()), true, false),
             };
             Some(model::Port {
                 port,
@@ -278,6 +278,7 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
                 tls: p.protocol.is_tls(),
                 publish,
                 fixed,
+                free,
                 dormant: p.dormant,
                 protocol: if p.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp },
                 login: p.login.clone(),

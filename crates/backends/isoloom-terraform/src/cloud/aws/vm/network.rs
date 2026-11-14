@@ -12,11 +12,11 @@ use crate::module::{ident, resource};
 /// The networks: one VPC, a subnet per network with its exact range (the first network's block
 /// is the VPC's, the others are added to it; with a gateway machine, one block holds them all),
 /// a route to the internet, and the key pair.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let nets: Vec<(&String, String)> = env.networks.iter().map(|(n, p)| (n, p.cidr.to_string())).collect();
     let Some((_, first)) = nets.first() else { return };
     let whole = routing::vpc_block(env);
-    m.commented(
+    module.commented(
         "The environment's networks: one VPC, a subnet per network with its exact range.",
         dns_hostnames(
             env,
@@ -27,7 +27,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     );
     if whole.is_none() {
         for (net, cidr) in nets.iter().skip(1) {
-            m.block(
+            module.block(
                 resource("aws_vpc_ipv4_cidr_block_association", &ident(net))
                     .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
                     .add_attribute(("cidr_block", string(cidr.as_str())))
@@ -35,22 +35,22 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             );
         }
     }
-    m.block(
+    module.block(
         resource("aws_internet_gateway", "env")
             .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
             .build(),
     );
-    let own_tables = routing::blocks(env, m);
+    let own_tables = routing::blocks(env, module);
     let closed = |net: &str| crate::seal::any(env) && crate::seal::closed(env, net);
     if !own_tables {
-        m.block(
+        module.block(
             resource("aws_route_table", "env")
                 .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
                 .add_block(route_out())
                 .build(),
         );
         if nets.iter().any(|(n, _)| closed(n)) {
-            m.commented(
+            module.commented(
                 "The networks without internet: theirs until the run is sealed, then allowed_cidr's replies only.",
                 resource("aws_route_table", "sealed")
                     .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
@@ -65,9 +65,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             (false, true) => "sealed".to_owned(),
             (false, false) => "env".to_owned(),
         };
-        m.blocks(subnet(net, cidr, i > 0 && whole.is_none(), &table));
+        module.blocks(subnet(net, cidr, i > 0 && whole.is_none(), &table));
     }
-    m.block(key_pair());
+    module.block(key_pair());
 }
 
 /// With a private zone (`dns.private`), the VPC's DNS support and host names on: a private

@@ -9,7 +9,7 @@ use isoloom_spec::syntax::{Guard, Invocation};
 use serde_json::{Value, json};
 
 use super::task::{Task, jinja};
-use super::tasks::{project, project_var};
+use super::tasks::{project_file, project_var};
 
 /// The `service` step: an enabled unit started (a defined one's file written first), or a disabled
 /// one stopped. Restarts come from the recipe's earlier changes notifying the handler and the
@@ -159,7 +159,7 @@ fn detect(cmd: &str, register: &str) -> Value {
 /// The `run` step: a project script run behind its `creates`.
 pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str, inputs: &[String]) -> Value {
     let mut args = serde_json::Map::new();
-    args.insert("cmd".to_owned(), project(vars));
+    args.insert("cmd".to_owned(), project_file(vars));
     if let Some(path) = &r.creates {
         args.insert("creates".to_owned(), Value::String(path.to_string()));
     }
@@ -188,7 +188,7 @@ pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String],
     let task = Task::new(format!("playbook {p}"))
         .module(
             "ansible.builtin.command",
-            json!({ "argv": ["ansible-playbook", "-c", "local", "-i", "localhost,", project(vars)] }),
+            json!({ "argv": ["ansible-playbook", "-c", "local", "-i", "localhost,", project_file(vars)] }),
         )
         .set("vars", project_var(vars, p.as_str()))
         .set("changed_when", Value::Bool(true));

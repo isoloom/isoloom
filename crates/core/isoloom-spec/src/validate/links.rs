@@ -9,28 +9,28 @@ use crate::model::Spec;
 const MTU: std::ops::RangeInclusive<u16> = 576..=9216;
 
 /// Each `mtu`, `rate_limit` and `docker.lxc`: well-formed, and `lxc` on a machine it applies to.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
     for (name, net) in &spec.networks {
         if let Some(mtu) = net.mtu
             && !MTU.contains(&mtu)
         {
-            p.add(format!("networks.{name}.mtu"), format!("{mtu} bytes is out of range: 576 to 9216"));
+            problems.add(format!("networks.{name}.mtu"), format!("{mtu} bytes is out of range: 576 to 9216"));
         }
     }
     for (name, m) in &spec.machines {
         if let Some(r) = &m.rate_limit {
-            rate(&format!("machines.{name}.rate_limit"), r, p);
+            rate(&format!("machines.{name}.rate_limit"), r, problems);
         }
         let Some(d) = m.docker.as_ref().filter(|d| d.lxc) else { continue };
         let at = format!("machines.{name}.docker.lxc");
         if d.image.is_none() {
-            p.add(&at, "an LXC container runs a published image: `app.image` (not `build` or `firmware`)");
+            problems.add(&at, "an LXC container runs a published image: `app.image` (not `build` or `firmware`)");
         }
         if d.appliance.is_some() {
-            p.add(&at, "a network appliance is wired the way Docker attaches networks: drop `lxc`");
+            problems.add(&at, "a network appliance is wired the way Docker attaches networks: drop `lxc`");
         }
         if m.vm.is_some() {
-            p.add(&at, "the machine also has a VM form, which Proxmox runs instead: drop `lxc`");
+            problems.add(&at, "the machine also has a VM form, which Proxmox runs instead: drop `lxc`");
         }
     }
 }

@@ -13,12 +13,12 @@ use crate::module::{ident, resource};
 /// A machine's own network security group, with a rule per port it publishes, so a port opens
 /// on the machine that publishes it and no other. Returns the group's id, or `None` when the
 /// machine publishes nothing.
-pub(super) fn group(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expression> {
+pub(super) fn group(name: &str, mp: &MachinePlan, module: &mut Module) -> Option<Expression> {
     if mp.ports.is_empty() {
         return None;
     }
     let id = ident(name);
-    m.commented(
+    module.commented(
         &format!("The ports `{name}` publishes, from allowed_cidr: on its VNIC only."),
         owned(resource("oci_core_network_security_group", &id))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
@@ -26,7 +26,7 @@ pub(super) fn group(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expr
             .build(),
     );
     for (protocol, port) in published::ports(mp) {
-        m.block(published_rule(&id, protocol, port));
+        module.block(published_rule(&id, protocol, port));
     }
     Some(reference(&format!("oci_core_network_security_group.{id}.id")))
 }

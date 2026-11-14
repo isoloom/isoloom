@@ -32,7 +32,7 @@ use crate::cloud::Cloud;
 use crate::cloud::instance::{self, name_with};
 use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
-use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
+use crate::cloud::vm::{self, VmDriver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::user_data::Capped;
 use crate::module::{ident, providers, resource};
@@ -170,7 +170,7 @@ const CAP: Capped = Capped {
 
 /// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
 /// the OCI CLI's configuration.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::OCI], &[]),
     refusal,
@@ -178,20 +178,20 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module after its providers: the images, the VCN, its security list and subnet, each machine, the outputs.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
-    m.commented(
+    module.commented(
         "The compartment's availability domains; the instances land in the first.",
         availability_domains(),
     );
-    images(env, m);
-    network::blocks(env, m);
-    private_dns::write(env, m);
+    images(env, module);
+    network::blocks(env, module);
+    private_dns::write(env, module);
     for (vm, at) in vm::at_first_address(env) {
-        machine(env, vm, at, m)?;
+        machine(env, vm, at, module)?;
     }
-    network::gateway_routes(env, m);
-    outputs::write_as(env, super::BASE.user, &public_ip, m);
+    network::gateway_routes(env, module);
+    outputs::write_as(env, super::BASE.user, &public_ip, module);
     Ok(())
 }
 
@@ -201,7 +201,7 @@ fn public_ip(name: &str) -> Expression {
 }
 
 /// The newest Canonical Ubuntu for the shape, one lookup per version the machines use.
-fn images(env: &Environment, m: &mut Module) {
+fn images(env: &Environment, module: &mut Module) {
     let mut versions: Vec<&str> = env
         .vms()
         .filter(|vm| own_image::of(vm.plan, own_image::oci).is_none())
@@ -210,7 +210,7 @@ fn images(env: &Environment, m: &mut Module) {
     versions.sort_unstable();
     versions.dedup();
     for v in versions {
-        m.commented(
+        module.commented(
             &format!("Ubuntu {v}: Oracle Cloud has no Debian image of its own."),
             ubuntu_images(&image_source(v), v),
         );
@@ -223,18 +223,18 @@ fn images(env: &Environment, m: &mut Module) {
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when its user data is over [`CAP`].
-fn machine(env: &Environment, vm: Vm<'_>, (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
+fn machine(env: &Environment, vm: Vm<'_>, (net, address): (&str, Ipv4Addr), module: &mut Module) -> crate::Result<()> {
     let Vm { name, plan: mp, .. } = vm;
-    let group = published::group(name, mp, m);
+    let group = published::group(name, mp, module);
     let mut at_boot = interfaces::up_found(env, &mp.addresses, &|_, a| metadata::mac(a));
     at_boot.extend(ipv6::at_boot(env, mp));
     let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
-    m.commented(
+    module.commented(
         &format!("Machine `{name}`, at its fixed address {address}."),
         instance(env, vm, (net, &address.to_string()), (group, setup)),
     );
-    vnics(env, (name, mp), m);
-    addresses::blocks((name, mp), m);
+    vnics(env, (name, mp), module);
+    addresses::blocks((name, mp), module);
     Ok(())
 }
 
@@ -296,7 +296,7 @@ fn primary_vnic(name: &str, net: &str, address: &str, forwards: bool, group: Opt
 
 /// A VNIC on each network after the first, at the machine's address there (forwarding, as the
 /// first), and its MAC address, which finds it at boot.
-fn vnics(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
+fn vnics(env: &Environment, (name, mp): (&str, &MachinePlan), module: &mut Module) {
     let id = ident(name);
     for (net, address) in mp.addresses.iter().skip(1) {
         let nic = format!("{id}_{}", ident(net));
@@ -306,7 +306,7 @@ fn vnics(env: &Environment, (name, mp): (&str, &MachinePlan), m: &mut Module) {
             .add_attribute(("assign_public_ip", boolean(false)))
             .add_attribute(("skip_source_dest_check", boolean(true)));
         let details = ipv6::vnic(env, mp, net, details).build();
-        m.block(
+        module.block(
             resource("oci_core_vnic_attachment", &nic)
                 .add_attribute(("instance_id", reference(&format!("oci_core_instance.{id}.id"))))
                 .add_attribute(("display_name", name_with(&format!("-{name}-{net}"))))

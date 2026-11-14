@@ -61,7 +61,7 @@ pub(super) fn vnet_of(env: &Environment) -> BTreeMap<&str, String> {
 
 /// A VNet per network that is no VLAN, then one per LAN that is only the frame around its
 /// VLANs ([`vnet_ids`]). Their references, for the applier to wait on.
-pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
+pub(super) fn vnets(env: &Environment, module: &mut Module) -> Vec<Expression> {
     let mut out = Vec::new();
     for (name, id) in vnet_ids(env) {
         let mut b = Block::builder("resource")
@@ -76,7 +76,7 @@ pub(super) fn vnets(env: &Environment, m: &mut Module) -> Vec<Expression> {
             Some(plan) => format!("Network `{name}`: {}", plan.cidr),
             None => format!("LAN `{name}`: its VLANs are tags on one VNet"),
         };
-        m.commented(&what, b.build());
+        module.commented(&what, b.build());
         out.push(reference(&format!("proxmox_sdn_vnet.{}", ident(name))));
     }
     out

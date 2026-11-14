@@ -3,7 +3,7 @@
 
 use super::{Bridge, Import, Machine, REBOOT};
 use crate::draft::quoting::{quoted, scalar};
-use crate::draft::writer::{Header, Port, Writer};
+use crate::draft::writer::{Header, Writer};
 use crate::naming::network_names;
 
 /// The draft: the header, the networks, the machines, then the boxes kept and the
@@ -34,20 +34,16 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
     for m in machines {
         y.machine(&m.name);
         y.machine_networks(m.networks.iter().filter_map(|(k, o)| Some((names.get(k)?, *o))));
-        y.ports(m.publish.iter().map(|&(number, host, udp)| Port {
-            number,
-            udp,
-            publish: Some(host),
-        }));
+        y.ports(m.publish.iter().copied());
         y.resources(m.cpus, m.memory_mb);
         y.os(m.os);
         if !m.host_folders.is_empty() {
             let each: Vec<String> = m
                 .host_folders
                 .iter()
-                .map(|(from, path, read_only)| {
-                    let ro = if *read_only { ", read_only: true" } else { "" };
-                    format!("{{ from: {}, path: {}{ro} }}", scalar(from), scalar(path))
+                .map(|f| {
+                    let ro = if f.read_only { ", read_only: true" } else { "" };
+                    format!("{{ from: {}, path: {}{ro} }}", scalar(&f.from), scalar(&f.path))
                 })
                 .collect();
             y.line(format!("    host_folders: [{}]", each.join(", ")));
