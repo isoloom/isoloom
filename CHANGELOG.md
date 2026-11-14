@@ -53,6 +53,9 @@ stable spec format.
 
 ### Fixed
 
+- **Two `isoloom generate` runs in one project at once no longer fail each other (#297):** each
+  writes its fresh copy of a file under a name of its own before renaming it into place, where they
+  shared one and could remove or rename the other's half-written copy.
 - **A Windows machine's command healthcheck runs in a PowerShell of its own (#290),** as Linux runs
   it in `sh -c`. The Ready step pasted the test into its own script: an `exit 1` ended the
   provisioner at once, an `exit 0` ended it before the ready file was written, a cmdlet-only test

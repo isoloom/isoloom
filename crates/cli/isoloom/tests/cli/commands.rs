@@ -664,13 +664,13 @@ fn generate_replaces_each_file_rather_than_writing_into_it() -> Outcome {
     let compose = dir.join(".isoloom/docker/compose.yml");
     let written = std::fs::read_to_string(&compose)?;
     std::fs::write(&compose, "stale\n")?;
-    std::fs::write(dir.join(".isoloom/docker/compose.yml.isoloom-new"), "a half-written file left over\n")?;
     assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
     assert_eq!(std::fs::read_to_string(&compose)?, written);
-    assert!(
-        !dir.join(".isoloom/docker/compose.yml.isoloom-new").exists(),
-        "the fresh file is renamed into place"
-    );
+    let fresh: Vec<_> = std::fs::read_dir(dir.join(".isoloom/docker"))?
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .filter(|name| name.starts_with("compose.yml.isoloom-new"))
+        .collect();
+    assert_eq!(fresh, Vec::<String>::new(), "the fresh file is renamed into place");
     Ok(())
 }
 
