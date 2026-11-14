@@ -129,10 +129,36 @@ fn a_build_argument_given_wins_over_the_default() {
 fn the_machines_own_os_picks_where_a_service_installs() {
     let build = Build {
         path: "Dockerfile",
-        text: "FROM mariadb:10.11\n",
+        text: "FROM postgres:16\n",
         context: ".",
         args: &[],
         os: Some("rocky@9"),
     };
     assert_eq!(translate(&build, &Sources::default()).unwrap().os.to_string(), "rocky@9");
+}
+
+#[test]
+fn a_catalogue_image_brings_its_entrys_recipe_with_the_images_settings() {
+    let text = std::fs::read_to_string(fixtures().join("mysql-catalogue/Dockerfile")).unwrap();
+    let build = Build {
+        path: "build/db/Dockerfile",
+        text: &text,
+        context: "build/db",
+        args: &[],
+        os: None,
+    };
+    let t = translate(&build, &Sources::default()).unwrap();
+    assert_eq!(t.os.to_string(), "debian@11");
+    assert!(t.yaml.contains("catalogue: mysql@5.7.44 on debian@11"), "{}", t.yaml);
+    let files: Vec<&str> = t.files.keys().map(ProjectPath::as_str).collect();
+    assert!(
+        files
+            .iter()
+            .any(|f| f.starts_with("catalogue/mysql/") && f.ends_with("files/docker-entrypoint.sh")),
+        "{files:?}"
+    );
+    // The root password from the image's environment, in its value file.
+    assert!(t.files.values().any(|v| v == "trading_platform"), "{files:?}");
+    // The entry's own service runs: the Dockerfile keeps the image's command.
+    assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
 }

@@ -19,6 +19,9 @@ pub(super) struct Translated {
     pub source: syntax::Spec,
     /// The machines whose Dockerfile doesn't translate: the refusal at their `app.build`.
     pub refused: BTreeMap<String, Problem>,
+    /// The texts of the templates the translations place that aren't the project's (catalogue
+    /// entries' files and value files), by the path their steps' `from` names.
+    pub files: BTreeMap<ProjectPath, String>,
 }
 
 /// The Dockerfile a machine's VM form is translated from: its build's, when it has no steps of
@@ -59,6 +62,7 @@ pub(super) fn wants_vm(target: Target) -> bool {
 pub(super) fn translate(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, String>, bases: &Sources) -> Translated {
     let mut out = source.clone();
     let mut refused = BTreeMap::new();
+    let mut files = BTreeMap::new();
     for (name, m) in &mut out.machines {
         let Some((build, path)) = dockerfile(m) else { continue };
         let Some(text) = path.parse::<ProjectPath>().ok().and_then(|p| texts.get(&p)) else {
@@ -75,6 +79,7 @@ pub(super) fn translate(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, Str
         };
         match dockerfile::translate(&b, bases) {
             Ok(t) => {
+                files.extend(t.files);
                 m.os = Some(t.os);
                 if let Kind::App(app) = &mut m.kind {
                     app.steps = t.steps;
@@ -89,7 +94,7 @@ pub(super) fn translate(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, Str
             }
         }
     }
-    Translated { source: out, refused }
+    Translated { source: out, refused, files }
 }
 
 impl Translated {
@@ -126,7 +131,10 @@ mod tests {
     fn a_vm_target_runs_the_translation_and_a_container_target_the_build() {
         let lab = Lab::parse(LAB).unwrap().with_dockerfiles(texts(&[
             ("build/web/Dockerfile", "FROM php:8.2-apache\nCOPY src/ .\n"),
-            ("build/db/Dockerfile.lab", "FROM mariadb:10.11\nENV MARIADB_DATABASE=app\n"),
+            (
+                "build/db/Dockerfile.lab",
+                "FROM mariadb:10.11\nENV MARIADB_ROOT_PASSWORD=root MARIADB_DATABASE=app\n",
+            ),
         ]));
         assert_eq!(lab.refusal(Target::Vagrant), None);
         let vm = lab.for_target(Target::Vagrant);

@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What gitea does, proven on both forms: the release asked for answers as `gitea`, and the image's
+# `su-exec` runs a command as `git`.
+cases:
+  default: {}
+
+checks:
+  - name: gitea reports the release asked for
+    exec: gitea --version
+    expect: "{{ version }}"
+  - name: su-exec runs as git
+    exec: su-exec git id -un
+    expect: "git"
+
+facts:
+  - name: the release
+    exec: gitea --version

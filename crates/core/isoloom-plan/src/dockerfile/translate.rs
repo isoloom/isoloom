@@ -9,13 +9,19 @@
 
 use std::collections::BTreeMap;
 
+use isoloom_catalogue::{Catalogue, Version, pick};
+
 use super::Untranslatable;
 use super::instruction::{self, Command, Copy, Instruction, Line, Source};
-use super::matrix::{self, NoEntry};
+use super::matrix::{self, EntryCall, NoEntry};
 use super::sources::Sources;
 
 /// The PATH an image has unless it sets its own.
 const DEFAULT_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+
+/// The folder of the commands a translated step finds first (the account shims the first step
+/// writes).
+pub(super) const SHIMS: &str = "/usr/local/lib/isoloom/shims";
 
 /// How many fetched Dockerfiles deep a `FROM` chain may go.
 const MAX_DEPTH: usize = 8;
@@ -52,6 +58,31 @@ pub(super) struct Image {
     pub cmd: Option<Command>,
     /// The shell `RUN`'s shell form runs in (`None`: `/bin/sh -c`).
     pub shell: Option<Vec<String>>,
+    /// The step ([`Op::Entry`]) of the catalogue entry it is, when it is one: the last stage's
+    /// entry takes its settings from the image's environment.
+    pub entry: Option<usize>,
+    /// kCTF's challenge base: the VM is the jail.
+    pub jail: bool,
+}
+
+/// One step of the translation, in order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum Op {
+    /// A shell step.
+    Shell(String),
+    /// A catalogue entry's recipe, resolved once the image's environment is known.
+    Entry(EntryOp),
+}
+
+/// A catalogue entry a stage starts from: its release and the VM's OS, picked at its `FROM`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct EntryOp {
+    /// The entry and what fills its settings.
+    pub call: EntryCall,
+    /// The release picked.
+    pub release: String,
+    /// The OS it installs on.
+    pub os: String,
 }
 
 impl Image {
@@ -71,6 +102,8 @@ impl Image {
             entrypoint: base.entrypoint,
             cmd: base.cmd,
             shell: None,
+            entry: None,
+            jail: base.jail,
         }
     }
 
@@ -137,8 +170,8 @@ pub(super) struct Run<'a> {
     sources: &'a Sources,
     /// The machine's own `os`, which the matrix installs on when it can.
     wanted: Option<&'a str>,
-    /// The shell steps, in order.
-    pub steps: Vec<String>,
+    /// The steps, in order.
+    pub steps: Vec<Op>,
     /// The VM's OS, and the image that set it.
     os: Option<(String, String)>,
 }
@@ -314,10 +347,29 @@ impl<'a> Run<'a> {
     /// fetched Dockerfile translated first.
     fn base(&mut self, f: &File<'_>, line: &Line, image_ref: &str) -> Result<Image, Untranslatable> {
         match matrix::of(image_ref, self.wanted) {
-            Ok(base) => {
+            Ok(mut base) => {
+                // A base that takes the VM's OS (kCTF's): the stages before made it.
+                if base.jail {
+                    base.os = self.os.as_ref().map(|(os, _)| os.clone()).ok_or_else(|| {
+                        f.at(
+                            line,
+                            format!("`{image_ref}` runs on the OS its stages before give, and none comes before it"),
+                            "build a stage FROM an OS before it",
+                        )
+                    })?;
+                }
+                let entry = match base.entry.take() {
+                    Some(call) => {
+                        let op = release(&call, self.wanted).map_err(|(reason, fix)| f.at(line, reason, &fix))?;
+                        base.os.clone_from(&op.os);
+                        self.steps.push(Op::Entry(op));
+                        Some(self.steps.len() - 1)
+                    }
+                    None => None,
+                };
                 // The base's install runs strict: a failed download or package stops the VM's set-up.
-                self.steps.extend(base.prelude.iter().map(|p| format!("set -eu\n{p}")));
-                Ok(Image::of(base))
+                self.steps.extend(base.prelude.iter().map(|p| Op::Shell(format!("set -eu\n{p}"))));
+                Ok(Image { entry, ..Image::of(base) })
             }
             Err(NoEntry::Refused { reason, fix }) => Err(f.at(line, reason, &fix)),
             Err(NoEntry::Unknown(_)) => match self.sources.get(image_ref) {
@@ -356,7 +408,10 @@ impl<'a> Run<'a> {
             .map(|(k, v)| format!("export {k}={}\n", quote(v)))
             .collect::<Vec<_>>()
             .concat();
-        let script = format!("set -e\n{exports}mkdir -p {0} && cd {0}\n{body}\n", quote(&st.img.workdir));
+        let script = format!(
+            "set -e\n{exports}export PATH=\"{SHIMS}:$PATH\"\nmkdir -p {0} && cd {0}\n{body}\n",
+            quote(&st.img.workdir)
+        );
         let step = match (&st.img.user, as_root) {
             (Some(user), false) => format!(
                 "set -e\nu={}\nsu -s /bin/sh \"$(getent passwd \"$u\" | cut -d: -f1)\" -c {}\n",
@@ -365,8 +420,50 @@ impl<'a> Run<'a> {
             ),
             _ => script,
         };
-        self.steps.push(step);
+        self.steps.push(Op::Shell(step));
     }
+}
+
+/// The release of `call`'s entry a VM installs (the newest its version picks among the releases
+/// with a VM form, not only an official image) and the OS: `wanted` when the release runs on it,
+/// else its first. Why there is none, and the fix, when there is none.
+fn release(call: &EntryCall, wanted: Option<&str>) -> Result<EntryOp, (String, String)> {
+    let catalogue = Catalogue::embedded().map_err(|e| (format!("Isoloom's catalogue doesn't load: {e}"), "report this to Isoloom".to_owned()))?;
+    let entry = catalogue
+        .entry(call.entry)
+        .ok_or_else(|| (format!("the catalogue has no `{}`", call.entry), "report this to Isoloom".to_owned()))?;
+    let def = entry.definition();
+    let built = |os: &isoloom_spec::syntax::OsRef| !def.images.contains_key(os);
+    let releases: Vec<_> = def.releases.iter().filter(|r| r.os.iter().any(built)).collect();
+    let versions: Vec<&Version> = releases.iter().map(|r| &r.version).collect();
+    let asked: Option<Version> = call.version.as_deref().and_then(|v| v.parse().ok());
+    let picked = match &asked {
+        Some(v) => pick(versions.iter().copied(), v),
+        None => versions.iter().copied().max(),
+    };
+    let listed = versions.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+    let none = || {
+        (
+            format!(
+                "the catalogue's `{}` has no release {} with a VM form (it has {listed})",
+                call.entry,
+                call.version.as_deref().unwrap_or("at all")
+            ),
+            "build FROM a release it has, or give the machine `os` and `app.steps`".to_owned(),
+        )
+    };
+    let picked = picked.ok_or_else(none)?;
+    let r = releases.iter().find(|r| &r.version == picked).ok_or_else(none)?;
+    let os =
+        r.os.iter()
+            .find(|o| built(o) && wanted.is_some_and(|w| o.to_string() == w))
+            .or_else(|| r.os.iter().find(|o| built(o)))
+            .ok_or_else(none)?;
+    Ok(EntryOp {
+        call: call.clone(),
+        release: picked.to_string(),
+        os: os.to_string(),
+    })
 }
 
 /// A `COPY`/`ADD`'s shell (stage `i` of `f`), or why it has none and the fix.
@@ -389,7 +486,7 @@ fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<Strin
     };
     let mut lines = vec![format!("dest={}", quote(&dest))];
     for src in &c.sources {
-        lines.push(copy_one(&substitute(src, &vars), root.as_deref(), add, into)?);
+        lines.push(copy_one(&substitute(src, &vars), root.as_deref(), add, into, st.img.jail)?);
     }
     if let Some(owner) = &c.chown {
         lines.push(format!("chown -R {} \"$dest\"", quote(&substitute(owner, &vars))));
@@ -401,8 +498,9 @@ fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<Strin
 }
 
 /// One source of a `COPY`/`ADD` into `$dest`: from the project copy under `root`, or (`None`)
-/// from an earlier stage on this VM; `into`: `$dest` is a folder.
-fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool) -> Result<String, (String, &'static str)> {
+/// from an earlier stage on this VM; `into`: `$dest` is a folder; `jail`: the VM is kCTF's jail,
+/// whose chroot is the VM itself.
+fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) -> Result<String, (String, &'static str)> {
     if add && (src.starts_with("http://") || src.starts_with("https://")) {
         let name = src.rsplit('/').next().unwrap_or("download");
         let to = if into { format!("\"$dest\"/{}", quote(name)) } else { "\"$dest\"".to_owned() };
@@ -411,6 +509,9 @@ fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool) -> Result<Stri
     let rel = src.trim_start_matches("./");
     let path = match root {
         Some(root) => format!("{root}/{rel}"),
+        None if (rel == "/" || rel.is_empty()) && jail => {
+            return Ok(": a stage's whole filesystem into kCTF's chroot: the VM itself is the jail".to_owned());
+        }
         None if rel == "/" || rel.is_empty() => {
             return Err((
                 "it copies a stage's whole filesystem: a VM can't be two systems".to_owned(),

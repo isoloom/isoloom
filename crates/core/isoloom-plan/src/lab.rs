@@ -225,9 +225,17 @@ impl Lab {
         templates::paths(&self.source)
     }
 
-    /// `spec` with the image table and the templates' texts applied.
+    /// `spec` with the image table and the templates' texts applied: the project's, and those
+    /// the Dockerfiles' translations bring (catalogue entries' files), once translated.
     fn finish(&self, spec: &model::Spec) -> model::Spec {
-        templates::add(self.images.apply(spec), &self.templates)
+        match self.memo.translated.get().filter(|t| !t.files.is_empty()) {
+            Some(t) => {
+                let mut texts = self.templates.clone();
+                texts.extend(t.files.iter().map(|(k, v)| (k.clone(), v.clone())));
+                templates::add(self.images.apply(spec), &texts)
+            }
+            None => templates::add(self.images.apply(spec), &self.templates),
+        }
     }
 
     /// The spec as written.

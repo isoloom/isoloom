@@ -1,9 +1,11 @@
 # yaml-language-server: $schema=../entry.schema.json
 #
-# The mysql entry: MySQL, from its official image. The image initialises the data directory at
-# first start from the settings below (its own entrypoint): the root password, an application
-# database, and an application user. There is no VM form in this unit; a VM form from Oracle's own
-# repository is a follow-up. lock.yml beside it is written only by
+# The mysql entry: MySQL, from its official image (8.4 on Debian 12), or Oracle's generic Linux
+# build of an exact release (5.5 to 8.4) installed the same way in every form: a VM, or a
+# container built from the OS's image. Either initialises the data directory at first start from
+# the settings below (the image's entrypoint, or the entry's own with the same contract): the root
+# password, an application database, an application user, then /docker-entrypoint-initdb.d. Each
+# download release pins its archive's SHA-256 in `vars`; lock.yml beside it is written only by
 # `cargo xtask catalogue refresh mysql`, which pins the image's digest.
 name: mysql
 description: >-
@@ -20,6 +22,32 @@ releases:
     channel: lts
     source: distro
     os: [debian@12]
+# Oracle's generic builds: 5.x links ncurses 5, which Debian 11 is the last to ship; 8.x links
+# libaio 1 by its old name, which Ubuntu 22.04 still has.
+  - version: 5.5.62
+    source: download
+    os: [debian@11]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-5.5/mysql-5.5.62-linux-glibc2.12-x86_64.tar.gz", sha256: 4927306c4e3f895d2a757fcb2bedb6fadf4685388b7c9bd344354455579e44d0 }
+  - version: 5.7.44
+    source: download
+    os: [debian@11]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz", sha256: 798ff0a14cdc1ab259f8a3b6a7f683403e9bbaa85957d82e5370f82b27ba6805 }
+  - version: 8.0.21
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.21-linux-glibc2.12-x86_64.tar.xz", sha256: aad4e7e811e517d2fe4d80d53df8eb122f3f2ec577440b2ba23949cebfda3edc }
+  - version: 8.0.33
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.33-linux-glibc2.12-x86_64.tar.xz", sha256: 4900c972a508d5b2f6d28bb9c51cf45906b6746d616d978f3996fbf2ca59467f }
+  - version: 8.0.44
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.44-linux-glibc2.17-x86_64.tar.xz", sha256: db5e35f13cf98276388d8ddd778d31be684557458c3a4e64f7a8f4a2e4cb4f6f }
+  - version: 8.4.7
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.4/mysql-8.4.7-linux-glibc2.17-x86_64.tar.xz", sha256: 6386faf7301f3d84fb3fd3e11c87e1759a8868378a08c57aa4414703fa281d1f }
 default: "8.4"
 
 images:
@@ -58,4 +86,42 @@ ports:
 data:
   data: /var/lib/mysql
 
-recipe: {}
+# The VM form (and the container built from the OS) of the download releases: never the
+# official image, whose OS (Debian 12) no download release runs on.
+recipe:
+  install:
+    - packages: [ca-certificates, libaio1, libnuma1, procps, xz-utils]
+      when: { os: [debian@11, ubuntu@22.04] }
+    - packages: [libncurses5]
+      when: { os: [debian@11] }
+    - file: { path: /var/cache/isoloom/mysql.tar, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - command: "sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
+      creates: /usr/local/mysql/bin/mysqld
+      when: { os: [debian@11, ubuntu@22.04] }
+    - group: { name: mysql, system: true }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - user: { name: mysql, group: mysql, system: true, home: /var/lib/mysql, shell: /bin/false }
+      when: { os: [debian@11, ubuntu@22.04] }
+
+  configure:
+    - file: { path: /var/lib/mysql, state: directory, owner: mysql, group: mysql, mode: "0750" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - file: { path: /var/lib/mysql-files, state: directory, owner: mysql, group: mysql, mode: "0750" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - file: { path: /docker-entrypoint-initdb.d, state: directory, mode: "0755" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - file: { path: /etc/mysql/conf.d, state: directory, mode: "0755" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - template: { from: files/my.cnf, to: /etc/my.cnf, mode: "0644" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    # The settings, read by the entrypoint at first start (the image reads them from its environment).
+    - template: { from: files/isoloom.env, to: /etc/mysql/isoloom.env, mode: "0600" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    - template: { from: files/docker-entrypoint.sh, to: /usr/local/bin/docker-entrypoint.sh, mode: "0755" }
+      when: { os: [debian@11, ubuntu@22.04] }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    - service: { name: mysql, run: [/usr/local/bin/docker-entrypoint.sh, mysqld] }
+      when: { os: [debian@11, ubuntu@22.04] }
+
+  start: []

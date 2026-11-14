@@ -17,19 +17,21 @@
 //! What has no VM form (`FROM scratch`, `COPY --from=<another image>`, `RUN --mount`, `ONBUILD`,
 //! a base no source gives) is refused, naming the file, the line and the instruction.
 
+mod catalogue;
 pub mod instruction;
 pub mod matrix;
 pub mod sources;
 mod translate;
 
+use std::collections::BTreeMap;
 use std::fmt;
 
-use isoloom_spec::syntax::{OsRef, Step};
+use isoloom_spec::syntax::{OsRef, ProjectPath, Step};
 use serde_json::{Value, json};
 
 use self::instruction::Command;
 pub use self::sources::{Fetched, Index, Origin, Sources, Vendored};
-use self::translate::{Image, Run, argv, quote};
+use self::translate::{Image, Op, Run, argv, quote};
 
 /// The marker folder a translated step's guard names.
 const MARKERS: &str = "/var/lib/isoloom/dockerfile";
@@ -48,8 +50,12 @@ pub struct Translation {
     /// The steps that make the VM what the image is.
     pub steps: Vec<Step>,
     /// `os` and `app` as YAML, the way a spec writes them: what the translation is, to read
-    /// or to paste as the machine's explicit VM form.
+    /// or to paste as the machine's explicit VM form. A catalogue entry's recipe shows as
+    /// `{ catalogue: <entry>@<release> }` where its steps go.
     pub yaml: String,
+    /// The texts of the templates the steps place that aren't the project's (a catalogue
+    /// entry's files, its value files), by the path a step's `from` names.
+    pub files: BTreeMap<ProjectPath, String>,
 }
 
 /// Why a Dockerfile has no VM form: the file, the line, the instruction and why.
@@ -123,34 +129,92 @@ pub fn translate(build: &Build<'_>, sources: &Sources) -> Result<Translation, Un
         .os
         .parse()
         .map_err(|e| Untranslatable::at(build.path, 0, "", format!("`{}` is no OS Isoloom has: {e}", image.os), "report this to Isoloom"))?;
-    let mut shells = vec![UNITS_BEFORE.to_owned()];
-    shells.extend(run.steps);
-    shells.push(UNITS_AFTER.to_owned());
-    let service = start(&image);
-    if let Some((script, _)) = &service {
-        shells.push(script.clone());
+    let mut out = Made::default();
+    out.shell(UNITS_BEFORE);
+    out.shell(ID_SHIMS);
+    let mut keep = Vec::new();
+    for (i, op) in run.steps.iter().enumerate() {
+        match op {
+            Op::Shell(text) => out.shell(text),
+            Op::Entry(e) => {
+                let last = image.entry == Some(i);
+                let recipe = catalogue::resolve(e, last.then_some(image.env.as_slice()), build.path)?;
+                out.written.push(json!({ "catalogue": format!("{}@{} on {}", e.call.entry, e.release, e.os) }));
+                out.steps.extend(recipe.steps);
+                out.files.extend(recipe.files);
+                if last {
+                    keep = recipe.units;
+                }
+            }
+        }
     }
-    let mut written: Vec<Value> = shells
-        .iter()
-        .enumerate()
-        .map(|(i, text)| {
-            let marker = format!("{MARKERS}/{:03}", i + 1);
-            json!({ "command": format!("{}\nmkdir -p {MARKERS} && touch {marker}\n", text.trim_end()), "creates": marker })
-        })
-        .collect();
-    if let Some((_, user)) = service {
+    let service = start(&image);
+    // The image's own command, when it is the entry's: the entry's service stays the VM's.
+    if service.is_some() || image.entry.is_none() {
+        keep.clear();
+    }
+    out.shell(&units_after(&keep));
+    if let Some((script, user)) = service {
+        out.shell(&script);
         let s = match user {
             Some(user) => json!({ "name": SERVICE, "run": [START], "cwd": image.workdir, "user": user }),
             None => json!({ "name": SERVICE, "run": [START], "cwd": image.workdir }),
         };
-        written.push(json!({ "service": s }));
+        out.typed(json!({ "service": s }));
     }
-    let steps: Vec<Step> = serde_json::from_value(Value::Array(written.clone()))
-        .map_err(|e| Untranslatable::at(build.path, 0, "", format!("the VM form isn't a valid one: {e}"), "report this to Isoloom"))?;
-    let form = json!({ "os": image.os, "app": { "steps": written } });
-    let yaml = serde_yaml_ng::to_string(&form)
-        .map_err(|e| Untranslatable::at(build.path, 0, "", format!("the VM form doesn't write: {e}"), "report this to Isoloom"))?;
-    Ok(Translation { os, steps, yaml })
+    out.finish(build.path, os, &image.os)
+}
+
+/// The translation's steps as they are made: typed, as YAML shows them, and the template texts.
+#[derive(Debug, Default)]
+struct Made {
+    steps: Vec<Step>,
+    written: Vec<Value>,
+    files: BTreeMap<ProjectPath, String>,
+    shells: usize,
+    invalid: Option<String>,
+}
+
+impl Made {
+    /// A shell step, run once behind its marker.
+    fn shell(&mut self, text: &str) {
+        self.shells += 1;
+        let marker = format!("{MARKERS}/{:03}", self.shells);
+        self.typed(json!({ "command": format!("{}\nmkdir -p {MARKERS} && touch {marker}\n", text.trim_end()), "creates": marker }));
+    }
+
+    /// A step as the spec writes it.
+    fn typed(&mut self, written: Value) {
+        match serde_json::from_value::<Step>(written.clone()) {
+            Ok(step) => self.steps.push(step),
+            Err(e) => {
+                self.invalid.get_or_insert_with(|| e.to_string());
+            }
+        }
+        self.written.push(written);
+    }
+
+    /// The translation, or why a step it made isn't a valid one.
+    fn finish(self, path: &str, os: OsRef, os_name: &str) -> Result<Translation, Untranslatable> {
+        if let Some(e) = self.invalid {
+            return Err(Untranslatable::at(
+                path,
+                0,
+                "",
+                format!("the VM form isn't a valid one: {e}"),
+                "report this to Isoloom",
+            ));
+        }
+        let form = json!({ "os": os_name, "app": { "steps": self.written } });
+        let yaml = serde_yaml_ng::to_string(&form)
+            .map_err(|e| Untranslatable::at(path, 0, "", format!("the VM form doesn't write: {e}"), "report this to Isoloom"))?;
+        Ok(Translation {
+            os,
+            steps: self.steps,
+            yaml,
+            files: self.files,
+        })
+    }
 }
 
 /// The start script's step and the service's user, for an image that runs something (a bare
@@ -186,7 +250,46 @@ fn start(image: &Image) -> Option<(String, Option<String>)> {
     Some((write, user))
 }
 
-/// Before the steps: the services enabled already (the OS's own).
+/// Account commands first on a translated step's PATH (`translate::SHIMS`): a Dockerfile's
+/// `useradd -u 1000` or `addgroup -g 1000` meets the VM's own account (a box's `vagrant` holds
+/// 1000), which a container never had. The same id is shared (shadow's `-o`); busybox, which
+/// can't share one, takes the next free id.
+const ID_SHIMS: &str = r#"set -e
+d=/usr/local/lib/isoloom/shims
+mkdir -p "$d"
+cat > "$d/useradd" <<'SHIM'
+#!/bin/sh
+for a; do [ "${prev:-}" = -u ] || [ "${prev:-}" = --uid ] && id="$a"; prev="$a"; done
+if [ -n "${id:-}" ] && getent passwd "$id" >/dev/null; then exec /usr/sbin/useradd -o "$@"; fi
+exec /usr/sbin/useradd "$@"
+SHIM
+cat > "$d/groupadd" <<'SHIM'
+#!/bin/sh
+for a; do [ "${prev:-}" = -g ] || [ "${prev:-}" = --gid ] && id="$a"; prev="$a"; done
+if [ -n "${id:-}" ] && getent group "$id" >/dev/null; then exec /usr/sbin/groupadd -o "$@"; fi
+exec /usr/sbin/groupadd "$@"
+SHIM
+chmod 755 "$d/useradd" "$d/groupadd"
+if command -v apk >/dev/null; then
+  for tool in adduser addgroup; do
+    cat > "$d/$tool" <<SHIM
+#!/bin/sh
+flag=-u; [ $tool = addgroup ] && flag=-g
+db=passwd; [ $tool = addgroup ] && db=group
+out=; skip=
+for a; do
+  if [ -n "\$skip" ]; then skip=; getent "\$db" "\$a" >/dev/null || out="\$out \$flag \$a"; continue; fi
+  if [ "\$a" = "\$flag" ]; then skip=1; continue; fi
+  out="\$out \$a"
+done
+exec /bin/busybox $tool \$out
+SHIM
+    chmod 755 "$d/$tool"
+  done
+fi"#;
+
+/// Before the steps: the services enabled already (the OS's own), and the id shims
+/// ([`ID_SHIMS`]).
 const UNITS_BEFORE: &str = "set -e
 mkdir -p /var/lib/isoloom/dockerfile
 if command -v systemctl >/dev/null; then
@@ -196,9 +299,21 @@ elif command -v rc-update >/dev/null; then
 fi";
 
 /// After the steps: the services they enabled disabled and stopped (a container ran its own
-/// process tree, nothing a package starts), the OS's own kept.
+/// process tree, nothing a package starts), the OS's own and `keep` (a catalogue entry's, when
+/// the image runs the entry's command) left as they are.
+fn units_after(keep: &[String]) -> String {
+    let mut kept =
+        String::from("ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom");
+    for unit in keep {
+        kept.push('|');
+        kept.push_str(&unit.replace('.', "\\."));
+    }
+    UNITS_AFTER.replace("@KEEP@", &kept)
+}
+
+/// [`units_after`]'s script, `@KEEP@` the units it keeps.
 const UNITS_AFTER: &str = "set -e
-keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom)'
+keep='^(@KEEP@)'
 if command -v systemctl >/dev/null; then
   systemctl list-unit-files --state=enabled --type=service --no-legend | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-after
   for u in $(comm -13 /var/lib/isoloom/dockerfile/units-before /var/lib/isoloom/dockerfile/units-after | grep -Ev \"$keep\" || true); do

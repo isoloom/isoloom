@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What golang does, proven on both forms: the release asked for answers as `go`.
+cases:
+  default: {}
+
+checks:
+  - name: go reports the release asked for
+    exec: go version
+    expect: "go{{ version }}"
+
+facts:
+  - name: the toolchain
+    exec: go version

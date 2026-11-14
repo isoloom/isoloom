@@ -711,6 +711,54 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^gitea(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "gitea's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^golang(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "golang's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^mariadb(@.+)?$"
               }
             },
@@ -990,6 +1038,30 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^node(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "node's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^openssh(@.+)?$"
               }
             },
@@ -1155,6 +1227,30 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^python(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "python's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
         }
       ]
     },
@@ -1178,6 +1274,7 @@
         "alma",
         "alma@9",
         "alpine",
+        "alpine@3.7",
         "alpine@3.19",
         "alpine@3.24",
         "kali",

@@ -209,6 +209,14 @@ pub const DISTROS: &[Distro] = &[
         installer: Installer::Apk,
         default: "3.19",
         releases: &[
+            // End of life (2019): for labs built on it (OWASP SKF's).
+            Release {
+                version: "3.7",
+                name: "alpine-3.7",
+                codename: None,
+                container: Some("alpine:3.7@sha256:8421d9a84432575381bfabd248f1eb56f3aa21d9d7cd2511583c68c9b7511d10"),
+                expects_tpm: false,
+            },
             Release {
                 version: "3.19",
                 name: "alpine-3.19",
