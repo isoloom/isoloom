@@ -17,10 +17,9 @@ cargo machete                                  # no unused dependencies
 typos                                          # spelling; legitimate words go in .typos.toml
 lychee --offline README.md CHANGELOG.md ARCHITECTURE.md '.github/*.md' 'docs/**/*.md'   # links
 
-# The generated docs must stay current (their stale-file tests enforce this):
-cargo run -q -p isoloom -- docs --spec > docs/spec.md
-cargo run -q -p isoloom -- docs --matrix > docs/matrix.md
-git diff --exit-code docs
+# The generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are current;
+# a stale one fails naming the command, `.githooks/regenerate`, which rewrites them all:
+.githooks/regenerate --check
 ```
 
 Clippy runs with `-D warnings`, as CI does: any lint that warns fails it. A lint silenced where
@@ -52,6 +51,9 @@ POSIX sh and quick:
   `Claude-Session`, "Generated with", 🤖): the history carries none.
 - `pre-commit` refuses a staged file over 5 MB that Git LFS doesn't hold, and runs rustfmt over
   the staged Rust.
+- `pre-commit` also regenerates and stages the generated files (`.githooks/regenerate`: the
+  docs `isoloom docs` prints and the schemas) when the clone opts in, since it builds:
+  `git config hooks.regenerate true`.
 - `pre-push` runs [gitleaks](https://github.com/gitleaks/gitleaks) over the commits being pushed
   (`brew install gitleaks`; without it the push is refused, not left unscanned), the attribution
   check over them, then `cargo fmt --all --check` and `typos`, in a few seconds. The other gates
@@ -105,7 +107,7 @@ POSIX sh and quick:
 The docs live under `docs/`, by purpose ([index](../docs/README.md)): `guide/` (tutorials and
 how-tos), `reference/`, `explanation/` and `dev/` (maintainers). `docs/spec.md`,
 `docs/matrix.md` and `docs/reference/cli.md` are generated: change the code, then regenerate
-them. Every link between the pages must resolve and every spec in a page (a YAML block whose
+them (`.githooks/regenerate`). Every link between the pages must resolve and every spec in a page (a YAML block whose
 first line is `# isoloom.yml`) must validate: `cargo test -p isoloom-spec --test docs` checks both.
 
 ## License

@@ -71,6 +71,9 @@ jobs:
         with:
           tool: cargo-machete@0.9.2
       - run: cargo run -p xtask --locked -- quality
+      # The generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are
+      # current; a stale one fails naming the command that regenerates them.
+      - run: .githooks/regenerate --check
       # The fuzz targets (a workspace of their own, outside the others' builds) still build
       # against the crates' public items, formatted and lint-clean.
       - run: cargo run -p xtask --locked -- fuzz --check

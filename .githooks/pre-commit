@@ -1,7 +1,8 @@
 #!/bin/sh
 # pre-commit: no staged file over 5 MB unless Git LFS holds it (the pointer is what's committed
 # then), and the staged files are formatted (repo.sh's format_staged: the formatters this
-# repository uses, over the staged files only, so it takes a moment).
+# repository uses, over the staged files only, so it takes a moment). With `git config
+# hooks.regenerate true`, the generated files are regenerated and staged too (regenerate).
 # shellcheck source-path=SCRIPTDIR
 set -u
 HOOK=pre-commit
@@ -24,4 +25,11 @@ fi
 
 files=$(staged_files)
 [ -z "$files" ] || format_staged "$files"
+
+# The generated files, regenerated and staged, when the clone opts in (`git config
+# hooks.regenerate true`): a cargo build, so not on by default. CI checks them either way.
+if [ "$(git config --bool hooks.regenerate)" = true ]; then
+  "$(dirname "$0")/regenerate" || exit 1
+  git add docs/spec.md docs/matrix.md docs/reference/cli.md schemas
+fi
 exit 0
