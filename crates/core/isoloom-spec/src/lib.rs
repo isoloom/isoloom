@@ -12,6 +12,14 @@
 //! # Ok::<(), Vec<isoloom_spec::syntax::Problem>>(())
 //! ```
 
+#![cfg_attr(
+    test,
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
 pub mod appliance;
 mod as_written;
 mod clones;

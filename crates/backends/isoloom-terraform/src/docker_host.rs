@@ -13,6 +13,7 @@ use crate::hcl_builder::{Expression, list, string};
 use crate::ssh::Login;
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::Protocol;
+use isoloom_spec::shell::quote;
 
 /// The ports the containers publish over `protocol`, sorted, each once.
 pub(crate) fn published(env: &Environment, protocol: Protocol) -> Vec<u16> {
@@ -60,7 +61,7 @@ pub(crate) fn accept_env(guest: &GuestCompose, as_root: AsRoot) -> Result<Option
     Ok(Some(GuestCommand {
         id: StepId::parse("accept-env")?,
         note: Some("Letting the VM accept the launch's values…".into()),
-        command: Template::text(&format!("{}sh -c '{}'", as_root.prefix(), steps::accept_env(&forwarded))),
+        command: Template::text(&format!("{}sh -c {}", as_root.prefix(), quote(&steps::accept_env(&forwarded)))),
         timeout_s: 60,
         failure: Failure::Fail,
         download: false,
@@ -118,8 +119,8 @@ pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<
         id: StepId::parse("project")?,
         note: Some("Copying the project into the VM…".into()),
         command: Template::text(&format!(
-            "{sudo}sh -c '{}'",
-            steps::project_unpack(steps::Archive::Stdin, steps::TopFolder::Kept)
+            "{sudo}sh -c {}",
+            quote(&steps::project_unpack(steps::Archive::Stdin, steps::TopFolder::Kept))
         )),
         timeout_s: 600,
         failure: Failure::Fail,

@@ -1,8 +1,14 @@
 {
   "rules": {
     "exception/expect": {
+      "isoloom": 5,
+      "isoloom-render": 1,
       "isoloom-spec": 2,
-      "xtask": 1
+      "isoloom-targets": 2,
+      "isoloom-test-support": 2,
+      "isoloom-vagrant": 2,
+      "xtask": 2,
+      "xtask-quality": 1
     }
   }
 }

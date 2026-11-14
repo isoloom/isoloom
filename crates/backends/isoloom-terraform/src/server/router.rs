@@ -10,6 +10,7 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Join, MachinePlan, MachineShape, OutsideAddress};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
+use isoloom_spec::shell::quote;
 
 use crate::checks::{Invocation, Runner, output_block};
 use crate::machine::cloud_init::{self, CloudConfig, file};
@@ -94,7 +95,7 @@ fn sealed_file(env: &Environment) -> Option<Expression> {
 /// an invalid ruleset isn't kept), then keep it as `/etc/nftables.conf` so a reboot stays sealed.
 #[must_use]
 pub(crate) fn sealed_reload() -> String {
-    format!("sudo sh -c 'nft -f {SEALED_NFT} && cp {SEALED_NFT} /etc/nftables.conf'")
+    format!("sudo sh -c {}", quote(&format!("nft -f {SEALED_NFT} && cp {SEALED_NFT} /etc/nftables.conf")))
 }
 
 /// The router's ruleset before the seal, or after it.

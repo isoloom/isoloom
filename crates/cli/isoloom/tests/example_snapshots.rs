@@ -13,6 +13,11 @@
 //! same example (`resolved.json` everywhere), byte for byte,
 //! is written once, in the earlier snapshot; the later one names it and says where it is.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
+
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};

@@ -29,6 +29,14 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+#![cfg_attr(
+    test,
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
 mod checks;
 mod cloud;
 mod docker_host;

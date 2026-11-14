@@ -9,6 +9,7 @@ use isoloom_manifest::{
 use isoloom_render::run_manifest::noted;
 use isoloom_render::steps::{Archive, PROJECT_DIR, TopFolder, project_unpack};
 use isoloom_spec::linux::STATE_DIR;
+use isoloom_spec::shell::quote;
 
 use super::connection::SEALED;
 use crate::machine::user_data::{DELIVERED, SETUP_LOG};
@@ -55,9 +56,12 @@ fn archive() -> Result<Step, ManifestError> {
 /// harmless.
 fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
     let command = format!(
-        "{}sh -c '{} && mkdir -p {STATE_DIR} && touch {DELIVERED}'",
+        "{}sh -c {}",
         guest.login.as_root().prefix(),
-        project_unpack(Archive::Stdin, TopFolder::Kept)
+        quote(&format!(
+            "{} && mkdir -p {STATE_DIR} && touch {DELIVERED}",
+            project_unpack(Archive::Stdin, TopFolder::Kept)
+        ))
     );
     let wait = [("wait_s", Template::text(&BOOT_WAIT_S.to_string()))];
     let mut s = guest.login.step(&format!("deliver-{}", guest.id()), &Template::text(&command), &wait)?;
