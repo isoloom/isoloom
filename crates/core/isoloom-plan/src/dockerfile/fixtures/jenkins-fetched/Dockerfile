@@ -1,5 +1,5 @@
-# A cicd-goat-style controller: plugins and a job on the published Jenkins image.
-FROM jenkins/jenkins:lts-jdk21
+# A cicd-goat-style controller on a Jenkins release the catalogue lacks: its fetched Dockerfile.
+FROM jenkins/jenkins:2.462.3-lts-jdk17
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
 USER jenkins

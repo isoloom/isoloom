@@ -42,6 +42,7 @@ pub(crate) fn run(args: &Args) -> Res<ExitCode> {
         let def: Definition =
             serde_yaml_ng::from_str(&std::fs::read_to_string(dir.join(name).join("entry.yml"))?).map_err(|e| format!("catalogue/{name}/entry.yml: {e}"))?;
         let path = dir.join(name).join("lock.yml");
+        let missing = !path.is_file();
         let old: Lock = match std::fs::read_to_string(&path) {
             Ok(text) => serde_yaml_ng::from_str(&text).map_err(|e| format!("catalogue/{name}/lock.yml: {e}"))?,
             Err(_) => Lock::default(),
@@ -54,9 +55,13 @@ pub(crate) fn run(args: &Args) -> Res<ExitCode> {
                 println!("catalogue refresh: {name}: {line}");
             }
         }
-        if changes.is_empty() {
+        // A new entry's lock is written even with nothing to pin: the catalogue reads one for each.
+        if changes.is_empty() && !missing {
             println!("catalogue refresh: {name}: current");
         } else if args.check {
+            if missing {
+                drift.push(format!("{name}: no lock.yml"));
+            }
             drift.extend(changes.iter().map(|c| format!("{name}: {}", c.text)));
         } else {
             write_lock(&path, name, new)?;

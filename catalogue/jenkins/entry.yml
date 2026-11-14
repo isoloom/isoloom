@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The jenkins entry: Jenkins as the jenkins/jenkins image has it (jenkinsci/docker's controller),
+# the same in every form: a VM, or a container built from Debian 13's image. The image's parts are
+# downloads pinned by SHA-256 in `vars`: the LTS release's jenkins.war (get.jenkins.io), the
+# Temurin JDK the image's build takes (Adoptium), and the plugin installation manager behind
+# `jenkins-plugin-cli`. The entry's own scripts keep the image's contract: jenkins.sh copies
+# /usr/share/jenkins/ref into JENKINS_HOME at every start, then runs the war as `jenkins`. There is no official image form: building from the OS keeps both forms the
+# same. Nothing for `cargo xtask catalogue refresh jenkins` to pin: every release is a download.
+name: jenkins
+description: >-
+  The Jenkins controller, as the jenkins/jenkins image has it: an LTS release's war on Temurin,
+  with the image's plugin installer and reference folder.
+upstream: https://www.jenkins.io/
+licence:
+  software: MIT
+  notes: Temurin is GPL-2.0 with the Classpath Exception; the plugins a lab installs carry their own licences.
+
+# The LTS releases labs pin (jenkins/jenkins:lts-jdk21 is 2.580.2), with the JDK the image's build
+# of that release takes (jenkinsci/docker's adoptium/jdk_installers.txt at the release's tag).
+releases:
+  - version: "2.580.2"
+    channel: lts
+    source: download
+    os: [debian@13]
+    vars:
+      war: "https://get.jenkins.io/war-stable/2.580.2/jenkins.war"
+      war_sha256: d98032d2401c540a35613a82ed358921fcf3166d5e6eaaaf60a7941845be3251
+      jdk: "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_linux_hotspot_21.0.13_9.tar.gz"
+      jdk_sha256: d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c
+      plugin_manager: "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.15.0/jenkins-plugin-manager-2.15.0.jar"
+      plugin_manager_sha256: a86853ec2e2933f37a4b471ba65099b61e03c87a80c2ef8fe2315eb135672d43
+default: "2.580.2"
+
+ports:
+  http: { port: 8080, protocol: http }
+  agent: { port: 50000, protocol: tcp }
+
+data:
+  home: /var/jenkins_home
+
+recipe:
+  install:
+    # The image's packages (its controller stage's, git-lfs aside).
+    - packages: [ca-certificates, curl, fontconfig, git, gnupg, less, openssh-client, procps, tzdata, unzip]
+    - file: { path: /var/cache/isoloom/jdk.tar.gz, url: "{{ vars.jdk }}", sha256: "{{ vars.jdk_sha256 }}" }
+    - command: "sh -c 'mkdir -p /opt/java/openjdk && tar -xzf /var/cache/isoloom/jdk.tar.gz --strip-components=1 -C /opt/java/openjdk && ln -sf /opt/java/openjdk/bin/java /usr/local/bin/java'"
+      creates: /opt/java/openjdk/bin/java
+    - file: { path: /usr/share/jenkins, state: directory, mode: "0755" }
+    - file: { path: /usr/share/jenkins/jenkins.war, url: "{{ vars.war }}", sha256: "{{ vars.war_sha256 }}" }
+    - file: { path: /opt/jenkins-plugin-manager.jar, url: "{{ vars.plugin_manager }}", sha256: "{{ vars.plugin_manager_sha256 }}" }
+    - group: { name: jenkins }
+    - user: { name: jenkins, group: jenkins, home: /var/jenkins_home, shell: /bin/bash }
+
+  configure:
+    - file: { path: /var/jenkins_home, state: directory, owner: jenkins, group: jenkins, mode: "0755" }
+    - file: { path: /usr/share/jenkins/ref/init.groovy.d, state: directory, owner: jenkins, group: jenkins, mode: "0755" }
+    - file: { path: /etc/jenkins, state: directory, mode: "0755" }
+    - template: { from: files/jenkins.env, to: /etc/jenkins/jenkins.env, mode: "0644" }
+    - template: { from: files/jenkins.sh, to: /usr/local/bin/jenkins.sh, mode: "0755" }
+    - template: { from: files/jenkins-plugin-cli, to: /bin/jenkins-plugin-cli, mode: "0755" }
+    - template: { from: files/jenkins-foreground, to: /usr/local/bin/jenkins-foreground, mode: "0755" }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    - service: { name: jenkins, run: [/usr/local/bin/jenkins-foreground] }
+
+  start: []
