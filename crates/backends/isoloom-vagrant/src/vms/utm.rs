@@ -123,16 +123,15 @@ fn named(var: &str) -> Provision {
 
 #[cfg(all(test, unix))]
 mod tests {
-    use std::path::Path;
-    use std::process::Command;
+    use isoloom_test_support::FakeBin;
 
     use super::NAT_ROUTE_SH;
 
     /// A run of the script in a scratch folder: stand-ins on a `PATH` holding nothing else but the
     /// text tools it uses, what they were asked (one call a line), and its networkd folder.
     struct Run {
-        /// The scratch folder, removed when the run goes.
-        dir: tempfile::TempDir,
+        /// The stand-ins and the scratch folder, removed when the run goes.
+        bin: FakeBin,
     }
 
     impl Run {
@@ -145,40 +144,34 @@ mod tests {
 
         /// As [`Run::new`], with a stand-in `ping` that answers when `reaches`.
         fn reaching(name: &str, routes: &str, reaches: bool) -> Result<Run, Box<dyn std::error::Error>> {
-            let dir = tempfile::Builder::new().prefix(&format!("isoloom-nat-route-{name}-")).tempdir()?;
-            std::fs::create_dir_all(dir.path().join("bin"))?;
-            std::fs::write(dir.path().join("routes"), routes)?;
-            let run = Run { dir };
+            let run = Run {
+                bin: FakeBin::named(&format!("nat-route-{name}"))?,
+            };
+            std::fs::write(run.bin.dir().join("routes"), routes)?;
             run.stand_in(
                 "ip",
                 &format!(
                     "if [ \"$3\" = show ]; then\n  shift 4\n  awk -v want=\"$*\" 'BEGIN {{ n = split(want, w, \" \") }} {{ ok = 1; for (i = 1; i < n; i += 2) if (index($0, w[i] \" \" w[i + 1] \" \") == 0) ok = 0; if (ok) print }}' {}\nelse\n  echo \"ip $*\" >> {}\nfi\n",
-                    run.dir.path().join("routes").display(),
+                    run.bin.dir().join("routes").display(),
                     run.log().display(),
                 ),
             )?;
             run.stand_in("ping", if reaches { "exit 0\n" } else { "exit 1\n" })?;
-            for tool in ["awk", "grep", "sed", "mkdir", "cat"] {
-                let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
-                std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), run.dir.path().join("bin").join(tool))?;
-            }
+            run.bin.link_real(&["awk", "grep", "sed", "mkdir", "cat"])?;
             Ok(run)
         }
 
         fn log(&self) -> std::path::PathBuf {
-            self.dir.path().join("log")
+            self.bin.log()
         }
 
         fn networkd(&self) -> std::path::PathBuf {
-            self.dir.path().join("networkd")
+            self.bin.dir().join("networkd")
         }
 
         /// A stand-in `name` running the shell `body`.
         fn stand_in(&self, name: &str, body: &str) -> Result<(), Box<dyn std::error::Error>> {
-            let path = self.dir.path().join("bin").join(name);
-            std::fs::write(&path, format!("#!/bin/sh\n{body}"))?;
-            Command::new("chmod").arg("+x").arg(&path).status()?;
-            Ok(())
+            self.bin.stand_in(name, body).map(drop)
         }
 
         /// A stand-in `networkctl` that reports the card's network file as `file` and logs every
@@ -195,19 +188,9 @@ mod tests {
 
         /// The script run to its end (it must succeed): the calls it made, one a line.
         fn calls(&self) -> Result<String, Box<dyn std::error::Error>> {
-            let out = Command::new("/bin/sh")
-                .arg("-c")
-                .arg(NAT_ROUTE_SH)
-                .env_clear()
-                .env("PATH", self.dir.path().join("bin"))
-                .env("ISOLOOM_NETWORKD_DIR", self.networkd())
-                .output()?;
-            assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-            Ok(if Path::new(&self.log()).exists() {
-                std::fs::read_to_string(self.log())?
-            } else {
-                String::new()
-            })
+            let networkd = self.networkd();
+            let calls = self.bin.calls_of(NAT_ROUTE_SH, &[("ISOLOOM_NETWORKD_DIR", &networkd)])?;
+            Ok(calls.iter().map(|c| format!("{}\n", c.join(" "))).collect())
         }
     }
 

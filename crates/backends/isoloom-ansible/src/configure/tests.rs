@@ -65,10 +65,35 @@ fn a_rocky_package_takes_dnf_and_the_rpm_version_join() {
 #[test]
 fn an_alpine_package_is_a_guarded_command_not_the_community_apk_module() {
     let t = tasks("os: alpine@3.24, app: { steps: [{ packages: [curl] }] }", Target::Vagrant, &[]);
-    assert!(t.contains("ansible.builtin.command:"), "{t}");
-    assert!(t.contains("apk"), "{t}");
-    assert!(!t.contains("community"), "{t}");
-    assert!(t.contains("changed_when:"), "{t}");
+    let parsed: serde_yaml_ng::Value = serde_yaml_ng::from_str(&t).expect("the tasks are YAML");
+    let commands: Vec<&serde_yaml_ng::Value> = parsed
+        .as_sequence()
+        .expect("a task list")
+        .iter()
+        .filter_map(|task| task.get("ansible.builtin.command"))
+        .collect();
+    let argv: Vec<&str> = match commands.as_slice() {
+        [one] => one
+            .get("argv")
+            .and_then(|a| a.as_sequence())
+            .expect("an argv")
+            .iter()
+            .filter_map(|a| a.as_str())
+            .collect(),
+        _ => panic!("one command task, not {}: {t}", commands.len()),
+    };
+    assert_eq!(argv, ["apk", "add", "--no-cache", "curl"], "{t}");
+    assert!(!t.contains("community."), "no community module: {t}");
+    let guarded = parsed
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|task| task.get("ansible.builtin.command").is_some())
+        .and_then(|task| task.get("changed_when"));
+    assert!(
+        guarded.and_then(|g| g.as_str()).is_some_and(|g| g.contains("isoloom_apk.stdout")),
+        "changed only when apk installed something: {t}"
+    );
 }
 
 #[test]

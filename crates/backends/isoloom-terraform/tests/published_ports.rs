@@ -5,6 +5,7 @@ pub mod testing;
 
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
+use isoloom_test_support::{hcl_body, hcl_literals};
 use testing::{Outcome, plan};
 
 /// `web` publishes 18080 (UDP 18053 too); `db` and `cache`, beside it, publish nothing.
@@ -30,24 +31,10 @@ machines:
     app: { steps: [{ run: setup.sh }] }
 ";
 
-/// Each `resource "<type>" "<name>"` block of a module: its name, and its text.
-fn resources(module: &str) -> Vec<(String, String)> {
-    let mut out: Vec<(String, String)> = Vec::new();
-    for line in module.lines() {
-        if let Some(rest) = line.strip_prefix("resource \"") {
-            let name = rest.split('"').nth(2).unwrap_or_default().to_owned();
-            out.push((name, String::new()));
-        } else if !line.starts_with(|c: char| c.is_ascii_alphabetic()) {
-            if let Some((_, body)) = out.last_mut() {
-                body.push_str(line);
-                body.push('\n');
-            }
-        } else {
-            // Another top-level block (a variable, an output, locals): not a resource's.
-            out.push((String::new(), String::new()));
-        }
-    }
-    out
+/// Whether `literal` (a value of the module) is port `port`, alone or as a range's end
+/// (`"18080"`, `18080`, `"18080-18080"`).
+fn is_port(literal: &str, port: &str) -> bool {
+    literal.split('-').any(|end| end == port)
 }
 
 #[test]
@@ -59,12 +46,24 @@ fn a_published_port_opens_on_its_machine_only() -> Outcome {
         if backend.refusal(&env).is_some() {
             continue;
         }
-        let module = &backend.render(&env)?.contents;
+        let module = hcl_body(&backend.render(&env)?.contents);
+        let resources: Vec<(String, Vec<String>)> = module
+            .blocks()
+            .filter(|b| b.identifier() == "resource")
+            .map(|b| (b.labels().get(1).map(|l| l.as_str().to_owned()).unwrap_or_default(), hcl_literals(b.body())))
+            .collect();
         for port in ["18080", "18053"] {
-            assert!(module.contains(port), "{cloud}: {port} isn't published at all");
-            for (name, body) in resources(module).into_iter().filter(|(n, _)| !n.is_empty()) {
-                let own = name == "web" || name.starts_with("web_");
-                assert!(own || !body.contains(port), "{cloud}: `{name}` opens {port}, which only `web` publishes");
+            let opening: Vec<&str> = resources
+                .iter()
+                .filter(|(_, values)| values.iter().any(|v| is_port(v, port)))
+                .map(|(name, _)| name.as_str())
+                .collect();
+            assert!(!opening.is_empty(), "{cloud}: {port} isn't published at all");
+            for name in opening {
+                assert!(
+                    name == "web" || name.starts_with("web_"),
+                    "{cloud}: `{name}` opens {port}, which only `web` publishes"
+                );
             }
         }
         checked += 1;
