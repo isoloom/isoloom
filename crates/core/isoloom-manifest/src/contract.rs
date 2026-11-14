@@ -5,14 +5,9 @@
 //! they are; Isoloom's backends write them from here, so the two can't drift. Each is part of the
 //! contract as the run manifest's fields are: a rename is a breaking change.
 
-/// The folder Isoloom writes a project's outputs under (`.isoloom/<target>/`), and the start of
-/// every instance's own (`.isoloom-<n>/`): a run manifest's folder is under one.
-pub const OUTPUT_DIR: &str = ".isoloom";
-
-/// What every name Isoloom reserves starts with: a machine, alias or network the spec names
-/// can't start with it, and the names Isoloom adds (its controller, its router, its tags, a
-/// Kubernetes Service) do.
-pub const RESERVED_PREFIX: &str = "isoloom-";
+/// The folder Isoloom writes a project's outputs under, and the prefix of the names it reserves:
+/// the spec's (a run manifest's folder is under the first).
+pub use isoloom_spec::contract::{OUTPUT_DIR, RESERVED_PREFIX};
 
 /// The machine that runs a run's controller (Ansible, the playbook checks): its Vagrant
 /// `define` name, its name in the manifest's machines.

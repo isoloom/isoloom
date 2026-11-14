@@ -23,6 +23,7 @@
 pub mod appliance;
 mod as_written;
 mod clones;
+pub mod contract;
 pub mod defaults;
 mod error;
 pub mod groups;

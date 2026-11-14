@@ -1,7 +1,7 @@
 //! `networks`: blocks (valid, private, /24 to /29, not overlapping), gateways, a LAN's switch,
 //! the appliances' management network, link impairment, and the blocks on Docker.
 
-use isoloom_manifest::KEBAB_MAX;
+use crate::contract::KEBAB_MAX;
 
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Network, Spec, Tc};

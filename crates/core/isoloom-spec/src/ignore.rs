@@ -36,7 +36,7 @@ use std::collections::BTreeSet;
 /// The file's name, at the project's root.
 pub const FILE: &str = ".isoloomignore";
 
-/// Isoloom's outputs, at the project's top: `.isoloom/` (`isoloom_manifest::contract::OUTPUT_DIR`),
+/// Isoloom's outputs, at the project's top: `.isoloom/` ([`OUTPUT_DIR`](crate::contract::OUTPUT_DIR)),
 /// an instance's `.isoloom-<n>/`, and every other `.isoloom*` entry there. It takes `.isoloomignore` itself too, on purpose: the copy has
 /// applied it already, and a machine has no use for it.
 pub const OUTPUTS: &str = "/.isoloom*";

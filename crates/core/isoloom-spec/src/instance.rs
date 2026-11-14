@@ -6,12 +6,12 @@
 //! committed `.isoloom/`. Local VM networks are isolated by name already (VirtualBox internal
 //! networks), so machines keep the addresses the spec writes.
 
+use crate::contract::OUTPUT_DIR;
 use crate::model::{NetworkDocker, Spec};
 use crate::net::Cidr;
 use crate::net::Cidr6;
 use crate::net::docker_cidrs;
 use crate::syntax::{Code, FieldPath, Problem};
-use isoloom_manifest::contract::OUTPUT_DIR;
 
 /// Why a spec can't be made an instance of itself ([`apply`]).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

@@ -1,7 +1,7 @@
 use proptest::prelude::*;
 
 use super::{FILE, OUTPUTS, Rules, Token, copy_rules, tokens};
-use isoloom_manifest::contract::OUTPUT_DIR;
+use crate::contract::OUTPUT_DIR;
 
 fn kept<'a>(rules: &str, paths: &[&'a str]) -> Vec<&'a str> {
     let r = Rules::parse(rules);

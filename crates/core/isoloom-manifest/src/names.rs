@@ -116,20 +116,9 @@ macro_rules! pattern_type {
     };
 }
 
-/// The longest kebab-case name ([`is_kebab`]): an environment's name is a DNS label and a
-/// Kubernetes namespace.
-pub const KEBAB_MAX: usize = 63;
-
-/// Kebab case, as an environment's name (`my-env`, `shop-2`): lowercase letters and digits in
-/// words joined by single dashes, at most [`KEBAB_MAX`] characters. The one rule the spec's
-/// kebab-case names follow too.
-#[must_use]
-pub fn is_kebab(s: &str) -> bool {
-    !s.is_empty()
-        && s.len() <= KEBAB_MAX
-        && s.split('-')
-            .all(|w| !w.is_empty() && w.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
-}
+/// Kebab case and its longest name: the spec's rule (`isoloom_spec::contract`), which an
+/// environment's name in a run manifest follows too.
+pub use isoloom_spec::contract::{KEBAB_MAX, is_kebab};
 
 pattern_type!(
     max_len KEBAB_MAX;

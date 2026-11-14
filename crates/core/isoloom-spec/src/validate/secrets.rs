@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use isoloom_manifest::{KEBAB_MAX, is_kebab};
+use crate::contract::{KEBAB_MAX, is_kebab};
 
 use super::{Problems, is_variable};
 use crate::model::{MachineSecret, SecretSource, Spec, after_drive};

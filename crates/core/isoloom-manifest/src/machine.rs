@@ -93,6 +93,13 @@ impl Cidr {
     }
 }
 
+impl From<isoloom_spec::net::Cidr> for Cidr {
+    /// The same block, as the run manifest writes it.
+    fn from(c: isoloom_spec::net::Cidr) -> Cidr {
+        Cidr::ipv4(c.address(), c.prefix())
+    }
+}
+
 impl FromStr for Cidr {
     type Err = Error;
 
