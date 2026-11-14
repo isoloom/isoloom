@@ -1,0 +1,41 @@
+---
+source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
+expression: "compiled(\"vlans\", &[\"docker\"])"
+---
+version: 1
+name: vlans
+networks:
+  sw1:
+    cidr: 10.10.0.0/19
+    vlans:
+      10:
+        cidr: 10.10.10.0/24
+      20:
+        cidr: 10.10.20.0/24
+        internet: false
+reach:
+- from: sw1.vlan10
+  to: sw1.vlan20
+- from: sw1.vlan20
+  to: sw1.vlan10
+machines:
+  pc1:
+    os: debian@12
+    networks:
+      sw1.vlan10: 10
+    access: true
+  pc2:
+    app:
+      image: alpine:3.20
+    command:
+    - sleep
+    - infinity
+    networks:
+      sw1.vlan10: 11
+  srv:
+    app:
+      image: nginx:1.27-alpine
+    networks:
+      sw1.vlan20: 10
+    ports:
+      http: 80

@@ -1,0 +1,59 @@
+---
+source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
+expression: "compiled(\"wan-links\", &[\"docker\"])"
+---
+version: 1
+name: wan-links
+networks:
+  hq:
+    cidr: 10.40.1.0/24
+    tc:
+      delay: 5ms
+  branch:
+    cidr: 10.40.2.0/28
+    internet: false
+    tc:
+      delay: 40ms
+      jitter: 5ms
+      loss: 0.5
+      rate: 10mbit
+  link-0:
+    cidr: 10.200.0.0/29
+    internet: false
+    tc:
+      delay: 1ms
+      rate: 512kbit
+machines:
+  edge:
+    app:
+      image: frrouting/frr:v8.5.2
+    networks:
+      hq: 2
+      branch: 2
+  hq-pc:
+    app:
+      image: alpine:3.20
+    command:
+    - sleep
+    - infinity
+    networks:
+      hq: 10
+    access: true
+  files:
+    os: rocky@9
+    app:
+      steps:
+      - run: provision/files.sh
+    networks:
+      branch: 3
+      link-0: 2
+    ports:
+      ftp: 21
+      ssh: 22
+  cache:
+    app:
+      image: redis:7-alpine
+    networks:
+      link-0: 3
+    ports:
+      redis: 6379

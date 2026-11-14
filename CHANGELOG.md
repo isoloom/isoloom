@@ -10,6 +10,14 @@ stable spec format.
 
 ## [Unreleased]
 
+### Added
+
+- **`isoloom-topology` and `isoloom-wasm`, the topology editor's compiler and its WebAssembly
+  engine, moved here from Isothrum** (where they were `isothrum-compiler` and `isothrum-wasm`):
+  a network drawn in an editor becomes an `isoloom.yml` and its project files, and in the
+  browser every target's files and the zips to download. `cargo xtask wasm` builds the engine
+  (`isoloom_wasm.js`, `isoloom_wasm_bg.wasm`); the JavaScript exports keep their names.
+
 ### Changed
 
 - **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
