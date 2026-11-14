@@ -53,6 +53,9 @@ stable spec format.
 
 ### Fixed
 
+- **An instance that would wrap a Docker block onto another is refused (#305):** instance 9 of
+  `10.250.0.0/24` became `10.3.0.0/24`, a block another network or instance may hold; it now fails
+  with `isoloom_spec::Error::InstanceDocker`.
 - **`/data` and `/DATA` are two mount points on a Linux machine (#304):** the duplicate-mount
   check folds case for Windows drives only.
 - **The schema's `vlans:` keys are exactly 1 to 4094 (#306),** as validation takes them.

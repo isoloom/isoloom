@@ -280,6 +280,17 @@ pub enum Error {
         /// The instance.
         instance: u8,
     },
+    /// A Docker network's block too high to shift for the instance: its second octet would go
+    /// past 255 and wrap onto another block.
+    #[error("networks.{network}.docker.cidr: {cidr} leaves no room for instance {instance} (Docker blocks move by the instance in their second octet)")]
+    InstanceDocker {
+        /// The network.
+        network: String,
+        /// Its Docker block.
+        cidr: String,
+        /// The instance.
+        instance: u8,
+    },
     /// An IPv6 block too high to shift for the instance.
     #[error("networks.{network}.ipv6.cidr: {cidr} leaves no room for instance {instance}")]
     InstanceIpv6 {
