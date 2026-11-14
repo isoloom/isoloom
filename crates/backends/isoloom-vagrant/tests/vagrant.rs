@@ -922,9 +922,8 @@ fn vagrant_host_names(example: &str, dir: &Path, key: Option<&str>) -> Outcome<s
 }
 
 /// Two copies of one environment (one spec, two folders, no instance number) never share a VM,
-/// network or libvirt prefix name on any provider (#285): each name carries the copy's key, the
-/// runner's (`ISOLOOM_KEY`) or, run by hand, one made from the copy's folder, the same at every
-/// read.
+/// network or libvirt prefix name on any provider: each name carries the copy's key, the runner's
+/// (`ISOLOOM_KEY`) or, run by hand, one made from the copy's folder, the same at every read.
 #[test]
 fn two_copies_of_one_environment_never_share_a_name_on_the_host() -> Outcome {
     if !ruby_runs() {

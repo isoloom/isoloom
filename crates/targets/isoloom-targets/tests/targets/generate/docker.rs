@@ -165,8 +165,7 @@ fn an_idle_container_is_kept_running() -> Outcome {
 }
 
 /// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
-/// so one service of Isoloom's own waits for it to complete, and the one `up --wait` covers it
-/// (#42).
+/// so one service of Isoloom's own waits for it to complete, and the one `up --wait` covers it.
 #[test]
 fn leaf_init_jobs_are_waited_for_by_the_one_up() -> Outcome {
     let spec = lab(r#"
