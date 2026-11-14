@@ -30,24 +30,40 @@ pub(super) fn linux(m: &Machine) -> Option<String> {
     ))
 }
 
-/// The fixed environment, for logins and for every service.
+/// The fixed environment, for logins and for every service. `/etc/environment` holds one
+/// variable a line with no escapes, so a value of several lines reaches logins from a
+/// `/etc/profile.d` script instead; systemd reads it escaped (`\n`), on the one line its
+/// configuration allows.
 fn environment(m: &Machine) -> String {
     if m.environment.is_empty() {
         return String::new();
     }
     let keys = m.environment.keys().map(|k| regex_escape(k)).collect::<Vec<_>>().join("|");
-    let lines: String = m.environment.iter().map(|(k, v)| format!("{k}={v}\n")).collect::<Vec<_>>().concat();
+    let (one_line, several): (Vec<_>, Vec<_>) = m.environment.iter().partition(|(_, v)| !v.contains(['\n', '\r']));
+    let lines: String = one_line.iter().map(|(k, v)| format!("{k}={v}\n")).collect::<Vec<_>>().concat();
     let systemd = m
         .environment
         .iter()
-        .map(|(k, v)| format!("\"{k}={}\"", v.replace('\\', "\\\\").replace('"', "\\\"")))
+        .map(|(k, v)| format!("\"{k}={}\"", systemd_escape(v)))
         .collect::<Vec<_>>()
         .join(" ");
+    let profile = if several.is_empty() {
+        String::new()
+    } else {
+        let exports = several.iter().map(|(k, v)| format!("export {k}={}\n", quote(v))).collect::<Vec<_>>().concat();
+        format!("printf %s {} > /etc/profile.d/90-isoloom-environment.sh\n", quote(&exports))
+    };
     format!(
-        "grep -v -E '^({keys})=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s {} >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\nprintf '[Manager]\\nDefaultEnvironment=%s\\n' {} > /etc/systemd/system.conf.d/90-isoloom-environment.conf\n",
+        "grep -v -E '^({keys})=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\nprintf %s {} >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\n{profile}printf '[Manager]\\nDefaultEnvironment=%s\\n' {} > /etc/systemd/system.conf.d/90-isoloom-environment.conf\n",
         quote(&lines),
         quote(&systemd)
     )
+}
+
+/// A value inside a double-quoted systemd assignment: backslashes and quotes escaped, and the
+/// line breaks a configuration line can't hold written as C escapes, which systemd reads back.
+fn systemd_escape(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r")
 }
 
 /// The kernel parameters, applied now and at every boot.
