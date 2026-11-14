@@ -23,5 +23,5 @@ pub(crate) const BASELINE: &str = "xtask/baselines/quality-baseline.json";
 pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     let outcome = xtask_quality::run(a, &repo::root(), &CONFIG)?;
     print!("{}", outcome.output);
-    Ok(if outcome.success { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+    Ok(crate::process::exit_code(outcome.success))
 }

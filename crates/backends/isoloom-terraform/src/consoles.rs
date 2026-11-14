@@ -19,11 +19,8 @@
 use isoloom_plan::{Environment, Vm};
 
 use crate::hcl_builder::{Block, Expression, Module, boolean, number, object, reference, string};
-use crate::machine::windows::{ADMIN, PASSWORD};
+use crate::machine::windows::{self, ADMIN, PASSWORD, RDP_PORT};
 use crate::module::output;
-
-/// Remote Desktop's port.
-pub(crate) const RDP_PORT: u16 = 3389;
 
 /// The sensitive output holding the Windows machines' password, for Remote Desktop.
 pub(crate) const PASSWORD_OUTPUT: &str = "windows_password";
@@ -36,12 +33,7 @@ const CONSOLES_OUTPUT: &str = "consoles";
 
 /// Whether `vm` is a Windows machine whose spec opens Remote Desktop's port.
 pub(crate) fn opens_rdp(env: &Environment, vm: Vm<'_>) -> bool {
-    vm.plan.is_windows()
-        && env
-            .spec()
-            .machines
-            .get(vm.name)
-            .is_some_and(|m| m.ports.iter().any(|p| p.port == RDP_PORT && p.protocol.is_tcp()))
+    vm.plan.is_windows() && windows::opens_remote_desktop(windows::spec_ports(env, vm.name))
 }
 
 /// The way to a Windows VM's Remote Desktop: through `via` as `user`, to `host`.

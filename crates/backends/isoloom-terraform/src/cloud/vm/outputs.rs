@@ -94,7 +94,7 @@ pub(crate) fn waited(env: &Environment) -> Vec<&str> {
 /// Each waited machine's readiness wait: Terraform signs in at its public address as the cloud's
 /// user, brings the project in (with the check runners, which the `checks` output runs from
 /// there over SSH), then waits for its set-up from its user data.
-fn waits(env: &Environment, reach: &Reach, m: &mut Module) {
+fn waits(env: &Environment, reach: &Reach, module: &mut Module) {
     let checks: Vec<String> = if env.checks_by_position().is_empty() {
         Vec::new()
     } else {
@@ -109,7 +109,7 @@ fn waits(env: &Environment, reach: &Reach, m: &mut Module) {
             (vm.os, (reach.public_ip)(name), SETUP_S, crate::ready::reboots(&vm.plan.lifecycle))
         };
         let user = (reach.user)(os);
-        m.block(
+        module.block(
             Wait {
                 machine: name.to_owned(),
                 connection: Connection::Ssh { host, user: user.to_owned() },

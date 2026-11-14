@@ -56,7 +56,7 @@ pub(super) fn blocks(env: &Environment, module: &mut Module) {
 /// out. What may come in at all is let in there (the virtual network, `allowed_cidr`: each
 /// machine's own group still decides), and a group is stateful, so the replies to SSH and the
 /// published ports still leave.
-fn sealed(env: &Environment, m: &mut Module) {
+fn sealed(env: &Environment, module: &mut Module) {
     let closed: Vec<&String> = env.networks.keys().filter(|n| crate::seal::any(env) && crate::seal::closed(env, n)).collect();
     if closed.is_empty() {
         return;
@@ -64,7 +64,7 @@ fn sealed(env: &Environment, m: &mut Module) {
     let vnet_in = security_rule(("vnet-in", 100), ("Inbound", "Allow"), string("VirtualNetwork"), string("*")).into_block();
     let allowed_in = security_rule(("allowed-in", 110), ("Inbound", "Allow"), reference("var.allowed_cidr"), string("*")).into_block();
     let no_internet = security_rule(("no-internet-out", 100), ("Outbound", "Deny"), string("*"), string("Internet")).into_block();
-    m.commented(
+    module.commented(
         "The seal: once every machine is set up, the networks without internet lose the internet out, at their subnets.",
         placed("azurerm_network_security_group", "sealed", name_with("-sealed"))
             .add_block(vnet_in)
@@ -74,7 +74,7 @@ fn sealed(env: &Environment, m: &mut Module) {
     );
     for net in closed {
         let id = ident(net);
-        m.block(
+        module.block(
             resource("azurerm_subnet_network_security_group_association", &format!("sealed_{id}"))
                 .add_attribute(("subnet_id", reference(&format!("azurerm_subnet.{id}.id"))))
                 .add_attribute(("network_security_group_id", reference("azurerm_network_security_group.sealed.id")))

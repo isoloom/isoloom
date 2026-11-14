@@ -12,7 +12,7 @@ use isoloom_spec::model::Target;
 use isoloom_spec::net::IPV6_PREFIX;
 
 use super::SERVICE_OS;
-use super::guest::{Guest, Nic};
+use super::guest::{Guest, GuestDns, Nic};
 use super::machines;
 use crate::module::ident;
 use crate::server::router::{NAME, Platform};
@@ -39,9 +39,13 @@ pub(super) fn blocks(env: &Environment, module: &mut Module) {
         name: NAME.to_owned(),
         index: INDEX,
         os: SERVICE_OS.to_owned(),
-        size: (1, 512, 10),
+        size: isoloom_spec::MachineSize {
+            cpus: 1,
+            memory_mb: 512,
+            disk_gb: 10,
+        },
         nics,
-        dns: (Vec::new(), None),
+        dns: GuestDns::default(),
         user_data: config.document(),
         wait_for_address: Some(ADDRESS_WAIT_SECS),
         depends_on: env.networks.keys().map(|n| reference(&format!("esxi_portgroup.{}", ident(n)))).collect(),

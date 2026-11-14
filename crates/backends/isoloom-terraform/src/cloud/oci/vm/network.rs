@@ -102,9 +102,9 @@ fn closed(env: &Environment, net: &str) -> bool {
 /// a routed network's), attached to its subnet once every machine is set up
 /// (`seal::after_set_up`). Until then the subnet has the internet table (the VCN routes between
 /// its subnets itself), and its security list lets the machines out.
-fn sealed(env: &Environment, net: &str, hops: Vec<Block>, m: &mut Module) {
+fn sealed(env: &Environment, net: &str, hops: Vec<Block>, module: &mut Module) {
     let id = format!("sealed_{}", ident(net));
-    m.commented(
+    module.commented(
         &format!("The seal of `{net}`: once every machine is set up, its subnet goes out to allowed_cidr alone."),
         in_vcn(resource("oci_core_route_table", &id), name_with(&format!("-{net}-sealed")))
             .add_block(
@@ -116,7 +116,7 @@ fn sealed(env: &Environment, net: &str, hops: Vec<Block>, m: &mut Module) {
             .add_blocks(hops)
             .build(),
     );
-    m.block(
+    module.block(
         resource("oci_core_route_table_attachment", &id)
             .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(net)))))
             .add_attribute(("route_table_id", reference(&format!("oci_core_route_table.{id}.id"))))

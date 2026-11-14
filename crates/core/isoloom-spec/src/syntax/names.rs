@@ -140,6 +140,12 @@ impl ServiceRef {
     pub fn name(&self) -> &str {
         self.0.split_once('@').map_or(self.0.as_str(), |(n, _)| n)
     }
+
+    /// The version it asks for (`16` in `postgres@16`), when it names one.
+    #[must_use]
+    pub fn version(&self) -> Option<&str> {
+        self.0.split_once('@').map(|(_, v)| v)
+    }
 }
 
 /// A value as written, a text or a number read as its digits, before its own rule reads it (so
@@ -222,6 +228,8 @@ mod tests {
         assert!("DEMO_SECRET".parse::<InputName>().is_ok() && "1TOKEN".parse::<InputName>().is_err());
         assert!("ISOLOOM_X".parse::<InputName>().unwrap_err().to_string().contains("ISOLOOM_"));
         assert_eq!("postgres@16".parse::<ServiceRef>().unwrap().name(), "postgres");
+        assert_eq!("postgres@16".parse::<ServiceRef>().unwrap().version(), Some("16"));
+        assert_eq!("nginx".parse::<ServiceRef>().unwrap().version(), None);
         assert!("postgres@".parse::<ServiceRef>().is_err() && "Nginx".parse::<ServiceRef>().is_err());
     }
 

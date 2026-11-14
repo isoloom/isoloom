@@ -50,6 +50,37 @@ fn inputs_reach_only_the_machines_that_list_them() -> Outcome {
     Ok(())
 }
 
+/// The shape of a published CTF lab (`examples/invoice-portal-api`): the API on 80 published on the
+/// host's fixed 8080, the launch URL an environment value and the launch token a file of the
+/// database only, the setup step and its volume, and both the `http` check and the script.
+#[test]
+fn a_ctf_labs_shape_keeps_its_port_inputs_setup_and_checks() -> Outcome {
+    let spec = example("invoice-portal-api")?;
+    let files = generate(&spec, Target::Docker).unwrap();
+    let compose = &files[0].contents;
+    assert!(compose.contains("- ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:8080:80\n"), "{compose}");
+    let web = compose.split("\n  web:").nth(1).unwrap().split("\n  isoloom-").next().unwrap();
+    assert!(
+        !web.contains("CTF_") && !web.contains("launch-token"),
+        "web must not receive the database's inputs:\n{web}"
+    );
+    assert!(compose.contains("CTF_API_URL: ${CTF_API_URL:-}"), "{compose}");
+    assert!(compose.contains("  input-ctf-launch-token:\n    environment: CTF_LAUNCH_TOKEN"), "{compose}");
+    assert!(compose.contains("target: /run/lab/launch-token"), "{compose}");
+    assert!(
+        !compose.contains("CTF_LAUNCH_TOKEN: ${CTF_LAUNCH_TOKEN"),
+        "the token is never an environment variable"
+    );
+    assert!(
+        compose.contains("- /isoloom/init/evidence.sh") && compose.contains("database-evidence:/var/lib/ctf"),
+        "{compose}"
+    );
+    let runners: String = files.iter().filter(|f| f.path.contains("/checks/")).map(|f| f.contents.as_str()).collect();
+    assert!(runners.contains("_http_is 'http://web/api/invoices/INV-1042' 401"), "{runners}");
+    assert!(runners.contains("build/check/check.sh"), "{runners}");
+    Ok(())
+}
+
 #[test]
 fn reach_rules_add_a_router_with_matching_rules() -> Outcome {
     let spec = example("segmented")?;
@@ -165,8 +196,7 @@ fn an_idle_container_is_kept_running() -> Outcome {
 }
 
 /// An init job on a machine nothing depends on is a leaf job: `up --wait` would fail on its exit,
-/// so one service of Isoloom's own waits for it to complete, and the one `up --wait` covers it
-/// (#42).
+/// so one service of Isoloom's own waits for it to complete, and the one `up --wait` covers it.
 #[test]
 fn leaf_init_jobs_are_waited_for_by_the_one_up() -> Outcome {
     let spec = lab(r#"

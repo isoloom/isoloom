@@ -64,15 +64,7 @@ pub(super) fn setup(env: &Environment, machine: &str, paths: &[String]) -> Optio
 
 /// The `setup` scripts on Windows: each run once in order, from the project folder.
 pub(super) fn windows_setup(paths: &[String]) -> String {
-    let runs: Vec<String> = paths
-        .iter()
-        .map(|p| {
-            format!(
-                "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-                powershell::quote(p)
-            )
-        })
-        .collect();
+    let runs: Vec<String> = paths.iter().map(|p| powershell::run_file(p)).collect();
     format!(
         // The mark lives in the state folder, which the project's unpack never touches (it wipes
         // the project folder), so a reprovision doesn't run the setup again.

@@ -39,12 +39,7 @@ pub(crate) fn probes(m: &Machine, c: &mut Container) {
     let ports = isoloom_render::container::probe(m.spec);
     let Some(h) = m.plan.process.health.as_ref() else {
         if !ports.is_empty() {
-            c.readiness_probe = Some(Probe {
-                exec: Some(busybox(ports)),
-                period_seconds: DEFAULT_INTERVAL,
-                failure_threshold: DEFAULT_RETRIES,
-                ..Probe::default()
-            });
+            c.readiness_probe = Some(port_probe(ports));
         }
         return;
     };
@@ -57,16 +52,21 @@ pub(crate) fn probes(m: &Machine, c: &mut Container) {
                 port: *port,
             });
             if !ports.is_empty() {
-                c.startup_probe = Some(Probe {
-                    exec: Some(busybox(ports)),
-                    period_seconds: DEFAULT_INTERVAL,
-                    failure_threshold: DEFAULT_RETRIES,
-                    ..Probe::default()
-                });
+                c.startup_probe = Some(port_probe(ports));
             }
         }
     }
     c.readiness_probe = Some(probe);
+}
+
+/// A probe of the machine's ports only (the `ports` test line), at the default pace.
+fn port_probe(ports: String) -> Probe {
+    Probe {
+        exec: Some(busybox(ports)),
+        period_seconds: DEFAULT_INTERVAL,
+        failure_threshold: DEFAULT_RETRIES,
+        ..Probe::default()
+    }
 }
 
 /// A probe at the healthcheck's pace: one passing try makes the machine ready, as Docker's.

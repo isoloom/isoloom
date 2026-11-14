@@ -1,7 +1,6 @@
 //! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
 //! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
-use crate::contract::RESERVED_PREFIX;
 use crate::contract::is_kebab;
 
 use super::{Problems, is_variable};
@@ -10,7 +9,7 @@ use crate::tags;
 
 /// The longest environment name: it becomes the Kubernetes namespace `isoloom-<name>`, a
 /// 63-character DNS label.
-pub(crate) const NAME_MAX: usize = super::DNS_LABEL_MAX - RESERVED_PREFIX.len();
+pub(crate) const NAME_MAX: usize = super::PREFIXED_NAME_MAX;
 
 /// The format version this isoloom reads, and a name every target can carry: its length is
 /// checked before its characters, so a long name is told its limit.

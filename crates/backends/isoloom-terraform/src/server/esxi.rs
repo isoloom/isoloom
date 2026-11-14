@@ -73,7 +73,7 @@ const LIMITS: Limits = Limits {
 
 /// Ubuntu's own cloud OVAs: the default `images`, pinned to a dated release (never the floating
 /// `current`) so a generated environment keeps booting the same OS build, each with the SHA-256
-/// Ubuntu publishes for it (resolved 2026-10-17). The `josenk/esxi` provider deploys an OVA from
+/// Ubuntu publishes for it. The `josenk/esxi` provider deploys an OVA from
 /// `ovf_source` with no checksum slot, so the module checks none: the `images` variable's
 /// description names each default's SHA-256 for the user to check the download against. The
 /// other ESXi path (`vagrant/vmware_esxi`) pins its boxes through Vagrant instead.

@@ -162,15 +162,22 @@ pub(crate) fn without_image(env: &Environment, has: impl Fn(&str, &MachinePlan) 
         .find_map(|vm| (!is_windows(vm.os) && !has(vm.os, vm.plan)).then_some((vm.name, vm.os)))
 }
 
+/// Machine `name`'s own DNS settings (`dns:` in its spec), when it has them.
+pub(crate) fn dns_of<'e>(env: &'e Environment, name: &str) -> Option<&'e isoloom_spec::model::Dns> {
+    env.spec().machines.get(name)?.dns.as_ref()
+}
+
+/// Machine `name`'s own search domain (`dns.domain`), when it has one.
+pub(crate) fn domain_of<'e>(env: &'e Environment, name: &str) -> Option<&'e str> {
+    dns_of(env, name)?.domain.as_deref()
+}
+
 /// The resolvers machine `name` asks: its own (`dns.servers`; an AD member points at its domain
 /// controller), else the site's (`constraints.dns`, else a public one), so it can still install
 /// software. `None` asks for the site's alone: Isoloom's own VMs' (the router's, the
 /// controller's).
 pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
-    let own = name
-        .and_then(|n| env.spec().machines.get(n))
-        .and_then(|m| m.dns.as_ref())
-        .filter(|d| !d.servers.is_empty());
+    let own = name.and_then(|n| dns_of(env, n)).filter(|d| !d.servers.is_empty());
     match own {
         Some(d) => d.servers.clone(),
         None => isoloom_spec::model::resolvers(env.constraints.as_ref())

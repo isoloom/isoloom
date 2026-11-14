@@ -2,7 +2,6 @@
 //! over the size limit, and the exceptions (`#[expect]`).
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use super::{Counts, Crate, add, path_in};
 use crate::{Res, process, repo};
@@ -12,8 +11,7 @@ const MAX_CODE_LINES: usize = 400;
 
 /// The workspace's crates, from `cargo metadata`.
 pub(crate) fn crates(root: &Path) -> Res<Vec<Crate>> {
-    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let mut cmd = Command::new(cargo);
+    let mut cmd = process::cargo();
     cmd.args(["metadata", "--format-version", "1", "--no-deps", "--offline", "--manifest-path"])
         .arg(root.join("Cargo.toml"));
     Ok(in_workspace(&serde_json::from_str(&process::output(&mut cmd)?)?))

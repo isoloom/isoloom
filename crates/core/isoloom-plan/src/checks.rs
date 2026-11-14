@@ -258,8 +258,7 @@ fn declared_http(d: &Declared, u: &str) -> Option<DeclaredProbe> {
 
 /// A declared `tcp` check (to `host:port` `target`).
 fn declared_tcp(d: &Declared, target: &str) -> Option<DeclaredProbe> {
-    let (host, port) = target.rsplit_once(':')?;
-    let port: u16 = port.parse().ok().filter(|p| *p > 0)?;
+    let (host, port) = isoloom_spec::probe::tcp_target(target)?;
     let expect = match d.expect.as_ref() {
         None => TcpExpect::Open,
         Some(Expect::Text(t)) if t == "open" => TcpExpect::Open,

@@ -56,6 +56,8 @@ pub use cloud::Cloud;
 pub use cloud::docker::{Host as CloudDockerHost, modules as cloud_docker_modules, refusal as cloud_docker_refusal, refusals as cloud_docker_refusals};
 pub use cloud::vm::{CloudVmBackend, CloudVmModule};
 pub use error::{Error, Result};
+pub use server::esxi::EsxiBackend;
+pub use server::proxmox::ProxmoxBackend;
 
 /// The HCL string literal the modules hold for `text` (`"..."`: quotes, backslashes and line
 /// breaks escaped, `${` and `%{` made literal), as Vagrant's `ruby_quote` is for Ruby: what the
@@ -64,5 +66,3 @@ pub use error::{Error, Result};
 pub fn hcl_quote(text: &str) -> String {
     hcl_builder::quote(text)
 }
-pub use server::esxi::EsxiBackend;
-pub use server::proxmox::ProxmoxBackend;

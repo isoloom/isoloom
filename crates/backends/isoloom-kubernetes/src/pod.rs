@@ -95,9 +95,7 @@ fn runs_supervisor(m: &Machine) -> bool {
 fn machine_container(m: &Machine, mounts: &[VolumeMount]) -> Container {
     let mut c = Container::new(m.name, m.image());
     c.image_pull_policy = IF_NOT_PRESENT;
-    // A stock image the runner supplies for the user to work from, or one the spec marks
-    // `idle`: kept running idle.
-    if m.spec.supplied || m.spec.docker.as_ref().is_some_and(|d| d.idle) {
+    if m.idle() {
         c.command = vec!["sleep".into(), "infinity".into()];
     }
     process::apply(m, &mut c);
@@ -215,7 +213,7 @@ fn needs_probe(m: &Machine) -> bool {
 fn init_containers(m: &Machine) -> Vec<Container> {
     let mut out = Vec::new();
     if needs_probe(m) {
-        let mut c = Container::new(PROBE_CONTAINER, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
+        let mut c = Container::new(PROBE_CONTAINER, Image::Tool(m.pull(PROBE_IMAGE)));
         c.command = vec!["/bin/cp".into(), "/bin/busybox".into(), "/probe/busybox".into()];
         c.security_context = Some(crate::security::helper());
         c.volume_mounts = vec![VolumeMount::at(PROBE_VOLUME, "/probe")];
@@ -231,12 +229,12 @@ fn init_containers(m: &Machine) -> Vec<Container> {
 
 /// Waits until dependency `dep`'s services answer, if it has any to probe.
 fn wait_for(m: &Machine, dep: &str) -> Option<Container> {
-    let ports = m.env.spec().machines.get(dep)?.ready_ports();
+    let ports = m.ready_ports_of(dep);
     if ports.is_empty() {
         return None;
     }
     let cond = ports.iter().map(|p| format!("nc -z {dep} {p}")).collect::<Vec<_>>().join(" && ");
-    let mut c = Container::new(format!("wait-{dep}"), Image::Tool(m.env.images.pull(UTILITY_IMAGE)));
+    let mut c = Container::new(format!("wait-{dep}"), Image::Tool(m.pull(UTILITY_IMAGE)));
     c.command = vec!["sh".into(), "-c".into(), format!("until {cond}; do sleep 2; done")];
     c.security_context = Some(crate::security::helper());
     Some(c)

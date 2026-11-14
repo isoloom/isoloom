@@ -1,8 +1,8 @@
-//! A VM whose uplink address the guest agent reports (the router, the Docker host): a bounded
-//! wait, and a clear failure when no address comes. A Debian cloud image boots and installs
+//! A VM whose uplink address the guest agent reports (the router, the Docker host): a bounded wait,
+//! and a clear failure when no address comes. A Debian cloud image boots and installs
 //! `qemu-guest-agent` in one to three minutes on a server, four and a half on a nested Proxmox
 //! under load (measured); with no DHCP, DNS or internet on the uplink the agent never reports one,
-//! and the provider's own wait was 15 minutes, after which the module failed on an empty list's
+//! and the provider's own wait is 15 minutes, after which the module would fail on an empty list's
 //! index with no reason. The address is read with `try`, so a destroy after such a failure still
 //! runs.
 
@@ -45,9 +45,9 @@ pub(super) fn first_address(vm: &str, own: &[String]) -> Expression {
 }
 
 /// The IPv4 addresses `vm` (`self`, or a resource address) reports that are neither the loopback
-/// nor one of `own` (its environment addresses); none while the provider reports none at all (`null`
-/// before the guest agent answers), so the postcondition fails with its own message rather than
-/// Terraform's "Invalid function argument" from `flatten(null)`.
+/// nor one of `own` (its environment addresses); none while the provider reports none at all
+/// (`null` before the guest agent answers), so the postcondition fails with its own message rather
+/// than Terraform's "Invalid function argument" from `flatten(null)`.
 pub(super) fn addresses(vm: &str, own: &[String]) -> Expression {
     let a = || reference("a");
     let mut cond = binary(a(), BinaryOperator::NotEq, string("127.0.0.1"));

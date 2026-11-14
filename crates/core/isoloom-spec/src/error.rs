@@ -34,7 +34,7 @@ pub enum Error {
     #[error("{0}")]
     Yaml(#[from] serde_yaml_ng::Error),
     /// The spec's problems: every one found, coded and placed, in file order.
-    #[error("{}", Rendered { file, problems })]
+    #[error("{}", Lines(&problems.iter().map(|p| p.render(file)).collect::<Vec<_>>()))]
     Invalid {
         /// The spec file the problems are placed in (`isoloom.yml`).
         file: String,
@@ -268,24 +268,6 @@ pub enum Error {
 
 /// What a function of this crate returns.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-/// Problems as an author reads them, one after the other.
-struct Rendered<'a> {
-    file: &'a str,
-    problems: &'a [Problem],
-}
-
-impl fmt::Display for Rendered<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, p) in self.problems.iter().enumerate() {
-            if i > 0 {
-                f.write_str("\n")?;
-            }
-            f.write_str(&p.render(self.file))?;
-        }
-        Ok(())
-    }
-}
 
 /// Items one per line.
 struct Lines<'a, T>(&'a [T]);

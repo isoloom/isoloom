@@ -103,7 +103,7 @@ impl<'de> Deserialize<'de> for PublishInput {
                 Ok(PublishInput::Free(v))
             }
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<PublishInput, E> {
-                host_port(v).map(PublishInput::Preferred)
+                nonzero_port(v, "a host port").map(PublishInput::Preferred)
             }
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<PublishInput, A::Error> {
                 /// `{ host, fixed }`, read.
@@ -189,11 +189,7 @@ impl<'de> Deserialize<'de> for PortInput {
                 f.write_str("a port number, or `{ port, protocol, publish, dormant, login }`")
             }
             fn visit_u64<E: de::Error>(self, v: u64) -> Result<PortInput, E> {
-                let port = u16::try_from(v)
-                    .ok()
-                    .and_then(NonZeroU16::new)
-                    .ok_or_else(|| E::custom("a port is 1 to 65535"))?;
-                Ok(PortInput::Number(port))
+                nonzero_port(v, "a port").map(PortInput::Number)
             }
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<PortInput, A::Error> {
                 PortFull::deserialize(de::value::MapAccessDeserializer::new(map)).map(PortInput::Full)
@@ -229,11 +225,12 @@ fn publish<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Publish>, D::Error>
     PublishInput::deserialize(d).map(PublishInput::publish)
 }
 
-fn host_port<E: de::Error>(v: u64) -> Result<NonZeroU16, E> {
+/// `v` as a port number, 1 to 65535; else "`what` is 1 to 65535".
+fn nonzero_port<E: de::Error>(v: u64, what: &str) -> Result<NonZeroU16, E> {
     u16::try_from(v)
         .ok()
         .and_then(NonZeroU16::new)
-        .ok_or_else(|| E::custom("a host port is 1 to 65535"))
+        .ok_or_else(|| E::custom(format!("{what} is 1 to 65535")))
 }
 
 impl JsonSchema for Port {

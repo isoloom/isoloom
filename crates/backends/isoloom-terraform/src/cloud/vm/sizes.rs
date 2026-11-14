@@ -109,8 +109,8 @@ impl Need {
 
     /// What the controller asks for: its size, and an interface on every network.
     pub(crate) fn controller(env: &Environment) -> Need {
-        let (cpus, memory_mb, disk_gb) = controller::size(env);
-        Need::new(cpus, memory_mb, disk_gb).on(env.networks.len())
+        let size = controller::size(env);
+        Need::new(size.cpus, size.memory_mb, size.disk_gb).on(env.networks.len())
     }
 
     /// The same on `networks` networks, an interface on each (one at least).

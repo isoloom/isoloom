@@ -206,6 +206,13 @@ mod tests {
             }
         }
 
+        /// The parser and the schema's pattern agree on every text: one version rule.
+        #[test]
+        fn the_parser_and_the_pattern_agree(text in "[0-9A-Za-z.+ -]{0,10}") {
+            let pattern = regex::Regex::new(PATTERN).unwrap();
+            prop_assert_eq!(text.parse::<Version>().is_ok(), pattern.is_match(&text));
+        }
+
         /// What a version picks starts with it, and no release it starts is newer.
         #[test]
         fn a_pick_is_the_newest_match(releases in proptest::collection::vec(version(), 0..8), asked in version()) {

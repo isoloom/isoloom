@@ -2,11 +2,8 @@
 //! controller that runs the environment's playbooks and the checks standing on every network.
 //! Their set-up goes through the same step renderings and transport as the environment's machines.
 
-use isoloom_spec::contract::HALTING;
-use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
-use crate::boxes::{HyperVBox, MainBox};
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
@@ -15,6 +12,8 @@ use isoloom_render::boot::{self, Trigger};
 use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY};
 use isoloom_render::router;
 use isoloom_render::{GeneratedFile, controller};
+use isoloom_spec::contract::HALTING;
+use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::model::Spec;
 use isoloom_spec::net::NetworkBlock;
 
@@ -25,6 +24,7 @@ use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
 use super::utm::Utm;
 use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
+use crate::boxes::{HyperVBox, MainBox};
 use crate::ruby::{Ruby, Start, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].

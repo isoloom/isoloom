@@ -7,7 +7,7 @@ use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::SERVICE_OS;
-use super::guest::{Guest, Nic};
+use super::guest::{Guest, GuestDns, Nic};
 use crate::machine::cloud_init::CloudConfig;
 use crate::machine::controller::{self, Ssh};
 use crate::machine::linux;
@@ -74,7 +74,7 @@ pub(super) fn guests(env: &Environment, module: &mut Module) {
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.
 fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, module: &mut Module) {
     let id = ident(name);
-    let dns = env.spec().machines.get(name).and_then(|sm| sm.dns.as_ref());
+    let dns = crate::server::dns_of(env, name);
     let servers = crate::server::resolvers(env, Some(name));
     let windows = mp.is_windows();
     let guest = Guest {
@@ -82,15 +82,16 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, module:
         name: name.to_owned(),
         index: CONTROLLER_INDEX + 1 + i,
         os: os.to_owned(),
-        size: (mp.size().cpus, mp.size().memory_mb, mp.size().disk_gb),
+        size: mp.size(),
         nics: nics(env, mp),
         // Its own domain, else the private zone's (`dns.private`), whose names its hosts file
         // carries: ESXi has no DNS of its own to serve them.
-        dns: (
+        dns: GuestDns {
             servers,
-            dns.and_then(|d| d.domain.clone())
+            search: dns
+                .and_then(|d| d.domain.clone())
                 .or_else(|| env.private_dns.as_ref().map(|z| z.domain.clone())),
-        ),
+        },
         user_data: if windows {
             cloudbase_init::user_data(env, (name, mp))
         } else {
@@ -146,15 +147,17 @@ fn controller(env: &Environment, module: &mut Module) {
     let Some(host) = nics.first().and_then(|n| n.addresses.first()?.split('/').next().map(str::to_owned)) else {
         return;
     };
-    let (cpus, memory, disk) = controller::size(env);
     let guest = Guest {
         id: "isoloom_controller".to_owned(),
         name: controller::NAME.to_owned(),
         index: CONTROLLER_INDEX,
         os: SERVICE_OS.to_owned(),
-        size: (cpus, memory, disk),
+        size: controller::size(env),
         nics,
-        dns: (crate::server::resolvers(env, None), None),
+        dns: GuestDns {
+            servers: crate::server::resolvers(env, None),
+            search: None,
+        },
         user_data: CloudConfig::new(controller::NAME, reference("local.users")).document(),
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],

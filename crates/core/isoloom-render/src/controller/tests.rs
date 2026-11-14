@@ -1,8 +1,8 @@
 //! The retry helpers, driven by a POSIX `sh` (they run on the Linux controller) with a fake
 //! `ansible-playbook` that prints what Ansible prints: `fatal:` lines and a PLAY RECAP. The
-//! cases of the dev branch's retry (#125) are here too: unreachable hosts alone run again on
-//! their own, a failed task beside an unreachable host isn't retried, nor is a playbook that
-//! doesn't parse, and the runs stop after four.
+//! retry's cases are here too: unreachable hosts alone run again on their own, a failed task
+//! beside an unreachable host isn't retried, nor is a playbook that doesn't parse, and the runs
+//! stop after four.
 
 // The helpers run on the Linux controller: their tests run where `sh` is the host's.
 #![cfg(unix)]

@@ -172,9 +172,7 @@ impl Entry {
             settings: &settings,
         };
         let mut files = BTreeMap::new();
-        let recipe = &self.definition().recipe;
-        let phases = [("install", &recipe.install), ("configure", &recipe.configure), ("start", &recipe.start)]
-            .map(|(name, steps)| context.phase(name, steps, &mut files));
+        let phases = self.definition().recipe.phases().map(|(name, steps)| context.phase(name, steps, &mut files));
         let [install, configure, start] = phases;
         let broken = |e: recipe::StepError| {
             vec![Problem::new(
@@ -208,8 +206,7 @@ impl Entry {
     /// The release `service`'s version picks: the default when it gives none.
     fn release_for(&self, service: &ServiceRef, field: &FieldPath) -> Result<&Release, Problem> {
         let def = self.definition();
-        let asked = service.as_str().split_once('@').map(|(_, v)| v);
-        let Some(asked) = asked else {
+        let Some(asked) = service.version() else {
             return def
                 .release(&def.default)
                 .ok_or_else(|| Problem::new(Code::InvalidValue, field.clone(), format!("{}'s default release is missing", self.name())));

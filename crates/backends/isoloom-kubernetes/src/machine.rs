@@ -65,6 +65,23 @@ impl<'a> Machine<'a> {
         self.spec.has_readiness()
     }
 
+    /// Whether it is kept running idle: a stock image the runner supplies for the user to work
+    /// from, or one the spec marks `idle`.
+    pub(crate) fn idle(&self) -> bool {
+        self.spec.supplied || self.spec.docker.as_ref().is_some_and(|d| d.idle)
+    }
+
+    /// The reference `image` (one of Isoloom's tools) is pulled as in its environment, which
+    /// may rewrite it to the site's registry.
+    pub(crate) fn pull(&self, image: &str) -> String {
+        self.env.images.pull(image)
+    }
+
+    /// The ports dependency `dep` is ready on; none when the spec has no machine `dep`.
+    pub(crate) fn ready_ports_of(&self, dep: &str) -> Vec<u16> {
+        self.env.spec().machines.get(dep).map(model::Machine::ready_ports).unwrap_or_default()
+    }
+
     /// Its `init:` scripts, in order.
     pub(crate) fn init(&self) -> &'a [String] {
         self.spec.docker.as_ref().map_or(&[], |d| d.init.as_slice())

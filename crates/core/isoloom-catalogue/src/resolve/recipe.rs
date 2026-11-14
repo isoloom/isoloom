@@ -61,10 +61,7 @@ impl Context<'_> {
 
     /// Whether every condition of `w` holds here.
     pub(crate) fn holds(&self, w: &When) -> bool {
-        let os = self.os.os();
-        w.family.as_ref().is_none_or(|f| f.iter().any(|f| f.as_str() == os.family))
-            && w.os.as_ref().is_none_or(|l| l.contains(&self.os))
-            && w.release.as_ref().is_none_or(|l| l.iter().any(|word| self.release.is(word)))
+        w.holds_on(self.os, self.release)
             && w.set.as_ref().is_none_or(|s| self.settings.is_set(s.as_str()))
             && w.unset.as_ref().is_none_or(|s| !self.settings.is_set(s.as_str()))
             && w.is.as_ref().is_none_or(|m| {

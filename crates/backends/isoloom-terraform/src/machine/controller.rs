@@ -12,6 +12,7 @@ use isoloom_plan::addressing::names_of;
 use isoloom_plan::{Controller, Environment, Step, Vm};
 use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::{controller, steps};
+use isoloom_spec::MachineSize;
 use isoloom_spec::linux::CONFIG_DIR;
 
 mod inventory;
@@ -61,12 +62,20 @@ pub(crate) fn install_packages() -> String {
 /// project fit, with room for their logs.
 pub(crate) const DISK_GB: u32 = 10;
 
-/// Its (CPUs, memory in MB, disk in GB): 1 CPU, 512 MB and [`DISK_GB`] unless the spec says
-/// otherwise.
-pub(crate) fn size(env: &Environment) -> (u32, u32, u32) {
-    env.controller.map_or((Controller::CPUS, Controller::MEMORY_MB, DISK_GB), |c| {
-        (c.cpus, c.memory_mb, c.disk_gb.unwrap_or(DISK_GB))
-    })
+/// Its size: 1 CPU, 512 MB and [`DISK_GB`] unless the spec says otherwise.
+pub(crate) fn size(env: &Environment) -> MachineSize {
+    env.controller.map_or(
+        MachineSize {
+            cpus: Controller::CPUS,
+            memory_mb: Controller::MEMORY_MB,
+            disk_gb: DISK_GB,
+        },
+        |c| MachineSize {
+            cpus: c.cpus,
+            memory_mb: c.memory_mb,
+            disk_gb: c.disk_gb.unwrap_or(DISK_GB),
+        },
+    )
 }
 
 /// Its key, `tls_private_key.controller`, when the environment needs a controller.

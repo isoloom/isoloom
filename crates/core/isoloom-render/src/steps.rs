@@ -352,10 +352,7 @@ pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> 
             kind: RunKind::PowerShell,
             creates,
         } => {
-            let run = format!(
-                "Set-Location {ISOLOOM_DIR}; & powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-                powershell::quote(path)
-            );
+            let run = format!("Set-Location {ISOLOOM_DIR}; {}", powershell::run_file(path));
             Some(match creates {
                 Some(done) => format!("if (-not (Test-Path -LiteralPath {})) {{ {run} }}", powershell::quote(done)),
                 None => run,

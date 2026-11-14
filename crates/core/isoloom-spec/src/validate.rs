@@ -20,13 +20,6 @@ mod ipv6;
 mod links;
 mod machine_files;
 mod machines;
-pub use machines::{MACHINE_NAME_MAX, dns_name};
-pub(crate) use top::NAME_MAX;
-
-/// The longest DNS label (RFC 1035), the limit of a Kubernetes name, a namespace, a cloud label
-/// and a machine's host name: one number where it was written as `63` five times (Clean Code
-/// G25, 2026-11-13).
-pub(crate) const DNS_LABEL_MAX: usize = 63;
 mod networks;
 mod os;
 mod outside;
@@ -45,15 +38,22 @@ mod windows;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeSet;
-
 use crate::contract::is_kebab;
-
 use crate::model::{Machine, Spec};
 use crate::net::Cidr;
 use crate::syntax::Code;
 
 pub use files::validate_files;
+pub use machines::{MACHINE_NAME_MAX, dns_name};
+pub(crate) use top::NAME_MAX;
+
+/// The longest DNS label (RFC 1035), the limit of a Kubernetes name, a namespace, a cloud label
+/// and a machine's host name.
+pub(crate) const DNS_LABEL_MAX: usize = 63;
+
+/// The longest name Isoloom prefixes with `isoloom-` to make a Kubernetes name (the environment's
+/// namespace, a machine's published Service): what is left of a DNS label after the prefix.
+const PREFIXED_NAME_MAX: usize = DNS_LABEL_MAX - crate::contract::RESERVED_PREFIX.len();
 
 /// One thing wrong with a lowered spec: the field's path and what to do about it. The plan
 /// places it at the field the author wrote, as a [`crate::syntax::Problem`].
@@ -175,6 +175,12 @@ pub fn is_variable(s: &str) -> bool {
     s.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// Whether `s` is a URL: a scheme of letters, then `://` (`https://`, `file://`).
+fn is_url(s: &str) -> bool {
+    s.split_once("://")
+        .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphabetic()))
+}
+
 /// The machines a machine starts after: its `depends_on`, then the gateways of its networks.
 pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a Machine) -> Vec<&'a str> {
     let mut after: Vec<&str> = m.depends_on.iter().map(String::as_str).collect();
@@ -197,32 +203,4 @@ pub fn starts_after<'a>(spec: &'a Spec, name: &str, m: &'a Machine) -> Vec<&'a s
         }
     }
     after
-}
-
-/// The first cycle in the machines' start order (`depends_on`, gateways, shared volumes), as
-/// the names along it, the first repeated at the end.
-fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
-    fn visit<'a>(spec: &'a Spec, n: &'a str, stack: &mut Vec<&'a str>, done: &mut BTreeSet<&'a str>) -> Option<Vec<String>> {
-        if let Some(pos) = stack.iter().position(|s| *s == n) {
-            let mut c: Vec<String> = stack.iter().skip(pos).map(|s| (*s).to_owned()).collect();
-            c.push(n.to_owned());
-            return Some(c);
-        }
-        if done.contains(n) {
-            return None;
-        }
-        stack.push(n);
-        for dep in spec.machines.get(n).map(|m| starts_after(spec, n, m)).unwrap_or_default() {
-            if spec.machines.contains_key(dep)
-                && let Some(c) = visit(spec, dep, stack, done)
-            {
-                return Some(c);
-            }
-        }
-        stack.pop();
-        done.insert(n);
-        None
-    }
-    let mut done = BTreeSet::new();
-    spec.machines.keys().find_map(|n| visit(spec, n, &mut Vec::new(), &mut done))
 }

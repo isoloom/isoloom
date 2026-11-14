@@ -140,7 +140,14 @@ fn the_refusal_comes_from_the_plan_without_rendering() -> Outcome {
 
 #[test]
 fn rendering_twice_gives_the_same_files() -> Outcome {
-    for example in ["hello-stack", "segmented", "shared-files", "supplier-portal-api", "udp-dns"] {
+    for example in [
+        "hello-stack",
+        "segmented",
+        "shared-files",
+        "supplier-portal-api",
+        "invoice-portal-api",
+        "udp-dns",
+    ] {
         assert_eq!(render(example)?, render(example)?, "{example}");
     }
     Ok(())

@@ -1,9 +1,14 @@
 //! `machines`: names, addresses, dependencies, size, names they answer to, implementations
 //! (`docker:`, `vm:`, `external:`), network appliances, and the start order.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
-use super::{Blocks, Problems, block, dns_label};
+use super::{Blocks, Problems, block, dns_label, starts_after};
+// What Isoloom's own machines, services and files beside a machine's are named with (its
+// controller, the check stand-in, the check runners and their scripts, the route sidecars, the
+// init jobs, a machine's published Kubernetes Service): a spec's machine or alias starting so
+// would collide with them.
+use crate::contract::RESERVED_PREFIX;
 use crate::model::{Appliance, DockerImpl, Machine, Protocol, Spec, VmImpl};
 use crate::net::NetworkBlock;
 use crate::sizing::{MIN_CONTAINER_MEMORY_MB, MIN_VM_DISK_GB, MIN_VM_MEMORY_MB};
@@ -93,15 +98,9 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, problems: &mut Problems) {
     }
 }
 
-// What Isoloom's own machines, services and files beside a machine's are named with (its
-// controller, the check stand-in, the check runners and their scripts, the route sidecars, the
-// init jobs, a machine's published Kubernetes Service): a spec's machine or alias starting so
-// would collide with them.
-use crate::contract::RESERVED_PREFIX;
-
 /// The longest machine name: its published ports' Kubernetes Service, `isoloom-<name>`, is a
 /// 63-character DNS label.
-pub const MACHINE_NAME_MAX: usize = super::DNS_LABEL_MAX - RESERVED_PREFIX.len();
+pub const MACHINE_NAME_MAX: usize = super::PREFIXED_NAME_MAX;
 const RESERVED_NAME: &str = "names starting with `isoloom-` are Isoloom's own (its controller, router and tool VM, the containers' VM, the check stand-in and runners, the route sidecars, the init jobs): choose another";
 
 /// The machine's name (a DNS label short enough for Kubernetes, its length checked first), and a
@@ -313,13 +312,41 @@ fn vm(s: &Subject, v: &VmImpl, problems: &mut Problems) {
 
 /// The start order has no cycle (`depends_on`, gateways, shared volumes).
 pub(super) fn cycle(spec: &Spec, problems: &mut Problems) {
-    let Some(cycle) = super::dependency_cycle(spec) else { return };
+    let Some(cycle) = dependency_cycle(spec) else { return };
     let hint = if spec.networks.values().any(|n| n.gateway.is_some()) {
         " (machines on a gateway's network also start after it)"
     } else {
         ""
     };
     problems.add("machines", format!("depends_on forms a cycle: {}{hint}", cycle.join(" -> ")));
+}
+
+/// The first cycle in the machines' start order (`depends_on`, gateways, shared volumes), as
+/// the names along it, the first repeated at the end.
+fn dependency_cycle(spec: &Spec) -> Option<Vec<String>> {
+    fn visit<'a>(spec: &'a Spec, n: &'a str, stack: &mut Vec<&'a str>, done: &mut BTreeSet<&'a str>) -> Option<Vec<String>> {
+        if let Some(pos) = stack.iter().position(|s| *s == n) {
+            let mut c: Vec<String> = stack.iter().skip(pos).map(|s| (*s).to_owned()).collect();
+            c.push(n.to_owned());
+            return Some(c);
+        }
+        if done.contains(n) {
+            return None;
+        }
+        stack.push(n);
+        for dep in spec.machines.get(n).map(|m| starts_after(spec, n, m)).unwrap_or_default() {
+            if spec.machines.contains_key(dep)
+                && let Some(c) = visit(spec, dep, stack, done)
+            {
+                return Some(c);
+            }
+        }
+        stack.pop();
+        done.insert(n);
+        None
+    }
+    let mut done = BTreeSet::new();
+    spec.machines.keys().find_map(|n| visit(spec, n, &mut Vec::new(), &mut done))
 }
 
 /// External machines: an address, a sane port, a user name.

@@ -6,11 +6,18 @@ use serde_json::{Value, json};
 
 use crate::syntax::Spec;
 
+/// The schema's address, written once for [`SCHEMA_URL`] and [`MODELINE`].
+macro_rules! schema_url {
+    () => {
+        "https://www.isoloom.com/schema/v1.json"
+    };
+}
+
 /// Where the schema is published.
-pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/v1.json";
+pub const SCHEMA_URL: &str = schema_url!();
 
 /// The first line that tells YAML editors (the YAML language server) which schema to use.
-pub const MODELINE: &str = "# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json";
+pub const MODELINE: &str = concat!("# yaml-language-server: $schema=", schema_url!());
 
 /// The schema, generated from the spec's types ([`crate::syntax`]) and completed with what
 /// `isoloom validate` checks that types alone don't say (name patterns, address formats).

@@ -2,6 +2,8 @@
 //! environment when it lacks the capability one of its requirements needs: the refusal comes
 //! from the plan, without generating anything.
 
+mod feature;
+
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -390,7 +392,7 @@ impl fmt::Display for Requirement {
             Requirement::VmDependsOnContainer { vm, container } => {
                 write!(f, "VM `{vm}` depends on container `{container}`: VMs start before the containers beside them")
             }
-            // Only Kubernetes lacks these today: the messages say so in its terms.
+            // Kubernetes is the target that lacks these: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
             Requirement::Tools { tool } => write!(
                 f,
@@ -597,6 +599,5 @@ pub(crate) fn container_checks(spec: &Spec) -> Option<Requirement> {
         .map(|c| Requirement::ExecWithoutContainer { check: c.name })
 }
 
-mod feature;
 #[cfg(test)]
 mod tests;

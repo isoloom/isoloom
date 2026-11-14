@@ -261,7 +261,7 @@ pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
         module.block(interface(&res::interface(res::CONTROLLER, n), n, &at.to_string(), group, None).build());
     }
     let first = res::interface(res::CONTROLLER, env.networks.keys().next().map_or("", String::as_str));
-    let (_, _, disk) = controller::size(env);
+    let disk = controller::size(env).disk_gb;
     let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Ntlm);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&res::interface(res::CONTROLLER, n)));
     let user = |os: &str| image_user(os).to_owned();

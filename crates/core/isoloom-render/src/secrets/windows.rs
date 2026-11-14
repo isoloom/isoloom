@@ -114,8 +114,9 @@ fn placed(files: &[SecretFile]) -> String {
         "Set-Content -Path {script} -Value {body}\n\
          $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {PLACE_SCRIPT}'; \
          Register-ScheduledTask -TaskName '{PLACE_TASK}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null\n\
-         & powershell -NoProfile -ExecutionPolicy Bypass -File {script}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}\n",
+         {run}\n",
         script = powershell::quote(PLACE_SCRIPT),
+        run = place_first(),
         body = powershell::quote(&place(files)),
     )
 }
@@ -150,10 +151,7 @@ pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> St
 /// put in place first, whichever startup task Windows ran first.
 #[must_use]
 pub(crate) fn place_first() -> String {
-    format!(
-        "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-        powershell::quote(PLACE_SCRIPT)
-    )
+    powershell::run_file(PLACE_SCRIPT)
 }
 
 /// The arguments of `powershell.exe` running `BOOTSTRAP`, encoded (UTF-16LE in base64) so

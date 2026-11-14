@@ -128,6 +128,10 @@ pub(crate) struct Manifest {
     pub(crate) binary_data: IndexMap<String, Text>,
 }
 
+/// The label every object Isoloom writes carries (Kubernetes' recommended key), as Compose's
+/// containers carry `isoloom.managed` and the clouds' resources `managed-by`.
+pub(crate) const MANAGED_BY: (&str, &str) = ("app.kubernetes.io/managed-by", "isoloom");
+
 impl Manifest {
     fn new(api_version: &'static str, kind: &'static str, name: &str, spec: Option<Spec>) -> Manifest {
         Manifest {
@@ -223,10 +227,6 @@ pub(crate) enum Spec {
     /// A Pod's.
     Pod(PodSpec),
 }
-
-/// The label every object Isoloom writes carries (Kubernetes' recommended key), as Compose's
-/// containers carry `isoloom.managed` and the clouds' resources `managed-by`.
-pub(crate) const MANAGED_BY: (&str, &str) = ("app.kubernetes.io/managed-by", "isoloom");
 
 /// What every object Isoloom writes is labelled with, whichever file holds it (the manifests,
 /// the checks' Jobs, the chart's templates and tests, a kustomization's generated `ConfigMap`s):

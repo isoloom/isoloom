@@ -95,10 +95,7 @@ impl Definition {
 
 /// Whether `step` may apply to `release` on `os`, whatever the settings.
 fn applies(step: &EntryStep, release: &Release, os: OsRef) -> bool {
-    let Some(w) = &step.when else { return true };
-    w.family.as_ref().is_none_or(|f| f.iter().any(|f| f.as_str() == os.os().family))
-        && w.os.as_ref().is_none_or(|l| l.contains(&os))
-        && w.release.as_ref().is_none_or(|l| l.iter().any(|word| release.is(word)))
+    step.when.as_ref().is_none_or(|w| w.holds_on(os, release))
 }
 
 /// A repository step's fetch, its suite and components as the plan fills them in.
