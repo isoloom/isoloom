@@ -1,6 +1,11 @@
 //! The Vagrant backend's rendering of a few examples, as snapshots, its determinism, and its
 //! refusals from the plan.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
+
 use std::error::Error;
 use std::path::Path;
 use std::process::Command;

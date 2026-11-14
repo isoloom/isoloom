@@ -1,0 +1,51 @@
+#!/bin/sh
+# The generated files, regenerated from the code: docs/spec.md, docs/matrix.md and
+# docs/reference/cli.md (`isoloom docs`), and the JSON schemas under schemas/ (the schema tests,
+# with ISOLOOM_WRITE_FIXTURES=1).
+#
+#   .githooks/regenerate           rewrites them in place
+#   .githooks/regenerate --check   rewrites nothing; fails, naming the command to run, when one is stale
+#
+# pre-commit runs it (in place, the regenerated files staged) when the clone opts in:
+# `git config hooks.regenerate true` (.github/CONTRIBUTING.md, "Git hooks").
+# shellcheck source-path=SCRIPTDIR
+set -u
+HOOK=regenerate
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# The pages `isoloom docs` prints: flag, then file.
+PAGES='--spec docs/spec.md
+--matrix docs/matrix.md
+--cli docs/reference/cli.md'
+
+# The schema tests: each rewrites its schema with ISOLOOM_WRITE_FIXTURES=1, and fails without it
+# when the committed one is stale.
+SCHEMA_TESTS='isoloom-catalogue catalogue the_generated_schemas_are_current
+isoloom-manifest schema the_committed_schema_is_current'
+
+STALE="a generated file is stale: run .githooks/regenerate, then commit what it changed"
+
+tmp=$(mktemp) || exit 1
+trap 'rm -f "$tmp"' EXIT
+
+printf '%s\n' "$PAGES" | while read -r flag file; do
+  cargo run -q -p isoloom -- docs "$flag" >"$tmp" || refuse "isoloom docs $flag failed"
+  if [ "${1:-}" = --check ]; then
+    cmp -s "$tmp" "$file" || refuse "$STALE" "$file differs from \`isoloom docs $flag\`"
+  else
+    cmp -s "$tmp" "$file" || cp "$tmp" "$file"
+  fi
+done || exit 1
+
+printf '%s\n' "$SCHEMA_TESTS" | while read -r crate test name; do
+  if [ "${1:-}" = --check ]; then
+    cargo test -q -p "$crate" --test "$test" "$name" >/dev/null 2>&1 ||
+      refuse "$STALE" "cargo test -p $crate --test $test $name fails"
+  else
+    ISOLOOM_WRITE_FIXTURES=1 cargo test -q -p "$crate" --test "$test" "$name" >/dev/null ||
+      refuse "writing the schema of $crate failed"
+  fi
+done || exit 1
+exit 0

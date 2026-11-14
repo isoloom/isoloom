@@ -1,6 +1,11 @@
 //! `isoloom graph`: the environment drawn, as D2 or Graphviz source, or rendered to SVG/PNG
 //! when the format's tool is installed.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the adapter of the graph renderers (`d2`, `dot`): the one module that runs them"
+)]
+
 use std::path::{Path, PathBuf};
 
 use super::{CliError, Console, Project, Result, Verdict, spec};

@@ -1,6 +1,11 @@
 //! What tests of the crates above this one build their cases from, behind the `test-support`
 //! feature (a dev-dependency's): never part of the API a backend renders with.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests' POSIX sh, which runs the generated scripts: test code, not an adapter"
+)]
+
 use crate::run_manifest::guest::{GuestCommand, GuestCompose};
 
 /// An office LAN split into VLAN 10 (offline) and VLAN 20 (online): `admin` and `nas` are on

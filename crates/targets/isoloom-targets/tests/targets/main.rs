@@ -2,6 +2,11 @@
 //! tests: what each target writes, what it refuses and why, the resolved snapshot, its reports
 //! and the run manifests, the way the composition root puts them together.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
+
 mod appliances;
 mod boot_digest;
 mod chart;

@@ -24,12 +24,17 @@
 //!   with `--copy-to <dir>` the two files a page serves copied there.
 //!
 //! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
-//! is the test that keeps the workspace's dependencies one way.
+//! is the test that keeps the workspace's dependencies one way (and Isoloom off the runner's
+//! crates), `guardrails` the scans of the product's sources clippy can't express.
 
 #![expect(
     clippy::print_stdout,
     clippy::print_stderr,
     reason = "the tasks report on the terminal: printing is their interface, not stray debugging output"
+)]
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the development tasks drive the tools (cargo, docker, terraform, the validators): each task is the adapter of its tools"
 )]
 
 mod bench;
@@ -40,6 +45,8 @@ mod deps;
 mod fuzz;
 mod fuzz_combos;
 mod generate_all;
+#[cfg(test)]
+mod guardrails;
 mod hack;
 mod mutants;
 mod process;
