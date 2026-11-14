@@ -38,6 +38,7 @@ pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
             ("sysctls", !m.sysctls.is_empty()),
             ("ulimits", !m.ulimits.is_empty()),
             ("tmpfs", !m.tmpfs.is_empty()),
+            ("dns.options", m.dns.as_ref().is_some_and(|d| !d.options.is_empty())),
         ] {
             if set {
                 p.add(format!("machines.{name}.{field}"), "Linux only: a Windows machine has none");
@@ -97,6 +98,14 @@ mod tests {
                 "machines.a.sysctls: Linux only: a Windows machine has none",
                 "machines.a.tmpfs: Linux only: a Windows machine has none"
             ]
+        );
+    }
+
+    #[test]
+    fn a_windows_machine_takes_no_resolver_options() {
+        assert_eq!(
+            of("vm: { os: windows-server@2022 }", "dns: { servers: [10.0.0.53], options: [rotate] }"),
+            ["machines.a.dns.options: Linux only: a Windows machine has none"]
         );
     }
 

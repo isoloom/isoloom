@@ -8,28 +8,32 @@
 //! - sysctls: `/etc/sysctl.d/90-isoloom.conf`, applied at once and at every boot;
 //! - ulimits: `/etc/security/limits.d/90-isoloom.conf` (logins) and systemd's `DefaultLimit*`;
 //! - tmpfs: a memory-backed mount per path, in `/etc/fstab` (every boot) and mounted at once, with
-//!   its size and mode; a path that is a tmpfs already (`/run`) takes them by a remount.
+//!   its size and mode; a path that is a tmpfs already (`/run`) takes them by a remount;
+//! - dns: the resolver the machine asks (its servers, its domain then its search domains, its
+//!   options), in whichever of systemd-resolved, NetworkManager, dhclient or udhcpc keeps it, so a
+//!   lease doesn't put the network's back; on Windows, every interface's servers and the suffixes.
 //!
 //! Idempotent: run again, it writes the same files.
 
-use isoloom_spec::model::Machine;
+use isoloom_spec::model::{Dns, Machine};
 use isoloom_spec::shell::quote;
 
 use crate::powershell;
 
 /// The machine's settings, as a root shell script for a Linux VM. `None` when it has none.
 pub(super) fn linux(m: &Machine) -> Option<String> {
-    if m.environment.is_empty() && m.sysctls.is_empty() && m.ulimits.is_empty() && m.tmpfs.is_empty() {
+    if m.environment.is_empty() && m.sysctls.is_empty() && m.ulimits.is_empty() && m.tmpfs.is_empty() && m.dns.is_none() {
         return None;
     }
     // systemd reads its defaults when it starts: re-executing it applies them to the services
     // started from now on (the machine's steps install them next).
     Some(format!(
-        "set -e\nmkdir -p /etc/systemd/system.conf.d\n{}{}{}{}systemctl daemon-reexec 2>/dev/null || true\n",
+        "set -e\nmkdir -p /etc/systemd/system.conf.d\n{}{}{}{}{}systemctl daemon-reexec 2>/dev/null || true\n",
         environment(m),
         sysctls(m),
         ulimits(m),
-        tmpfs(m)
+        tmpfs(m),
+        m.dns.as_ref().map(linux_dns).unwrap_or_default()
     ))
 }
 
@@ -137,25 +141,91 @@ fn tmpfs(m: &Machine) -> String {
         .concat()
 }
 
-/// The machine's environment on a Windows VM (machine-wide variables). Windows has no sysctls
-/// or ulimits: validation keeps them off Windows machines.
-pub(super) fn windows(m: &Machine) -> Option<String> {
-    if m.environment.is_empty() {
-        return None;
-    }
-    Some(
-        m.environment
-            .iter()
-            .map(|(k, v)| {
-                format!(
-                    "[Environment]::SetEnvironmentVariable({}, {}, 'Machine')",
-                    powershell::quote(k),
-                    powershell::quote(v)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; "),
+/// The machine's resolver on Linux: its servers (else the ones it has), its domain then its
+/// search domains, its options. Kept where the system's resolver manager reads it:
+/// systemd-resolved's own configuration (its servers asked for every name, `~.`), with a
+/// resolv.conf of its stub when there are options; else a plain resolv.conf, with NetworkManager
+/// told to leave it (`dns=none`) and dhclient and udhcpc told not to rewrite it from a lease.
+fn linux_dns(d: &Dns) -> String {
+    let domains: Vec<&str> = d.domain.iter().map(String::as_str).chain(d.search.iter().map(String::as_str)).collect();
+    let servers = d.servers.join(" ");
+    let search = domains.join(" ");
+    let options = d.options.join(" ");
+    // systemd-resolved: these servers for every name (`~.`), else only the domains.
+    let resolved = if !servers.is_empty() {
+        format!("[Resolve]\nDNS={servers}\nDomains={}\n", [search.as_str(), "~."].join(" ").trim())
+    } else if !search.is_empty() {
+        format!("[Resolve]\nDomains={search}\n")
+    } else {
+        "[Resolve]\n".to_owned()
+    };
+    let lines = |nameservers: &str| {
+        let search = if search.is_empty() { String::new() } else { format!("search {search}\n") };
+        let options = if options.is_empty() { String::new() } else { format!("options {options}\n") };
+        [nameservers, &search, &options].concat()
+    };
+    let own: String = d.servers.iter().flat_map(|s| ["nameserver ", s.as_str(), "\n"]).collect();
+    let dhclient: String = [
+        (!d.servers.is_empty()).then(|| format!("supersede domain-name-servers {};\n", d.servers.join(", "))),
+        (!domains.is_empty()).then(|| {
+            let quoted: Vec<String> = domains.iter().map(|x| format!("\"{x}\"")).collect();
+            format!("supersede domain-search {};\n", quoted.join(", "))
+        }),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let stub = if options.is_empty() {
+        String::new()
+    } else {
+        format!("rm -f /etc/resolv.conf && printf %s {} > /etc/resolv.conf\n", quote(&lines("nameserver 127.0.0.53\n")))
+    };
+    let nameservers = if own.is_empty() {
+        "\"$(grep '^nameserver' /etc/resolv.conf 2>/dev/null || true)\n\"".to_owned()
+    } else {
+        quote(&own)
+    };
+    format!(
+        "if systemctl is-active -q systemd-resolved 2>/dev/null; then\n  mkdir -p /etc/systemd/resolved.conf.d && printf %s {resolved} > /etc/systemd/resolved.conf.d/90-isoloom.conf\n  systemctl restart systemd-resolved\n  {stub}else\n  if systemctl is-active -q NetworkManager 2>/dev/null; then mkdir -p /etc/NetworkManager/conf.d && printf '[main]\\ndns=none\\n' > /etc/NetworkManager/conf.d/90-isoloom-dns.conf && systemctl reload NetworkManager; fi\n  if [ -f /etc/dhcp/dhclient.conf ]; then grep -v '# isoloom$' /etc/dhcp/dhclient.conf > /etc/dhcp/dhclient.conf.isoloom || true; printf %s {dhclient} | sed 's/$/ # isoloom/' >> /etc/dhcp/dhclient.conf.isoloom && mv /etc/dhcp/dhclient.conf.isoloom /etc/dhcp/dhclient.conf; fi\n  if [ -d /etc/udhcpc ]; then printf 'RESOLV_CONF=\"no\"\\n' > /etc/udhcpc/udhcpc.conf; fi\n  n={nameservers}\n  rm -f /etc/resolv.conf.isoloom && printf '%s' \"$n\" | grep . > /etc/resolv.conf.isoloom || true\n  printf %s {rest} >> /etc/resolv.conf.isoloom && rm -f /etc/resolv.conf && mv /etc/resolv.conf.isoloom /etc/resolv.conf\nfi\n",
+        resolved = quote(&resolved),
+        stub = stub,
+        dhclient = quote(&dhclient),
+        nameservers = nameservers,
+        rest = quote(&lines("")),
     )
+}
+
+/// The machine's settings on a Windows VM: its environment (machine-wide variables) and its
+/// resolver (every interface's servers, its domain then its search domains as the suffixes).
+/// Windows has no sysctls, ulimits, tmpfs or resolver options: validation keeps them off Windows
+/// machines.
+pub(super) fn windows(m: &Machine) -> Option<String> {
+    let mut parts: Vec<String> = m
+        .environment
+        .iter()
+        .map(|(k, v)| {
+            format!(
+                "[Environment]::SetEnvironmentVariable({}, {}, 'Machine')",
+                powershell::quote(k),
+                powershell::quote(v)
+            )
+        })
+        .collect();
+    if let Some(d) = &m.dns {
+        let list = |items: &mut dyn Iterator<Item = &String>| items.map(|s| powershell::quote(s)).collect::<Vec<_>>().join(", ");
+        if !d.servers.is_empty() {
+            parts.push(format!(
+                "Get-NetAdapter | Where-Object Status -eq 'Up' | Set-DnsClientServerAddress -ServerAddresses @({})",
+                list(&mut d.servers.iter())
+            ));
+        }
+        let mut suffixes = d.domain.iter().chain(&d.search);
+        let suffixes = list(&mut suffixes);
+        if !suffixes.is_empty() {
+            parts.push(format!("Set-DnsClientGlobalSetting -SuffixSearchList @({suffixes})"));
+        }
+    }
+    (!parts.is_empty()).then(|| parts.join("; "))
 }
 
 /// `text` matched literally in an extended regular expression.
