@@ -184,3 +184,30 @@ fn a_value_of_the_wrong_kind_says_what_the_field_takes() {
         "{test}"
     );
 }
+
+#[test]
+fn a_secrets_source_and_a_device_of_the_wrong_kind_say_what_they_take() {
+    let reason = |rest: &str| {
+        let found = problems(&spec(rest));
+        let [p] = &found[..] else { panic!("one problem: {found:?}") };
+        (p.path.to_string(), p.reason.clone())
+    };
+    let machine = "machines:\n  m: { os: debian@12, networks: { lab: 10 } }\n";
+    let store = "one store: `{ env: NAME }`, `{ file: <path> }`, `{ vault: <path>#<field> }` or `{ sops: <file>#<key> }`";
+    for source in ["5", "[DB]", "{}", "{ env: A, file: b }"] {
+        let (path, why) = reason(&format!("secrets: {{ db: {source} }}\n{machine}"));
+        assert_eq!(path, "secrets.db", "{source}");
+        assert!(why.contains(store) && !why.contains("untagged"), "{source}: {why}");
+    }
+    let (_, typo) = reason(&format!("secrets: {{ db: {{ evn: DB }} }}\n{machine}"));
+    assert_eq!(typo, "`evn` isn't a field here");
+    let device = |value: &str| reason(&format!("machines:\n  m: {{ app: {{ image: nginx }}, networks: {{ lab: 10 }}, hardware: {{ devices: [{value}] }} }}\n"));
+    let (path, why) = device("5");
+    assert_eq!(path, "machines.m.hardware.devices[0]");
+    assert!(
+        why.ends_with("expected a device path (`/dev/fuse`, or `host:guest[:permissions]`), or `{ host, guest, permissions }`"),
+        "{why}"
+    );
+    let (_, misspelt) = device("{ hots: /dev/fuse }");
+    assert_eq!(misspelt, "`hots` isn't a field here");
+}

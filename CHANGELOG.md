@@ -85,6 +85,10 @@ stable spec format.
 
 ### Fixed
 
+- **A secret's source and a device of the wrong kind say what they take (#320),** where they were
+  refused with "data did not match any variant of untagged enum": a source is one store
+  (`{ env }`, `{ file }`, `{ vault }` or `{ sops }`), a device a path, `host:guest[:permissions]`
+  or `{ host, guest, permissions }`, and a misspelt key is named as such.
 - **An external machine's run and playbook steps get its inputs (#316),** through the task's
   `environment` read from where Ansible runs (`lookup('ansible.builtin.env')`).
 - **An external machine's `files[].secret` and `files[].input` are refused (#317),** as on Proxmox
