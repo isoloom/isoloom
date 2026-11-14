@@ -97,6 +97,15 @@ stable spec format.
 
 ### Removed
 
+- **The `cloud-services` target and the spec's `cloud:` section** (`provider`, `terraform`,
+  `vars`, `outputs`, `hourly_usd`, `before`, `env`, `apply_retries`, `requires`), for now: a spec
+  with `cloud:` is refused with "cloud-services is not supported in Isoloom 3.0". The
+  `{{ cloud.outputs.<name> }}` placeholders and the `cloud-bucket` example go with it. Breaking for
+  the Rust API: `Target::CloudServices` and `Shape::Cloud` are gone (`Target::ALL` has 9 targets);
+  `isoloom_spec::CloudServices`, `model::CloudProvider` and `model::CloudServices` are gone, with
+  `model::Spec::cloud` and `syntax::Spec::cloud`; `placeholder::Reference::CloudOutput` is gone;
+  `isoloom_plan::NotPossible::{CloudServicesOnly, NoCloud}` are gone; so is
+  `isoloom_terraform::CloudServicesBackend`. The resolved snapshot has no `cloud` section.
 - **The tier list.** `tiers.json`, `cargo xtask tiers record` and `isoloom_targets::tiers` (`Tier`,
   `TierEntry`, `Run`, `RunResult`, `HostOs`, `Date`) are gone, with every run-evidence claim.
   Breaking for the Rust API: `tiers::variants` is `isoloom_targets::validators::variants`, and
@@ -118,10 +127,8 @@ stable spec format.
   `ready_line`, `check_line`). Breaking for the Rust API: `Backend::run_manifest`,
   `Backend::run_manifests` and `Placed` are gone, with `isoloom_render::run_manifest`;
   `isoloom_compose::guest` is replaced by `isoloom_compose::vm_start` (`VmStart { start, values }`);
-  `isoloom_terraform::cloud_docker_manifests` is gone. `cloud-services` writes its fixed variables only
-  (`terraform.tfvars.json`): its launch inputs are given as `TF_VAR_<name>`, and no generated file
-  acts on `cloud.before`, `cloud.env`, `cloud.apply_retries` or `cloud.requires`. The capability
-  matrix loses its graphical consoles section, which the run manifests fed.
+  `isoloom_terraform::cloud_docker_manifests` is gone. The capability matrix loses its graphical
+  consoles section, which the run manifests fed.
 
 ### Fixed
 

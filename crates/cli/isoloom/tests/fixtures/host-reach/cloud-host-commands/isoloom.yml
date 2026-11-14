@@ -1,5 +1,4 @@
-# Cloud services whose settings would change how this computer's tools run: a loader variable,
-# Terraform's own settings, and requirements written as command lines. Each is refused.
+# Cloud services (`cloud:`), which Isoloom 3.0 refuses: the target is removed.
 version: 1
 name: cloud-host-commands
 cloud:

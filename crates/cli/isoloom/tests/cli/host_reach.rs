@@ -114,22 +114,11 @@ fn a_vm_booting_from_the_hosts_files_is_refused() -> Outcome {
 }
 
 #[test]
-fn cloud_settings_for_the_hosts_tools_and_command_lines_as_requirements_are_refused() -> Outcome {
+fn a_spec_with_cloud_services_is_refused() -> Outcome {
     let home = scratch("host-reach-home")?;
     let dir = fixture("cloud-host-commands")?;
     let found = refused(&home, &dir, &[])?;
-    for name in ["LD_PRELOAD", "TF_CLI_ARGS_apply", "TF_CLI_CONFIG_FILE"] {
-        assert!(
-            has(&found, &format!("cloud.env.{name}"), "changes how the tools on this computer run"),
-            "{name} in {found:#?}"
-        );
-    }
-    for i in 0..2 {
-        assert!(has(&found, &format!("cloud.requires[{i}]"), "isn't a command's name"), "{i} in {found:#?}");
-    }
-    // Nothing allows them.
-    let all = ["--allow-host", "host-folders", "--allow-host", "privileged", "--allow-host", "devices"];
-    assert_eq!(refused(&home, &dir, &all)?.len(), found.len());
+    assert!(has(&found, "cloud", "cloud-services is not supported in Isoloom 3.0"), "{found:#?}");
     Ok(())
 }
 

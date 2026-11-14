@@ -136,10 +136,6 @@
     "constraints": {
       "description": "What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time\nservers.",
       "$ref": "#/$defs/Constraints"
-    },
-    "cloud": {
-      "description": "An environment of cloud services rather than machines: a Terraform module applied into\nthe user's own cloud account.",
-      "$ref": "#/$defs/CloudServices"
     }
   },
   "required": [
@@ -3964,11 +3960,6 @@
           "type": "string",
           "const": "external",
           "description": "Machines that already exist, reached over SSH at the addresses the spec gives\n(`machines.*.external`): nothing is created, everything else applies."
-        },
-        {
-          "type": "string",
-          "const": "cloud-services",
-          "description": "The spec's cloud services (`cloud:`): its Terraform module applied into the user's own\ncloud account."
         }
       ],
       "description": "Where an environment can run."
@@ -4060,90 +4051,6 @@
         }
       },
       "description": "Package mirrors (see [`Constraints::mirrors`])."
-    },
-    "CloudServices": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "provider": {
-          "$ref": "#/$defs/CloudProvider",
-          "description": "The cloud the module deploys into (its credentials come from the environment, as\nTerraform expects)."
-        },
-        "terraform": {
-          "type": "string",
-          "description": "A Terraform root module in the project (a folder holding `.tf` files), used as is."
-        },
-        "vars": {
-          "type": "object",
-          "additionalProperties": true,
-          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.OPERATOR_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list:\nrequired when a runner brings the environment up, kept for taking it down."
-        },
-        "outputs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "What the environment exposes, by name: a module output each. Checks and the message\nuse them as `{{ cloud.outputs.<name> }}`."
-        },
-        "hourly_usd": {
-          "type": "number",
-          "format": "double",
-          "description": "About what the environment costs per hour while it exists, in US dollars: the author's\nestimate, for whoever runs it. A runner can say it before applying, and the resolved\nsnapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a\nbudget. Isoloom doesn't bill or stop anything by it."
-        },
-        "before": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Steps run on this machine before Terraform applies the module (a key pair the module\nreads, a build): scripts in the project, run in order from the module's copy, with the\nspec's inputs and `env` in their environment. They run every time a runner brings the\nenvironment up: make them idempotent."
-        },
-        "env": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`,\n`TF_VAR_size: small`): plain upper-case names of the module's own. Not for credentials or\ntool settings: those come from the user's own environment, so the names a loader, a shell,\nan interpreter, Terraform (`TF_*` but `TF_VAR_*`) or a cloud's CLI read to change what\nruns or where it connects are refused (a region setting is allowed)."
-        },
-        "apply_retries": {
-          "type": "integer",
-          "format": "uint8",
-          "minimum": 0,
-          "maximum": 255,
-          "description": "How many times to apply again when an apply fails (a module that only converges on a\nsecond apply), 0 to 5. 0 by default."
-        },
-        "requires": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "What the module needs on this machine besides Terraform: commands by their bare name\n(`jq`, `gsed`) that must be on the PATH. A runner checks each before applying by asking it\nfor its `--version`, and runs nothing else."
-        }
-      },
-      "required": [
-        "provider",
-        "terraform"
-      ],
-      "description": "An environment of cloud services: a Terraform module applied into the user's account."
-    },
-    "CloudProvider": {
-      "oneOf": [
-        {
-          "type": "string",
-          "const": "aws",
-          "description": "Amazon Web Services."
-        },
-        {
-          "type": "string",
-          "const": "azure",
-          "description": "Microsoft Azure."
-        },
-        {
-          "type": "string",
-          "const": "gcp",
-          "description": "Google Cloud."
-        }
-      ],
-      "description": "A cloud an environment of cloud services deploys into."
     }
   },
   "$id": "https://www.isoloom.com/schema/v1.json"

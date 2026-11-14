@@ -16,17 +16,11 @@ use crate::configure::{self, DaemonTable};
 /// The machines `target` has no form for, in machine order (`services`: the environment's catalogue
 /// services, resolved).
 pub(super) fn forms(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
-    if source.cloud.is_some() {
-        return Vec::new();
-    }
     source.machines.iter().filter_map(|(name, m)| form(source, name, m, services, target)).collect()
 }
 
 /// Everything `target` refuses in `source`, in machine order.
 pub(super) fn of(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
-    if source.cloud.is_some() {
-        return Vec::new();
-    }
     let mut out = Vec::new();
     for (name, m) in &source.machines {
         let service = services.get(name);
@@ -97,7 +91,6 @@ fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, services: &Servi
                 "`overrides: {{ external: {{ machines: {{ {name}: {{ ssh: {{ address: <host> }} }} }} }} }}`"
             ))
         }),
-        Shape::Cloud => None,
     }
 }
 
@@ -108,7 +101,7 @@ fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, services: 
     match target.needs() {
         Shape::Vm | Shape::External => vm,
         Shape::VmOrLxc => vm && !overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Docker | Shape::Cloud => false,
+        Shape::Docker => false,
     }
 }
 
@@ -123,7 +116,7 @@ fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, services: &Serv
     let container = match target.needs() {
         Shape::Docker => true,
         Shape::VmOrLxc => overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Vm | Shape::External | Shape::Cloud => false,
+        Shape::Vm | Shape::External => false,
     };
     container.then_some(carrier)
 }
@@ -218,12 +211,5 @@ overrides:
             "a Linux existing host's steps now run through Ansible, so only the missing hosts are refused"
         );
         assert!(found.iter().all(|p| p.code == Code::Refused));
-    }
-
-    #[test]
-    fn a_cloud_services_lab_refuses_nothing() {
-        let l = testing::lab("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n");
-        assert_eq!(on(&l, Target::CloudServices), []);
-        assert_eq!(forms(l.source(), &Services::default(), Target::Vagrant), []);
     }
 }

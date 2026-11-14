@@ -1,16 +1,15 @@
-# Clouds: `cloud-vm`, `cloud-docker` and `cloud-services`
+# Clouds: `cloud-vm` and `cloud-docker`
 
 - **`cloud-vm`**: one cloud VM per machine, set up by the machine's steps, on AWS, Azure, Google
   Cloud, DigitalOcean, Linode or Oracle Cloud. `.isoloom/cloud-vm/<cloud>/`, one Terraform module
   per cloud that can take the environment.
 - **`cloud-docker`**: the `docker` target's containers on one cloud VM, on the same six clouds.
   `.isoloom/cloud-docker/<cloud>/`.
-- **`cloud-services`**: your own Terraform module (the spec's `cloud:`), applied into your account
-  on AWS, Azure or Google Cloud, with the spec's checks. `.isoloom/cloud-services/`.
+
+`cloud-services` is not supported in Isoloom 3.0: a spec with `cloud:` is refused.
 
 Each cloud's module is checked by `terraform validate`, `tflint` and `terraform test` (every
-provider mocked); `cloud-docker`'s Compose file by `docker compose config` too, and
-`cloud-services`' own module by `terraform validate` and `terraform test`. `isoloom targets` says which clouds can
+provider mocked); `cloud-docker`'s Compose file by `docker compose config` too. `isoloom targets` says which clouds can
 take an environment and why the others can't (DigitalOcean takes one machine on one network for
 `cloud-vm`; Windows runs on AWS and Azure only).
 
@@ -226,9 +225,6 @@ Isoloom doesn't know your prices and bills nothing. What it gives you to keep co
 - **Tags.** Every resource carries `managed-by = isoloom`, `isoloom-environment` and
   `isoloom-instance` (labels on Google Cloud), so a cost report can group by environment. The
   spec's `tags:` map adds your own cost-allocation tags to every resource.
-- **`cloud.hourly_usd`** (for `cloud-services`): the spec author's estimate of what the
-  environment costs per hour. Isoloom copies it into `.isoloom/resolved.json`; a runner or a
-  portal can show it before applying or keep to a budget with it. It is an estimate, not a limit.
 - The best guard is the cloud's own: a budget with an action (AWS Budgets, Azure cost alerts,
   Google Cloud budgets) on a dedicated account.
 
@@ -250,13 +246,6 @@ address, its user and the command (`cd /opt/isoloom && … sh .isoloom/cloud-vm/
 the runner scripts Terraform brought in with the project). A runner such as
 [Isothrum](https://github.com/Isothrum/isothrum) runs the same commands, with no contract of its
 own.
-
-`cloud-services` writes the spec's fixed variables only (`.isoloom/cloud-services/terraform.tfvars.json`):
-you apply your own module with them, `terraform -chdir=<your module> apply
--var-file=<project>/.isoloom/cloud-services/terraform.tfvars.json`, and give each variable that
-takes a launch-time input as `TF_VAR_<name>`. No generated file acts on the spec's `cloud.before`,
-`cloud.env`, `cloud.apply_retries` or `cloud.requires`: run the `before` scripts, set the
-environment, retry and install the tools yourself (or let a runner do it).
 
 ## Teardown
 

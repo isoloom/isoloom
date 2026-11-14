@@ -64,13 +64,6 @@ impl Paths<'_> {
 #[must_use]
 pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     let mut paths = Paths { lab_dir, problems: Vec::new() };
-    if let Some(c) = &spec.cloud {
-        let module = paths.check("cloud.terraform".into(), &c.terraform);
-        paths.problems.extend(cloud_module(c, module.as_deref()));
-        for (i, b) in c.before.iter().enumerate() {
-            paths.check(format!("cloud.before[{i}]"), b);
-        }
-    }
     machines(spec, &mut paths);
     for (i, ca) in spec.constraints.iter().flat_map(|c| c.ca_certificates.iter()).enumerate() {
         paths.check(format!("constraints.ca_certificates[{i}]"), ca);
@@ -145,20 +138,6 @@ fn machines(spec: &Spec, paths: &mut Paths) {
     }
 }
 
-/// A cloud-services module is a folder of .tf files: `module`, its real place when it is one of
-/// the project.
-fn cloud_module(c: &crate::model::CloudServices, module: Option<&Path>) -> Option<Problem> {
-    let dir = module?;
-    let tf = std::fs::read_dir(dir).is_ok_and(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")));
-    (!tf && dir.is_dir()).then(|| {
-        Problem::new(
-            Code::InvalidValue,
-            "cloud.terraform",
-            format!("`{}` holds no .tf file: it must be a Terraform root module", c.terraform),
-        )
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use std::error::Error;
@@ -196,8 +175,6 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
         "v1..2/probe.sh",
     ];
 
-    /// A cloud-services spec with its module in `infra` and a `before` script.
-    const CLOUD: &str = "version: 1\nname: t\ncloud: { provider: aws, terraform: infra, before: [prep.sh] }\n";
 
     /// What `validate_files` finds for the lowered spec `yaml` in a fresh project folder (named
     /// after `test`) holding `files`, each written empty; a name ending in `/` is a folder.
@@ -220,7 +197,6 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
     #[test]
     fn every_path_present_in_the_project_passes() -> Outcome {
         assert_eq!(found("present", MACHINES_FILES, &lab(MACHINES))?, Vec::<String>::new());
-        assert_eq!(found("present-cloud", &["infra/main.tf", "prep.sh"], CLOUD)?, Vec::<String>::new());
         Ok(())
     }
 
@@ -308,22 +284,6 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
                 "machines.web.host_folders[1].from: `notes.txt` is a file: name a folder",
                 "machines.web.host_folders[2].from: `gone` doesn't exist: a folder relative to the project folder",
             ]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_cloud_module_is_a_folder_holding_terraform_files() -> Outcome {
-        assert_eq!(
-            found("cloud-missing", &[], CLOUD)?,
-            [
-                "cloud.terraform: `infra` doesn't exist in the project folder",
-                "cloud.before[0]: `prep.sh` doesn't exist in the project folder"
-            ]
-        );
-        assert_eq!(
-            found("cloud-no-tf", &["infra/README.md", "prep.sh"], CLOUD)?,
-            ["cloud.terraform: `infra` holds no .tf file: it must be a Terraform root module"]
         );
         Ok(())
     }

@@ -105,7 +105,6 @@ pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowe
     spec.inputs = inputs(source);
     spec.secrets = secrets;
     spec.machines = machines;
-    spec.cloud.clone_from(&source.cloud);
     spec.volumes = overrides::volumes(source, scope);
     spec.constraints.clone_from(&source.constraints);
     spec.groups = groups(source);

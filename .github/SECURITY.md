@@ -71,8 +71,7 @@ In scope:
   Isoloom builds what the spec says.
 - The documented defaults [security considerations](../docs/explanation/security.md) describes:
   public IPs on cloud VMs, `proxmox_insecure`, plain-HTTP WinRM on private networks.
-- Code the project brings: provisioning scripts, playbooks, checks, Dockerfiles, and the Terraform
-  module of `cloud-services`.
+- Code the project brings: provisioning scripts, playbooks, checks and Dockerfiles.
 - Someone who already controls the computer running `isoloom`, or the cloud account, Proxmox
   server or ESXi host it targets.
 - Environments built to be vulnerable on purpose: their weaknesses are their point.

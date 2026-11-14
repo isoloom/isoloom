@@ -4,8 +4,7 @@
 //!   target on a cloud (`.isoloom/cloud-vm/aws/`);
 //! - `tests/terraform/<target>/<example>.tftest.hcl` tests the example's module for a target
 //!   with one module (`.isoloom/proxmox/`);
-//! - a first line `# module: <folder>` names another folder of the example instead: the user's
-//!   own module on `cloud-services`, which the generated scripts apply.
+//! - a first line `# module: <folder>` names another folder of the example instead.
 //!
 //! `tests/terraform/mocks/<provider>/` holds the mocked providers' shared values; every suite
 //! gets them as `tests/mocks/` beside it (`mock_provider "aws" { source = "./tests/mocks/aws" }`).
@@ -135,10 +134,10 @@ mod tests {
 
     #[test]
     fn a_module_line_names_another_folder_of_the_example() {
-        let s = parse(&rel("cloud-services/cloud-bucket.tftest.hcl"), "# module: terraform").unwrap();
-        assert_eq!(s.module, "cloud-bucket/terraform");
+        let s = parse(&rel("proxmox/segmented.tftest.hcl"), "# module: terraform").unwrap();
+        assert_eq!(s.module, "segmented/terraform");
         for outside in ["# module: ../x", "# module: a//b", "# module:"] {
-            assert!(parse(&rel("cloud-services/cloud-bucket.tftest.hcl"), outside).is_err(), "{outside}");
+            assert!(parse(&rel("proxmox/segmented.tftest.hcl"), outside).is_err(), "{outside}");
         }
     }
 

@@ -5,8 +5,7 @@ decide when you run it. To report a vulnerability: [SECURITY.md](../../.github/S
 
 ## Trust model
 
-- **A spec is code.** Its steps run as root in the machines; `cloud.before` steps and a
-  `cloud-services` module run on the computer that applies them; a playbook step runs whatever it
+- **A spec is code.** Its steps run as root in the machines; a playbook step runs whatever it
   holds. Review a spec, and the scripts it names, as you would a script.
 - **`isoloom` itself runs nothing** from the spec. It reads files and writes files, opens no
   network connection and starts no program, except `d2`/`dot` for `isoloom graph -o` and Ruby for

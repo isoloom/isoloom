@@ -148,8 +148,9 @@ checked by its format's official validators on every example (`cargo xtask verif
 | `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | `terraform validate`, `tflint`, `terraform test` | [ESXi](docs/guide/targets/esxi.md) |
 | `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | `terraform validate`, `tflint`, `terraform test` | [Clouds](docs/guide/targets/cloud.md) |
 | `cloud-docker` | The Compose file and a Terraform module per cloud: the containers on one cloud VM | `docker compose config`, `terraform validate`, `tflint`, `terraform test` | [Clouds](docs/guide/targets/cloud.md) |
-| `cloud-services` | The fixed variables of your own Terraform module, applied into your AWS, Azure or Google Cloud account | `terraform validate`, `terraform test` | [Clouds](docs/guide/targets/cloud.md) |
 | `external` | Hosts that already exist, set up and checked over SSH with Ansible | `ansible-lint` | [Existing hosts](docs/guide/targets/external.md) |
+
+`cloud-services` is not supported in Isoloom 3.0: a spec with `cloud:` is refused.
 
 The cloud targets' default regions are all in Europe; [change them](docs/guide/targets/cloud.md#regions)
 in your defaults.

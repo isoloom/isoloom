@@ -39,7 +39,7 @@ fn declared(spec: &Spec, at: &str, d: &Declared, problems: &mut Problems) {
     }
     extras(at, d, problems);
     if let Some(u) = &d.http {
-        http(spec, at, u, d, problems);
+        http(at, u, d, problems);
     }
     if let Some(t) = &d.tcp {
         tcp(at, t, d, problems);
@@ -118,11 +118,9 @@ fn extras(at: &str, d: &Declared, problems: &mut Problems) {
     }
 }
 
-/// An `http` probe: a URL (or a cloud output filled in later), and a status, `any` or `blocked`.
-fn http(spec: &Spec, at: &str, u: &str, d: &Declared, problems: &mut Problems) {
-    // A cloud-services output is only known once the services are deployed.
-    let output = spec.cloud.is_some() && u.contains("{{ cloud.outputs.");
-    if !output && Url::parse(u).is_none() {
+/// An `http` probe: a URL, and a status, `any` or `blocked`.
+fn http(at: &str, u: &str, d: &Declared, problems: &mut Problems) {
+    if Url::parse(u).is_none() {
         problems.add(format!("{at}.http"), format!("`{u}` isn't a URL like http://web:8080/path"));
     }
     match &d.expect {
@@ -268,14 +266,10 @@ mod tests {
     }
 
     #[test]
-    fn a_cloud_output_url_is_known_only_once_deployed() {
-        let services =
-            "version: 1\nname: t\ncloud: { provider: aws, terraform: infra, outputs: { site: site_url } }\nchecks: [{ http: '{{ cloud.outputs.site }}' }]\n";
-        assert_eq!(problems(services), Vec::<String>::new());
-        assert_eq!(
-            of("[{ http: '{{ cloud.outputs.site }}' }]"),
-            ["checks[0].http: `{{ cloud.outputs.site }}` isn't a URL like http://web:8080/path"]
-        );
+    fn a_spec_with_cloud_services_is_refused() {
+        let services = "version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n";
+        let found = crate::parse(services).map(|_| ()).unwrap_err().to_string();
+        assert!(found.contains("cloud-services is not supported in Isoloom 3.0"), "{found}");
     }
 
     #[test]

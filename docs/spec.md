@@ -21,7 +21,6 @@ for each item of a list.
 - [`overrides`](#overrides)
 - [`tools`](#tools)
 - [`constraints`](#constraints)
-- [`cloud`](#cloud)
 
 ## Top level
 
@@ -2164,71 +2163,5 @@ The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its 
 ### `constraints.ca_certificates`
 
 Certificate authorities every machine trusts beside the public ones (PEM files in the project, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each Linux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`) once the project is in, Isoloom's own too (the containers' Docker host before it installs Docker, the controller and the router before their packages), each Windows VM to its root store, each image Isoloom builds at build time, and each container has them at `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
-
-- **Type:** list of strings
-
-## `cloud`
-
-### `cloud`
-
-An environment of cloud services rather than machines: a Terraform module applied into the user's own cloud account.
-
-- **Type:** mapping
-
-### `cloud.provider`
-
-The cloud the module deploys into (its credentials come from the environment, as Terraform expects).
-
-- **Type:** string
-- **Allowed:**
-  - `aws`: Amazon Web Services.
-  - `azure`: Microsoft Azure.
-  - `gcp`: Google Cloud.
-
-### `cloud.terraform`
-
-A Terraform root module in the project (a folder holding `.tf` files), used as is.
-
-- **Type:** string
-
-### `cloud.vars`
-
-The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.OPERATOR_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list: required when a runner brings the environment up, kept for taking it down.
-
-- **Type:** mapping
-
-### `cloud.outputs`
-
-What the environment exposes, by name: a module output each. Checks and the message use them as `{{ cloud.outputs.<name> }}`.
-
-- **Type:** map of name to string
-
-### `cloud.hourly_usd`
-
-About what the environment costs per hour while it exists, in US dollars: the author's estimate, for whoever runs it. A runner can say it before applying, and the resolved snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a budget. Isoloom doesn't bill or stop anything by it.
-
-- **Type:** number
-
-### `cloud.before`
-
-Steps run on this machine before Terraform applies the module (a key pair the module reads, a build): scripts in the project, run in order from the module's copy, with the spec's inputs and `env` in their environment. They run every time a runner brings the environment up: make them idempotent.
-
-- **Type:** list of strings
-
-### `cloud.env`
-
-Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`, `TF_VAR_size: small`): plain upper-case names of the module's own. Not for credentials or tool settings: those come from the user's own environment, so the names a loader, a shell, an interpreter, Terraform (`TF_*` but `TF_VAR_*`) or a cloud's CLI read to change what runs or where it connects are refused (a region setting is allowed).
-
-- **Type:** map of name to string
-
-### `cloud.apply_retries`
-
-How many times to apply again when an apply fails (a module that only converges on a second apply), 0 to 5. 0 by default.
-
-- **Type:** integer
-
-### `cloud.requires`
-
-What the module needs on this machine besides Terraform: commands by their bare name (`jq`, `gsed`) that must be on the PATH. A runner checks each before applying by asking it for its `--version`, and runs nothing else.
 
 - **Type:** list of strings

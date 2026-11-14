@@ -11,12 +11,11 @@ use crate::{Error, Result};
 /// The rows, as written.
 const DATA: &str = include_str!("probes.yml");
 
-/// The file: the environment, the cloud environment, the rows.
+/// The file: the environment, the rows.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct File {
     base: Value,
-    cloud: Value,
     rows: Vec<RowFile>,
 }
 
@@ -40,8 +39,6 @@ struct RowFile {
     without: Vec<String>,
     #[serde(default)]
     only: Vec<String>,
-    #[serde(default)]
-    cloud: bool,
     #[serde(default = "yes")]
     hosts: bool,
     patch: Value,
@@ -86,8 +83,6 @@ pub(crate) struct Probe {
     pub(crate) uses: Uses,
     /// The targets it applies to; empty: every target.
     pub(crate) only: Vec<Target>,
-    /// A row of the cloud-services lab.
-    pub(crate) cloud: bool,
     /// Whether `external`'s environment gives each machine an existing host.
     pub(crate) hosts: bool,
     pub(crate) patch: Value,
@@ -98,8 +93,6 @@ pub(crate) struct Probe {
 pub(crate) struct Probes {
     /// The one-machine environment.
     pub(crate) base: Value,
-    /// The environment of cloud services.
-    pub(crate) cloud: Value,
     pub(crate) rows: Vec<Probe>,
 }
 
@@ -110,7 +103,6 @@ pub(crate) fn probes() -> Result<Probes> {
     rows.extend(os_rows());
     Ok(Probes {
         base: file.base,
-        cloud: file.cloud,
         rows,
     })
 }
@@ -170,7 +162,6 @@ fn row(r: RowFile) -> Result<Probe> {
         features,
         uses,
         only,
-        cloud: r.cloud,
         hosts: r.hosts,
         patch: r.patch,
     })
@@ -204,7 +195,6 @@ fn os_rows() -> Vec<Probe> {
                         without: Vec::new(),
                     }),
                     only: Vec::new(),
-                    cloud: false,
                     hosts: true,
                     patch,
                 }

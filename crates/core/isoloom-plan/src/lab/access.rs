@@ -44,7 +44,7 @@ impl Lab {
                 "without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none",
                 "access: { vm: debian@12 }",
             ),
-            Shape::External | Shape::Cloud => return None,
+            Shape::External => return None,
         };
         if has {
             return None;
@@ -55,8 +55,7 @@ impl Lab {
     }
 
     /// A warning when the image table gives the access machine the spec leaves to the runner no
-    /// form at all: every target that creates the machines (all but `external` and
-    /// `cloud-services`) refuses it.
+    /// form at all: every target that creates the machines (all but `external`) refuses it.
     pub(super) fn unsupplied_warning(&self) -> Option<Warning> {
         if self.given() != (false, false) {
             return None;
@@ -64,7 +63,7 @@ impl Lab {
         let name = self.supplied()?;
         let mut w = Warning::new(
             FieldPath::new("machines").key(name).key("access"),
-            "without `os`, the access machine comes from the image table's `access:`, and none is given here: every target that creates the machines (all but `external` and `cloud-services`) refuses it unless `isoloom generate --images` gives one",
+            "without `os`, the access machine comes from the image table's `access:`, and none is given here: every target that creates the machines (all but `external`) refuses it unless `isoloom generate --images` gives one",
         )
         .fix("`os: debian@12`");
         w.span = self.source.spans.find(&w.path);
@@ -98,12 +97,10 @@ mod tests {
             assert!(why.starts_with("machines.user.os: without `os`, the access machine"), "{t:?}: {why}");
             assert!(!none.possible().contains(&t), "{t:?}");
         }
-        for t in [Target::External, Target::CloudServices] {
-            assert_eq!(refused(&none, t).filter(|w| w.contains("machines.user")), None, "{t:?}");
-        }
+        assert_eq!(refused(&none, Target::External).filter(|w| w.contains("machines.user")), None);
         let warned = none.warnings();
         assert_eq!(warned.iter().map(|w| w.path.to_string()).collect::<Vec<_>>(), ["machines.user.access"]);
-        assert!(warned[0].reason.contains("all but `external` and `cloud-services`"), "{}", warned[0].reason);
+        assert!(warned[0].reason.contains("all but `external`)"), "{}", warned[0].reason);
 
         let vm = lab("access: { vm: debian@12 }");
         assert_eq!(refused(&vm, Target::Vagrant), None);

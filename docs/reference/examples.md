@@ -72,4 +72,3 @@ These need Cisco images you bring yourself (from Cisco Modeling Labs, for one): 
 | Example | Shows | Targets |
 |---|---|---|
 | `existing-hosts` | Machines that already exist, set up and checked over SSH | vagrant, proxmox, esxi, cloud-vm, external |
-| `cloud-bucket` | Cloud services instead of machines: your Terraform module, applied into your AWS account | cloud-services |

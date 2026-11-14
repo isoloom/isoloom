@@ -63,8 +63,7 @@ pub(crate) enum Cell {
     Supported,
     /// It refuses it: the step, and why.
     Refused(Refused),
-    /// The field means nothing on that target (another target's settings, machines on
-    /// `cloud-services`).
+    /// The field means nothing on that target (another target's settings).
     NotApplicable,
 }
 
@@ -126,12 +125,11 @@ pub fn matrix() -> Result<Matrix> {
     })
 }
 
-/// The environments a row's columns decide on: the plain one, `external`'s (each machine an
-/// existing host), and the cloud lab.
+/// The environments a row's columns decide on: the plain one, and `external`'s (each machine an
+/// existing host).
 struct Labs {
     plain: std::result::Result<Lab, String>,
     external: std::result::Result<Lab, String>,
-    cloud: std::result::Result<Lab, String>,
 }
 
 /// The environment of `start`, with `patch` merged in (and each machine an existing host, with
@@ -149,7 +147,7 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
 
 /// The image table every row's environment is read with, as a runner gives one: it supplies the access
 /// machine a spec leaves to the runner (no `os`), in both forms. Without it, every target that
-/// creates the machines (all but `external` and `cloud-services`) refuses that machine.
+/// creates the machines (all but `external`) refuses that machine.
 const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:1, vm: debian@12 }\n";
 
 /// A row: its environments, then each column's decision about the one it reads.
@@ -157,7 +155,6 @@ fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Result<Row> {
     let labs = Labs {
         plain: lab(&probes.base, &p.patch, false),
         external: lab(&probes.base, &p.patch, p.hosts),
-        cloud: lab(&probes.cloud, &p.patch, false),
     };
     Ok(Row {
         field: p.field.clone(),
@@ -170,15 +167,14 @@ fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Result<Row> {
 }
 
 /// What `column` decides about the row's environment, or not applicable when the row is about another
-/// target or another kind of lab.
+/// target.
 fn cell(p: &Probe, labs: &Labs, column: &Column) -> std::result::Result<Cell, crate::GenerateError> {
     let target = column.target;
-    if (!p.only.is_empty() && !p.only.contains(&target)) || p.cloud != (target == Target::CloudServices) {
+    if !p.only.is_empty() && !p.only.contains(&target) {
         return Ok(Cell::NotApplicable);
     }
     let lab = match target {
         Target::External => &labs.external,
-        Target::CloudServices => &labs.cloud,
         _ => &labs.plain,
     };
     Ok(match lab {

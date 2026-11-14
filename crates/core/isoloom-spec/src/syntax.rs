@@ -74,7 +74,7 @@ pub use warning::Warning;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 
-use crate::model::{Check, CloudServices, Constraints, Controller, EnvironmentDns, Network, Provision, Reach, SecretSource, SharedVolume, Target, Tool};
+use crate::model::{Check, Constraints, Controller, EnvironmentDns, Network, Provision, Reach, SecretSource, SharedVolume, Target, Tool};
 
 /// An environment spec, as written. Field order is kept (machines start in the order written).
 #[derive(Debug, Clone, PartialEq, Default, JsonSchema)]
@@ -155,9 +155,6 @@ pub struct Spec {
     /// What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time
     /// servers.
     pub constraints: Option<Constraints>,
-    /// An environment of cloud services rather than machines: a Terraform module applied into
-    /// the user's own cloud account.
-    pub cloud: Option<CloudServices>,
     /// Base machine name → its clones, for machines that had a `count`. Filled when parsing.
     #[schemars(skip)]
     pub clones: IndexMap<String, Vec<String>>,

@@ -4,8 +4,7 @@
 //! - **Server targets**: `proxmox` ([`ProxmoxBackend`]) and a standalone ESXi host
 //!   ([`EsxiBackend`]), each environment behind a router VM of its own.
 //! - **Cloud targets**: `cloud-vm` ([`CloudVmBackend`]), one cloud VM per machine and a module
-//!   per [`Cloud`] ([`CloudVmModule`] renders one); `cloud-services` ([`CloudServicesBackend`]),
-//!   the project's own module applied into the user's account.
+//!   per [`Cloud`] ([`CloudVmModule`] renders one).
 //! - **The Terraform halves of the composite targets** `isoloom-targets` puts together: the
 //!   Docker host on each cloud for `cloud-docker` ([`cloud_docker_modules`]).
 //!
@@ -55,7 +54,6 @@ mod testing;
 
 pub use cloud::Cloud;
 pub use cloud::docker::{Host as CloudDockerHost, modules as cloud_docker_modules, refusal as cloud_docker_refusal, refusals as cloud_docker_refusals};
-pub use cloud::services::CloudServicesBackend;
 pub use cloud::vm::{CloudVmBackend, CloudVmModule};
 pub use error::{Error, Result};
 
