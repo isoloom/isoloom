@@ -1,6 +1,6 @@
 # Examples
 
-Thirty complete projects live under `examples/<name>/` in the repository: each is an
+Thirty-one complete projects live under `examples/<name>/` in the repository: each is an
 `isoloom.yml` with the files it names (build recipes, set-up scripts, checks). CI validates every
 one, generates it twice to prove generation is deterministic, validates its Terraform, and runs a
 selection for real on Compose and Kubernetes. Copy one to start your own:
@@ -21,6 +21,7 @@ may still refuse some clouds).
 | `workbench` | A machine to work from (its OS alone) next to a web server | docker, hosted, cloud-docker, kubernetes |
 | `configured-app` | An app written in the configuration model (steps rendered for VMs and image builds alike) | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `supplier-portal-api` | A recipe per form for each machine; a launch token delivered to the database as a file | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
+| `invoice-portal-api` | A CTF lab's shape: an API on a fixed host port (80 published on 8080) over its database, a launch value as an environment variable and a token as a file, an `http` check and a script | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 
 ## Networks and isolation
 
