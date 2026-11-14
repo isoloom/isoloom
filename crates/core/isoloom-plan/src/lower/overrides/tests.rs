@@ -41,7 +41,7 @@ fn source() -> syntax::Spec {
 fn an_existing_network_is_the_target_being_lowereds_own() {
     let s = source();
     let external = |scope| networks(&s, scope).get("corp").and_then(|n| n.external.clone());
-    for t in [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker] {
+    for t in [Target::Docker, Target::Hosted, Target::CloudDocker] {
         assert_eq!(external(Scope::Target(t)).as_deref(), Some("corp-net"), "{t:?}");
     }
     assert_eq!(external(Scope::Target(Target::Proxmox)).as_deref(), Some("vmbr9"));

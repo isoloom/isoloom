@@ -287,7 +287,7 @@ jobs:
       # The exports as JavaScript calls them (wasm-bindgen-test, on Node).
       - run: wasm-pack test --node crates/frontends/isoloom-wasm
 
-  # The generated Terraform (Proxmox, ESXi, docker-vm on Proxmox, cloud-docker, cloud-vm,
+  # The generated Terraform (Proxmox, ESXi, cloud-docker, cloud-vm,
   # cloud-services) is valid for its providers, with the latest Terraform.
   terraform:
     name: Terraform validate
@@ -317,7 +317,7 @@ jobs:
             terraform -chdir="$1" init -backend=false -input=false >/dev/null
             terraform -chdir="$1" validate
           }
-          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
+          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
             validate "$d"
           done
           # cloud-services runs the lab's own module, which its run manifest copies (`from`).

@@ -125,8 +125,7 @@ pub(crate) enum Decision {
     /// It refuses it.
     Refused(Refused),
     /// The environment isn't one the target takes: cloud services on a machine target, machines on
-    /// `cloud-services`, `hybrid` without both containers and VMs, a target `targets:` leaves
-    /// out.
+    /// `cloud-services`, a target `targets:` leaves out.
     NotApplicable,
 }
 
@@ -142,7 +141,7 @@ fn refused(code: Code, field: Option<String>, reason: impl Into<String>) -> Deci
 /// What `target` decides about `lab`, run with `variant` when it names one: the spec's own
 /// problems, lowering, then the backend's capabilities and its own limits (a cloud's, on
 /// `cloud-vm` with a cloud: `aws`), then a provider's: a Vagrant provider's on `vagrant`
-/// (`libvirt`), on `docker-vm` the Proxmox server's (`proxmox`) or a Vagrant provider's.
+/// (`libvirt`).
 #[must_use]
 pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decision {
     if let Some(p) = lab.problems().into_iter().next() {
@@ -181,8 +180,6 @@ pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decisi
 fn provider_refusal(env: &Environment, target: Target, provider: Option<&str>) -> Option<String> {
     match (target, provider?) {
         (Target::Vagrant, p) => isoloom_vagrant::provider_refusal(env, p),
-        (Target::DockerVm, crate::composite::PROXMOX) => crate::composite::docker_vm_proxmox_refusal(env),
-        (Target::DockerVm, p) => isoloom_vagrant::docker_vm_refusal(env, p),
         _ => None,
     }
 }
@@ -211,7 +208,7 @@ mod tests {
         let ids: Vec<String> = columns().iter().map(Column::id).collect();
         assert_eq!(ids.len(), Target::ALL.len() - 2 + 7 + 6);
         assert!(ids.contains(&"vagrant/libvirt".to_owned()) && ids.contains(&"cloud-vm/oci".to_owned()));
-        assert!(!ids.contains(&"vagrant".to_owned()) && ids.contains(&"docker-vm".to_owned()));
+        assert!(!ids.contains(&"vagrant".to_owned()) && ids.contains(&"cloud-docker".to_owned()));
     }
 
     /// What `column` refuses `lab` for; a test failure when it doesn't.
@@ -263,6 +260,5 @@ mod tests {
     fn a_lab_a_target_doesnt_take_is_not_applicable_there() {
         let two = lab(TWO);
         assert_eq!(decide(&two, Target::CloudServices, None), Decision::NotApplicable);
-        assert_eq!(decide(&two, Target::Hybrid, None), Decision::NotApplicable, "no VM-only machine");
     }
 }

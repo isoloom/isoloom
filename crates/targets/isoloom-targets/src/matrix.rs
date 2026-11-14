@@ -129,11 +129,10 @@ pub fn matrix() -> Result<Matrix> {
     })
 }
 
-/// The environments a row's columns decide on: the plain one, `hybrid`'s (with a container-only and a
-/// VM-only machine beside), `external`'s (each machine an existing host), and the cloud lab.
+/// The environments a row's columns decide on: the plain one, `external`'s (each machine an
+/// existing host), and the cloud lab.
 struct Labs {
     plain: std::result::Result<Lab, String>,
-    hybrid: std::result::Result<Lab, String>,
     external: std::result::Result<Lab, String>,
     cloud: std::result::Result<Lab, String>,
 }
@@ -160,7 +159,6 @@ const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:
 fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Row {
     let labs = Labs {
         plain: lab(&probes.base, &p.patch, false),
-        hybrid: lab(&probes.hybrid, &p.patch, false),
         external: lab(&probes.base, &p.patch, p.hosts),
         cloud: lab(&probes.cloud, &p.patch, false),
     };
@@ -182,7 +180,6 @@ fn cell(p: &Probe, labs: &Labs, column: &Column) -> Cell {
         return Cell::NotApplicable;
     }
     let lab = match target {
-        Target::Hybrid => &labs.hybrid,
         Target::External => &labs.external,
         Target::CloudServices => &labs.cloud,
         _ => &labs.plain,
@@ -209,7 +206,7 @@ impl Matrix {
     }
 
     /// The tiers of `column`: its entry's, or every entry's of its target when it stands for
-    /// them all (`docker-vm`), each tier once, lowest first.
+    /// them all (`cloud-docker`), each tier once, lowest first.
     #[must_use]
     pub(crate) fn column_tiers(&self, column: &Column) -> Vec<crate::tiers::Tier> {
         let mut found: Vec<_> = self

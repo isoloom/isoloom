@@ -50,8 +50,6 @@ pub fn refusal(lab: &Lab, target: Target) -> Option<String> {
 /// `qemu`, ...). `None` is the target whatever the provider, which is [`refusal`].
 ///
 /// On `vagrant`, a provider refuses what [`isoloom_vagrant::provider_refusal`] says; on
-/// `docker-vm`, what [`isoloom_vagrant::docker_vm_refusal`] says of a provider, and the Proxmox
-/// server (`proxmox`) a container's host folders (its Proxmox module isn't written then); on
 /// `cloud-vm`, a cloud (`aws`) what its module refuses.
 #[must_use]
 pub fn refusal_on(lab: &Lab, target: Target, provider: Option<&str>) -> Option<String> {

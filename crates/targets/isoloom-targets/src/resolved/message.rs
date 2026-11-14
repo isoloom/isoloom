@@ -43,7 +43,7 @@ pub fn render_message_on(lab: &Lab, instance: Option<u8>, target: Target) -> Res
 /// instance); elsewhere the snapshot is unchanged.
 #[must_use]
 pub(crate) fn on_target(mut snapshot: Value, target: Target) -> Value {
-    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker | Target::DockerVm) {
+    if !matches!(target, Target::Docker | Target::Hosted | Target::CloudDocker) {
         return snapshot;
     }
     if let Some(machines) = snapshot.get_mut("machines").and_then(Value::as_object_mut) {

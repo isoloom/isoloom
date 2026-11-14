@@ -18,8 +18,6 @@
 //!   file inside it over SSH ([`manifest`], the shared Compose-in-a-VM pieces), reading the
 //!   containers there. Its only user data schedules the run's expiry shutdown.
 //! - Its outputs: the host's address (`ip`) and its SSH user.
-//!
-//! The same Docker host on a Proxmox server is `docker-vm`'s module.
 
 pub(crate) mod manifest;
 

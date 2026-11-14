@@ -91,7 +91,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     .concat()
 }
 
-/// The server's variables, the same in both modules (`proxmox`'s and `docker-vm`'s): the
+/// The server's variables (the `proxmox` module's): the
 /// connection, the node, where the disks, images and snippets go, the uplink bridge (`uplink`
 /// says what it is for), the environment's slot, 1 to [`MAX_SLOT`] (`slot` says how unique) and
 /// the key the `isoloom` user takes.

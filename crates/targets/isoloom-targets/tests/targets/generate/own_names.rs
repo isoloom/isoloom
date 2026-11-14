@@ -33,27 +33,6 @@ checks:
   - { tcp: \"controller:80\" }
 ";
 
-/// The same names on `hybrid`: `controller` a Linux VM (its TPM), `docker` a Windows one,
-/// `containers` a container beside them.
-const HYBRID: &str = "
-version: 1
-name: names
-networks:
-  front: { cidr: 10.61.10.0/24 }
-  back: { cidr: 10.61.20.0/24 }
-reach:
-  - { from: front, to: back }
-machines:
-  controller: { os: debian@12, hardware: { tpm: required }, networks: { front: 10 }, ports: { web: 80 } }
-  docker: { os: windows-server@2022, networks: { front: 11 } }
-  containers: { networks: { back: 11 }, app: { image: \"nginx:1.27\" }, ports: { web: 80 } }
-provision:
-  - ansible: provision/site.yml
-checks:
-  - { from: controller, tcp: \"containers:80\" }
-  - { tcp: \"containers:80\" }
-";
-
 /// The names `target`'s Vagrantfile gives its VMs, by the provider setting that takes each
 /// (`v.name`: VirtualBox and Parallels; `v.vmname`: Hyper-V; `v.guest_name`: ESXi), the copy's key
 /// still to read (`#{ISOLOOM_KEY}`).
@@ -101,34 +80,5 @@ fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_vagrant()
     for runner in ["vagrant/checks/controller.sh", "vagrant/checks/isoloom-controller.sh"] {
         assert!(paths.iter().any(|p| p.ends_with(runner)), "{runner}: {paths:?}");
     }
-    Ok(())
-}
-
-#[test]
-fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_hybrid() -> Outcome {
-    let lab = valid(HYBRID)?;
-    let files = generate(&lab, Target::Hybrid)?;
-    let vagrantfile = file(&files, "hybrid/Vagrantfile")?;
-    assert!(vagrantfile.contains("v.name = \"names-#{ISOLOOM_KEY} - isoloom-docker-host\""), "{vagrantfile}");
-    let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
-    assert!(paths.iter().any(|p| p.ends_with("hybrid/checks/controller.sh")), "{paths:?}");
-    assert!(paths.iter().any(|p| p.ends_with("hybrid/checks/isoloom-controller.sh")), "{paths:?}");
-    Ok(())
-}
-
-#[test]
-fn docker_vms_vm_is_named_after_the_containers_host() -> Outcome {
-    let lab = valid(
-        "version: 1
-name: names
-networks: { lan: { cidr: 10.9.0.0/24 } }
-machines:
-  docker: { networks: { lan: 10 }, app: { image: \"nginx:1.27\" } }
-",
-    )?;
-    let files = generate(&lab, Target::DockerVm)?;
-    let names = vm_names(&files, "docker-vm")?;
-    assert!(named(&names, "names-#{ISOLOOM_KEY} - isoloom-docker-host"), "{names:?}");
-    assert!(named(&names, "names-#{ISOLOOM_KEY}-isoloom-docker-host"), "{names:?}");
     Ok(())
 }

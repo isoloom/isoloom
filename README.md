@@ -144,8 +144,6 @@ real runs: **Tier 1**, a full real run (up, checks, down) from every host OS it 
 | `hosted` | The same Compose file, for a hosting service | 2 | no | [Docker](docs/guide/targets/docker.md) |
 | `kubernetes` | Manifests with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart | 2 | no | [Kubernetes](docs/guide/targets/kubernetes.md) |
 | `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU, remote ESXi | **1** on libvirt (Linux) and Hyper-V (Windows); 2 on the others | yes | [Vagrant](docs/guide/targets/vagrant.md) |
-| `docker-vm` | The containers on one VM (Vagrant, UTM included, or Proxmox) | 2 | yes | [Vagrant](docs/guide/targets/vagrant.md), [Proxmox](docs/guide/targets/proxmox.md) |
-| `hybrid` | Containers and VMs together on the same networks | 2 | no | [Vagrant](docs/guide/targets/vagrant.md) |
 | `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | 2 | yes | [Proxmox](docs/guide/targets/proxmox.md) |
 | `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | yes | [ESXi](docs/guide/targets/esxi.md) |
 | `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | 2 | yes, per cloud | [Clouds](docs/guide/targets/cloud.md) |
@@ -161,8 +159,8 @@ in your defaults.
 `isoloom` needs nothing else to validate and generate, and no network access. Running the files
 needs each target's tools ([tool versions](docs/reference/tool-versions.md)):
 
-- Docker with **Compose 2.17** or later: `docker`, `hosted`, `docker-vm`'s VM;
-- **Vagrant 2.4** or later and a hypervisor (with its Vagrant plugin): `vagrant`, `docker-vm`;
+- Docker with **Compose 2.17** or later: `docker`, `hosted`;
+- **Vagrant 2.4** or later and a hypervisor (with its Vagrant plugin): `vagrant`;
 - **Terraform 1.6** or later for the clouds, Proxmox and ESXi, with the
   providers the modules pin (`hashicorp/aws ~> 6.67.0`, `hashicorp/azurerm ~> 5.8.0`,
   `hashicorp/google ~> 8.5.0`, `digitalocean/digitalocean ~> 2.103.0`, `linode/linode ~> 4.7.0`,
@@ -199,10 +197,10 @@ manifest instead: it checks the tools' versions, brings the environment up, deli
 - **A runner is required** for `cloud-vm` and `cloud-docker` (their machines wait for the project
   and secrets the runner delivers over SSH) and for sealing `internet: false` networks on the
   clouds once the machines are set up. It also enforces cloud expiry and reaps leftovers.
-- **It is optional** for `docker`, `vagrant`, `docker-vm`, `proxmox`, `esxi` and
+- **It is optional** for `docker`, `vagrant`, `proxmox`, `esxi` and
   `cloud-services`; on `proxmox` and `esxi` it also seals `internet: false` networks at the
   router once the machines are set up.
-- `kubernetes`, `hybrid`, `external` and `hosted` have no run manifest: run them by hand.
+- `kubernetes`, `external` and `hosted` have no run manifest: run them by hand.
 
 [Isothrum](https://github.com/Isothrum/isothrum) is the reference runner; any program that follows
 [the run manifest contract](docs/reference/run-manifest.md) can be one.

@@ -87,8 +87,8 @@ fn machine_size(m: &model::Machine, form: Form) -> (u32, u32, u32) {
     (s.cpus, s.memory_mb, s.disk_gb)
 }
 
-/// Whether `target` runs `m` as a container (lighter) rather than a VM. Hybrid and Proxmox
-/// decide machine by machine; the machine targets that aren't about a local footprint (external
+/// Whether `target` runs `m` as a container (lighter) rather than a VM. Proxmox decides machine
+/// by machine; the machine targets that aren't about a local footprint (external
 /// hosts, cloud services) count as VM-sized, the heavier guess.
 fn form_on(target: model::Target, m: &model::Machine) -> Form {
     use model::Shape;
@@ -96,7 +96,6 @@ fn form_on(target: model::Target, m: &model::Machine) -> Form {
         Shape::Docker => true,
         Shape::Vm | Shape::External | Shape::Cloud => false,
         Shape::VmOrLxc => m.docker.as_ref().is_some_and(|d| d.lxc),
-        Shape::Either => m.docker.is_some(),
     };
     if container { Form::Container } else { Form::Vm }
 }
@@ -183,16 +182,6 @@ mod tests {
         let docker = totals_for(&spec, Target::Docker);
         assert_eq!(docker.memory_mb, 2048, "the spec's number wins");
         assert_eq!(docker.disk_gb, CONTAINER_DISK_GB, "the field it left out takes the container default");
-    }
-
-    #[test]
-    fn hybrid_sizes_each_machine_by_its_own_kind() {
-        // A container-capable machine (container on hybrid) beside a VM-only one (a VM on hybrid).
-        let spec =
-            spec("machines:\n  web: { networks: { lan: 10 }, docker: { image: x } }\n  win: { networks: { lan: 11 }, vm: { os: windows-server@2022 } }\n");
-        let hybrid = totals_for(&spec, Target::Hybrid);
-        assert_eq!(hybrid.memory_mb, CONTAINER_MEMORY_MB + DEFAULT_MEMORY_MB);
-        assert_eq!(hybrid.disk_gb, CONTAINER_DISK_GB + DEFAULT_DISK_GB);
     }
 
     #[test]

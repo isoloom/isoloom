@@ -1,6 +1,6 @@
 //! Isoloom's targets: the composition root above the backends. It holds the registry of every
-//! target's backend, puts together the targets made of two backends (`cloud-docker`,
-//! `docker-vm`, `hybrid`), and works out what spans them: an environment's files for a target
+//! target's backend, puts together the target made of two backends (`cloud-docker`), and works
+//! out what spans them: an environment's files for a target
 //! ([`generate`]), why a target refuses it ([`refusal()`], on one Vagrant provider or cloud
 //! [`refusal_on`], every cloud's at once [`cloud_refusals`] as [`CloudRefusal`]s), the resolved
 //! snapshot ([`resolved`]), the tables and diagram drawn from it ([`report`], [`graph`]), the

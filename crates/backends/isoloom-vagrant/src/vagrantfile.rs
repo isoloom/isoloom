@@ -121,8 +121,6 @@ pub(crate) fn forwarded_port(var: &str, guest: u16, host: impl Into<Value>, prot
 
 /// The constraints' provisioner.
 pub(crate) const CONSTRAINTS: &str = "constraints";
-/// The Docker install's provisioner.
-pub(crate) const DOCKER: &str = "docker";
 
 /// The spec's constraints (proxy, mirrors, NTP) as the VM's first provisioner, rendered by the
 /// plan's [`Step::Prelude`]. Nothing when the spec has none.

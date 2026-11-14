@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-vagrant"
-description = "The Vagrant backends of Isoloom (vagrant, docker-vm, hybrid)."
+description = "The Vagrant backend of Isoloom (vagrant)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

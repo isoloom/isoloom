@@ -276,9 +276,9 @@ impl Provider {
                 hosts: &[HostOs::Macos],
                 // `vagrant_utm` (0.1.6) gives a VM no private network, only forwarded ports on its
                 // shared network, and every machine of a spec is on a network (validation asks
-                // it); it runs `docker-vm`'s one VM, which needs no private network.
+                // it), so UTM could run no environment's VMs.
                 no_vms: Some(
-                    "the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network (it only forwards ports), and every machine is on one; UTM runs `docker-vm`",
+                    "the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network (it only forwards ports), and every machine is on one",
                 ),
                 share: Share::Both {
                     kind: "utm",

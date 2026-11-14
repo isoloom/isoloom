@@ -57,13 +57,6 @@ fn targets_say_what_generates_and_why_the_others_dont() -> Outcome {
             .unwrap()
             .contains("no cloud can run it")
     );
-    assert!(
-        lookup(&r, "targets.not_possible.hybrid")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .contains("containers and others are VMs")
-    );
     Ok(())
 }
 

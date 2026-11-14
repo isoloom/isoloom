@@ -11,7 +11,7 @@ use crate::testing::{Outcome, between, example};
 fn every_server_module_checks_its_slot_against_the_range_it_describes() -> Outcome {
     let lab = example("hello-stack")?;
     let mut modules = 0;
-    for target in [Target::Proxmox, Target::Esxi, Target::DockerVm] {
+    for target in [Target::Proxmox, Target::Esxi] {
         for f in generate(&lab, target)?.iter().filter(|f| f.path.ends_with("main.tf")) {
             let Ok(slot) = between(&f.contents, "variable \"slot\" {", "\n}\n") else {
                 continue;
@@ -27,6 +27,6 @@ fn every_server_module_checks_its_slot_against_the_range_it_describes() -> Outco
             modules += 1;
         }
     }
-    assert_eq!(modules, 3, "proxmox, esxi and docker-vm's proxmox module each have a slot");
+    assert_eq!(modules, 2, "proxmox and esxi each have a slot");
     Ok(())
 }

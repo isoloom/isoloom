@@ -144,7 +144,7 @@ fn host_names(lab: &isoloom_targets::Lab, target: Target, n: Option<u8>) -> Outc
                 target.id()
             );
         }
-        for net in list("networks").into_iter().filter(|_| target != Target::DockerVm) {
+        for net in list("networks") {
             assert!(net.get("native").is_none(), "{}: the manifest names a network: {net}", target.id());
         }
     }
@@ -156,7 +156,7 @@ fn two_instances_never_share_a_vm_network_or_prefix_name() -> Outcome {
     let mut compared = 0;
     for name in ["solo-web", "segmented", "corp-ad-basics", "hello-stack", "configured-windows", "mixed-office"] {
         let lab = example(name)?;
-        for target in [Target::Vagrant, Target::DockerVm, Target::Hybrid] {
+        for target in [Target::Vagrant] {
             if !lab.possible().contains(&target) || isoloom_targets::refusal(&lab, target).is_some() {
                 continue;
             }

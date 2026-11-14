@@ -56,7 +56,6 @@ fn a_target_the_image_table_gives_no_form_for_the_access_machine_refuses_it() ->
     let bare = Lab::new(supplied.clone());
     for t in [
         Target::Docker,
-        Target::DockerVm,
         Target::Kubernetes,
         Target::Vagrant,
         Target::Proxmox,

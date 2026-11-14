@@ -40,12 +40,7 @@ fn a_container_gets_the_hosts_gpus_and_devices_on_docker_only() -> Outcome {
         compose.contains("          - capabilities:\n            - gpu\n            - compute\n            driver: nvidia\n            count: 2\n"),
         "{compose}"
     );
-    for target in [Target::DockerVm, Target::CloudDocker] {
-        assert!(
-            refusal(&s, target)?.contains("asks for GPUs (`gpus`): its container runs on a VM Isoloom creates"),
-            "{target:?}"
-        );
-    }
+    assert!(refusal(&s, Target::CloudDocker)?.contains("asks for GPUs (`gpus`): its container runs on a VM Isoloom creates"));
     let devices_only = spec("devices: [/dev/fuse]")?;
     assert!(refusal(&devices_only, Target::Kubernetes)?.contains("is given host devices (`devices`)"));
     Ok(())

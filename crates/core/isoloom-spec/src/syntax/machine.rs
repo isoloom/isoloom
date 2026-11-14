@@ -228,8 +228,8 @@ pub(crate) struct MachineInput {
     /// the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the
     /// targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each
     /// provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,
-    /// libvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;
-    /// UTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.
+    /// libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a
+    /// read-only one.
     /// VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable
     /// whatever its mode on the computer, so another account of the VM writes there once in that
     /// group.

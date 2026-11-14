@@ -72,7 +72,7 @@ networks:
   lab: { cidr: 10.9.0.0/24 }
   back: { cidr: 10.8.0.0/24 }
 groups:
-  servers: { members: [web, dc, box] }
+  servers: { members: [web, dc] }
 machines:
   web:
     networks: { back: 10, lab: 10 }
@@ -80,12 +80,9 @@ machines:
   dc:
     networks: { lab: 20 }
     os: windows-server@2022
-  box:
-    networks: { lab: 30 }
-    app: { image: alpine }
 provision:
   - ansible: site.yml
-    groups: { dcs: [dc], boxes: [box] }
+    groups: { dcs: [dc], boxes: [] }
     host_vars:
       web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
 overrides:

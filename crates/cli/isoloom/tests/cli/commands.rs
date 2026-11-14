@@ -415,18 +415,11 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     let first = isoloom(&home, &[&"generate", &dir])?;
     assert_eq!(first.code, Some(0), "{first:?}");
     let out = dir.join(".isoloom");
-    for written in [
-        "docker/compose.yml",
-        "kubernetes/environment.yaml",
-        "cloud-vm/gcp/main.tf",
-        "docker-vm/Vagrantfile",
-    ] {
+    for written in ["docker/compose.yml", "kubernetes/environment.yaml", "cloud-vm/gcp/main.tf"] {
         assert!(out.join(written).is_file(), "{written}");
     }
     // What a runner and its tools leave beside the generated files is theirs.
     std::fs::write(out.join("cloud-vm/gcp/.terraform.lock.hcl"), "lock\n")?;
-    std::fs::create_dir_all(out.join("docker-vm/.vagrant/machines"))?;
-    std::fs::write(out.join("docker-vm/.vagrant/machines/id"), "x\n")?;
     // The machine becomes Windows: no container form, no Windows on Google Cloud.
     std::fs::write(dir.join("isoloom.yml"), one_vm("windows-server@2022").replace("p.sh", "p.ps1"))?;
     std::fs::write(dir.join("p.ps1"), "$true\n")?;
@@ -456,7 +449,6 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     }
     assert!(!out.join("cloud-vm/gcp/main.tf").exists() && !out.join("cloud-vm/gcp/run.json").exists());
     assert!(out.join("cloud-vm/gcp/.terraform.lock.hcl").is_file(), "a tool's file is kept");
-    assert!(out.join("docker-vm/.vagrant/machines/id").is_file() && !out.join("docker-vm/Vagrantfile").exists());
     assert!(out.join("vagrant/Vagrantfile").is_file() && out.join("cloud-vm/aws/main.tf").is_file());
     let clean = isoloom(&home, &[&"check", &dir])?;
     assert_eq!(clean.code, Some(0), "{clean:?}");

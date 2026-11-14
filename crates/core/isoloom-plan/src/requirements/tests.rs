@@ -218,8 +218,8 @@ fn several_addresses_need_the_feature_of_the_machines_shape() {
 #[test]
 fn mixing_containers_and_vms_asks_for_a_volume_both_mount_and_a_vm_after_a_container() {
     let env = crate::testing::environment(
-        "version: 1\nname: t\nvolumes: { data: { owner: db } }\nmachines:\n  db: { app: { image: postgres }, volumes: { data: /d } }\n  vm: { os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d }, depends_on: [db] }\n  other: { app: { image: nginx }, depends_on: [db] }\n",
-        isoloom_spec::model::Target::Hybrid,
+        "version: 1\nname: t\nvolumes: { data: { owner: db } }\nmachines:\n  db: { app: { image: postgres }, volumes: { data: /d } }\n  vm: { os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d }, depends_on: [db] }\n  other: { app: { image: nginx }, depends_on: [db] }\noverrides: { proxmox: { machines: { db: { lxc: true }, other: { lxc: true } } } }\n",
+        isoloom_spec::model::Target::Proxmox,
     );
     let mixed: Vec<&Requirement> = env
         .requirements
@@ -272,18 +272,7 @@ fn a_refusal_of_a_vm_feature_names_no_target_and_points_at_the_matrix() {
     ] {
         let text = r.to_string();
         assert!(text.contains("`isoloom matrix` lists the targets that do"), "{text}");
-        for target in [
-            "Vagrant",
-            "Proxmox",
-            "ESXi",
-            "AWS",
-            "Google",
-            "Oracle",
-            "cloud",
-            "hybrid",
-            "Kubernetes",
-            "later",
-        ] {
+        for target in ["Vagrant", "Proxmox", "ESXi", "AWS", "Google", "Oracle", "cloud", "Kubernetes", "later"] {
             assert!(!text.contains(target), "{target} in {text}");
         }
     }

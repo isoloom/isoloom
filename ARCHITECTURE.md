@@ -83,7 +83,7 @@ render-twice test.
 The crates sit in groups under `crates/` — `core/`, `backends/`, `tools/`, `targets/`, `cli/`,
 `frontends/` — and depend only downward: spec → plan → render → backends → targets → cli and the
 front-ends. No backend depends on
-another backend; the targets made of two backends (`cloud-docker`, `docker-vm`, `hybrid`) are
+another backend; the target made of two backends (`cloud-docker`) is
 composed in `isoloom-targets`. A test over `cargo metadata` fails on any upward or cross-backend
 edge.
 

@@ -18,8 +18,8 @@ Per target backend (prerequisites, credentials, permissions, cost, teardown):
 
 - [Docker Compose](guide/targets/docker.md): `docker`, `hosted`
 - [Kubernetes](guide/targets/kubernetes.md): manifests, Kustomize, the Helm chart
-- [Vagrant](guide/targets/vagrant.md): `vagrant`, `docker-vm` on local VMs, `hybrid`
-- [Proxmox VE](guide/targets/proxmox.md): `proxmox`, `docker-vm` on Proxmox
+- [Vagrant](guide/targets/vagrant.md): `vagrant`
+- [Proxmox VE](guide/targets/proxmox.md): `proxmox`
 - [ESXi](guide/targets/esxi.md): `esxi`
 - [Clouds](guide/targets/cloud.md): `cloud-vm`, `cloud-docker`, `cloud-services` on AWS, Azure,
   Google Cloud, DigitalOcean, Linode and Oracle Cloud

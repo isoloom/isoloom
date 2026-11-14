@@ -297,8 +297,8 @@ impl Lab {
     /// one rule [`Lab::possible`] and every caller that explains a target left out read. In this
     /// order: cloud services run on `cloud-services` only, which runs nothing else; a spec with no
     /// machines runs nowhere; a machine the target has no form for (the access machine the spec
-    /// leaves to the runner has the forms the image table gives it); `hybrid` takes only an
-    /// environment that mixes containers and VMs; and `targets:` leaves the target out.
+    /// leaves to the runner has the forms the image table gives it); and `targets:` leaves the
+    /// target out.
     #[must_use]
     pub fn not_possible(&self, target: Target) -> Option<NotPossible> {
         let spec = &self.source;
@@ -321,9 +321,6 @@ impl Lab {
         }
         if let Some(missing) = self.unsupplied(target) {
             return Some(NotPossible::Unsupplied(self.place(missing)));
-        }
-        if target == Target::Hybrid && !mixed(&self.spec()) {
-            return Some(NotPossible::NotMixed);
         }
         spec.targets
             .as_ref()
@@ -478,8 +475,6 @@ pub enum NotPossible {
     /// The access machine the spec leaves to the runner, at its `os`: the image table gives it
     /// none of the form the target runs (a fact of this run's table, not of the spec).
     Unsupplied(Problem),
-    /// The target is `hybrid`, and the machines are all containers or all VMs.
-    NotMixed,
     /// The spec's `targets:` leaves the target out.
     LeftOut,
 }
@@ -491,18 +486,9 @@ impl fmt::Display for NotPossible {
             NotPossible::NoCloud => f.write_str("needs `cloud:` (cloud services instead of machines)"),
             NotPossible::NoMachines => f.write_str("the spec has no machines"),
             NotPossible::MissingForm(p) | NotPossible::Unsupplied(p) => f.write_str(&p.line()),
-            NotPossible::NotMixed => f.write_str("only when some machines are containers and others are VMs"),
             NotPossible::LeftOut => f.write_str("left out by `targets:`"),
         }
     }
-}
-
-/// Whether the environment mixes both: a machine that can only be a VM (Windows, say) and one
-/// that can be a container, the access machine aside. Only then is `hybrid` worth it; otherwise
-/// Docker or VMs alone run it.
-fn mixed(spec: &model::Spec) -> bool {
-    let own = || spec.machines.values().filter(|m| !m.access);
-    own().any(|m| m.docker.is_some()) && own().any(|m| m.docker.is_none() && m.vm.is_some())
 }
 
 /// `found` added to `out`, unless a problem at the same field is already there (the authored

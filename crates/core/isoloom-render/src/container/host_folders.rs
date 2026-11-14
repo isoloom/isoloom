@@ -1,5 +1,5 @@
 //! The containers' host folders (`host_folders`): each bound from where Compose finds it. On this
-//! computer's Docker that is the folder itself; Compose in a VM (`docker-vm`) finds it where the
+//! computer's Docker that is the folder itself; Compose in a VM finds it where the
 //! VM's shared folder puts it, which the commands run there say through one variable per folder,
 //! so both run the same Compose file.
 
@@ -46,7 +46,7 @@ pub fn of_containers(env: &Environment) -> Vec<ContainerFolder<'_>> {
 }
 
 /// The first container of `env` that mounts a folder of the computer that runs the environment, if one
-/// does: the VM its Compose runs in (`docker-vm`, `cloud-docker`) must then run on that computer,
+/// does: the VM its Compose runs in (`cloud-docker`) must then run on that computer,
 /// to share the folder into it.
 #[must_use]
 pub fn needing_a_local_vm(env: &Environment) -> Option<&str> {

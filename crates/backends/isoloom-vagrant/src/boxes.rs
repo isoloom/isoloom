@@ -51,10 +51,6 @@ pub(crate) const HYPERV_DEBIAN_12: (&str, &str) = ("generic/debian12", ROBOXES);
 /// containers' host) boot too.
 pub(crate) const DEBIAN_12: &str = "bento/debian-12";
 
-/// Debian 12 for UTM (`vagrant_utm`), which bento's and roboxes' boxes have no build for: an
-/// amd64 and an arm64 one. The containers' host boots it there.
-pub(crate) const UTM_DEBIAN_12: &str = "utm/bookworm";
-
 /// The last version of the roboxes `generic/*` boxes, which have Hyper-V builds.
 const ROBOXES: &str = "4.3.12";
 
@@ -140,25 +136,6 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "kali" => b("kalilinux/rolling", None, None),
         _ => return None,
     })
-}
-
-impl VagrantBox {
-    /// The boxes one of Isoloom's own VMs boots when it boots this one: the computer's build on
-    /// every provider, libvirt's and QEMU's own where it has them, `utm` on UTM; no Hyper-V block.
-    pub(crate) fn own_vm<'a>(&'a self, utm: Option<&'a str>) -> Choice<'a> {
-        Choice {
-            main: MainBox {
-                version: self.version.as_deref(),
-                ..MainBox::plain(&self.name)
-            },
-            libvirt: self.libvirt.as_deref(),
-            qemu: self.qemu.as_deref(),
-            cpu: None,
-            hyperv: None,
-            esxi: None,
-            utm,
-        }
-    }
 }
 
 /// The built-in Windows boxes: each has a Hyper-V build at its pinned version, but

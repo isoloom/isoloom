@@ -1,6 +1,6 @@
 //! Lowering: the spec as an author writes it ([`isoloom_spec::syntax`]) into the form the plan
 //! and the backends read ([`isoloom_spec::model`]), once per target. A machine keeps every form
-//! it has (each target picks the one it runs, both on `hybrid`); the overrides of the target
+//! it has (each target picks the one it runs); the overrides of the target
 //! being lowered fill in its platform facts; and a machine the target can't run is a refusal
 //! naming the field that rules it out (`machines.web.app.build`), never a silent stand-in.
 //!

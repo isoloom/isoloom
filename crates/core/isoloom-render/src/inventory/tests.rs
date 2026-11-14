@@ -16,7 +16,7 @@ fn env(spec: &str, target: Target) -> Environment {
 }
 
 #[test]
-fn vms_are_hosts_at_their_first_address_and_containers_are_not() {
+fn vms_are_hosts_at_their_first_address() {
     let env = env(SPEC, Target::Vagrant);
     let hosts: Vec<(&str, String)> = hosts(&env).into_iter().map(|h| (h.name, h.address)).collect();
     assert_eq!(hosts, [("web", "10.8.0.10".to_owned()), ("dc", "10.9.0.20".to_owned())]);

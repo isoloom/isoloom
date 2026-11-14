@@ -11,12 +11,11 @@ use crate::{Error, Result};
 /// The rows, as written.
 const DATA: &str = include_str!("probes.yml");
 
-/// The file: the environment, `hybrid`'s two more machines, the cloud environment, the rows.
+/// The file: the environment, the cloud environment, the rows.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct File {
     base: Value,
-    hybrid: Value,
     cloud: Value,
     rows: Vec<RowFile>,
 }
@@ -99,8 +98,6 @@ pub(crate) struct Probe {
 pub(crate) struct Probes {
     /// The one-machine environment.
     pub(crate) base: Value,
-    /// The same, with `hybrid`'s container-only and VM-only machines beside.
-    pub(crate) hybrid: Value,
     /// The environment of cloud services.
     pub(crate) cloud: Value,
     pub(crate) rows: Vec<Probe>,
@@ -111,11 +108,8 @@ pub(crate) fn probes() -> Result<Probes> {
     let file: File = serde_yaml_ng::from_str(DATA).map_err(|e| invalid("probes.yml", &e.to_string()))?;
     let mut rows = file.rows.into_iter().map(row).collect::<Result<Vec<_>>>()?;
     rows.extend(os_rows());
-    let mut hybrid = file.base.clone();
-    merge(&mut hybrid, &mapping([("machines", file.hybrid)]));
     Ok(Probes {
         base: file.base,
-        hybrid,
         cloud: file.cloud,
         rows,
     })

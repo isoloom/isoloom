@@ -2,7 +2,7 @@
 # delivered as a file. Made up for the syntax design; the project files it names
 # (build/web, checks/) aren't part of the example.
 #
-# Targets: the container ones (docker, hosted, docker-vm, cloud-docker, kubernetes). `app.build`
+# Targets: the container ones (docker, hosted, cloud-docker, kubernetes). `app.build`
 # is a container recipe, so the VM targets refuse `web` with a reason.
 version: 1
 name: help-desk

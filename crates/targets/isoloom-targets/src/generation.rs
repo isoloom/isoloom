@@ -51,8 +51,8 @@ pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<Generat
         .collect())
 }
 
-/// Every target the environment allows: the files (each once: `docker-vm` runs the `docker` target's
-/// Compose file), and why each target left out wasn't generated. A caller that writes or checks
+/// Every target the environment allows: the files (each once: `cloud-docker` runs the `docker`
+/// target's Compose file), and why each target left out wasn't generated. A caller that writes or checks
 /// the files fails on any that isn't a refusal ([`GenerateError::is_refusal`]): a failed backend
 /// leaves its target's files out, which would otherwise read as a target the environment can't use.
 #[must_use]
@@ -260,19 +260,19 @@ mod tests {
     fn a_path_two_targets_write_is_theirs_once_or_an_error() {
         let mut files = unwritten(&[], Target::Docker, vec![GeneratedFile::new(".isoloom/docker/compose.yml", "a")]).unwrap();
         assert_eq!(files.len(), 1);
-        // The same file again (docker-vm runs the docker target's Compose file): kept once.
+        // The same file again (cloud-docker runs the docker target's Compose file): kept once.
         let same = vec![
             GeneratedFile::new(".isoloom/docker/compose.yml", "a"),
-            GeneratedFile::new(".isoloom/docker-vm/Vagrantfile", "v"),
+            GeneratedFile::new(".isoloom/cloud-docker/aws/main.tf", "v"),
         ];
-        files.extend(unwritten(&files, Target::DockerVm, same).unwrap());
+        files.extend(unwritten(&files, Target::CloudDocker, same).unwrap());
         assert_eq!(files.len(), 2);
         // Other contents at that path would replace it: an error, and nothing of the target added.
         let other = vec![
-            GeneratedFile::new(".isoloom/hybrid/Vagrantfile", "h"),
+            GeneratedFile::new(".isoloom/kubernetes/manifest.yaml", "h"),
             GeneratedFile::new(".isoloom/docker/compose.yml", "b"),
         ];
-        let e = unwritten(&files, Target::Hybrid, other).err().map(|e| e.to_string()).unwrap_or_default();
+        let e = unwritten(&files, Target::Kubernetes, other).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(e.contains("`.isoloom/docker/compose.yml` is an earlier target's file"), "{e}");
     }
 

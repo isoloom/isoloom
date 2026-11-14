@@ -144,9 +144,9 @@ fn image_environment(l: &Lowering<'_>, image: ContainerImage, service: Service<'
 }
 
 /// Whether the target runs a machine with a container form as a container (`docker` and the
-/// container targets; `hybrid` too).
+/// container targets).
 fn runs_containers(l: &Lowering<'_>) -> bool {
-    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker | Shape::Either))
+    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker))
 }
 
 /// The inputs its environment reads.

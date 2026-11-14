@@ -10,9 +10,8 @@ a runner checks them before it creates anything.
 |---|---|---|
 | `docker`, `hosted` | Docker, Docker Compose | Compose 2.17.0 |
 | `kubernetes` | `kubectl` (with Kustomize), or Helm for the chart | none set |
-| `vagrant`, `docker-vm` (local) | Vagrant, and the provider's hypervisor (VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU; UTM for `docker-vm`) | Vagrant 2.4.0 |
-| `hybrid` | Docker Compose and Vagrant | as above |
-| `proxmox`, `docker-vm` on Proxmox | Terraform, an OpenSSH client | Terraform 1.6.0 |
+| `vagrant` | Vagrant, and the provider's hypervisor (VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU) | Vagrant 2.4.0 |
+| `proxmox` | Terraform, an OpenSSH client | Terraform 1.6.0 |
 | `esxi` | Terraform, `ovftool`, an OpenSSH client | Terraform 1.6.0 |
 | `cloud-vm`, `cloud-docker` | Terraform, an OpenSSH client | Terraform 1.6.0 |
 | `cloud-services` | Terraform, and what the spec's `cloud.requires` lists | none set |
@@ -47,7 +46,7 @@ reaches you only through a new Isoloom release, after the modules are validated 
 | DigitalOcean | `digitalocean/digitalocean` | `~> 2.103.0` | on DigitalOcean |
 | Linode | `linode/linode` | `~> 4.7.0` | on Linode |
 | Oracle Cloud | `oracle/oci` | `~> 9.8.0` | on Oracle Cloud |
-| Proxmox VE | `bpg/proxmox` | `~> 0.116.1` | `proxmox`, `docker-vm` on Proxmox |
+| Proxmox VE | `bpg/proxmox` | `~> 0.116.1` | `proxmox` |
 | ESXi | `josenk/esxi` | `~> 1.10.3` | `esxi` |
 | TLS | `hashicorp/tls` | `~> 4.4.1` | the controller's SSH key |
 | Random | `hashicorp/random` | `~> 3.9.1` | Windows machines' and Linode's root passwords |

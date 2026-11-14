@@ -138,10 +138,10 @@ mod tests {
             what: "the run manifest refused a value of this backend".to_owned(),
             source: Arc::new(std::io::Error::other("bad name")),
         };
-        let stopped = refusals(vec![failed(Target::Vagrant), failed(Target::DockerVm)]);
+        let stopped = refusals(vec![failed(Target::Vagrant), failed(Target::CloudDocker)]);
         let Err(e) = &stopped else { panic!("{stopped:?}") };
         let rendered = crate::diagnostic::render(e);
-        for target in ["vagrant", "docker-vm"] {
+        for target in ["vagrant", "cloud-docker"] {
             assert!(
                 rendered.contains(&format!(
                     "error: {target}: the run manifest refused a value of this backend\n  caused by: bad name"

@@ -200,13 +200,3 @@ machines:
     assert!(plain.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{plain}");
     Ok(())
 }
-
-/// The check runners run with --no-deps: `compose run` would run completed init jobs again,
-/// re-seeding the environment on every test (#47).
-#[test]
-fn checks_on_the_docker_vm_never_rerun_init_jobs() -> Outcome {
-    let spec = example("hello-stack")?;
-    let vf = generated(&spec, Target::DockerVm, "Vagrantfile")?;
-    assert!(vf.contains("--profile check run --rm --no-deps"));
-    Ok(())
-}

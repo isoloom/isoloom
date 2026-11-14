@@ -44,11 +44,6 @@ impl Lab {
                 "without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none",
                 "access: { vm: debian@12 }",
             ),
-            Shape::Either => (
-                container || vm,
-                "without `os`, the access machine comes from the image table's `access:`, which gives neither a container nor a VM",
-                "access: { vm: debian@12 }",
-            ),
             Shape::External | Shape::Cloud => return None,
         };
         if has {
@@ -98,7 +93,7 @@ mod tests {
     #[test]
     fn a_target_the_image_table_gives_no_form_for_the_supplied_access_machine_refuses_it() {
         let none = lab("{}");
-        for t in [Target::Docker, Target::Vagrant, Target::Proxmox, Target::Esxi, Target::CloudVm, Target::Hybrid] {
+        for t in [Target::Docker, Target::Vagrant, Target::Proxmox, Target::Esxi, Target::CloudVm] {
             let why = refused(&none, t).unwrap_or_default();
             assert!(why.starts_with("machines.user.os: without `os`, the access machine"), "{t:?}: {why}");
             assert!(!none.possible().contains(&t), "{t:?}");
@@ -112,7 +107,6 @@ mod tests {
 
         let vm = lab("access: { vm: debian@12 }");
         assert_eq!(refused(&vm, Target::Vagrant), None);
-        assert_eq!(refused(&vm, Target::Hybrid), None);
         assert!(refused(&vm, Target::Docker).is_some_and(|w| w.contains("`access.docker`")));
         assert_eq!(vm.warnings().len(), 0, "{:?}", vm.warnings());
 
