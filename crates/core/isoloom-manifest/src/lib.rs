@@ -56,7 +56,6 @@ pub mod contract;
 mod error;
 mod guest;
 mod identity;
-pub mod ignore;
 mod lifecycle;
 mod list;
 mod machine;

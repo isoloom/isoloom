@@ -98,9 +98,9 @@ pub(crate) fn project_rb() -> String {
 }
 
 /// What the project step of a machine reading Isoloom's `outputs` leaves out (its `rules:`), as a
-/// Ruby string: [`isoloom_manifest::ignore::copy_rules`].
+/// Ruby string: [`isoloom_spec::ignore::copy_rules`].
 pub(crate) fn copy_rules(outputs: &[&str]) -> Value {
-    Value::str(&isoloom_manifest::ignore::copy_rules(outputs))
+    Value::str(&isoloom_spec::ignore::copy_rules(outputs))
 }
 
 /// Where a Vagrantfile goes and what it carries besides the environment's VMs.
