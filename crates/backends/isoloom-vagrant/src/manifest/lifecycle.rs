@@ -31,7 +31,7 @@ const PARK_TIMEOUT_S: u32 = 1800;
 const CONTROLLER_HALT_S: u32 = 300;
 /// Reading every VM's state: Vagrant answers from its own records on the local providers.
 const STATUS_TIMEOUT_S: u32 = 25;
-/// On ESXi, `vagrant status` asks the host once per VM (41 s for two, measured on `esxi-lab`
+/// On ESXi, `vagrant status` asks the host once per VM (41 s for two, measured on a test ESXi host
 /// from macOS through the runner's relay): this much for the read, plus [`ESXI_STATUS_PER_VM_S`]
 /// a VM.
 const ESXI_STATUS_BASE_S: u32 = 60;

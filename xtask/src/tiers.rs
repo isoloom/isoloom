@@ -2,7 +2,7 @@
 //! (`crates/targets/isoloom-targets/tiers.json`), the evidence a target's tier is worked out from.
 //!
 //! The entry is a target, or a target and its provider or cloud (`docker`, `vagrant/libvirt`,
-//! `cloud-vm/aws`); the host is one of the list's `hosts` (`macos-arm64`, `linux-1`, `linux-2`, `windows-11`), or
+//! `cloud-vm/aws`); the host is one of the list's `hosts` (`macos`, `linux`, `windows`), or
 //! a new one with `--os`; the result is `pass` (the whole cycle passed: it proves the host's OS),
 //! `partial` (part of it passed; `--note` says which) or `fail`. The run is dated today (UTC) unless
 //! `--date` says otherwise. The list is written back in the form it is kept in, and
@@ -32,7 +32,7 @@ pub(crate) struct Args {
 #[derive(clap::Subcommand)]
 enum Action {
     /// Add a real run of an entry's generated files: `cargo xtask tiers record vagrant/hyperv
-    /// windows-11 pass`.
+    /// windows pass`.
     Record(Record),
 }
 
@@ -41,14 +41,14 @@ enum Action {
 struct Record {
     /// The entry: a target, or a target and its provider or cloud (`vagrant/libvirt`).
     entry: String,
-    /// The host that ran the tools, as the list's `hosts` names it (`macos-arm64`, `linux-1`, `windows-11`).
+    /// The host that ran the tools, as the list's `hosts` names it (`macos`, `linux`, `windows`).
     host: String,
     /// `pass` (the whole cycle passed), `partial` (part of it, said in `--note`) or `fail`.
     result: RunResult,
     /// The day it ran, `YYYY-MM-DD` (default: today, UTC).
     #[arg(long)]
     date: Option<String>,
-    /// The server it ran on, for a server target (`pve-lab`).
+    /// The server it ran on, for a server target (`pve-1`), when the run names it.
     #[arg(long)]
     server: Option<String>,
     /// What ran, in a few words.
@@ -231,7 +231,7 @@ mod tests {
             host: host.to_owned(),
             result: RunResult::Pass,
             date: None,
-            server: Some("pve-lab".to_owned()),
+            server: Some("pve-1".to_owned()),
             note: None,
             os: os.map(str::to_owned),
             isoloom: "2.0.0".to_owned(),
@@ -240,7 +240,7 @@ mod tests {
 
     fn list() -> Value {
         json!({
-            "hosts": { "macos-arm64": "macos", "windows-11": "windows" },
+            "hosts": { "macos": "macos", "windows": "windows" },
             "entries": [
                 { "entry": "vagrant/hyperv", "goal": 1, "exists_on": ["windows"], "runs": [] },
                 { "entry": "proxmox", "goal": 1, "exists_on": ["linux", "macos", "windows"], "runs": [] }
@@ -251,10 +251,10 @@ mod tests {
     #[test]
     fn a_run_is_added_to_its_entry_with_its_date_and_server() {
         let mut doc = list();
-        assert!(record(&mut doc, &asked("proxmox", "macos-arm64", None), "2026-10-15").unwrap(), "added");
+        assert!(record(&mut doc, &asked("proxmox", "macos", None), "2026-10-15").unwrap(), "added");
         assert_eq!(
             doc["entries"][1]["runs"],
-            json!([{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass", "isoloom": "2.0.0", "server": "pve-lab" }])
+            json!([{ "host": "macos", "date": "2026-10-15", "result": "pass", "isoloom": "2.0.0", "server": "pve-1" }])
         );
         assert_eq!(doc["entries"][0]["runs"], json!([]));
     }
@@ -262,20 +262,17 @@ mod tests {
     #[test]
     fn recording_the_same_run_twice_is_a_no_op() {
         let mut doc = list();
-        assert!(
-            record(&mut doc, &asked("proxmox", "macos-arm64", None), "2026-10-15").unwrap(),
-            "the first is added"
-        );
+        assert!(record(&mut doc, &asked("proxmox", "macos", None), "2026-10-15").unwrap(), "the first is added");
         let after_first = doc.clone();
         assert!(
-            !record(&mut doc, &asked("proxmox", "macos-arm64", None), "2026-10-15").unwrap(),
+            !record(&mut doc, &asked("proxmox", "macos", None), "2026-10-15").unwrap(),
             "the second is a no-op"
         );
         assert_eq!(doc, after_first, "the list is unchanged by the duplicate");
         assert_eq!(doc["entries"][1]["runs"].as_array().map(Vec::len), Some(1), "one run, not two");
         // A run that differs (a different day) is a new run, not a duplicate.
         assert!(
-            record(&mut doc, &asked("proxmox", "macos-arm64", None), "2026-10-16").unwrap(),
+            record(&mut doc, &asked("proxmox", "macos", None), "2026-10-16").unwrap(),
             "a different date is added"
         );
         assert_eq!(doc["entries"][1]["runs"].as_array().map(Vec::len), Some(2));
@@ -285,7 +282,7 @@ mod tests {
     fn an_unknown_entry_or_host_is_rejected_and_the_matrix_regenerates_deterministically() {
         let mut doc = list();
         assert!(
-            record(&mut doc, &asked("no-such-target", "macos-arm64", None), "2026-10-15").is_err(),
+            record(&mut doc, &asked("no-such-target", "macos", None), "2026-10-15").is_err(),
             "unknown entry"
         );
         assert!(
@@ -302,22 +299,22 @@ mod tests {
     #[test]
     fn a_new_host_needs_its_os_and_is_added() {
         let mut doc = list();
-        let unknown = record(&mut doc, &asked("proxmox", "linux-1", None), "2026-10-16").unwrap_err();
+        let unknown = record(&mut doc, &asked("proxmox", "linux", None), "2026-10-16").unwrap_err();
         assert!(unknown.to_string().contains("--os"), "{unknown}");
-        record(&mut doc, &asked("proxmox", "linux-1", Some("linux")), "2026-10-16").unwrap();
-        assert_eq!(doc["hosts"]["linux-1"], "linux");
-        assert!(record(&mut doc, &asked("proxmox", "linux-1", Some("windows")), "2026-10-16").is_err());
+        record(&mut doc, &asked("proxmox", "linux", Some("linux")), "2026-10-16").unwrap();
+        assert_eq!(doc["hosts"]["linux"], "linux");
+        assert!(record(&mut doc, &asked("proxmox", "linux", Some("windows")), "2026-10-16").is_err());
         assert!(record(&mut doc, &asked("proxmox", "ultron", Some("beos")), "2026-10-16").is_err());
     }
 
     #[test]
     fn a_run_on_a_host_os_the_entry_doesnt_exist_on_or_an_unknown_entry_is_refused() {
         let mut doc = list();
-        let mac = record(&mut doc, &asked("vagrant/hyperv", "macos-arm64", None), "2026-10-15").unwrap_err();
+        let mac = record(&mut doc, &asked("vagrant/hyperv", "macos", None), "2026-10-15").unwrap_err();
         assert!(mac.to_string().contains("doesn't exist on macos"), "{mac}");
-        let unknown = record(&mut doc, &asked("vagrant/proxmox", "macos-arm64", None), "2026-10-15").unwrap_err();
+        let unknown = record(&mut doc, &asked("vagrant/proxmox", "macos", None), "2026-10-15").unwrap_err();
         assert!(unknown.to_string().contains("no entry `vagrant/proxmox`"), "{unknown}");
-        assert!(record(&mut doc, &asked("proxmox", "macos-arm64", None), "15/10/2026").is_err());
+        assert!(record(&mut doc, &asked("proxmox", "macos", None), "15/10/2026").is_err());
         assert_eq!(doc, list());
     }
 

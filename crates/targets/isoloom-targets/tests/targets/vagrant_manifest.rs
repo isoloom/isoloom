@@ -210,7 +210,7 @@ fn on_esxi_vagrant_picks_the_boxes_builds_for_the_esxi_hosts_amd64() -> Outcome 
 }
 
 /// `vagrant status` on ESXi asks the host once per VM (41 s for two VMs, measured on
-/// `esxi-lab`): there the read gets 60 s and 30 s a VM, as on Hyper-V (its PowerShell a VM), and
+/// a test ESXi host): there the read gets 60 s and 30 s a VM, as on Hyper-V (its PowerShell a VM), and
 /// 40 s and 20 s a VM on VirtualBox (2.1.9); the other local providers keep 25 s.
 #[test]
 fn on_esxi_hyper_v_and_virtualbox_the_status_read_gets_time_for_each_vm() -> Outcome {
