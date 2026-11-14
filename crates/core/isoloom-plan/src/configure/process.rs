@@ -105,14 +105,14 @@ impl ContainerProcess {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{DaemonTable, recipe};
+    use super::super::recipe;
     use super::*;
 
     /// What machine `m` (YAML) of an environment of its own runs in a container.
     fn process(yaml: &str) -> Result<ContainerProcess, NoProcess> {
         let m: syntax::Machine = serde_yaml_ng::from_str(yaml).unwrap_or_else(|e| panic!("{yaml}: {e}"));
         let os = m.os.expect("the test's machine has an os");
-        let r = recipe(os, &m, &DaemonTable::common()).expect("a portable recipe");
+        let r = recipe(os, &m, &crate::testing::daemons()).expect("a portable recipe");
         ContainerProcess::of(&r, &m)
     }
 

@@ -14,7 +14,7 @@ fn vagrant_orders_machines_and_names_them() -> Outcome {
     let web = vf.find("config.vm.define \"web\"").unwrap();
     assert!(cache < web, "cache starts before web, which depends on it");
     assert!(vf.contains("'10.60.0.10 web'"));
-    assert!(vf.contains("virtualbox__intnet: \"isoloom-hello-stack-app\""));
+    assert!(vf.contains("virtualbox__intnet: \"isoloom-hello-stack-#{ISOLOOM_KEY}-app\""));
     Ok(())
 }
 
@@ -23,11 +23,9 @@ fn libvirt_domains_are_named_after_the_environment() -> Outcome {
     // Unset, vagrant-libvirt prefixes the folder's name ("vagrant_web"), the same for every lab.
     let spec = example("hello-stack")?;
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
-    assert!(vf.contains("v.default_prefix = \"hello-stack_\""), "{vf}");
+    assert!(vf.contains("v.default_prefix = \"hello-stack-#{ISOLOOM_KEY}_\""), "{vf}");
     let second = file(&generate_instance(&spec, Target::Vagrant, 2)?, ".isoloom-2/vagrant/Vagrantfile")?.to_owned();
-    assert!(second.contains("v.default_prefix = \"hello-stack-2_\""));
-    let dvm = generated(&spec, Target::DockerVm, ".isoloom/docker-vm/Vagrantfile")?;
-    assert!(dvm.contains("v.default_prefix = \"hello-stack_\""));
+    assert!(second.contains("v.default_prefix = \"hello-stack-2-#{ISOLOOM_KEY}_\""));
     Ok(())
 }
 
@@ -90,7 +88,7 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     let spec = lab(
         "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app: { steps: [{ run: p.ps1 }] }\nprovision:\n  - ansible: ansible/main.yml\n",
     )?;
-    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
+    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap(), None);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]"));
     // QEMU boots machines in parallel unless told not to: the controller would run its play
@@ -153,7 +151,7 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
     // bento has no Hyper-V build: the roboxes box, pinned; the VM named after the environment.
     assert!(
         web.contains(
-            "m.vm.provider \"hyperv\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      o.vm.box_version = \"4.3.12\"\n      v.vmname = \"segmented-web\""
+            "m.vm.provider \"hyperv\" do |v, o|\n      o.vm.box = \"generic/debian12\"\n      o.vm.box_version = \"4.3.12\"\n      v.vmname = \"segmented-#{ISOLOOM_KEY}-web\""
         ),
         "{web}"
     );
@@ -161,9 +159,12 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
     assert!(!web.contains("enable_virtualization_extensions"), "{web}");
     // Its network is a private switch, its adapter attached before every start (by a fixed MAC),
     // its address set in the guest once it answers, the switch gone with the last VM.
-    assert!(web.contains("IsoloomHyperV.switches([\"isoloom-segmented-front\"])"), "{web}");
+    assert!(web.contains("IsoloomHyperV.switches([\"isoloom-segmented-#{ISOLOOM_KEY}-front\"])"), "{web}");
     assert!(web.contains("before :\"VagrantPlugins::HyperV::Action::StartInstance\""), "{web}");
-    assert!(web.contains("IsoloomHyperV.attach(machine, [[\"isoloom-segmented-front\", \"0215"), "{web}");
+    assert!(
+        web.contains("IsoloomHyperV.attach(machine, [[\"isoloom-segmented-#{ISOLOOM_KEY}-front\", \"0215"),
+        "{web}"
+    );
     // The address step hangs on a Hyper-V action: other providers run (and print) no trigger.
     assert!(web.contains("m.trigger.after :\"VagrantPlugins::HyperV::Action::WaitForIPAddress\""), "{web}");
     assert!(!v.contains("Vagrant::Action::Builtin"), "a trigger fires on every provider");
@@ -176,7 +177,7 @@ fn vagrant_runs_on_hyperv_with_a_switch_per_network_and_addresses_set_in_the_gue
         web.contains("systemctl enable -q isoloom-env-net.service") && web.contains("rc-update add local default"),
         "{web}"
     );
-    assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-front\"])"), "{web}");
+    assert!(web.contains("IsoloomHyperV.prune([\"isoloom-segmented-#{ISOLOOM_KEY}-front\"])"), "{web}");
     hyperv_router_and_macs(&v, spec.source().networks.len())?;
     Ok(())
 }
@@ -201,7 +202,9 @@ fn vagrant_on_hyperv_takes_windows_and_privileged_machines() -> Outcome {
     let win = example("windows-hello")?;
     let v = generated(&win, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(
-        v.contains("      o.vm.box = \"StefanScherer/windows_2019\"\n      o.vm.box_version = \">= 0\"\n      v.vmname = \"windows-hello-web01\""),
+        v.contains(
+            "      o.vm.box = \"StefanScherer/windows_2019\"\n      o.vm.box_version = \">= 0\"\n      v.vmname = \"windows-hello-#{ISOLOOM_KEY}-web01\""
+        ),
         "{v}"
     );
     assert!(
@@ -236,14 +239,16 @@ fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() ->
         v.contains("# No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`."),
         "{v}"
     );
-    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
-    let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv")).expect("refused on Hyper-V");
+    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
+    let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv"))
+        .unwrap()
+        .expect("refused on Hyper-V");
     assert!(why.contains("machine `box`") && why.contains("boxes.hyperv"), "{why}");
     // The spec's own box: its latest version with a Hyper-V build.
     let own = lab(&format!(
         "{yaml}overrides: {{ vagrant: {{ machines: {{ box: {{ boxes: {{ hyperv: my/debian13 }} }} }} }} }}\n"
     ))?;
-    assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")), None);
+    assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")).unwrap(), None);
     let given = generated(&own, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(given.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{given}");
     Ok(())

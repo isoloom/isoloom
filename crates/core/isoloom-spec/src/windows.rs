@@ -56,19 +56,13 @@ pub enum Tpm {
     Required,
 }
 
-/// Whether an OS expects a TPM 2.0: Windows 11 refuses to install or upgrade without one.
-#[must_use]
-fn expects_tpm(os: &str) -> bool {
-    os == "windows-11"
-}
-
 /// The TPM a VM gets: what `vm.tpm` says, else what its OS expects.
 #[must_use]
 pub fn tpm(vm: &VmImpl) -> Option<Tpm> {
     match vm.tpm {
         Some(true) => Some(Tpm::Required),
         Some(false) => None,
-        None => expects_tpm(&vm.os).then_some(Tpm::Wanted),
+        None => crate::os::by_name(&vm.os).is_some_and(|os| os.expects_tpm()).then_some(Tpm::Wanted),
     }
 }
 

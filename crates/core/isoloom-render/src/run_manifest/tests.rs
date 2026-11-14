@@ -52,8 +52,8 @@ fn the_environment_is_named_after_the_spec_and_its_instance() {
     const LAB: &str = "version: 1\nname: demo\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n";
     let one = environment(&testing::env(LAB, Target::Docker)).unwrap();
     assert_eq!((one.name.to_string(), one.instance, one.message), ("demo".to_owned(), None, None));
-    let spec = testing::lab(LAB).for_target(Target::Docker);
-    let third = environment(&isoloom_plan::Environment::build(&spec, Target::Docker, Some(3)).expect("the spec plans")).unwrap();
+    let lab = testing::lab(LAB);
+    let third = environment(&lab.plan(&lab.for_target(Target::Docker), Target::Docker, Some(3)).expect("the spec plans")).unwrap();
     assert_eq!(third.instance, isoloom_manifest::Instance::new(3).ok());
 }
 
@@ -145,6 +145,7 @@ fn model_port(port: u16, protocol: model::Protocol, http: bool) -> model::Port {
         fixed: false,
         dormant: false,
         protocol,
+        login: None,
     }
 }
 
@@ -314,8 +315,8 @@ fn a_check_reports_its_kind_its_wait_and_whether_isoloom_derived_it() {
 #[test]
 fn a_secret_slot_names_the_machines_of_its_shape_that_get_it_and_no_input_s_file() {
     let env = testing::env(
-        "version: 1\nname: s\ninputs: [TOKEN]\nsecrets:\n  db: { env: DB }\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    files: [{ path: /run/db, secret: db }, { path: /run/token, input: TOKEN }]\n  vm:\n    networks: { lan: 11 }\n    os: windows-server@2022\n    files: [{ path: 'C:\\db', secret: db }]\n",
-        Target::Hybrid,
+        "version: 1\nname: s\ninputs: [TOKEN]\nsecrets:\n  db: { env: DB }\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    app: { image: nginx }\n    files: [{ path: /run/db, secret: db }, { path: /run/token, input: TOKEN }]\n  vm:\n    networks: { lan: 11 }\n    os: windows-server@2022\n    files: [{ path: 'C:\\db', secret: db }]\noverrides: { proxmox: { machines: { web: { lxc: true } } } }\n",
+        Target::Proxmox,
     );
     let held = super::held_secrets(&env, isoloom_plan::MachineShape::Container);
     let found: Vec<(&str, Vec<&str>)> = held.iter().map(|h| (h.name, h.holders.clone())).collect();

@@ -11,7 +11,7 @@ use crate::syntax::Mode;
 /// Where a runner reads a secret's value: one store, written as a map with
 /// one key (`{ env: DB_PASSWORD }`). Another store is a new variant here and a reader of its
 /// own in the runtime.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum SecretSource {
     /// An environment variable of the runner (or the profile's `inputs`).
@@ -44,6 +44,49 @@ pub enum SecretSource {
         /// The input's name (`APP_TOKEN`): the runner's variable holding the value.
         input: String,
     },
+}
+
+/// A secret's source as written: one of its stores' keys.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceInput {
+    env: Option<String>,
+    file: Option<String>,
+    vault: Option<String>,
+    sops: Option<String>,
+}
+
+/// What a secret's source is, for a value of the wrong kind or a map naming no store, or several.
+const ONE_STORE: &str = "one store: `{ env: NAME }`, `{ file: <path> }`, `{ vault: <path>#<field> }` or `{ sops: <file>#<key> }`";
+
+// One map, one store. Written by hand (not `untagged`) so a value of the wrong kind, a typo in the
+// store's name and a map naming none or several each say what a source is, instead of "no variant
+// matched".
+impl<'de> Deserialize<'de> for SecretSource {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<SecretSource, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = SecretSource;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str(ONE_STORE)
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<SecretSource, A::Error> {
+                let SourceInput { env, file, vault, sops } = SourceInput::deserialize(serde::de::value::MapAccessDeserializer::new(map))?;
+                let stores = [
+                    env.map(|env| SecretSource::Env { env }),
+                    file.map(|file| SecretSource::File { file }),
+                    vault.map(|vault| SecretSource::Vault { vault }),
+                    sops.map(|sops| SecretSource::Sops { sops }),
+                ];
+                let mut given = stores.into_iter().flatten();
+                match (given.next(), given.next()) {
+                    (Some(source), None) => Ok(source),
+                    _ => Err(serde::de::Error::custom(format!("a secret's source is {ONE_STORE}"))),
+                }
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 impl SecretSource {

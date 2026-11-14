@@ -415,18 +415,11 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     let first = isoloom(&home, &[&"generate", &dir])?;
     assert_eq!(first.code, Some(0), "{first:?}");
     let out = dir.join(".isoloom");
-    for written in [
-        "docker/compose.yml",
-        "kubernetes/environment.yaml",
-        "cloud-vm/gcp/main.tf",
-        "docker-vm/Vagrantfile",
-    ] {
+    for written in ["docker/compose.yml", "kubernetes/environment.yaml", "cloud-vm/gcp/main.tf"] {
         assert!(out.join(written).is_file(), "{written}");
     }
     // What a runner and its tools leave beside the generated files is theirs.
     std::fs::write(out.join("cloud-vm/gcp/.terraform.lock.hcl"), "lock\n")?;
-    std::fs::create_dir_all(out.join("docker-vm/.vagrant/machines"))?;
-    std::fs::write(out.join("docker-vm/.vagrant/machines/id"), "x\n")?;
     // The machine becomes Windows: no container form, no Windows on Google Cloud.
     std::fs::write(dir.join("isoloom.yml"), one_vm("windows-server@2022").replace("p.sh", "p.ps1"))?;
     std::fs::write(dir.join("p.ps1"), "$true\n")?;
@@ -456,7 +449,6 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     }
     assert!(!out.join("cloud-vm/gcp/main.tf").exists() && !out.join("cloud-vm/gcp/run.json").exists());
     assert!(out.join("cloud-vm/gcp/.terraform.lock.hcl").is_file(), "a tool's file is kept");
-    assert!(out.join("docker-vm/.vagrant/machines/id").is_file() && !out.join("docker-vm/Vagrantfile").exists());
     assert!(out.join("vagrant/Vagrantfile").is_file() && out.join("cloud-vm/aws/main.tf").is_file());
     let clean = isoloom(&home, &[&"check", &dir])?;
     assert_eq!(clean.code, Some(0), "{clean:?}");
@@ -664,13 +656,13 @@ fn generate_replaces_each_file_rather_than_writing_into_it() -> Outcome {
     let compose = dir.join(".isoloom/docker/compose.yml");
     let written = std::fs::read_to_string(&compose)?;
     std::fs::write(&compose, "stale\n")?;
-    std::fs::write(dir.join(".isoloom/docker/compose.yml.isoloom-new"), "a half-written file left over\n")?;
     assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
     assert_eq!(std::fs::read_to_string(&compose)?, written);
-    assert!(
-        !dir.join(".isoloom/docker/compose.yml.isoloom-new").exists(),
-        "the fresh file is renamed into place"
-    );
+    let fresh: Vec<_> = std::fs::read_dir(dir.join(".isoloom/docker"))?
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .filter(|name| name.starts_with("compose.yml.isoloom-new"))
+        .collect();
+    assert_eq!(fresh, Vec::<String>::new(), "the fresh file is renamed into place");
     Ok(())
 }
 
@@ -840,5 +832,46 @@ fn profiles_checks_the_lab_generate_writes_its_defaults_tags_included() -> Outco
     let o = isoloom(&home, &[&"profiles", &dir])?;
     assert_eq!(o.code, Some(1), "{o:?}");
     assert!(o.stdout.contains("✗ p") && o.stdout.contains("`Team` and `team`"), "{}", o.stdout);
+    Ok(())
+}
+
+#[test]
+fn an_environment_value_reaches_every_format_as_written() -> Outcome {
+    let dir = project(
+        "env-as-written",
+        "version: 1\nname: written\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    environment: { APP_VERSION: 1.10, MASK: 0x10, BIG: 1e3 }\n",
+    )?;
+    let generated = isoloom(&dir, &[&"generate", &"-s", &"machines.web.environment.EXTRA=2.50", &dir])?;
+    assert_eq!(generated.code, Some(0), "{}", generated.stderr);
+    let read = |file: &str| std::fs::read_to_string(dir.join(".isoloom").join(file));
+    let written = [("APP_VERSION", "1.10"), ("MASK", "0x10"), ("BIG", "1e3"), ("EXTRA", "2.50")];
+    // Compose and Kubernetes read YAML: each value must be a string there, the text as written.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
+    for (k, v) in written {
+        assert_eq!(compose["services"]["web"]["environment"][k].as_str(), Some(v), "compose: {k}");
+    }
+    let manifests = read("kubernetes/environment.yaml")?;
+    let mut env = Vec::new();
+    for doc in manifests.split("---\n") {
+        let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(doc)?;
+        let containers = doc["spec"]["template"]["spec"]["containers"].as_sequence().cloned().unwrap_or_default();
+        for var in containers
+            .iter()
+            .filter(|c| c["name"].as_str() == Some("web"))
+            .flat_map(|c| c["env"].as_sequence().cloned().unwrap_or_default())
+        {
+            env.push((var["name"].as_str().map(str::to_owned), var["value"].as_str().map(str::to_owned)));
+        }
+    }
+    for (k, v) in written {
+        assert!(env.contains(&(Some(k.to_owned()), Some(v.to_owned()))), "kubernetes: {k} in {env:?}");
+    }
+    // The VM forms write each variable as `NAME=value` into the machine's settings script.
+    for file in ["vagrant/Vagrantfile", "proxmox/main.tf"] {
+        let text = read(file)?;
+        for (k, v) in written {
+            assert!(text.contains(&format!("{k}={v}")), "{file} has no `{k}={v}`");
+        }
+    }
     Ok(())
 }

@@ -1,8 +1,7 @@
-//! The Docker host: one VM running the environment's containers with the `docker` target's
-//! Compose file, on a cloud (`cloud-docker`) or a Proxmox server (`docker-vm`). Every module of
-//! it shares its size (`isoloom_render::container::HostSize`) and the ports it opens; a cloud's
-//! host sets itself up from its user data (`crate::cloud::docker::setup`), and the Proxmox one
-//! through the docker-vm run manifest. Either is readied the same way over SSH ([`into_vm`]): the
+//! The Docker host: one cloud VM running the environment's containers with the `docker`
+//! target's Compose file (`cloud-docker`). Every cloud's module of it shares its size
+//! (`isoloom_render::container::HostSize`) and the ports it opens; it sets itself up from its
+//! user data (`crate::cloud::docker::setup`), and is readied over SSH ([`into_vm`]): the
 //! project's archive piped in, then [`setup_script`] (Docker); then the Compose backend's
 //! commands run through the same way in ([`Login`]).
 
@@ -46,8 +45,7 @@ pub(crate) fn port_strings(ports: &[u16]) -> Expression {
 /// The command that makes a VM readied over SSH accept the [`GuestCompose::forwarded`]
 /// variables (`AcceptEnv`) and reloads sshd, run before the start steps so the sessions that
 /// create the containers carry the launch's values. `None` when nothing is forwarded. A VM
-/// whose image sets `AcceptEnv` from cloud-init (docker-vm on Proxmox) does not need it; a VM
-/// Terraform makes bare (cloud-docker) does, since nothing else tells its sshd. Run as root as
+/// Terraform makes bare (cloud-docker) needs it, since nothing else tells its sshd. Run as root as
 /// `as_root` says.
 ///
 /// # Errors
@@ -119,7 +117,10 @@ pub(crate) fn into_vm(login: &Login, setup: &RelPath, root: &str) -> Result<Vec<
     let copy = GuestCommand {
         id: StepId::parse("project")?,
         note: Some("Copying the project into the VM…".into()),
-        command: Template::text(&format!("{sudo}sh -c '{}'", steps::project_unpack(steps::Archive::Stdin, false))),
+        command: Template::text(&format!(
+            "{sudo}sh -c '{}'",
+            steps::project_unpack(steps::Archive::Stdin, steps::TopFolder::Kept)
+        )),
         timeout_s: 600,
         failure: Failure::Fail,
         download: false,

@@ -28,7 +28,7 @@ const DEEP: u64 = 10_000;
 #[cfg(test)]
 const FAST: u64 = 150;
 
-/// Seeds found to fail once, replayed by the fast test forever after. Empty while none has.
+/// Seeds found to fail once, replayed first by the fast test forever after.
 #[cfg(test)]
 const REGRESSION_SEEDS: &[u64] = &[];
 
@@ -141,24 +141,15 @@ fn report(a: &Args, totals: &Totals, failures: &[(u64, String)]) -> Res<ExitCode
 mod tests {
     use super::*;
 
-    /// The fast run: a few hundred random specs through the whole pipeline in the normal gate. A
-    /// panic here fails the test (so "no panic, no unwrap/expect fires" is a gate), and an invar-
-    /// iant that breaks names the seed, which reproduces the spec.
+    /// The fast run: every seed once found to fail, then a few hundred random specs, through the
+    /// whole pipeline in the normal gate. A panic here fails the test (so "no panic, no
+    /// unwrap/expect fires" is a gate), and an invariant that breaks names the seed, which
+    /// reproduces the spec.
     #[test]
     fn many_random_specs_generate_cleanly_and_deterministically() {
-        for seed in 0..FAST {
+        for seed in REGRESSION_SEEDS.iter().copied().chain(0..FAST) {
             if let Err(reason) = run_seed(seed) {
                 panic!("seed {seed} broke an invariant: {reason}\n\nspec:\n{}", generator::spec(seed).yaml);
-            }
-        }
-    }
-
-    /// Every seed once found to fail is checked again, forever.
-    #[test]
-    fn the_regression_seeds_pass() {
-        for &seed in REGRESSION_SEEDS {
-            if let Err(reason) = run_seed(seed) {
-                panic!("regression seed {seed} failed again: {reason}");
             }
         }
     }

@@ -78,7 +78,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
 /// instance profile not usable yet, an address still being released).
 pub(crate) fn recovery() -> Result<Option<Recovery>, ManifestError> {
     Ok(Some(Recovery {
-        stale_markers: Vec::new(),
+        leftovers: Vec::new(),
         steps: Vec::new(),
         retries: Retries::default(),
         apply_retries: Some(Retries::new(1)?),

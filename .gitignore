@@ -21,3 +21,6 @@ __pycache__/
 # A `cargo mutants` report written in the tree (`cargo xtask mutants` writes under target/).
 mutants.out/
 mutants.out.old/
+
+# What `cargo xtask wasm` builds (wasm-pack): the topology editor engine's JavaScript package.
+/web/pkg/

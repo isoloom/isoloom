@@ -211,7 +211,7 @@ fn a_vms_route_steps_are_its_plans_routes() -> Result<(), Box<dyn std::error::Er
     let mut seen = 0;
     for (dir, lab) in example_labs()? {
         for target in [Target::Vagrant, Target::Proxmox, Target::CloudVm] {
-            let env = Environment::build(&lab.for_target(target), target, None).unwrap();
+            let env = lab.plan(&lab.for_target(target), target, None).unwrap();
             for (name, mp) in &env.machines {
                 for step in &mp.lifecycle {
                     match step {
@@ -238,7 +238,7 @@ fn every_vm_of_the_plan_has_its_os() -> Result<(), Box<dyn std::error::Error>> {
     let mut vms = 0;
     for (dir, lab) in example_labs()? {
         for target in Target::ALL {
-            let Ok(env) = Environment::build(&lab.for_target(target), target, None) else {
+            let Ok(env) = lab.plan(&lab.for_target(target), target, None) else {
                 continue;
             };
             for (name, _) in env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Vm) {

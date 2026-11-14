@@ -3,7 +3,7 @@
 
 use serde_yaml_ng::Value;
 
-use super::text::{flat, str_of};
+use super::text::{colon_parts, flat, str_of};
 use isoloom_spec::model::Protocol;
 
 /// A container port and its protocol.
@@ -82,26 +82,6 @@ fn host_port(h: &str) -> Option<u16> {
     }
 }
 
-/// The parts of a short `ports` entry, split on ':' outside `${...}`.
-fn port_parts(entry: &str) -> Vec<String> {
-    let mut parts = Vec::new();
-    let (mut depth, mut cur) = (0_u32, String::new());
-    for ch in entry.chars() {
-        match ch {
-            '{' => depth += 1,
-            '}' => depth = depth.saturating_sub(1),
-            ':' if depth == 0 => {
-                parts.push(std::mem::take(&mut cur));
-                continue;
-            }
-            _ => {}
-        }
-        cur.push(ch);
-    }
-    parts.push(cur);
-    parts
-}
-
 /// The container port and fixed host port of one `ports` entry, when it says them.
 fn published_port(item: &Value) -> (Option<u16>, Option<u16>) {
     match item {
@@ -111,7 +91,7 @@ fn published_port(item: &Value) -> (Option<u16>, Option<u16>) {
         ),
         other => {
             let entry = str_of(other).unwrap_or_default();
-            let parts = port_parts(entry.split('/').next().unwrap_or_default());
+            let parts = colon_parts(entry.split('/').next().unwrap_or_default());
             let mut from_the_end = parts.iter().rev();
             let container = from_the_end.next().and_then(|c| c.parse::<u16>().ok());
             let host = from_the_end.next().and_then(|h| host_port(h));
@@ -155,7 +135,7 @@ mod tests {
 
     #[test]
     fn a_host_port_with_a_default_is_that_default() {
-        assert_eq!(port_parts("127.0.0.1:${P:-80}:80"), ["127.0.0.1", "${P:-80}", "80"]);
+        assert_eq!(colon_parts("127.0.0.1:${P:-80}:80"), ["127.0.0.1", "${P:-80}", "80"]);
         assert_eq!(host_port("${P:-8080}"), Some(8080));
         assert_eq!(host_port("${P}"), None);
     }

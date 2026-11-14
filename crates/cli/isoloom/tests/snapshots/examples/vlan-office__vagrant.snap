@@ -475,6 +475,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -528,7 +537,9 @@ end
 #   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
 #   VM on its network does, unless one runs, with `SPARE` ports more for VMs that join the network
 #   while it runs; it is never restarted under the VMs connected to it, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+#   network's last VM is destroyed: destroying one VM leaves it to the others. Vagrant starts and
+#   destroys QEMU's VMs in parallel (and two Vagrant processes can act on one copy at once), so a
+#   network's hub is started, joined and stopped under that network's lock only (`locked`).
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -561,6 +572,19 @@ module IsoloomQemu
     pid if command.include?(pid_file(net))
   rescue ArgumentError, SystemCallError
     nil
+  end
+
+  # Runs the block holding network `net`'s lock (an exclusive lock on its file in `hubs_dir`,
+  # across threads and processes), so the hub is decided by one VM at a time: two VMs starting at
+  # once would each find no hub and start one (the second stopping the first's under the VM
+  # connected to it), and a start beside the last VM's destroy would find a hub about to stop.
+  def self.locked(net)
+    require "fileutils"
+    FileUtils.mkdir_p(hubs_dir)
+    File.open(File.join(hubs_dir, "#{net}.lock"), File::RDWR | File::CREAT, 0o600) do |f|
+      f.flock(File::LOCK_EX)
+      yield
+    end
   end
 
   # The hub ports: 20000-39999.
@@ -658,6 +682,11 @@ module IsoloomQemu
   # than restarted under the VMs connected to it. A hub without a record Isoloom reads (an older
   # Isoloom started it) is replaced: the VM about to start connects to its new port.
   def self.hub(net, ports)
+    locked(net) { start_or_join(net, ports) }
+  end
+
+  # `hub`'s work, under the network's lock.
+  def self.start_or_join(net, ports)
     rec = record(net)
     if rec
       joined = ports.reject { |vm, port| rec[:vms][vm] == port }
@@ -670,8 +699,6 @@ module IsoloomQemu
       return
     end
     stop(net)
-    require "fileutils"
-    FileUtils.mkdir_p(hubs_dir)
     taken = ports.values.dup
     at = taken.max || start
     spare = Array.new(SPARE) do
@@ -694,10 +721,11 @@ module IsoloomQemu
   # holds) is left besides the one just destroyed. A VM is left while Vagrant keeps its id: a
   # halted one still holds its port, and the hub starts again for it anyway if stopped.
   def self.release(net, vms, env, gone)
-    rec = record(net)
-    left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
-    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
-    stop(net)
+    locked(net) do
+      rec = record(net)
+      left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
+      stop(net) unless left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    end
   end
 
   # Stops the network's hub, if it runs, and forgets it. The hub can be gone, pid file and all, by
@@ -742,7 +770,7 @@ module IsoloomQemu
   # virtiofsd's arguments for a host folder (`host_folders`) every account of the VM writes, as
   # on the other providers: vagrant-qemu maps only its guest user and group to this computer's
   # (`--translate-uid map:1000:<uid>:1`), and an unprivileged virtiofsd refuses any other id
-  # (EPERM: the attack box's player, root in docker-vm's VM), whatever the folder's permissions
+  # (EPERM: an account of the VM other than the guest user), whatever the folder's permissions
   # say. Every other guest uid and gid is squashed to this computer's user and group, in two
   # ranges either side of the mapped one, so no two rules overlap. Only where the virtiofsd
   # vagrant-qemu starts translates ids (1.13 or later, `--translate-uid` in its `--help`, as
@@ -775,28 +803,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "vlan-office_"
+    v.default_prefix = "vlan-office-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.70.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-servers", libvirt__network_name: "isoloom-vlan-office-servers", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office - isoloom-router"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office - isoloom-router"
+      v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office - isoloom-router"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -816,7 +844,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "vlan-office-isoloom-router"
+      v.guest_name = "vlan-office-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -830,17 +858,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "vlan-office-isoloom-router"
+      v.vmname = "vlan-office-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-office-vlan10", "isoloom-vlan-office-office-vlan20", "isoloom-vlan-office-servers"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", "isoloom-vlan-office-#{ISOLOOM_KEY}-servers"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan10", "021573B119C0"], ["isoloom-vlan-office-office-vlan20", "021505B8BB5B"], ["isoloom-vlan-office-servers", "02155D44E92B"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "021573B119C0"], ["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", "021505B8BB5B"], ["isoloom-vlan-office-#{ISOLOOM_KEY}-servers", "02155D44E92B"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -900,7 +928,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-office-vlan10", "isoloom-vlan-office-office-vlan20", "isoloom-vlan-office-servers"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", "isoloom-vlan-office-#{ISOLOOM_KEY}-servers"]) }
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -928,16 +956,16 @@ Vagrant.configure("2") do |config|
   config.vm.define "intranet" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "intranet"
-    m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-servers", libvirt__network_name: "isoloom-vlan-office-servers", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office - intranet"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office - intranet"
+      v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("intranet"))
@@ -948,7 +976,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office - intranet"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -985,7 +1013,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([3])
-      v.guest_name = "vlan-office-intranet"
+      v.guest_name = "vlan-office-#{ISOLOOM_KEY}-intranet"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1003,17 +1031,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "vlan-office-intranet"
+      v.vmname = "vlan-office-#{ISOLOOM_KEY}-intranet"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-servers"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-#{ISOLOOM_KEY}-servers"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-servers", "0215A0BD8F2E"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-#{ISOLOOM_KEY}-servers", "0215A0BD8F2E"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1071,9 +1099,11 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-servers"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-servers"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1177,16 +1207,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "staff", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "staff"
-    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office - staff"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office - staff"
+      v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("staff"))
@@ -1197,7 +1227,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office - staff"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1234,7 +1264,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "vlan-office-staff"
+      v.guest_name = "vlan-office-#{ISOLOOM_KEY}-staff"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1252,17 +1282,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "vlan-office-staff"
+      v.vmname = "vlan-office-#{ISOLOOM_KEY}-staff"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-office-vlan10"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan10", "021553776EDC"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "021553776EDC"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1320,9 +1350,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-office-vlan10"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1425,16 +1457,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "guest" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "guest"
-    m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office - guest"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office - guest"
+      v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("guest"))
@@ -1445,7 +1477,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office - guest"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1482,7 +1514,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "vlan-office-guest"
+      v.guest_name = "vlan-office-#{ISOLOOM_KEY}-guest"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1500,17 +1532,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "vlan-office-guest"
+      v.vmname = "vlan-office-#{ISOLOOM_KEY}-guest"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-office-vlan20"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan20", "02159CB547F5"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", "02159CB547F5"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1568,9 +1600,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-office-vlan20"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1637,17 +1671,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "admin" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "admin"
-    m.vm.network "private_network", ip: "10.70.10.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan10", libvirt__network_name: "isoloom-vlan-office-office-vlan10", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-office-vlan20", libvirt__network_name: "isoloom-vlan-office-office-vlan20", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "vlan-office - admin"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "vlan-office - admin"
+      v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("admin"))
@@ -1658,7 +1692,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "vlan-office - admin"
+      v.name = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1686,7 +1720,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "vlan-office-admin"
+      v.guest_name = "vlan-office-#{ISOLOOM_KEY}-admin"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1704,17 +1738,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "vlan-office-admin"
+      v.vmname = "vlan-office-#{ISOLOOM_KEY}-admin"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-office-vlan10", "isoloom-vlan-office-office-vlan20"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-office-vlan10", "0215DDCE5929"], ["isoloom-vlan-office-office-vlan20", "0215E3D0A132"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "0215DDCE5929"], ["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", "0215E3D0A132"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1773,9 +1807,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-office-vlan10", "isoloom-vlan-office-office-vlan20"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -2600,20 +2636,17 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "office-vlan10",
       "cidr": "10.70.10.0/24",
-      "internet": false,
-      "native": "isoloom-vlan-office-office-vlan10"
+      "internet": false
     },
     {
       "name": "office-vlan20",
       "cidr": "10.70.20.0/24",
-      "internet": true,
-      "native": "isoloom-vlan-office-office-vlan20"
+      "internet": true
     },
     {
       "name": "servers",
       "cidr": "10.70.99.0/24",
-      "internet": false,
-      "native": "isoloom-vlan-office-servers"
+      "internet": false
     }
   ],
   "machines": [
@@ -2631,16 +2664,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-router",
-        "vm_names": {
-          "virtualbox": "vlan-office - isoloom-router",
-          "vmware_desktop": "vlan-office - isoloom-router",
-          "hyperv": "vlan-office-isoloom-router",
-          "parallels": "vlan-office - isoloom-router",
-          "libvirt": "vlan-office_isoloom-router",
-          "utm": "vlan-office - isoloom-router",
-          "vmware_esxi": "vlan-office-isoloom-router"
-        },
-        "boot_digest": "sha256:cb3b35d4b881ce0c0c7f3078a33884e4c41fed45e05238cfaf9a1e645eadfa5c",
+        "vm_names": {},
+        "boot_digest": "sha256:53a8de0771114aef5d8728dae6bd792707c240b84c3f9aaa94aa1fa7a5c314fa",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2689,16 +2714,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "intranet",
-        "vm_names": {
-          "virtualbox": "vlan-office - intranet",
-          "vmware_desktop": "vlan-office - intranet",
-          "hyperv": "vlan-office-intranet",
-          "parallels": "vlan-office - intranet",
-          "libvirt": "vlan-office_intranet",
-          "utm": "vlan-office - intranet",
-          "vmware_esxi": "vlan-office-intranet"
-        },
-        "boot_digest": "sha256:737a8ca830de9c21caf92445f7406e605fa5507f18e37cd7c70ab9e07885de42",
+        "vm_names": {},
+        "boot_digest": "sha256:1c82946b895a0d3e2d8a8592c4328f3a5c9b9fd06b233781f6db254c3a9f01b5",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2818,16 +2835,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "staff",
-        "vm_names": {
-          "virtualbox": "vlan-office - staff",
-          "vmware_desktop": "vlan-office - staff",
-          "hyperv": "vlan-office-staff",
-          "parallels": "vlan-office - staff",
-          "libvirt": "vlan-office_staff",
-          "utm": "vlan-office - staff",
-          "vmware_esxi": "vlan-office-staff"
-        },
-        "boot_digest": "sha256:97a84173a434de8d8feb98af85494fc1035d4c058889e195d74068ea7a11b3e0",
+        "vm_names": {},
+        "boot_digest": "sha256:099d1b0d167970487171ec1d06c8a9c5e355ebc35488d9fdb035366797735182",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2938,16 +2947,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "guest",
-        "vm_names": {
-          "virtualbox": "vlan-office - guest",
-          "vmware_desktop": "vlan-office - guest",
-          "hyperv": "vlan-office-guest",
-          "parallels": "vlan-office - guest",
-          "libvirt": "vlan-office_guest",
-          "utm": "vlan-office - guest",
-          "vmware_esxi": "vlan-office-guest"
-        },
-        "boot_digest": "sha256:e2fb3a235f57a0adfbb177ee96ca0268afb14ebaf78d3325e922003a5d8b901d",
+        "vm_names": {},
+        "boot_digest": "sha256:74880142dad247100dcfc68db7b52910f8ddf100d6c1cac51ef73b0021262743",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3059,16 +3060,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "admin",
-        "vm_names": {
-          "virtualbox": "vlan-office - admin",
-          "vmware_desktop": "vlan-office - admin",
-          "hyperv": "vlan-office-admin",
-          "parallels": "vlan-office - admin",
-          "libvirt": "vlan-office_admin",
-          "utm": "vlan-office - admin",
-          "vmware_esxi": "vlan-office-admin"
-        },
-        "boot_digest": "sha256:73457e5815f47bc164e9baf3052205659144709595a1dbd423359f28f920053e",
+        "vm_names": {},
+        "boot_digest": "sha256:940b57153227e3ce110b27e2cb7d3dbe069402ee469e91d9589a51c65b7258cc",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3481,12 +3474,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
     "teardown": []
   },
   "recovery": {
-    "stale_markers": [
-      "verr_already_exists",
-      "could not rename",
-      "is locked",
-      "different provider",
-      "single provider at a time"
+    "leftovers": [
+      "virtualbox_name_taken",
+      "machine_locked",
+      "other_provider"
     ],
     "steps": [
       {

@@ -55,12 +55,13 @@ fn kubernetes_seeds_a_volume_from_the_image_before_the_init_jobs() -> Outcome {
     assert!(block.contains("- /.isoloom-probe/busybox\n        - sh"), "{block}");
     assert!(block.contains("runAsUser: 0"), "{block}");
     assert!(block.contains("name: vol-data\n          mountPath: /isoloom-seed"), "{block}");
-    // Its script, as Kubernetes reads it.
+    // Its script, as the kubelet hands it to the shell: every `$` is written doubled so the
+    // kubelet expands nothing, and it reads `$$` back as `$`.
     let docs: Vec<serde_yaml_ng::Value> = env.split("\n---\n").filter_map(|d| serde_yaml_ng::from_str(d).ok()).collect();
     let deploy = docs.iter().find(|d| d["kind"] == "Deployment").expect("the machine's Deployment");
     let inits = deploy["spec"]["template"]["spec"]["initContainers"].as_sequence().unwrap();
     let seed_c = inits.iter().find(|c| c["name"] == "seed-data").unwrap();
-    let script = seed_c["command"][3].as_str().unwrap();
+    let script = seed_c["command"][3].as_str().unwrap().replace("$$", "$");
     assert!(script.contains("[ -d '/chroot' ] || exit 0"), "{script}");
     assert!(script.contains("lost+found"), "{script}");
     assert!(script.contains("$b cp -a '/chroot/.' \"$d/\""), "{script}");

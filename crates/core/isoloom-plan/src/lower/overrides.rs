@@ -52,18 +52,24 @@ pub(super) fn volumes(source: &syntax::Spec, scope: Scope) -> IndexMap<String, S
 /// The entry of `entries` for machine `name`: its own, else a counted machine's (its clones
 /// share it), else the first of its groups'.
 pub(super) fn for_machine<'a, T>(source: &syntax::Spec, entries: &'a IndexMap<String, T>, name: &str) -> Option<&'a T> {
-    if let Some(e) = entries.get(name) {
-        return Some(e);
+    keyed_for_machine(source, entries, name).map(|(_, e)| e)
+}
+
+/// [`for_machine`]'s entry with the key it is written under (the machine's, its counted
+/// machine's or a group's).
+pub(super) fn keyed_for_machine<'a, T>(source: &syntax::Spec, entries: &'a IndexMap<String, T>, name: &str) -> Option<(&'a str, &'a T)> {
+    if let Some((key, e)) = entries.get_key_value(name) {
+        return Some((key, e));
     }
-    if let Some(e) = source
+    if let Some((key, e)) = source
         .clones
         .iter()
         .find(|(_, c)| c.iter().any(|n| n == name))
-        .and_then(|(base, _)| entries.get(base))
+        .and_then(|(base, _)| entries.get_key_value(base.as_str()))
     {
-        return Some(e);
+        return Some((key, e));
     }
-    entries.iter().find(|(key, _)| member(source, key, name, 0)).map(|(_, e)| e)
+    entries.iter().find(|(key, _)| member(source, key, name, 0)).map(|(key, e)| (key.as_str(), e))
 }
 
 /// Whether group `group` holds machine `name` (its members' names, globs and nested groups).

@@ -173,7 +173,7 @@ pub(super) fn windows_healthy(env: &Environment, machine: &str) -> Option<String
             h.timeout,
             powershell::quote(&format!("http://127.0.0.1:{port}{path}"))
         ),
-        HealthTest::Command(c) => format!("Set-Location {}; {} | Out-Null; $LASTEXITCODE -eq 0", windows_dir(mp), powershell(c)),
+        HealthTest::Command(c) => windows_test(mp, c, h.timeout),
     };
     let failed = powershell::quote(&format!("{machine}: its healthcheck didn't pass after {} tries", h.retries));
     Some(format!(
@@ -182,10 +182,28 @@ pub(super) fn windows_healthy(env: &Environment, machine: &str) -> Option<String
     ))
 }
 
+/// A healthcheck command on Windows, run in a PowerShell of its own as Linux runs it in
+/// `sh -c`: an `exit` in it ends that PowerShell, not the step. It passes when that PowerShell
+/// exits 0 and the command's last output isn't `$false` (a cmdlet's test: `Test-Path`); a
+/// cmdlet's error fails it, and it is stopped after `timeout` seconds.
+fn windows_test(mp: &MachinePlan, c: &CommandLine, timeout: u32) -> String {
+    let child = format!(
+        "$ErrorActionPreference = 'Stop'; Set-Location {}; $r = & {{ {} }}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}; $last = @($r)[-1]; if ($last -is [bool] -and -not $last) {{ exit 1 }}; exit 0",
+        windows_dir(mp),
+        powershell(c)
+    );
+    // Encoded (UTF-16LE in base64), the command reaches the child as written, whatever quotes it holds.
+    format!(
+        "$c = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes({})); $p = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $c -NoNewWindow -PassThru; $null = $p.Handle; if ($p.WaitForExit({})) {{ $p.ExitCode -eq 0 }} else {{ $p.Kill(); $false }}",
+        powershell::quote(&child),
+        u64::from(timeout) * 1000
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use isoloom_plan::{Environment, Lab, lifecycle::Step};
-    use isoloom_spec::model::Target;
+    use isoloom_spec::model::{CommandLine, Target};
 
     const SPEC: &str = r"
 version: 1
@@ -216,7 +234,7 @@ machines:
     fn planned(yaml: &str) -> Environment {
         let lab = Lab::parse(yaml).expect("the test spec parses");
         assert_eq!(lab.problems(), [], "the test spec is valid");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
+        lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
     }
 
     fn env() -> Environment {
@@ -293,7 +311,10 @@ machines:
             "{command}"
         );
         let ready = super::super::windows(&env, "win", &Step::Ready).expect("renders");
-        assert!(ready.contains("& 'python' 'check.py' | Out-Null; $LASTEXITCODE -eq 0"), "{ready}");
+        assert!(
+            ready.contains("Set-Location ''C:\\isoloom''; $r = & { & ''python'' ''check.py'' };") && ready.contains("WaitForExit(3000)"),
+            "the test runs in a PowerShell of its own, stopped after its timeout: {ready}"
+        );
         assert!(ready.contains("Set-Content C:\\isoloom\\ready ready"), "{ready}");
     }
 
@@ -353,6 +374,38 @@ machines:
         let sh = super::super::linux(&env, "db", &Step::Ready).expect("renders");
         assert!(sh.contains("timeout 4 sh -c ''\\''pg_isready'\\'''\n) >/dev/null 2>&1; }"), "{sh}");
         assert!(sh.contains("echo 'db: its healthcheck didn'\\''t pass after 60 tries' >&2"), "{sh}");
+    }
+
+    #[test]
+    fn a_windows_command_healthcheck_runs_in_a_powershell_of_its_own() {
+        // A PowerShell to run it with (pwsh standing in for Windows PowerShell), else the test
+        // passes without running it.
+        if std::process::Command::new("pwsh").args(["-NoProfile", "-Command", "exit 0"]).output().is_err() {
+            return;
+        }
+        let env = env();
+        let mp = &env.machines["win"];
+        let passes = |text: &str, timeout: u32| {
+            let test = super::windows_test(mp, &CommandLine::Shell(text.to_owned()), timeout)
+                .replace("'C:\\isoloom'", "'.'")
+                .replace("-FilePath powershell.exe", "-FilePath pwsh");
+            let out = std::process::Command::new("pwsh")
+                .args(["-NoProfile", "-NonInteractive", "-Command", &test])
+                .output()
+                .expect("pwsh runs");
+            match String::from_utf8_lossy(&out.stdout).trim() {
+                "True" => true,
+                "False" => false,
+                other => panic!("{text}: {other}\n{}", String::from_utf8_lossy(&out.stderr)),
+            }
+        };
+        assert!(passes("exit 0", 30), "an exit 0 passes");
+        assert!(!passes("exit 1", 30), "an exit 1 fails, and ends the test only");
+        assert!(passes("Test-Path .", 30), "a cmdlet's true passes");
+        assert!(!passes("Test-Path ./nowhere", 30), "a cmdlet's false fails");
+        assert!(!passes("Get-Item ./nowhere", 30), "a cmdlet's error fails");
+        assert!(passes("if (\"a\" -eq 'a') { exit 0 } else { exit 1 }", 30), "quotes reach it as written");
+        assert!(!passes("Start-Sleep -Seconds 20", 1), "it is stopped after its timeout");
     }
 
     #[test]

@@ -471,6 +471,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -527,7 +536,9 @@ end
 #   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
 #   VM on its network does, unless one runs, with `SPARE` ports more for VMs that join the network
 #   while it runs; it is never restarted under the VMs connected to it, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+#   network's last VM is destroyed: destroying one VM leaves it to the others. Vagrant starts and
+#   destroys QEMU's VMs in parallel (and two Vagrant processes can act on one copy at once), so a
+#   network's hub is started, joined and stopped under that network's lock only (`locked`).
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -560,6 +571,19 @@ module IsoloomQemu
     pid if command.include?(pid_file(net))
   rescue ArgumentError, SystemCallError
     nil
+  end
+
+  # Runs the block holding network `net`'s lock (an exclusive lock on its file in `hubs_dir`,
+  # across threads and processes), so the hub is decided by one VM at a time: two VMs starting at
+  # once would each find no hub and start one (the second stopping the first's under the VM
+  # connected to it), and a start beside the last VM's destroy would find a hub about to stop.
+  def self.locked(net)
+    require "fileutils"
+    FileUtils.mkdir_p(hubs_dir)
+    File.open(File.join(hubs_dir, "#{net}.lock"), File::RDWR | File::CREAT, 0o600) do |f|
+      f.flock(File::LOCK_EX)
+      yield
+    end
   end
 
   # The hub ports: 20000-39999.
@@ -657,6 +681,11 @@ module IsoloomQemu
   # than restarted under the VMs connected to it. A hub without a record Isoloom reads (an older
   # Isoloom started it) is replaced: the VM about to start connects to its new port.
   def self.hub(net, ports)
+    locked(net) { start_or_join(net, ports) }
+  end
+
+  # `hub`'s work, under the network's lock.
+  def self.start_or_join(net, ports)
     rec = record(net)
     if rec
       joined = ports.reject { |vm, port| rec[:vms][vm] == port }
@@ -669,8 +698,6 @@ module IsoloomQemu
       return
     end
     stop(net)
-    require "fileutils"
-    FileUtils.mkdir_p(hubs_dir)
     taken = ports.values.dup
     at = taken.max || start
     spare = Array.new(SPARE) do
@@ -693,10 +720,11 @@ module IsoloomQemu
   # holds) is left besides the one just destroyed. A VM is left while Vagrant keeps its id: a
   # halted one still holds its port, and the hub starts again for it anyway if stopped.
   def self.release(net, vms, env, gone)
-    rec = record(net)
-    left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
-    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
-    stop(net)
+    locked(net) do
+      rec = record(net)
+      left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
+      stop(net) unless left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    end
   end
 
   # Stops the network's hub, if it runs, and forgets it. The hub can be gone, pid file and all, by
@@ -741,7 +769,7 @@ module IsoloomQemu
   # virtiofsd's arguments for a host folder (`host_folders`) every account of the VM writes, as
   # on the other providers: vagrant-qemu maps only its guest user and group to this computer's
   # (`--translate-uid map:1000:<uid>:1`), and an unprivileged virtiofsd refuses any other id
-  # (EPERM: the attack box's player, root in docker-vm's VM), whatever the folder's permissions
+  # (EPERM: an account of the VM other than the guest user), whatever the folder's permissions
   # say. Every other guest uid and gid is squashed to this computer's user and group, in two
   # ranges either side of the mapped one, so no two rules overlap. Only where the virtiofsd
   # vagrant-qemu starts translates ids (1.13 or later, `--translate-uid` in its `--help`, as
@@ -774,27 +802,27 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "udp-dns_"
+    v.default_prefix = "udp-dns-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.66.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-servers", libvirt__network_name: "isoloom-udp-dns-servers", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.66.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-users", libvirt__network_name: "isoloom-udp-dns-users", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-udp-dns-#{ISOLOOM_KEY}-servers", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-#{ISOLOOM_KEY}-users", libvirt__network_name: "isoloom-udp-dns-#{ISOLOOM_KEY}-users", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "udp-dns - isoloom-router"
+      v.name = "udp-dns-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "udp-dns - isoloom-router"
+      v.vmx["displayName"] = "udp-dns-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "udp-dns - isoloom-router"
+      v.name = "udp-dns-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -814,7 +842,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "udp-dns-isoloom-router"
+      v.guest_name = "udp-dns-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -828,17 +856,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "udp-dns-isoloom-router"
+      v.vmname = "udp-dns-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-udp-dns-servers", "isoloom-udp-dns-users"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-udp-dns-#{ISOLOOM_KEY}-servers", "isoloom-udp-dns-#{ISOLOOM_KEY}-users"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-udp-dns-servers", "021540B02DF8"], ["isoloom-udp-dns-users", "0215DF5BD620"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-udp-dns-#{ISOLOOM_KEY}-servers", "021540B02DF8"], ["isoloom-udp-dns-#{ISOLOOM_KEY}-users", "0215DF5BD620"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -897,7 +925,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-udp-dns-servers", "isoloom-udp-dns-users"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-udp-dns-#{ISOLOOM_KEY}-servers", "isoloom-udp-dns-#{ISOLOOM_KEY}-users"]) }
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -925,17 +953,17 @@ Vagrant.configure("2") do |config|
   config.vm.define "dns" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "dns"
-    m.vm.network "private_network", ip: "10.66.10.53", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-servers", libvirt__network_name: "isoloom-udp-dns-servers", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.10.53", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-udp-dns-#{ISOLOOM_KEY}-servers", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 53, host: ISOLOOM_HOSTPORTS.fetch("dns/dns-udp", 10053), host_ip: "127.0.0.1", protocol: "udp" # not on libvirt: vagrant-libvirt skips UDP forwards
     m.vm.provider "virtualbox" do |v|
-      v.name = "udp-dns - dns"
+      v.name = "udp-dns-#{ISOLOOM_KEY} - dns"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "udp-dns - dns"
+      v.vmx["displayName"] = "udp-dns-#{ISOLOOM_KEY} - dns"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("dns"))
@@ -946,7 +974,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "udp-dns - dns"
+      v.name = "udp-dns-#{ISOLOOM_KEY} - dns"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -983,7 +1011,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "udp-dns-dns"
+      v.guest_name = "udp-dns-#{ISOLOOM_KEY}-dns"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1001,17 +1029,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "udp-dns-dns"
+      v.vmname = "udp-dns-#{ISOLOOM_KEY}-dns"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-udp-dns-servers"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-udp-dns-#{ISOLOOM_KEY}-servers"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-udp-dns-servers", "02155C677213"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-udp-dns-#{ISOLOOM_KEY}-servers", "02155C677213"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1069,9 +1097,11 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-udp-dns-servers"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-udp-dns-#{ISOLOOM_KEY}-servers"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1174,16 +1204,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "client", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "client"
-    m.vm.network "private_network", ip: "10.66.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-users", libvirt__network_name: "isoloom-udp-dns-users", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-udp-dns-#{ISOLOOM_KEY}-users", libvirt__network_name: "isoloom-udp-dns-#{ISOLOOM_KEY}-users", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "udp-dns - client"
+      v.name = "udp-dns-#{ISOLOOM_KEY} - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "udp-dns - client"
+      v.vmx["displayName"] = "udp-dns-#{ISOLOOM_KEY} - client"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("client"))
@@ -1194,7 +1224,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "udp-dns - client"
+      v.name = "udp-dns-#{ISOLOOM_KEY} - client"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1231,7 +1261,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "udp-dns-client"
+      v.guest_name = "udp-dns-#{ISOLOOM_KEY}-client"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1249,17 +1279,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "udp-dns-client"
+      v.vmname = "udp-dns-#{ISOLOOM_KEY}-client"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-udp-dns-users"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-udp-dns-#{ISOLOOM_KEY}-users"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-udp-dns-users", "021550286F65"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-udp-dns-#{ISOLOOM_KEY}-users", "021550286F65"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1317,9 +1347,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-udp-dns-users"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-udp-dns-#{ISOLOOM_KEY}-users"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1417,7 +1449,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
-    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/resolve.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/resolve.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/client.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/resolve.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/resolve.sh'"]].map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); "mkdir -p #{folder} && cat > #{file} <<'#{tag}'\n#{body}\n#{tag}\n" }.join + File.read(File.join(__dir__, "checks/client.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end
 
@@ -1986,14 +2018,12 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "servers",
       "cidr": "10.66.10.0/24",
-      "internet": false,
-      "native": "isoloom-udp-dns-servers"
+      "internet": false
     },
     {
       "name": "users",
       "cidr": "10.66.20.0/24",
-      "internet": false,
-      "native": "isoloom-udp-dns-users"
+      "internet": false
     }
   ],
   "machines": [
@@ -2010,16 +2040,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-router",
-        "vm_names": {
-          "virtualbox": "udp-dns - isoloom-router",
-          "vmware_desktop": "udp-dns - isoloom-router",
-          "hyperv": "udp-dns-isoloom-router",
-          "parallels": "udp-dns - isoloom-router",
-          "libvirt": "udp-dns_isoloom-router",
-          "utm": "udp-dns - isoloom-router",
-          "vmware_esxi": "udp-dns-isoloom-router"
-        },
-        "boot_digest": "sha256:28e265594479bf5debd06e117de39b3b4df4f567044c3ba0bb00b5f9622f91de",
+        "vm_names": {},
+        "boot_digest": "sha256:1f1d3de3eaeefed81856764b20c48fdd2090a9a3026b54db6c62155a27367bd6",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2068,16 +2090,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "dns",
-        "vm_names": {
-          "virtualbox": "udp-dns - dns",
-          "vmware_desktop": "udp-dns - dns",
-          "hyperv": "udp-dns-dns",
-          "parallels": "udp-dns - dns",
-          "libvirt": "udp-dns_dns",
-          "utm": "udp-dns - dns",
-          "vmware_esxi": "udp-dns-dns"
-        },
-        "boot_digest": "sha256:c0d9578693997cd53614f567ee78a763ec2e44c71309a5590dfe7652cb864b8c",
+        "vm_names": {},
+        "boot_digest": "sha256:519e2da2fca01e5dcbc5669646683d4bd917f1f96075b65a04764743a9a9dd21",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2208,16 +2222,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "client",
-        "vm_names": {
-          "virtualbox": "udp-dns - client",
-          "vmware_desktop": "udp-dns - client",
-          "hyperv": "udp-dns-client",
-          "parallels": "udp-dns - client",
-          "libvirt": "udp-dns_client",
-          "utm": "udp-dns - client",
-          "vmware_esxi": "udp-dns-client"
-        },
-        "boot_digest": "sha256:ad3e6e8a13eebdcbc98277220ed36c3ff8d5f85f0eccaac9182dcce414b62b04",
+        "vm_names": {},
+        "boot_digest": "sha256:b6aab89aaf6ac8d976e1539f9afd9b658d323b1fd2bc58012e58d495baf90742",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2575,12 +2581,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
     "teardown": []
   },
   "recovery": {
-    "stale_markers": [
-      "verr_already_exists",
-      "could not rename",
-      "is locked",
-      "different provider",
-      "single provider at a time"
+    "leftovers": [
+      "virtualbox_name_taken",
+      "machine_locked",
+      "other_provider"
     ],
     "steps": [
       {

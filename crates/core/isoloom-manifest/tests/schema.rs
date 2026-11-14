@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-const WRITE: &str = "cargo test -p isoloom-manifest --test schema -- --ignored write_the_committed_schema";
+const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-manifest --test schema the_committed_schema_is_current";
 
 fn committed() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/run-manifest-v1.schema.json")
@@ -14,22 +14,21 @@ fn generated() -> serde_json::Result<String> {
     serde_json::to_string_pretty(&isoloom_manifest::schema()).map(|text| text + "\n")
 }
 
+/// The committed schema is the one the types generate; `ISOLOOM_WRITE_FIXTURES=1` writes it
+/// instead, as it writes the other fixtures.
 #[test]
 fn the_committed_schema_is_current() {
+    if std::env::var_os("ISOLOOM_WRITE_FIXTURES").is_some() {
+        let path = committed();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, generated().unwrap()).unwrap();
+        return;
+    }
     let on_disk = std::fs::read_to_string(committed()).unwrap_or_default();
     assert!(
         on_disk == generated().unwrap(),
         "schemas/run-manifest-v1.schema.json is out of date: run `{WRITE}`"
     );
-}
-
-/// Writes the schema the types generate to `schemas/run-manifest-v1.schema.json`.
-#[test]
-#[ignore = "writes the committed schema; run it after changing the types"]
-fn write_the_committed_schema() {
-    let path = committed();
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(path, generated().unwrap()).unwrap();
 }
 
 /// What the schema says calls the environment an environment, as every user-facing text does:

@@ -1,4 +1,4 @@
-//! Compose inside a VM (`docker-vm`, `cloud-docker`): the environment's containers, and the shell commands
+//! Compose inside a VM (`cloud-docker`): the environment's containers, and the shell commands
 //! that start, check and read them there, as the Compose backend works them out
 //! ([`GuestCompose`]). The backend that makes the VM runs each command through its own way in
 //! (`vagrant ssh`, or SSH to a VM Terraform made) and adds the VM itself. Shared here, below the

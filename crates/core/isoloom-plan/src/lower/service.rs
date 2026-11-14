@@ -11,10 +11,16 @@ use isoloom_catalogue::{Catalogue, ImageStart, Password, Resolved};
 use isoloom_spec::model::{self, Mount};
 use isoloom_spec::syntax::{self, Code, FieldPath, File, FileSource, Kind, Mode, Problem, Problems};
 
+use crate::configure::DaemonTable;
+
 /// Every service machine of an environment, resolved: its services, or the problems of its `service`,
 /// `os` and `with`.
 #[derive(Debug, Clone, Default)]
-pub(super) struct Services(IndexMap<String, Result<Vec<Resolved>, Problems>>);
+pub(super) struct Services {
+    resolved: IndexMap<String, Result<Vec<Resolved>, Problems>>,
+    /// The catalogue's daemon table, built once from the catalogue the services resolved in.
+    daemons: DaemonTable,
+}
 
 impl Services {
     /// The service machines of `source`, resolved in `catalogue`.
@@ -25,17 +31,25 @@ impl Services {
             .filter(|(_, m)| matches!(m.kind, Kind::Service(_)))
             .map(|(name, _)| (name.clone(), catalogue.resolve(source, name)))
             .collect();
-        Services(resolved)
+        Services {
+            resolved,
+            daemons: DaemonTable::from(catalogue),
+        }
     }
 
     /// Machine `name`'s services, when it runs any.
     pub(super) fn get(&self, name: &str) -> Option<&Result<Vec<Resolved>, Problems>> {
-        self.0.get(name)
+        self.resolved.get(name)
+    }
+
+    /// The daemons the catalogue knows the foreground form of.
+    pub(super) fn daemons(&self) -> &DaemonTable {
+        &self.daemons
     }
 
     /// What the catalogue finds wrong, machine after machine.
     pub(super) fn problems(&self) -> Problems {
-        self.0.values().filter_map(|r| r.as_ref().err()).flatten().cloned().collect()
+        self.resolved.values().filter_map(|r| r.as_ref().err()).flatten().cloned().collect()
     }
 }
 
@@ -58,7 +72,7 @@ pub(super) fn effective<'a>(name: &str, m: &'a syntax::Machine, services: Option
     (Cow::Owned(out), problems)
 }
 
-/// The machine's ports: each entry's, by name, with the author's `publish` and `dormant`; a port
+/// The machine's ports: each entry's, by name, with the author's `publish`, `dormant` and `login`; a port
 /// the author names that no entry has is an `unknown-reference`.
 fn ports(at: &FieldPath, m: &mut syntax::Machine, resolved: &[Resolved]) -> Problems {
     let mut ports = IndexMap::new();
@@ -71,6 +85,7 @@ fn ports(at: &FieldPath, m: &mut syntax::Machine, resolved: &[Resolved]) -> Prob
                 protocol: p.protocol,
                 publish: written.and_then(|w| w.publish),
                 dormant: written.is_some_and(|w| w.dormant),
+                login: written.and_then(|w| w.login.clone()),
             },
         );
     }

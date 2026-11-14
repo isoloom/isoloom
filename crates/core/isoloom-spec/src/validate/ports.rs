@@ -8,7 +8,7 @@ use super::machines::Subject;
 use crate::model::Protocol;
 
 /// The machine's ports: real ports listed once, HTTP and TLS on TCP, host ports published
-/// by one machine only, and a `publish` port for `fixed`.
+/// by one machine only, a `publish` port for `fixed`, and a login that names its account.
 pub(super) fn of_machine(s: &Subject, published: &mut HashMap<(u16, Protocol), String>, p: &mut Problems) {
     let at = &s.at;
     let mut ports = BTreeSet::new();
@@ -21,6 +21,9 @@ pub(super) fn of_machine(s: &Subject, published: &mut HashMap<(u16, Protocol), S
         }
         if !svc.protocol.is_tcp() && (svc.http || svc.tls) {
             p.add(format!("{at}.ports[{i}]"), "`http` and `tls` run over TCP: a UDP port has neither");
+        }
+        if svc.login.as_ref().is_some_and(|l| l.user.trim().is_empty()) {
+            p.add(format!("{at}.ports[{i}].login.user"), "a login names its account");
         }
         match svc.publish {
             Some(0) => p.add(format!("{at}.ports[{i}].publish"), "port 0 isn't a port"),
@@ -110,6 +113,19 @@ mod tests {
         assert_eq!(
             ports("[{ port: 80, fixed: true }]"),
             ["machines.web.ports[0].fixed: `fixed` keeps the `publish` port: give one"]
+        );
+    }
+
+    #[test]
+    fn a_login_names_its_account() {
+        assert_eq!(
+            ports("[{ port: 8080, http: true, login: { user: alice, password: alice } }]"),
+            Vec::<String>::new()
+        );
+        assert_eq!(ports("[{ port: 22, login: { user: root, password: '' } }]"), Vec::<String>::new());
+        assert_eq!(
+            ports("[{ port: 8080, login: { user: ' ', password: alice } }]"),
+            ["machines.web.ports[0].login.user: a login names its account"]
         );
     }
 

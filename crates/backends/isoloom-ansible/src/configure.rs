@@ -11,7 +11,7 @@
 //! - [`role_files`] and [`role_name`]: one machine's role, which the conformance harness renders
 //!   and runs on its own.
 //!
-//! Pure: it reads the planned environment and the embedded catalogue's pinned collections, and
+//! Pure: it reads the planned environment and its catalogue's pinned collections, and
 //! writes files. No vendor or `community.*` module is ever named (the maintainer's rule).
 
 mod role;
@@ -31,8 +31,12 @@ pub use role::files as role_files;
 pub use role::role_name;
 
 /// The project variable each play sets to the project folder, so a role's `copy` and `script`
-/// find a project file wherever `site.yml` is run from (relative to the playbook's own folder).
-const PROJECT_VAR: &str = "{{ (playbook_dir + '/../..') | realpath }}";
+/// find a project file wherever `site.yml` is run from: `site.yml`'s folder `base`, climbed back
+/// to the project (`.isoloom/external` -> `../..`).
+fn project_var(base: &str) -> String {
+    let up: Vec<&str> = base.split('/').filter(|part| !part.is_empty() && *part != ".").map(|_| "..").collect();
+    format!("{{{{ (playbook_dir + '/{}') | realpath }}}}", up.join("/"))
+}
 
 /// The Ansible project for `env`, its files under `base` (`.isoloom/external`): `site.yml` running
 /// each host's role, the roles themselves, and `requirements.yml` when a role names a pinned
@@ -49,7 +53,7 @@ pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<Genera
     for (name, c) in &configured {
         out.extend(role_files(c, &format!("{base}/roles/{}", role_name(name)))?);
     }
-    if let Some(reqs) = requirements(&configured)? {
+    if let Some(reqs) = requirements(env.catalogue(), &configured)? {
         out.push(GeneratedFile {
             path: format!("{base}/requirements.yml"),
             contents: reqs,
@@ -59,8 +63,9 @@ pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<Genera
 }
 
 /// `site.yml`: one play per configured host, applying its role as `isoloom` the host over the
-/// inventory, each play setting [`PROJECT_VAR`].
+/// inventory, each play setting [`project_var`].
 fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
+    let project = project_var(base);
     let plays: Vec<Value> = configured
         .iter()
         .map(|(name, _)| {
@@ -68,7 +73,7 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
                 "name": format!("Configure {name}"),
                 "hosts": name,
                 "become": true,
-                "vars": { "isoloom_project": task::jinja(PROJECT_VAR) },
+                "vars": { "isoloom_project": task::jinja(&project) },
                 "roles": [role_name(name)],
             })
         })
@@ -84,15 +89,15 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
 ///
 /// # Errors
 ///
-/// [`crate::Error::Collection`] when the embedded catalogue doesn't load or pins no
-/// `ansible.posix`: a bug its tests and `a_firewall_recipe_pins_ansible_posix_in_requirements`
+/// [`crate::Error::Collection`] when the environment's `catalogue` (empty when Isoloom's doesn't
+/// load, which planning reports) pins no `ansible.posix`: a bug its tests and `a_firewall_recipe_pins_ansible_posix_in_requirements`
 /// catch first.
 ///
 /// Each entry is the pinned archive's URL, of `type: url`, which `ansible-galaxy collection
 /// install -r` fetches as is. Galaxy checks no hash of such an archive, so the file names the
 /// `sha256` that `catalogue/collections.yml` pins in a comment above it, for the user to check
 /// the archive against before installing it (the external guide says how).
-fn requirements(configured: &[(String, Configured<'_>)]) -> crate::Result<Option<String>> {
+fn requirements(catalogue: &Catalogue, configured: &[(String, Configured<'_>)]) -> crate::Result<Option<String>> {
     const POSIX: &str = "ansible.posix";
     let firewall = configured
         .iter()
@@ -101,11 +106,10 @@ fn requirements(configured: &[(String, Configured<'_>)]) -> crate::Result<Option
         return Ok(None);
     }
     let missing = |why: String| crate::Error::Collection { name: POSIX, why };
-    let catalogue = Catalogue::embedded().map_err(|e| missing(e.to_string()))?;
     let posix = catalogue
         .collections()
         .get(POSIX)
-        .ok_or_else(|| missing("the embedded catalogue's collections.yml has none".to_owned()))?;
+        .ok_or_else(|| missing("the catalogue's collections.yml has none".to_owned()))?;
     let pins = format!(
         "# ansible-galaxy checks no hash of an archive it fetches by URL: before installing, check\n# each one against the SHA-256 the catalogue pins.\n# {} {}: sha256 {}\n",
         posix.name, posix.version, posix.sha256

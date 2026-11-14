@@ -20,7 +20,7 @@
 use std::net::Ipv4Addr;
 
 use crate::boxes::{self, HyperVBox};
-use isoloom_plan::{Environment, Vm};
+use isoloom_plan::{Environment, Names, Vm};
 use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::windows::Tpm;
 
@@ -44,8 +44,8 @@ pub(crate) fn hyperv_rb() -> String {
 /// How a VM runs under Vagrant's Hyper-V provider.
 #[derive(Debug, Clone)]
 pub(crate) struct HyperV<'a> {
-    /// The environment's name (its networks' switches are named after it).
-    pub(crate) env: &'a str,
+    /// The environment's host names (its networks' switches among them).
+    pub(crate) names: Names<'a>,
     /// The box Hyper-V boots.
     pub(crate) boxed: HyperVBox,
     /// Its adapters on the networks, in order.
@@ -94,7 +94,7 @@ impl<'a> HyperV<'a> {
     /// Isoloom's own Debian VMs (router, tool shell) at these addresses: Debian 12's Hyper-V box.
     pub(crate) fn helper(env: &'a Environment, at: impl IntoIterator<Item = (&'a str, Ipv4Addr)>) -> Self {
         HyperV {
-            env: &env.name,
+            names: env.names(),
             boxed: HyperVBox::Other {
                 name: boxes::HYPERV_DEBIAN_12.0.into(),
                 version: Some(boxes::HYPERV_DEBIAN_12.1.into()),
@@ -109,13 +109,13 @@ impl<'a> HyperV<'a> {
     }
 
     /// The private switch of a network.
-    fn switch(&self, net: &str) -> String {
-        super::network_name(self.env, net)
+    fn switch(&self, net: &str) -> Value {
+        crate::vagrantfile::host_name(&self.names.network(net))
     }
 
     /// The networks' switches, as a Ruby array.
     fn switches(&self) -> Value {
-        Value::array(self.nics.iter().map(|n| Value::str(&self.switch(n.net))))
+        Value::array(self.nics.iter().map(|n| self.switch(n.net)))
     }
 }
 
@@ -126,15 +126,23 @@ fn mac(vm: &str, net: &str) -> [u8; 6] {
     [0x02, 0x15, a, b, c, d]
 }
 
-/// A MAC address written with `sep` between its bytes, in capitals when `upper` (Hyper-V's
-/// cmdlets and WMI) or not (Linux's `/sys/class/net/*/address`).
-fn mac_text(mac: [u8; 6], sep: &str, upper: bool) -> String {
-    let s = mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(sep);
-    if upper { s.to_uppercase() } else { s }
+/// A MAC address as Hyper-V's cmdlets and WMI write it: in capitals, `sep` between its bytes.
+fn hyperv_mac_text(mac: [u8; 6], sep: &str) -> String {
+    mac.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(sep)
+}
+
+/// A MAC address as Linux writes it (`/sys/class/net/*/address`): lower case, `:` between its
+/// bytes.
+fn linux_mac_text(mac: [u8; 6]) -> String {
+    mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":")
 }
 
 /// The VM `vm_name`'s Hyper-V provider block, then the triggers that give it its networks there.
-pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
+/// Its adapters' MAC addresses are seeded by its name without the copy's key: the same in every
+/// copy, each on its own copy's switches.
+pub(crate) fn block(r: &mut Ruby, vm: &isoloom_plan::HostName, size: Size, hv: &HyperV) {
+    let seed = vm.unkeyed();
+    let vm_name = seed.as_str();
     r.block(Call::new("m.vm.provider").arg(Value::str("hyperv")), "v, o", |r| {
         match &hv.boxed {
             HyperVBox::Main => {}
@@ -147,7 +155,7 @@ pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
                 r.comment("No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`.");
             }
         }
-        r.assign("v.vmname", Value::str(vm_name));
+        r.assign("v.vmname", crate::vagrantfile::host_name(vm));
         r.assign("v.cpus", size.cpus);
         r.assign("v.memory", size.mem);
         r.assign("v.linked_clone", true);
@@ -185,7 +193,7 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
     let nics = Value::array(
         hv.nics
             .iter()
-            .map(|n| Value::array([Value::str(&hv.switch(n.net)), Value::str(&mac_text(mac(vm_name, n.net), "", true))])),
+            .map(|n| Value::array([hv.switch(n.net), Value::str(&hyperv_mac_text(mac(vm_name, n.net), ""))])),
     );
     let mut before_start = Vec::new();
     if !hv.nics.is_empty() {
@@ -257,7 +265,7 @@ fn env_net_at_boot() -> String {
 /// A Linux VM's addresses on its networks under Hyper-V: [`ENV_NET_SCRIPT`] written, run at
 /// every boot, and now.
 fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
-    let macs: Vec<String> = nics.iter().map(|n| mac_text(mac(vm_name, n.net), ":", false)).collect();
+    let macs: Vec<String> = nics.iter().map(|n| linux_mac_text(mac(vm_name, n.net))).collect();
     let lines: Vec<String> = nics
         .iter()
         .zip(&macs)
@@ -265,8 +273,9 @@ fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
         .collect();
     let lines = lines.concat();
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
+    let script = isoloom_spec::shell::heredoc(&format!("cat > {ENV_NET_SCRIPT}"), "NET", &format!("{ENV_NET}{lines}exit $rc\n"));
     format!(
-        "set -e\nmkdir -p {CONFIG_DIR}\ncat > {ENV_NET_SCRIPT} <<'NET'\n{ENV_NET}{lines}exit $rc\nNET\nchmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{ENV_NET_SCRIPT}\n",
+        "set -e\nmkdir -p {CONFIG_DIR}\n{script}chmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{ENV_NET_SCRIPT}\n",
         env_net_at_boot()
     )
 }
@@ -276,7 +285,7 @@ fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
 fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let nics: Vec<_> = nics
         .iter()
-        .map(|n| (Adapter::Mac(mac_text(mac(vm_name, n.net), ":", true)), n.ip, n.mask))
+        .map(|n| (Adapter::Mac(hyperv_mac_text(mac(vm_name, n.net), ":")), n.ip, n.mask))
         .collect();
     super::windows::static_addresses(&nics)
 }
@@ -297,7 +306,7 @@ pub(crate) fn refusal(env: &Environment) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{mac, mac_text};
+    use super::{hyperv_mac_text, linux_mac_text, mac};
 
     #[test]
     fn macs_are_local_stable_and_differ_by_vm_and_network() {
@@ -306,7 +315,7 @@ mod tests {
         assert_eq!(&a[..2], &[0x02, 0x15]);
         assert_ne!(a, mac("lab-web", "back"));
         assert_ne!(a, mac("lab-db", "front"));
-        assert_eq!(mac_text([0x02, 0x15, 0xab, 0, 1, 0xff], ":", false), "02:15:ab:00:01:ff");
-        assert_eq!(mac_text([0x02, 0x15, 0xab, 0, 1, 0xff], "", true), "0215AB0001FF");
+        assert_eq!(linux_mac_text([0x02, 0x15, 0xab, 0, 1, 0xff]), "02:15:ab:00:01:ff");
+        assert_eq!(hyperv_mac_text([0x02, 0x15, 0xab, 0, 1, 0xff], ""), "0215AB0001FF");
     }
 }

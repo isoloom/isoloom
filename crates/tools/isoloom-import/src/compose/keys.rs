@@ -3,7 +3,7 @@
 
 use serde_yaml_ng::{Mapping, Value};
 
-use super::environment::{env_entries, input_name, variables};
+use super::environment::{env_entries, input_name, reads_itself, variables};
 use super::limits::{cpus, memory_mb};
 use super::ports::{container_ports, other_protocols, published_ports};
 use super::text::{flat, str_of};
@@ -160,6 +160,7 @@ impl Import<'_> {
     /// Values read from the shell become inputs; fixed values belong in the image.
     fn environment(&mut self, kat: String, v: &Value, m: &mut Machine) {
         let mut fixed = Vec::new();
+        let mut renamed = Vec::new();
         for (key, value) in env_entries(v) {
             let from_shell: Vec<String> = match &value {
                 None => input_name(&key).into_iter().collect(),
@@ -167,11 +168,23 @@ impl Import<'_> {
             };
             if from_shell.is_empty() {
                 fixed.push(format!("{key}={}", value.unwrap_or_default()));
+            } else if let Some(text) = value.filter(|text| !reads_itself(&key, text)) {
+                renamed.push(format!("{key}={text}"));
             }
             for i in from_shell {
                 m.inputs.insert(i.clone());
                 self.spec_inputs.insert(i);
             }
+        }
+        if !renamed.is_empty() {
+            self.notes.add(
+                kat.clone(),
+                NoteKind::Changed,
+                format!(
+                    "the machine gets each shell variable these read as an input of that name (an input keeps its name), without a default: set the variable from it in the image or a `setup` script: {}",
+                    renamed.join(", ")
+                ),
+            );
         }
         if !fixed.is_empty() {
             self.notes

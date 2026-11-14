@@ -381,6 +381,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
 # - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
 #   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
@@ -388,7 +397,9 @@ end
 #   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
 #   VM on its network does, unless one runs, with `SPARE` ports more for VMs that join the network
 #   while it runs; it is never restarted under the VMs connected to it, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+#   network's last VM is destroyed: destroying one VM leaves it to the others. Vagrant starts and
+#   destroys QEMU's VMs in parallel (and two Vagrant processes can act on one copy at once), so a
+#   network's hub is started, joined and stopped under that network's lock only (`locked`).
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -421,6 +432,19 @@ module IsoloomQemu
     pid if command.include?(pid_file(net))
   rescue ArgumentError, SystemCallError
     nil
+  end
+
+  # Runs the block holding network `net`'s lock (an exclusive lock on its file in `hubs_dir`,
+  # across threads and processes), so the hub is decided by one VM at a time: two VMs starting at
+  # once would each find no hub and start one (the second stopping the first's under the VM
+  # connected to it), and a start beside the last VM's destroy would find a hub about to stop.
+  def self.locked(net)
+    require "fileutils"
+    FileUtils.mkdir_p(hubs_dir)
+    File.open(File.join(hubs_dir, "#{net}.lock"), File::RDWR | File::CREAT, 0o600) do |f|
+      f.flock(File::LOCK_EX)
+      yield
+    end
   end
 
   # The hub ports: 20000-39999.
@@ -518,6 +542,11 @@ module IsoloomQemu
   # than restarted under the VMs connected to it. A hub without a record Isoloom reads (an older
   # Isoloom started it) is replaced: the VM about to start connects to its new port.
   def self.hub(net, ports)
+    locked(net) { start_or_join(net, ports) }
+  end
+
+  # `hub`'s work, under the network's lock.
+  def self.start_or_join(net, ports)
     rec = record(net)
     if rec
       joined = ports.reject { |vm, port| rec[:vms][vm] == port }
@@ -530,8 +559,6 @@ module IsoloomQemu
       return
     end
     stop(net)
-    require "fileutils"
-    FileUtils.mkdir_p(hubs_dir)
     taken = ports.values.dup
     at = taken.max || start
     spare = Array.new(SPARE) do
@@ -554,10 +581,11 @@ module IsoloomQemu
   # holds) is left besides the one just destroyed. A VM is left while Vagrant keeps its id: a
   # halted one still holds its port, and the hub starts again for it anyway if stopped.
   def self.release(net, vms, env, gone)
-    rec = record(net)
-    left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
-    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
-    stop(net)
+    locked(net) do
+      rec = record(net)
+      left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
+      stop(net) unless left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    end
   end
 
   # Stops the network's hub, if it runs, and forgets it. The hub can be gone, pid file and all, by
@@ -653,7 +681,8 @@ route_back() {
   done
 }
 netd=${ISOLOOM_NETWORKD_DIR:-/etc/systemd/network}
-if command -v nmcli >/dev/null 2>&1 && nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
+# nmcli translates `running` even in its terse output: read it in C.
+if command -v nmcli >/dev/null 2>&1 && LC_ALL=C nmcli -t -f RUNNING general 2>/dev/null | grep -q running; then
   con=$(nmcli -g GENERAL.CONNECTION device show "$up")
   if [ -n "$con" ] && [ "$(nmcli -g ipv4.route-metric connection show "$con")" != "$metric" ]; then
     nmcli connection modify "$con" ipv4.route-metric "$metric"
@@ -698,28 +727,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 600
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "slow-link_"
+    v.default_prefix = "slow-link-#{ISOLOOM_KEY}_"
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
-    v.name = "slow-link - isoloom-docker-host"
+    v.name = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "slow-link - isoloom-docker-host"
+    v.vmx["displayName"] = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "slow-link - isoloom-docker-host"
+    v.name = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
     o.vm.box_version = ">= 0"
-    v.name = "slow-link - isoloom-docker-host"
+    v.name = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -749,7 +778,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "slow-link-isoloom-docker-host"
+    v.guest_name = "slow-link-#{ISOLOOM_KEY}-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048
   end
@@ -2106,15 +2135,8 @@ systemctl enable --now isoloom-published.service
       "addresses": {},
       "native": {
         "vagrant": "default",
-        "vm_names": {
-          "virtualbox": "slow-link - isoloom-docker-host",
-          "vmware_desktop": "slow-link - isoloom-docker-host",
-          "parallels": "slow-link - isoloom-docker-host",
-          "libvirt": "slow-link_default",
-          "utm": "slow-link - isoloom-docker-host",
-          "vmware_esxi": "slow-link-isoloom-docker-host"
-        },
-        "boot_digest": "sha256:94b43b1c399f3ab82e651f5ac6043b465dd046ddf8c5c8eccf8511bf94d7758c",
+        "vm_names": {},
+        "boot_digest": "sha256:de8d390da75ac3ec0ca44da98c28c58b0aeaba06a2bffe7b091a7f818b11bf78",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2512,12 +2534,10 @@ systemctl enable --now isoloom-published.service
     ]
   },
   "recovery": {
-    "stale_markers": [
-      "verr_already_exists",
-      "could not rename",
-      "is locked",
-      "different provider",
-      "single provider at a time"
+    "leftovers": [
+      "virtualbox_name_taken",
+      "machine_locked",
+      "other_provider"
     ],
     "steps": [
       {

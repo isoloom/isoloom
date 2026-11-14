@@ -1001,10 +1001,9 @@ volumes:
     ]
   },
   "recovery": {
-    "stale_markers": [
-      "is already in use by container",
-      "network with name",
-      "has incorrect label"
+    "leftovers": [
+      "container_name_taken",
+      "network_left"
     ],
     "steps": [
       {
@@ -1199,7 +1198,6 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1210,7 +1208,6 @@ volumes:
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1220,7 +1217,6 @@ volumes:
     ],
     "refused": {},
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },

@@ -54,9 +54,8 @@ fn capabilities() -> Capabilities {
         // The hosts are already on their networks, outside ones included.
         Feature::ExternalNetworks,
         Feature::BridgedNetworks,
-        // Delivered by the runner over the host's SSH, owners included.
-        Feature::Secrets,
-        Feature::SecretOwners,
+        // No secrets: no secret value goes into the generated files, and the target has no run
+        // manifest, so nothing would deliver one to a host.
     ])
 }
 
@@ -131,10 +130,71 @@ mod tests {
             ("[{ name: web, tcp: 'a:80' }]", "check \"web\" has no host to run from"),
         ] {
             let env = environment(&format!("  a: {{ networks: {{ lab: 5 }}, os: debian@12 }}\n{hosts}checks: {checks}\n"));
-            let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+            let refusal = ExternalBackend.refusal(&env).unwrap_or_else(|| panic!("{checks}: not refused"));
             assert!(refusal.contains(why), "{checks}: {refusal}");
             assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })), "{checks}");
         }
+    }
+
+    #[test]
+    fn an_existing_hosts_own_settings_are_refused_not_dropped() {
+        let hosts = "overrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n";
+        for (settings, field) in [
+            ("environment: { MODE: lab }", "environment"),
+            ("sysctls: { net.core.somaxconn: '4096' }", "sysctls"),
+            ("ulimits: { nofile: 1024 }", "ulimits"),
+        ] {
+            let env = environment(&format!("  a: {{ networks: {{ lab: 5 }}, os: debian@12, {settings} }}\n{hosts}"));
+            let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+            assert!(
+                refusal.contains(&format!("machine `a` sets `{field}`: Isoloom doesn't set up a host that already exists")),
+                "{settings}: {refusal}"
+            );
+            assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })), "{settings}");
+        }
+    }
+
+    #[test]
+    fn a_secret_file_is_refused_not_dropped() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12, files: [{ path: /run/secrets/api-key, secret: api-key }] }\ninputs: { TOKEN: { sensitive: true } }\nsecrets: { api-key: { env: TOKEN } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+        assert!(refusal.contains("nothing delivers them"), "{refusal}");
+        assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })));
+    }
+
+    #[test]
+    fn a_step_gets_the_machines_inputs_from_where_ansible_runs() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12, environment: { MODE: { input: MODE } }, app: { steps: [{ run: setup.sh }, { playbook: site.yml }] } }\ninputs: { MODE: { sensitive: false } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        let files = render(&env).expect("renders");
+        let tasks = files
+            .iter()
+            .find(|f| f.path.ends_with("roles/isoloom_machine_a/tasks/main.yml"))
+            .expect("a's role");
+        let tasks: serde_yaml_ng::Value = serde_yaml_ng::from_str(&tasks.contents).expect("the tasks read");
+        let steps: Vec<&serde_yaml_ng::Value> = tasks
+            .as_sequence()
+            .expect("a list of tasks")
+            .iter()
+            .filter(|t| t.get("ansible.builtin.script").is_some() || t.get("ansible.builtin.command").is_some())
+            .collect();
+        assert_eq!(steps.len(), 2, "{}", tasks_text(&files));
+        for step in steps {
+            assert_eq!(
+                step["environment"]["MODE"].as_str(),
+                Some("{{ lookup('ansible.builtin.env', 'MODE') }}"),
+                "{}",
+                tasks_text(&files)
+            );
+        }
+    }
+
+    /// Every generated file's text, for a failing assertion.
+    fn tasks_text(files: &[GeneratedFile]) -> String {
+        files.iter().map(|f| ["# ", &f.path, "\n", &f.contents].concat()).collect()
     }
 
     #[test]

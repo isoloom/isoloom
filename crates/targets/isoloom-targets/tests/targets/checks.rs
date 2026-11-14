@@ -4,8 +4,6 @@
 use isoloom_plan::checks::{self, HttpExpect, Position, Probe, TcpExpect};
 use isoloom_spec::parse;
 
-use isoloom_targets::Lab;
-
 use crate::testing::{Outcome, example, lab};
 
 #[cfg(unix)]
@@ -143,29 +141,6 @@ fn the_controller_runs_the_derived_checks_of_a_windows_only_environment() -> Out
         let entry = format!("position = \"isoloom-networks\"\n      machine  = \"isoloom-controller\"\n      host     = {host}");
         assert!(tf.contains(&entry), "{cloud}: {tf}");
     }
-    Ok(())
-}
-
-#[test]
-fn hybrid_checks_from_the_controller_when_only_containers_could() -> Outcome {
-    use isoloom_spec::Target;
-    use isoloom_targets::generate;
-    let runner = |spec: &Lab, dir: &str, target| {
-        generate(spec, target)
-            .unwrap()
-            .into_iter()
-            .find(|f| f.path == format!(".isoloom/{dir}/checks/isoloom-controller.sh"))
-            .map(|f| f.contents)
-    };
-    // mixed-office: a Windows VM and a Linux container. The container's derived checks don't run
-    // on hybrid (the checks run from the VM side), so the controller checks both services.
-    let spec = example("mixed-office")?;
-    let hybrid = runner(&spec, "hybrid", Target::Hybrid).expect("the controller's runner");
-    assert!(hybrid.contains("pass 'files01:445 from the networks'"), "{hybrid}");
-    assert!(hybrid.contains("pass 'intranet:80 from the networks'"), "{hybrid}");
-    // On Vagrant the intranet is a Linux VM and runs them: nothing changes there.
-    let vagrant = runner(&spec, "vagrant", Target::Vagrant).expect("the controller's runner");
-    assert!(!vagrant.contains("from the networks"), "{vagrant}");
     Ok(())
 }
 

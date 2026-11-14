@@ -23,7 +23,9 @@ fn refusal_reports_what_a_generator_would_refuse() -> Outcome {
     // used to show ✓ for those (the clouds for a Windows 11 workstation, which none has an
     // image of).
     let ad = example("corp-ad-basics")?;
-    let why = isoloom_targets::refusal(&ad, Target::CloudVm).ok_or("no cloud has a Windows 11 image")?;
+    let why = isoloom_targets::refusal(&ad, Target::CloudVm)
+        .unwrap()
+        .ok_or("no cloud has a Windows 11 image")?;
     assert!(why.contains("no AWS image for `windows-11`"), "{why}");
     // The images listed are the ones AWS has, Kali among them.
     assert!(
@@ -32,14 +34,14 @@ fn refusal_reports_what_a_generator_would_refuse() -> Outcome {
     );
     // A Windows lab of PowerShell steps clones a template on Proxmox.
     let windows = example("windows-hello")?;
-    assert_eq!(isoloom_targets::refusal(&windows, Target::Proxmox), None);
+    assert_eq!(isoloom_targets::refusal(&windows, Target::Proxmox).unwrap(), None);
     // Environment-level provisioning runs from a controller on Proxmox now, so it is not refused.
     let ansible = example("ansible-pair")?;
-    assert_eq!(isoloom_targets::refusal(&ansible, Target::Proxmox), None);
+    assert_eq!(isoloom_targets::refusal(&ansible, Target::Proxmox).unwrap(), None);
     // A plain Linux lab is generated: nothing to refuse.
     let plain = example("hello-stack")?;
-    assert_eq!(isoloom_targets::refusal(&plain, Target::Proxmox), None);
-    assert_eq!(isoloom_targets::refusal(&plain, Target::Docker), None);
+    assert_eq!(isoloom_targets::refusal(&plain, Target::Proxmox).unwrap(), None);
+    assert_eq!(isoloom_targets::refusal(&plain, Target::Docker).unwrap(), None);
     Ok(())
 }
 
@@ -53,7 +55,7 @@ const UNDECLARED_NETWORK: &str =
 fn refused_everywhere(yaml: &str, problem: &str) -> Outcome {
     let spec = lab(yaml)?;
     for t in Target::ALL {
-        let why = isoloom_targets::refusal(&spec, t).ok_or_else(|| format!("{t:?} not refused"))?;
+        let why = isoloom_targets::refusal(&spec, t)?.ok_or_else(|| format!("{t:?} not refused"))?;
         assert!(why.contains(problem), "{t:?}: {why}");
     }
     Ok(())
@@ -72,7 +74,7 @@ fn refusal_of_an_undeclared_network_does_not_panic() -> Outcome {
 #[test]
 fn checks_plan_of_an_undeclared_network_does_not_panic() -> Outcome {
     let planned = isoloom_plan::checks::plan(&lab(UNDECLARED_NETWORK)?.spec());
-    assert!(planned.iter().all(|c| !c.name.is_empty()), "{planned:?}");
+    assert!(!planned.is_empty() && planned.iter().all(|c| !c.name.is_empty()), "{planned:?}");
     Ok(())
 }
 

@@ -170,8 +170,6 @@ pub(crate) struct Provision {
     call: Call,
     /// The heredoc the call ends with: its keyword, its tag, the script.
     heredoc: Option<(String, String, String)>,
-    /// Its name, when `vagrant up --provision-with` takes it ([`Provision::named`]).
-    named: Option<String>,
 }
 
 impl Provision {
@@ -181,19 +179,14 @@ impl Provision {
         Provision {
             call: Call::new(format!("{var}.vm.provision")).arg(Value::str(name)),
             heredoc: None,
-            named: None,
         }
     }
 
     /// `<var>.vm.provision "<name>", type: "<kind>"`: a provisioner named at its own level, which
     /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
-    /// provisioner's own `name:` option, and the project provisioner has no such option). The
-    /// writer records the name ([`Ruby::named_provisioners`]).
+    /// provisioner's own `name:` option, and the project provisioner has no such option).
     pub(crate) fn named(var: &str, name: &str, kind: &str) -> Provision {
-        Provision {
-            named: Some(name.to_owned()),
-            ..Provision::new(var, name).kw("type", Value::str(kind))
-        }
+        Provision::new(var, name).kw("type", Value::str(kind))
     }
 
     /// Adds a keyword argument (`key: value`).
@@ -231,6 +224,15 @@ impl Provision {
     }
 }
 
+/// When a VM [`Ruby::define`] writes is started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Start {
+    /// By `vagrant up`, with the environment.
+    WithUp,
+    /// Not by `vagrant up` (`autostart: false`): the runner brings it up on its own.
+    OnDemand,
+}
+
 /// Ruby source, written statement by statement at the depth of the enclosing blocks (two
 /// spaces a level).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -241,8 +243,6 @@ pub(crate) struct Ruby {
     recording: Option<Recording>,
     /// What the configure block applied at boot, once written.
     boot: BootStatements,
-    /// The named provisioners written ([`Provision::named`]), each once, in the file's order.
-    named: Vec<String>,
 }
 
 /// The statements of a Vagrantfile's configure block that Vagrant applies to a VM only when it
@@ -335,11 +335,11 @@ impl Ruby {
         self.write("end")
     }
 
-    /// `config.vm.define "<name>" do |m|` (`autostart: false` unless `autostart`), `body` one
-    /// level deeper, then `end`: VM `name`, whose statements are recorded as its own.
-    pub(crate) fn define(&mut self, name: &str, autostart: bool, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
+    /// `config.vm.define "<name>" do |m|` (`autostart: false` for a VM started [`Start::OnDemand`]),
+    /// `body` one level deeper, then `end`: VM `name`, whose statements are recorded as its own.
+    pub(crate) fn define(&mut self, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
         let mut call = Call::new("config.vm.define").arg(Value::str(name));
-        if !autostart {
+        if start == Start::OnDemand {
             call = call.kw("autostart", false);
         }
         self.write(&format!("{call} do |m|"));
@@ -359,12 +359,6 @@ impl Ruby {
     /// What the configure block written applies at boot (empty before [`Ruby::configure`]).
     pub(crate) fn boot(&self) -> &BootStatements {
         &self.boot
-    }
-
-    /// The names of the provisioners written with [`Provision::named`], each once, in the file's
-    /// order: what `vagrant up --provision-with` can take.
-    pub(crate) fn named_provisioners(&self) -> &[String] {
-        &self.named
     }
 
     /// An empty line.
@@ -414,11 +408,6 @@ impl Ruby {
     /// A provisioner: its call, then its heredoc's lines one level deeper and its closing tag,
     /// when it has one. Never recorded ([`BootStatements`]).
     pub(crate) fn provision(&mut self, p: Provision) -> &mut Ruby {
-        if let Some(name) = p.named
-            && !self.named.contains(&name)
-        {
-            self.named.push(name);
-        }
         let recording = self.recording.take();
         match p.heredoc {
             None => self.line(p.call),
@@ -506,7 +495,7 @@ fn closing_tag(tag: &str, script: &str) -> String {
 mod tests {
     use proptest::prelude::*;
 
-    use super::{Call, Provision, Ruby, Value, closing_tag, quote};
+    use super::{Call, Provision, Ruby, Start, Value, closing_tag, quote};
 
     #[test]
     fn quotes_backslashes_and_interpolations_are_escaped() {
@@ -644,7 +633,7 @@ mod tests {
             r.assign("config.vm.boot_timeout", 900u32);
             r.comment("shared");
             r.provision(Provision::new("config", "shell").heredoc("inline", "SH", "echo a\n"));
-            r.define("web", false, |r| {
+            r.define("web", Start::OnDemand, |r| {
                 r.block(Call::new("m.vm.provider").arg(Value::str("utm")), "_, o", |r| {
                     r.assign("o.memory", 512u32);
                 });

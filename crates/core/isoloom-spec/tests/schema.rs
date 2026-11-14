@@ -11,7 +11,7 @@ use isoloom_spec::schema::{MODELINE, schema};
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
 /// The committed schema is written by the catalogue, which adds each entry's `with:` rule.
-const WRITE: &str = "cargo test -p isoloom-catalogue --test catalogue -- --ignored write_the_generated_schemas";
+const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
 
 /// The committed copy of the schema.
 fn committed() -> std::path::PathBuf {
@@ -92,6 +92,23 @@ fn the_schema_holds_names_to_the_lengths_validate_does() -> Outcome {
     for (name, machine, network) in [(&n56, &n55, &n63), (&n55, &n56, &n63), (&n55, &n55, &n64)] {
         let doc = spec(name, machine, network)?;
         assert!(!v.is_valid(&doc), "should be flagged: {doc}");
+    }
+    Ok(())
+}
+
+/// Regression: the schema took a VLAN id up to 9999 while validation refuses past 4094.
+#[test]
+fn the_schema_holds_vlan_ids_to_the_range_validate_does() -> Outcome {
+    let v = validator()?;
+    let spec = |id: u16| -> Outcome<serde_json::Value> {
+        let text = format!("version: 1\nname: v\nnetworks: {{ lan: {{ cidr: 10.0.0.0/16, vlans: {{ {id}: {{ cidr: 10.0.1.0/24 }} }} }} }}\n");
+        Ok(serde_yaml_ng::from_str(&text)?)
+    };
+    for id in [1, 9, 10, 99, 100, 999, 1000, 3999, 4000, 4089, 4090, 4094] {
+        assert!(v.is_valid(&spec(id)?), "{id} is a VLAN id");
+    }
+    for id in [0, 4095, 4099, 4100, 5000, 9999] {
+        assert!(!v.is_valid(&spec(id)?), "{id} isn't a VLAN id");
     }
     Ok(())
 }

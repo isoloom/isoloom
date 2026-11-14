@@ -303,6 +303,28 @@ pub struct Port {
     /// A port served over both is two entries, one per protocol.
     #[serde(default, skip_serializing_if = "Protocol::is_tcp")]
     pub protocol: Protocol,
+    /// The account its service ships with, shown to the user beside the port: a training
+    /// environment's published sign-in, never a secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<Login>,
+}
+
+/// The fixed account a port's service ships with, shown to the user beside the port: a training
+/// environment's published sign-in, never a secret (a secret is an input).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Login {
+    /// The account's name.
+    pub user: String,
+    /// Its password.
+    pub password: String,
+}
+
+// Leaves the password out, so a debug line never prints it.
+impl std::fmt::Debug for Login {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Login").field("user", &self.user).finish_non_exhaustive()
+    }
 }
 
 /// A port's transport protocol.

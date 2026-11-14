@@ -1,7 +1,8 @@
 //! The one-way dependency rule of the engineering standard, checked on what
-//! `cargo metadata` says: spec → plan → render → backends → targets → cli. A crate depends only
-//! on crates below it, so no backend depends on another backend, the tools (import) depend on
-//! the core alone, the manifest crate depends on no other crate of the workspace (it is the
+//! `cargo metadata` says: spec → plan → render → backends → targets → cli and the front-ends. A
+//! crate depends only on crates below it, so no backend depends on another backend, the tools
+//! (import) depend on the core alone, a front-end (the topology compiler, its WebAssembly engine)
+//! builds on the targets and the front-ends before it, the manifest crate depends on no other crate of the workspace (it is the
 //! serde-only contract the runner reads too, whose names the spec uses), and nothing depends on
 //! the xtask (which may use
 //! any crate: the catalogue's refresh reads the catalogue's types).
@@ -21,6 +22,8 @@ enum Level {
     Targets,
     /// The command line (`crates/cli/`).
     Cli,
+    /// A front-end (`crates/frontends/`), by its rank in the front-end order.
+    Frontend(u8),
     /// The development tasks: on their own.
     Xtask,
 }
@@ -33,6 +36,7 @@ impl Level {
             Level::Backend | Level::Tool => 10,
             Level::Targets => 11,
             Level::Cli => 12,
+            Level::Frontend(rank) => 12 + rank,
             Level::Xtask => 0,
         }
     }
@@ -47,6 +51,9 @@ const CORE: [(&str, u8); 5] = [
     ("isoloom-plan", 3),
     ("isoloom-render", 4),
 ];
+
+/// The front-ends, in their order: the WebAssembly engine runs the topology compiler.
+const FRONTENDS: [(&str, u8); 2] = [("isoloom-topology", 0), ("isoloom-wasm", 1)];
 
 /// What the manifest crate may build on: serde and its schema, nothing else, so the runner reads
 /// the contract without pulling in the converter.
@@ -83,12 +90,21 @@ fn level(name: &str, dir: &str) -> Result<Level, String> {
         ["crates", "tools", _] => Ok(Level::Tool),
         ["crates", "targets", _] => Ok(Level::Targets),
         ["crates", "cli", _] => Ok(Level::Cli),
+        ["crates", "frontends", _] => FRONTENDS
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, rank)| Level::Frontend(*rank))
+            .ok_or_else(|| format!("{name}: a front-end the dependency rule doesn't place: add it to the front-end order (xtask/src/deps.rs)")),
         ["xtask"] => Ok(Level::Xtask),
         _ => Err(format!(
-            "{name} ({dir}): outside the layout (crates/{{core,backends,tools,targets,cli}}/<crate>, xtask)"
+            "{name} ({dir}): outside the layout (crates/{{core,backends,tools,targets,cli,frontends}}/<crate>, xtask)"
         )),
     }
 }
+
+/// The crate of helpers the tests share (unpublished, on no workspace crate): a dev-dependency
+/// any crate may take.
+const TEST_SUPPORT: &str = "isoloom-test-support";
 
 /// Whether `from` may depend on `to`.
 fn allowed(from: Level, to: Level) -> bool {
@@ -125,10 +141,14 @@ pub(crate) fn violations(metadata: &Value) -> Vec<String> {
         for d in p["dependencies"].as_array().into_iter().flatten() {
             let dep = d["name"].as_str().unwrap_or("");
             let Some(to) = level_of(dep) else { continue };
+            // The tests' shared helpers sit beneath every crate: any crate's tests may use them.
+            if dep == TEST_SUPPORT && d["kind"].as_str() == Some("dev") {
+                continue;
+            }
             if !allowed(from, to) {
                 let kind = d["kind"].as_str().map(|k| format!(" ({k})")).unwrap_or_default();
                 problems.push(format!(
-                    "{name} ({from:?}) depends on {dep} ({to:?}){kind}: dependencies go one way, spec → plan → render → backends → targets → cli"
+                    "{name} ({from:?}) depends on {dep} ({to:?}){kind}: dependencies go one way, spec → plan → render → backends → targets → cli and the front-ends"
                 ));
             }
         }
@@ -172,6 +192,41 @@ mod tests {
             upward[0].starts_with("isoloom-spec (Core(1)) depends on isoloom-plan (Core(3)) (dev)"),
             "{upward:?}"
         );
+    }
+
+    #[test]
+    fn any_crate_s_tests_may_use_the_shared_test_helpers_and_nothing_else_may() {
+        let helpers = || package(TEST_SUPPORT, "crates/tools/isoloom-test-support", &[]);
+        let ok = check(&[
+            helpers(),
+            package("isoloom-vagrant", "crates/backends/isoloom-vagrant", &[(TEST_SUPPORT, Some("dev"))]),
+        ]);
+        assert!(ok.is_empty(), "{ok:?}");
+        let built = check(&[
+            helpers(),
+            package("isoloom-vagrant", "crates/backends/isoloom-vagrant", &[(TEST_SUPPORT, None)]),
+        ]);
+        assert_eq!(built.len(), 1, "{built:?}");
+    }
+
+    #[test]
+    fn a_front_end_builds_on_the_targets_and_the_front_ends_before_it() {
+        let ok = check(&[
+            package("isoloom-targets", "crates/targets/isoloom-targets", &[]),
+            package("isoloom-topology", "crates/frontends/isoloom-topology", &[("isoloom-targets", Some("dev"))]),
+            package(
+                "isoloom-wasm",
+                "crates/frontends/isoloom-wasm",
+                &[("isoloom-targets", None), ("isoloom-topology", None)],
+            ),
+        ]);
+        assert!(ok.is_empty(), "{ok:?}");
+        let found = check(&[
+            package("isoloom-topology", "crates/frontends/isoloom-topology", &[("isoloom-wasm", None)]),
+            package("isoloom-wasm", "crates/frontends/isoloom-wasm", &[]),
+            package("isoloom", "crates/cli/isoloom", &[("isoloom-topology", None)]),
+        ]);
+        assert_eq!(found.len(), 2, "{found:?}");
     }
 
     #[test]

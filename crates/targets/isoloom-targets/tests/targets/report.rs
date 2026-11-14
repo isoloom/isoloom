@@ -31,29 +31,53 @@ fn the_graph_shows_networks_machines_reach_and_the_router() -> Outcome {
 }
 
 #[test]
-fn reports_cover_addresses_services_wiring_and_resources() -> Outcome {
-    let r = snapshot("segmented")?;
-    let addressing = report("addressing", &r, false).unwrap();
-    let header = addressing.lines().next().unwrap();
+fn the_addressing_report_shows_each_machines_address_on_each_network() -> Outcome {
+    let addressing = report("addressing", &snapshot("segmented")?, false)?;
+    let header = addressing.lines().next().ok_or("an empty report")?;
     assert!(
         header.starts_with("machine") && header.contains("front") && header.contains("access"),
         "{header}"
     );
     assert!(addressing.lines().any(|l| l.starts_with("web") && l.contains("10.61.10.10")), "{addressing}");
     assert!(addressing.contains("(router)"), "{addressing}");
-    let services = report("ports", &r, true).unwrap();
+    Ok(())
+}
+
+#[test]
+fn the_ports_report_says_from_where_each_service_answers() -> Outcome {
+    let services = report("ports", &snapshot("segmented")?, true)?;
     assert!(services.starts_with("| machine | port | name | http | published | reachable from |"));
     // The cache answers on 6379 from its own network and from front (reach rule), not from access.
     assert!(services.contains("| cache | 6379 | redis |  |  | front, back |"), "{services}");
     assert!(services.contains("| web | 80 | web | yes |  | front, access |"), "{services}");
-    let wiring = report("wiring", &r, false).unwrap();
-    assert!(
-        wiring.contains("isoloom-segmented-front") && wiring.contains("net.isoloom.com/front=member") && wiring.contains("10.61.10.254"),
-        "{wiring}"
-    );
-    let resources = report("resources", &r, false).unwrap();
-    assert!(resources.lines().last().unwrap().starts_with("total"), "{resources}");
-    assert!(report("nope", &r, false).unwrap_err().to_string().contains("addressing"));
+    Ok(())
+}
+
+#[test]
+fn the_wiring_report_names_the_bridges_their_labels_and_gateways() -> Outcome {
+    let wiring = report("wiring", &snapshot("segmented")?, false)?;
+    assert!(wiring.contains("isoloom-segmented-<key>-front"), "{wiring}");
+    assert!(wiring.contains("net.isoloom.com/front=member"), "{wiring}");
+    assert!(wiring.contains("10.61.10.254"), "{wiring}");
+    Ok(())
+}
+
+/// The totals read the snapshot as its writer writes it: an all-zero total is the reader missing
+/// the sizes, not an environment of empty machines.
+#[test]
+fn the_resources_report_totals_every_machines_size() -> Outcome {
+    let resources = report("resources", &snapshot("segmented")?, false)?;
+    let total: Vec<&str> = resources.lines().last().ok_or("an empty report")?.split_whitespace().collect();
+    assert_eq!(total.first(), Some(&"total"), "{resources}");
+    let sizes = total.get(1..4).ok_or("cpus, memory and disk")?;
+    assert!(sizes.iter().all(|n| n.parse::<u64>().is_ok_and(|n| n > 0)), "{resources}");
+    Ok(())
+}
+
+#[test]
+fn an_unknown_report_names_the_known_ones() -> Outcome {
+    let e = report("nope", &snapshot("segmented")?, false).expect_err("no report is named nope");
+    assert!(e.to_string().contains("addressing"), "{e}");
     assert_eq!(REPORTS.len(), 4);
     Ok(())
 }

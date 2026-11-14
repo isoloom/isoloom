@@ -7,7 +7,7 @@ use isoloom_manifest::{
     Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Param, Part, PathTemplate, Placeholder, RunVar, Seal, Step, Template,
 };
 use isoloom_render::run_manifest::noted;
-use isoloom_render::steps::{Archive, PROJECT_DIR, project_unpack};
+use isoloom_render::steps::{Archive, PROJECT_DIR, TopFolder, project_unpack};
 use isoloom_spec::linux::STATE_DIR;
 
 use super::connection::SEALED;
@@ -57,7 +57,7 @@ fn deliver(guest: &Guest) -> Result<Step, ManifestError> {
     let command = format!(
         "{}sh -c '{} && mkdir -p {STATE_DIR} && touch {DELIVERED}'",
         guest.login.as_root().prefix(),
-        project_unpack(Archive::Stdin, false)
+        project_unpack(Archive::Stdin, TopFolder::Kept)
     );
     let wait = [("wait_s", Template::text(&BOOT_WAIT_S.to_string()))];
     let mut s = guest.login.step(&format!("deliver-{}", guest.id()), &Template::text(&command), &wait)?;

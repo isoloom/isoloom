@@ -90,7 +90,15 @@ fn resolve(spec: &Spec, template_of: Option<&str>, r: &Reference) -> Result<(), 
             Some(_) => Err(format!("`cloud.outputs` has no `{name}`")),
             None => Err("the spec has no `cloud:`".into()),
         },
-        _ => Ok(()),
+        // Each names what every machine has, or an entry's own value: listed, so a new kind of
+        // reference is resolved here before it is accepted.
+        Reference::MachineName
+        | Reference::Version
+        | Reference::Os(_)
+        | Reference::Var(_)
+        | Reference::Setting { .. }
+        | Reference::Item(_)
+        | Reference::ItemPath(_) => Ok(()),
     }
 }
 

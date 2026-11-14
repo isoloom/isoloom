@@ -16,18 +16,38 @@ pub(crate) fn crates(root: &Path) -> Res<Vec<Crate>> {
     let mut cmd = Command::new(cargo);
     cmd.args(["metadata", "--format-version", "1", "--no-deps", "--offline", "--manifest-path"])
         .arg(root.join("Cargo.toml"));
-    let metadata: serde_json::Value = serde_json::from_str(&process::output(&mut cmd)?)?;
-    let base = repo::slashed(Path::new(metadata.get("workspace_root").and_then(serde_json::Value::as_str).unwrap_or("")));
-    let packages = metadata.get("packages").and_then(serde_json::Value::as_array).cloned().unwrap_or_default();
-    Ok(packages
+    Ok(in_workspace(&serde_json::from_str(&process::output(&mut cmd)?)?))
+}
+
+/// What this tool reads of `cargo metadata --format-version 1`: the workspace's root and each
+/// package's name and manifest. Unknown fields are skipped; a missing one is an error, never an
+/// empty path that would put every crate in the wrong folder.
+#[derive(Debug, serde::Deserialize)]
+struct Metadata {
+    workspace_root: String,
+    packages: Vec<Package>,
+}
+
+/// A package of [`Metadata`].
+#[derive(Debug, serde::Deserialize)]
+struct Package {
+    name: String,
+    manifest_path: String,
+}
+
+/// The crates of `metadata`, each with its folder relative to the workspace's root (a package
+/// outside it is left out).
+fn in_workspace(metadata: &Metadata) -> Vec<Crate> {
+    let base = repo::slashed(Path::new(&metadata.workspace_root));
+    metadata
+        .packages
         .iter()
         .filter_map(|p| {
-            let name = p.get("name")?.as_str()?.to_owned();
-            let manifest = repo::slashed(Path::new(p.get("manifest_path")?.as_str()?));
+            let manifest = repo::slashed(Path::new(&p.manifest_path));
             let dir = manifest.strip_suffix("/Cargo.toml")?.strip_prefix(&base)?.trim_start_matches('/').to_owned();
-            Some(Crate { name, dir })
+            Some(Crate { name: p.name.clone(), dir })
         })
-        .collect())
+        .collect()
 }
 
 /// Counts the files over the size limit (a crate's `src`, its `tests.rs` files aside) and the
@@ -100,6 +120,16 @@ fn expectations(src: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cargo_metadata_gives_each_crate_with_its_folder() {
+        // As `cargo metadata --format-version 1 --no-deps` prints it (fields trimmed to a few).
+        let printed = r#"{"packages":[{"name":"isoloom","version":"2.0.0","id":"path+file:///w/crates/cli/isoloom#2.0.0","manifest_path":"/w/crates/cli/isoloom/Cargo.toml","targets":[]},{"name":"xtask","version":"0.0.0","manifest_path":"/w/xtask/Cargo.toml"},{"name":"elsewhere","manifest_path":"/other/Cargo.toml"}],"workspace_members":[],"resolve":null,"target_directory":"/w/target","version":1,"workspace_root":"/w","metadata":null}"#;
+        let crates = in_workspace(&serde_json::from_str(printed).unwrap());
+        let found: Vec<(&str, &str)> = crates.iter().map(|c| (c.name.as_str(), c.dir.as_str())).collect();
+        assert_eq!(found, [("isoloom", "crates/cli/isoloom"), ("xtask", "xtask")]);
+        assert!(serde_json::from_str::<Metadata>(r#"{"packages":[]}"#).is_err(), "no workspace root is an error");
+    }
 
     #[test]
     fn comments_blanks_and_the_test_module_are_not_counted() {

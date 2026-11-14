@@ -103,7 +103,7 @@ impl Row {
         match &self.uses {
             Uses::Written(w) => uses::written_in(w, &written.0),
             Uses::Features => {
-                let env = isoloom_plan::Environment::build(&lab.for_target(target), target, None).expect("the spec plans");
+                let env = lab.plan(&lab.for_target(target), target, None).expect("the spec plans");
                 env.requirements.iter().any(|r| self.features.contains(&r.feature()))
             }
             Uses::Refusal => lab.refusal(target).is_some_and(|p| uses::path_matches(&self.field, p.path.as_str())),
@@ -116,11 +116,13 @@ impl Row {
 /// # Errors
 ///
 /// [`crate::Error::Probe`] when a row of `probes.yml` names what doesn't exist, [`crate::Error::Tiers`] or
-/// [`crate::Error::TiersJson`] when the tier list can't be read (tests keep both readable).
+/// [`crate::Error::TiersJson`] when the tier list can't be read (tests keep both readable),
+/// [`crate::Error::Generate`] when a row's lab doesn't plan for a column's target (a failure of
+/// lowering, never a cell shown as supported).
 pub fn matrix() -> Result<Matrix> {
     let probes = probe::probes()?;
     let columns = columns();
-    let rows = probes.rows.iter().map(|p| row(&probes, p, &columns)).collect();
+    let rows = probes.rows.iter().map(|p| row(&probes, p, &columns)).collect::<Result<_>>()?;
     Ok(Matrix {
         consoles: consoles::rows(&columns),
         columns,
@@ -129,11 +131,10 @@ pub fn matrix() -> Result<Matrix> {
     })
 }
 
-/// The environments a row's columns decide on: the plain one, `hybrid`'s (with a container-only and a
-/// VM-only machine beside), `external`'s (each machine an existing host), and the cloud lab.
+/// The environments a row's columns decide on: the plain one, `external`'s (each machine an
+/// existing host), and the cloud lab.
 struct Labs {
     plain: std::result::Result<Lab, String>,
-    hybrid: std::result::Result<Lab, String>,
     external: std::result::Result<Lab, String>,
     cloud: std::result::Result<Lab, String>,
 }
@@ -157,48 +158,46 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
 const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:1, vm: debian@12 }\n";
 
 /// A row: its environments, then each column's decision about the one it reads.
-fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Row {
+fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Result<Row> {
     let labs = Labs {
         plain: lab(&probes.base, &p.patch, false),
-        hybrid: lab(&probes.hybrid, &p.patch, false),
         external: lab(&probes.base, &p.patch, p.hosts),
         cloud: lab(&probes.cloud, &p.patch, false),
     };
-    Row {
+    Ok(Row {
         field: p.field.clone(),
         value: p.value.clone(),
         about: p.about.clone(),
         features: p.features.clone(),
-        cells: columns.iter().map(|c| cell(p, &labs, c)).collect(),
+        cells: columns.iter().map(|c| cell(p, &labs, c)).collect::<std::result::Result<_, _>>()?,
         uses: p.uses.clone(),
-    }
+    })
 }
 
 /// What `column` decides about the row's environment, or not applicable when the row is about another
 /// target or another kind of lab.
-fn cell(p: &Probe, labs: &Labs, column: &Column) -> Cell {
+fn cell(p: &Probe, labs: &Labs, column: &Column) -> std::result::Result<Cell, crate::GenerateError> {
     let target = column.target;
     if (!p.only.is_empty() && !p.only.contains(&target)) || p.cloud != (target == Target::CloudServices) {
-        return Cell::NotApplicable;
+        return Ok(Cell::NotApplicable);
     }
     let lab = match target {
-        Target::Hybrid => &labs.hybrid,
         Target::External => &labs.external,
         Target::CloudServices => &labs.cloud,
         _ => &labs.plain,
     };
-    match lab {
+    Ok(match lab {
         Err(why) => Cell::Refused(Refused {
             code: Code::Invalid,
             field: None,
             reason: why.clone(),
         }),
-        Ok(lab) => match decide(lab, column.target, column.variant) {
+        Ok(lab) => match decide(lab, column.target, column.variant)? {
             Decision::Generated => Cell::Supported,
             Decision::Refused(r) => Cell::Refused(r),
             Decision::NotApplicable => Cell::NotApplicable,
         },
-    }
+    })
 }
 
 impl Matrix {
@@ -209,7 +208,7 @@ impl Matrix {
     }
 
     /// The tiers of `column`: its entry's, or every entry's of its target when it stands for
-    /// them all (`docker-vm`), each tier once, lowest first.
+    /// them all (`cloud-docker`), each tier once, lowest first.
     #[must_use]
     pub(crate) fn column_tiers(&self, column: &Column) -> Vec<crate::tiers::Tier> {
         let mut found: Vec<_> = self

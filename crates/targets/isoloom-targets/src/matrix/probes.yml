@@ -30,10 +30,6 @@ base:
       networks: { lan: 10 }
       app: { image: "redis:7", steps: [{ run: setup.sh }] }
 
-# On `hybrid`, beside `m`: a machine only a container runs, and one only a VM runs.
-hybrid:
-  c: { networks: { lan: 20 }, app: { image: "nginx:1.27" } }
-  v: { os: debian@12, networks: { lan: 30 }, ports: { web: 80 }, app: { steps: [{ run: v.sh }] } }
 
 # The environment of cloud services.
 cloud:
@@ -96,6 +92,7 @@ rows:
     patch: { machines: { m: { setup: [seed.sh] } } }
   - field: machines.*.environment
     about: environment variables
+    features: [existing-host-settings]
     patch: { machines: { m: { environment: { MODE: lab } } } }
   - field: machines.*.environment.*.input
     about: an environment variable from a non-sensitive input
@@ -107,11 +104,11 @@ rows:
         m: { depends_on: [w] }
         w: { os: debian@12, networks: { lan: 11 }, ports: { redis: 6379 }, app: { image: "redis:7", steps: [{ run: setup.sh }] } }
   - field: machines.*.depends_on
-    about: a VM waiting for a container
+    about: a VM waiting for a container (an LXC container on Proxmox)
     features: [vm-after-container]
     uses: features
-    only: [hybrid]
-    patch: { machines: { c: { ports: { web: 80 } }, v: { depends_on: [c] } } }
+    only: [proxmox]
+    patch: { machines: { m: { ports: { redis: 6379 }, app: { steps: null } }, v: { os: debian@12, networks: { lan: 30 }, depends_on: [m] } }, overrides: { proxmox: { machines: { m: { lxc: true } } } } }
   - field: machines.*.resources
     about: CPUs and memory
     patch: { machines: { m: { resources: { cpus: 2, memory_mb: 2048 } } } }
@@ -120,10 +117,11 @@ rows:
     patch: { machines: { m: { privileged: true } } }
   - field: machines.*.sysctls
     about: kernel parameters
+    features: [existing-host-settings]
     patch: { machines: { m: { sysctls: { net.core.somaxconn: 4096 } } } }
   - field: machines.*.ulimits
     about: process limits
-    features: [ulimits]
+    features: [ulimits, existing-host-settings]
     patch: { machines: { m: { ulimits: { nofile: 65536 } } } }
   - field: machines.*.dns
     about: its own resolver settings
@@ -254,11 +252,11 @@ rows:
         m: { volumes: { shared: /srv } }
         w: { os: debian@12, networks: { lan: 11 }, volumes: { shared: /srv }, app: { image: "redis:7", steps: [{ run: setup.sh }] } }
   - field: volumes
-    about: a volume a container and a VM share
+    about: a volume a container and a VM share (an LXC container on Proxmox)
     features: [volumes-across-shapes]
     uses: features
-    only: [hybrid]
-    patch: { volumes: { shared: { owner: v } }, machines: { c: { volumes: { shared: /srv } }, v: { volumes: { shared: /srv } } } }
+    only: [proxmox]
+    patch: { volumes: { shared: { owner: v } }, machines: { m: { volumes: { shared: /srv }, app: { steps: null } }, v: { os: debian@12, networks: { lan: 30 }, volumes: { shared: /srv } } }, overrides: { proxmox: { machines: { m: { lxc: true } } } } }
   - field: volumes.*.persistent
     value: true
     about: a volume kept past `down`
@@ -397,6 +395,7 @@ rows:
     patch: { checks: [check.sh] }
   - field: tools
     about: a toolbox beside the environment, on every network
+    features: [tools]
     patch: { tools: { shell: {} } }
   - field: constraints.proxy
     about: an HTTP proxy every machine goes through
@@ -425,7 +424,7 @@ rows:
       overrides: { proxmox: { volumes: { data: { virtiofs: {} } } } }
   - field: overrides.vagrant.machines.*.box
     about: a Vagrant box of one's own
-    only: [vagrant, hybrid]
+    only: [vagrant]
     patch: { overrides: { vagrant: { machines: { m: { box: generic/debian12 } } } } }
 
   # Cloud services.

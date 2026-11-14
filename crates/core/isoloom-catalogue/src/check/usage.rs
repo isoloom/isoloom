@@ -122,6 +122,15 @@ fn in_templates(entry: &Entry, name: &str) -> bool {
         })
 }
 
+/// Whether `text` starts with a placeholder of a setting (`{{ with.root }}`, however spaced, as
+/// the placeholder grammar reads it).
+fn starts_with_a_setting(text: &str) -> bool {
+    matches!(
+        isoloom_spec::placeholders::pieces(text.trim_start()).first(),
+        Some(isoloom_spec::placeholders::Piece::Placeholder(path)) if path.trim().starts_with("with.")
+    )
+}
+
 /// What `step`'s sources break: a template's file is one of the entry's `files/`; a copy places
 /// the project's content, through a setting.
 fn sources(entry: &Entry, step: &EntryStep) -> Vec<String> {
@@ -136,7 +145,7 @@ fn sources(entry: &Entry, step: &EntryStep) -> Vec<String> {
         }
     }
     if let Some(from) = step.body.pointer("/copy/from").and_then(Value::as_str)
-        && !from.trim_start().starts_with("{{ with.")
+        && !starts_with_a_setting(from)
     {
         out.push(format!(
             "a copy places the project's content a setting names (`{{{{ with.root }}}}/`), not `{from}`: the entry's own files go through `template`"

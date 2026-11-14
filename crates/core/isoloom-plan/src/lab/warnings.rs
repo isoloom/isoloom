@@ -8,7 +8,7 @@ use isoloom_spec::model::Seal;
 use isoloom_spec::syntax::{FieldPath, PackageName, Warning};
 
 use super::Lab;
-use crate::configure::{DaemonTable, unstarted};
+use crate::configure::unstarted;
 
 impl Lab {
     /// What the spec says that is likely not what its author means, in file order: a daemon a
@@ -27,13 +27,13 @@ impl Lab {
     /// A daemon a recipe installs with no `service` step for it, once per step and package of the
     /// spec's own lines (a machine's clones share them).
     fn unstarted_warnings(&self) -> Vec<Warning> {
-        let daemons = DaemonTable::common();
+        let daemons = self.daemons();
         let mut said: HashSet<(FieldPath, PackageName)> = HashSet::new();
         let mut out = Vec::new();
         for (name, m) in &self.source.machines {
             let Some(os) = m.os else { continue };
             let base = self.written_as(name);
-            for u in unstarted(os, m, &daemons) {
+            for u in unstarted(os, m, daemons) {
                 let path = FieldPath::new("machines").key(base).key("app").key("steps").index(u.step);
                 if !said.insert((path.clone(), u.package.clone())) {
                     continue;

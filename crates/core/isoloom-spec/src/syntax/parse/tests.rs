@@ -99,3 +99,17 @@ fn a_typed_problem_beside_an_old_key_is_kept() {
     let found: Vec<(Code, &str)> = p.iter().map(|p| (p.code, p.path.as_str())).collect();
     assert_eq!(found, [(Code::RemovedField, "machines.web.docker"), (Code::InvalidValue, "machines.db.os")]);
 }
+
+#[test]
+fn a_name_that_isnt_a_text_is_said_so_not_reported_as_an_empty_name() {
+    let top = problems("version: 1\nname: t\n1: x\n");
+    assert_eq!((top[0].path.as_str(), top[0].reason.as_str()), ("", "a field's name is a text"));
+    let group = problems("version: 1\nname: t\ngroups:\n  1: { members: [] }\n");
+    assert_eq!((group[0].path.as_str(), group[0].reason.as_str()), ("groups", "a group's name is a text"));
+}
+
+#[test]
+fn fields_that_exclude_each_other_are_a_conflict() {
+    let p = problems("version: 1\nname: t\nmachines:\n  web: { service: postgres, app: { image: nginx } }\n");
+    assert_eq!((p[0].code, p[0].path.as_str()), (Code::Conflict, "machines.web"));
+}

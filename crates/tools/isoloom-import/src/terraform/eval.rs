@@ -104,8 +104,16 @@ fn expansions(b: &Block, ctx: &Context, at: &str, notes: &mut Notes) -> Option<V
         }
     } else if let Some(c) = attr("count") {
         if let Ok(Value::Number(n)) = c.evaluate(ctx) {
+            let Some(n) = n.as_u64() else {
+                notes.add(
+                    at,
+                    NoteKind::Changed,
+                    format!("its `count` is {n}, not a whole number of machines: add these machines by hand"),
+                );
+                return None;
+            };
             Some(
-                (0..n.as_u64().unwrap_or(0))
+                (0..n)
                     .map(|i| {
                         let count: hcl::Map<String, Value> = [("index".to_owned(), Value::from(i))].into_iter().collect();
                         (Some(i.to_string()), Some(("count", Value::Object(count))))

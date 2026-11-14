@@ -152,10 +152,7 @@ fn the_design_examples_validate_but_for_what_waits_on_later_phases() {
 #[test]
 fn a_lab_lists_the_targets_its_machines_have_forms_for() {
     let lab = crate::Lab::new(example("help-desk"));
-    assert_eq!(
-        lab.possible(),
-        [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Kubernetes]
-    );
+    assert_eq!(lab.possible(), [Target::Docker, Target::Hosted, Target::CloudDocker, Target::Kubernetes]);
     let refused = lab.refusal(Target::Vagrant).unwrap();
     assert_eq!((refused.path.as_str(), refused.span.map(|s| s.line)), ("machines.web.app.build", Some(21)));
     let forest = crate::Lab::new(example("forest-mini"));
@@ -169,7 +166,7 @@ fn a_catalogue_service_is_refused_at_its_service_until_its_entry_exists() {
     let lab = crate::testing::lab(
         "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db:\n    os: debian@12\n    service: no-such-service\n    networks: { lan: 10 }\n",
     );
-    for target in [Target::Docker, Target::Vagrant, Target::Hybrid] {
+    for target in [Target::Docker, Target::Vagrant, Target::Proxmox] {
         let l = lower(lab.source(), built_in(), Scope::Target(target));
         let db: Vec<&str> = l
             .refusals

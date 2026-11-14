@@ -37,6 +37,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     let m = m.as_ref();
     let (files, secrets, inputs) = files(name, m, trail);
     trail.machine(name, m);
+    trail.overrides(l.source, name);
     let at = FieldPath::new("machines").key(name);
     let (ports, unnumbered) = ports(&at, m);
     problems.extend(unnumbered);
@@ -83,7 +84,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.docker = docker;
     out.external = overrides::external(l.source, name);
     out.configuration = configuration(l, m, service, image);
-    problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service));
+    problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service, l.services.daemons()));
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
         out.vm = None;
@@ -143,9 +144,9 @@ fn image_environment(l: &Lowering<'_>, image: ContainerImage, service: Service<'
 }
 
 /// Whether the target runs a machine with a container form as a container (`docker` and the
-/// container targets; `hybrid` too).
+/// container targets).
 fn runs_containers(l: &Lowering<'_>) -> bool {
-    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker | Shape::Either))
+    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker))
 }
 
 /// The inputs its environment reads.
@@ -178,11 +179,17 @@ fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, im
 /// can't carry at all, at its `service`, so the plan resolves every configuration of an environment that
 /// lowered clean ([`crate::configure::Recipe::of`]). An app's own steps are refused per target,
 /// at each step (`super::refusals`).
-fn unresolved(at: &FieldPath, c: Option<&model::Configuration>, ports: &[model::Port], service: Service<'_>) -> Vec<Problem> {
+fn unresolved(
+    at: &FieldPath,
+    c: Option<&model::Configuration>,
+    ports: &[model::Port],
+    service: Service<'_>,
+    daemons: &crate::configure::DaemonTable,
+) -> Vec<Problem> {
     let (Some(c), Some(Ok(resolved))) = (c, service) else {
         return Vec::new();
     };
-    let Err(unportable) = crate::configure::Recipe::of(c, ports, &crate::configure::DaemonTable::common()) else {
+    let Err(unportable) = crate::configure::Recipe::of(c, ports, daemons) else {
         return Vec::new();
     };
     let entries: Vec<&str> = resolved.iter().map(|r| r.entry.as_str()).collect();
@@ -204,7 +211,7 @@ fn serves(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>) -> bool {
     let Some(c) = configuration(l, m, service, ContainerImage::Own) else {
         return false;
     };
-    crate::configure::Recipe::of(&c, &[], &crate::configure::DaemonTable::common()).is_ok_and(|r| !r.daemons.is_empty())
+    crate::configure::Recipe::of(&c, &[], l.services.daemons()).is_ok_and(|r| !r.daemons.is_empty())
 }
 
 /// Each network's first address, and the further ones where a list gives several.
@@ -273,6 +280,7 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
                 fixed,
                 dormant: p.dormant,
                 protocol: if p.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp },
+                login: p.login.clone(),
             })
         })
         .collect();
@@ -374,7 +382,7 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
     d.lxc = overrides::lxc(source, name, scope);
     // No container form: the target refuses the machine there (`refusals`), or the lab lowers
     // it with the forms it has.
-    match forms::container(m, service).ok()? {
+    match forms::container(m, service, l.services.daemons()).ok()? {
         Container::Supplied => return None,
         Container::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
         Container::Recipe(Recipe::Build(b)) => {

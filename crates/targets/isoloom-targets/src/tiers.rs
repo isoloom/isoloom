@@ -259,13 +259,8 @@ pub fn of(entries: &[TierEntry], target: Target) -> Vec<&TierEntry> {
 }
 
 /// The Vagrant providers the Vagrantfile has a block for, as `vagrant up --provider` names them,
-/// in the order a runner offers them (no UTM: it gives a VM no private network, so it runs
-/// `docker-vm`'s VM only).
+/// in the order a runner offers them (no UTM: it gives a VM no private network).
 pub(crate) const VAGRANT_PROVIDERS: [&str; 7] = ["virtualbox", "vmware_desktop", "hyperv", "parallels", "libvirt", "qemu", "vmware_esxi"];
-
-/// Where `docker-vm`'s VM runs: the Vagrant providers its Vagrantfile has a block for (no
-/// Hyper-V), then the Proxmox module.
-const DOCKER_VM: [&str; 8] = ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "libvirt", "vmware_esxi", "proxmox"];
 
 /// The clouds `cloud-services` reads (`cloud.provider`).
 const CLOUD_SERVICES: [&str; 3] = ["aws", "azure", "gcp"];
@@ -275,9 +270,8 @@ const CLOUD_SERVICES: [&str; 3] = ["aws", "azure", "gcp"];
 pub fn variants(target: Target) -> Vec<&'static str> {
     match target {
         Target::Vagrant => VAGRANT_PROVIDERS.to_vec(),
-        Target::DockerVm => DOCKER_VM.to_vec(),
         Target::CloudVm | Target::CloudDocker => isoloom_terraform::Cloud::ALL.iter().map(|c| c.id()).collect(),
         Target::CloudServices => CLOUD_SERVICES.to_vec(),
-        Target::Docker | Target::Hosted | Target::Kubernetes | Target::Hybrid | Target::Proxmox | Target::Esxi | Target::External => Vec::new(),
+        Target::Docker | Target::Hosted | Target::Kubernetes | Target::Proxmox | Target::Esxi | Target::External => Vec::new(),
     }
 }

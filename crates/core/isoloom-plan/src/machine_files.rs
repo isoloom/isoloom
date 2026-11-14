@@ -54,6 +54,21 @@ pub(crate) fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineSh
     if let Some((machine, _)) = existing {
         out.push(Requirement::ExistingHostFiles { machine: machine.clone() });
     }
+    let settings = spec
+        .machines
+        .iter()
+        .filter(|(n, _)| shape(n) == Some(MachineShape::External))
+        .find_map(|(n, m)| {
+            let field = [
+                ("environment", m.environment.is_empty()),
+                ("sysctls", m.sysctls.is_empty()),
+                ("ulimits", m.ulimits.is_empty()),
+            ]
+            .into_iter()
+            .find_map(|(field, empty)| (!empty).then_some(field))?;
+            Some(Requirement::ExistingHostSettings { machine: n.clone(), field })
+        });
+    out.extend(settings);
     out
 }
 
@@ -71,6 +86,14 @@ pub(crate) fn no_existing_host_files(f: &mut fmt::Formatter<'_>, machine: &str) 
     write!(
         f,
         "machine `{machine}` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook"
+    )
+}
+
+/// Why the `external` target refuses an existing host's own settings.
+pub(crate) fn no_existing_host_settings(f: &mut fmt::Formatter<'_>, machine: &str, field: &str) -> fmt::Result {
+    write!(
+        f,
+        "machine `{machine}` sets `{field}`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)"
     )
 }
 

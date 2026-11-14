@@ -45,7 +45,8 @@ pub(crate) fn run(args: &Args) -> Res<ExitCode> {
         let missing = !path.is_file();
         let old: Lock = match std::fs::read_to_string(&path) {
             Ok(text) => serde_yaml_ng::from_str(&text).map_err(|e| format!("catalogue/{name}/lock.yml: {e}"))?,
-            Err(_) => Lock::default(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Lock::default(),
+            Err(e) => return Err(format!("{}: {e}", path.display()).into()),
         };
         let new = lock(&def, &old, &mut indexes)?;
         let changes = pins::changes(&old, &new);
@@ -188,7 +189,8 @@ fn collections(dir: &Path, args: &Args) -> Res<Vec<String>> {
     let path = dir.join("collections.yml");
     let old: Collections = match std::fs::read_to_string(&path) {
         Ok(text) => serde_yaml_ng::from_str(&text)?,
-        Err(_) => Collections::default(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Collections::default(),
+        Err(e) => return Err(format!("{}: {e}", path.display()).into()),
     };
     let mut new = Collections::default();
     let mut changes = Vec::new();

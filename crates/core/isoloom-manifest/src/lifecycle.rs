@@ -212,15 +212,39 @@ impl JsonSchema for Retries {
     }
 }
 
+/// A previous run's leftover a failed `up` can trip over, named by what it is, not by a tool's
+/// words: the runner reads the failed step's output for it, in the words of the tool versions it
+/// knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Leftover {
+    /// A name a VirtualBox VM or its folder already holds (VirtualBox's `VERR_ALREADY_EXISTS`,
+    /// `Could not rename the directory`).
+    VirtualboxNameTaken,
+    /// Vagrant's lock on the machine, held by an earlier process (`… because it is locked!`).
+    MachineLocked,
+    /// Vagrant's record of the machine on another provider (`… with a different provider`,
+    /// `… a single provider at a time`).
+    OtherProvider,
+    /// A container name an earlier run's container holds (Docker's `is already in use by
+    /// container`).
+    ContainerNameTaken,
+    /// A network of the run's name an earlier run left, or left with other labels (Docker's
+    /// `network with name … already exists`, Compose's `has incorrect label`).
+    NetworkLeft,
+}
+
 /// A failed `up` that tripped over a previous run's leftovers, and how to clear them before one
 /// more try. A genuine failure is never retried.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Recovery {
-    /// Case-insensitive substrings of the failed step's output that mean leftovers, not a failure
-    /// of the environment.
+    /// The previous run's leftovers this start can trip over: a failed step whose output the
+    /// runner reads as one of them is cleared and tried again, not failed. The runner, which runs
+    /// the tools, owns their wordings.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub stale_markers: Vec<String>,
+    pub leftovers: Vec<Leftover>,
     /// What clears the leftovers.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub steps: Vec<Step>,

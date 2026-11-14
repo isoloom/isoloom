@@ -65,6 +65,12 @@ pub(crate) fn host() -> isoloom_spec::host::Host {
     isoloom_spec::host::Host::new(std::env::vars_os())
 }
 
+/// Vagrant's own default provider on this host (`VAGRANT_DEFAULT_PROVIDER`, when set and not
+/// empty): read here, at the edge, with the rest of the environment.
+pub(crate) fn vagrant_default_provider() -> Option<String> {
+    std::env::var("VAGRANT_DEFAULT_PROVIDER").ok().filter(|v| !v.is_empty())
+}
+
 /// Where a project's defaults come from, on this host.
 pub(crate) fn defaults_of<'a>(
     project: &'a Path,

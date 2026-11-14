@@ -1,7 +1,7 @@
 //! The operations of a Compose run, when it counts as ready, and how a start that tripped over a
 //! previous run's leftovers is retried.
 
-use isoloom_manifest::{Action, Argv, Condition, HostArgv, Lifecycle, NonEmpty, Park, Recovery, Retries, Step, StepId, Template, When};
+use isoloom_manifest::{Action, Argv, Condition, HostArgv, Leftover, Lifecycle, NonEmpty, Park, Recovery, Retries, Step, StepId, Template, When};
 use isoloom_plan::{Environment, Image, Lifetime, MachineShape};
 use isoloom_render::run_manifest::{cleanup, noted, tolerated};
 
@@ -212,9 +212,7 @@ pub(super) fn ready(plan: &StartPlan, members: &[Member], up: &str) -> Result<Ve
 /// with another label) clears them and tries once more.
 pub(super) fn recovery() -> Result<Recovery> {
     Ok(Recovery {
-        stale_markers: ["is already in use by container", "network with name", "has incorrect label"]
-            .map(String::from)
-            .into(),
+        leftovers: vec![Leftover::ContainerNameTaken, Leftover::NetworkLeft],
         steps: vec![
             cleanup(act("containers", Action::ComposeRemoveContainers)?),
             cleanup(act("networks", Action::ComposeRemoveNetworks)?),

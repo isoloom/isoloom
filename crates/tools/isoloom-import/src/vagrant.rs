@@ -38,6 +38,26 @@ struct Machine {
     steps: Vec<String>,
 }
 
+/// The shell provisioner's options a step has no field for, each with what the step does instead.
+const SHELL_OPTIONS_LEFT_OUT: [(&str, &str); 4] = [
+    ("args", "a step runs its script with no arguments: write them into the script"),
+    (
+        "env",
+        "a step's script has no variables of its own: set them in the script, or use the machine's `environment`",
+    ),
+    ("privileged", "a step runs as root"),
+    ("run", "a step runs once, when the machine is set up"),
+];
+
+/// Whether a shell provisioner's option says what a step does anyway: run as root, once.
+fn is_shell_default(key: &str, v: &Value) -> bool {
+    match key {
+        "privileged" => v.as_bool() == Some(true),
+        "run" => v.as_str() == Some("once"),
+        _ => false,
+    }
+}
+
 /// The step a shell provisioner's `reboot: true` becomes.
 const REBOOT: &str = isoloom_spec::model::REBOOT_STEP;
 
@@ -243,7 +263,15 @@ impl<'a> Import<'a> {
             }
             other => text(other),
         };
-        let fixed = text(c.opt("ip")).and_then(|ip| ip.parse::<Ipv4Addr>().ok());
+        let given = text(c.opt("ip"));
+        let fixed = given.as_deref().and_then(|ip| ip.parse::<Ipv4Addr>().ok());
+        if let Some(given) = given.as_deref().filter(|_| fixed.is_none()) {
+            self.notes.add(
+                &at,
+                NoteKind::Changed,
+                format!("`{given}` isn't an IPv4 address: drafted as an address by DHCP"),
+            );
+        }
         let dhcp = fixed.is_none();
         let bridge = Bridge {
             interface: interface.clone(),
@@ -251,6 +279,7 @@ impl<'a> Import<'a> {
             default_route: dhcp && c.opt("use_dhcp_assigned_default_route").and_then(Value::as_bool) == Some(true),
         };
         let (cidr, octet) = if let Some(ip) = fixed {
+            self.note_unreadable_netmask(&at, c);
             (block(ip, text(c.opt("netmask")).as_deref()).0, ip.octets()[3])
         } else {
             self.notes.add(
@@ -267,6 +296,17 @@ impl<'a> Import<'a> {
             bridged: Some(bridge),
         });
         m.networks.push((key, octet));
+    }
+
+    /// A `netmask` that is neither an address nor a length, noted: the block falls back to a /24.
+    fn note_unreadable_netmask(&mut self, at: &str, c: &Call) {
+        if let Some(mask) = text(c.opt("netmask")).filter(|m| netmask_length(m).is_none()) {
+            self.notes.add(
+                at,
+                NoteKind::Changed,
+                format!("netmask `{mask}` is neither an address nor a length: the block is a /24"),
+            );
+        }
     }
 
     /// A synced folder: a host folder of a Linux machine, read only when mounted `ro`. Vagrant's
@@ -330,6 +370,7 @@ impl<'a> Import<'a> {
             );
             return;
         };
+        self.note_unreadable_netmask(&format!("{at}.vm.network"), c);
         let (cidr, asked) = block(ip, text(c.opt("netmask")).as_deref());
         if let Some(len) = asked {
             self.notes.add(
@@ -417,6 +458,15 @@ impl<'a> Import<'a> {
                 .add(at, NoteKind::InImage, "an inline script: put it in a file and list it in `app.steps`"),
             _ => {}
         }
+        // What the script was run with: a step runs its script as root, once, with no arguments
+        // and no variables of its own.
+        let given: Vec<String> = SHELL_OPTIONS_LEFT_OUT
+            .iter()
+            .filter_map(|(key, why)| c.opt(key).filter(|v| !is_shell_default(key, v)).map(|v| format!("`{key}: {v}` ({why})")))
+            .collect();
+        if !given.is_empty() {
+            self.notes.add(at, NoteKind::Changed, format!("left out: {}", given.join(", ")));
+        }
         // `reboot: true`: Vagrant restarts the guest after the script (if any).
         if c.opt("reboot").and_then(Value::as_bool) == Some(true) {
             if isoloom_spec::images::is_windows(m.os) {
@@ -436,13 +486,16 @@ impl<'a> Import<'a> {
 /// it gives none, and never wider than /24 or narrower than /29 (the spec's sizes); with the
 /// length asked when it was outside those.
 fn block(ip: Ipv4Addr, netmask: Option<&str>) -> (Cidr, Option<u32>) {
-    let asked = netmask
-        .and_then(|m| m.parse::<Ipv4Addr>().ok().map(|mask| u32::from(mask).count_ones()).or_else(|| m.parse().ok()))
-        .unwrap_or(24);
+    let asked = netmask.and_then(netmask_length).unwrap_or(24);
     let clamped = asked.clamp(24, 29);
     // The clamp keeps it within 24..=29, so it fits a `u8`.
     let len = u8::try_from(clamped).unwrap_or(24);
     (Cidr::enclosing(ip, len), (asked != clamped).then_some(asked))
+}
+
+/// A netmask's length: from an address (`255.255.255.0`) or written as one (`24`).
+fn netmask_length(mask: &str) -> Option<u32> {
+    mask.parse::<Ipv4Addr>().ok().map(|m| u32::from(m).count_ones()).or_else(|| mask.parse().ok())
 }
 
 #[cfg(test)]
@@ -486,6 +539,23 @@ mod tests {
         assert!(said.iter().any(|t| t.starts_with("`fd00::10` isn't an IPv4 address")), "{said:?}");
         assert!(said.contains(&"10.9.3.10/16 isn't a /24 to /29; re-addressed to 10.9.3.0/24"), "{said:?}");
         assert!(d.yaml.contains("cidr: 10.9.3.0/24"), "{}", d.yaml);
+        Ok(())
+    }
+
+    /// What the spec drafts instead of an address or a netmask it can't read is said.
+    #[test]
+    fn an_unreadable_address_or_netmask_is_said() -> Result<()> {
+        let recorded: Recording = r#"{"children":{"vm":{"calls":[
+            {"name":"network","args":["public_network",{"ip":"192.168.1.x"}]},
+            {"name":"network","args":["private_network",{"ip":"10.9.3.10","netmask":"wide"}]}]}}}"#
+            .parse()?;
+        let d = draft(&recorded, "lab", "Vagrantfile")?;
+        let said: Vec<&str> = d.notes.iter().map(|n| n.text.as_str()).collect();
+        assert!(said.contains(&"`192.168.1.x` isn't an IPv4 address: drafted as an address by DHCP"), "{said:?}");
+        assert!(
+            said.contains(&"netmask `wide` is neither an address nor a length: the block is a /24"),
+            "{said:?}"
+        );
         Ok(())
     }
 

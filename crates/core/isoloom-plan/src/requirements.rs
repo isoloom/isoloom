@@ -31,6 +31,8 @@ pub enum Feature {
     VmAfterContainer,
     /// Extra names for a machine (`aliases`), dotted ones included.
     MachineAliases,
+    /// The tools beside the environment (`tools:`), each a machine of its own on every network.
+    Tools,
     /// Per-container process limits (`ulimits`).
     Ulimits,
     /// Link impairment (`tc`), applied on the path into a network.
@@ -53,6 +55,9 @@ pub enum Feature {
     OwnedProjectFiles,
     /// Files written on a host that already exists.
     ExistingHostFiles,
+    /// A machine's own settings (`environment`, `sysctls`, `ulimits`) on a host that already
+    /// exists, which Isoloom doesn't set up: no backend has it.
+    ExistingHostSettings,
     /// A check that runs a project script on a host that already exists, which has no copy of
     /// the project: no backend has it.
     ExistingHostScriptChecks,
@@ -140,6 +145,11 @@ pub enum Requirement {
     },
     /// A machine has `aliases`.
     MachineAliases,
+    /// The environment has tools beside it (`tools:`).
+    Tools {
+        /// The first tool, by name.
+        tool: String,
+    },
     /// A machine sets `ulimits`.
     Ulimits {
         /// The first machine that does.
@@ -195,6 +205,13 @@ pub enum Requirement {
     ExistingHostFiles {
         /// The machine.
         machine: String,
+    },
+    /// An existing host has its own `environment`, `sysctls` or `ulimits`.
+    ExistingHostSettings {
+        /// The machine.
+        machine: String,
+        /// The field (`environment`, `sysctls`, `ulimits`).
+        field: &'static str,
     },
     /// A check runs a project script on an existing host.
     ExistingHostScriptCheck {
@@ -297,6 +314,7 @@ impl Requirement {
             Requirement::VolumeAcrossShapes { .. } => Feature::VolumesAcrossShapes,
             Requirement::VmDependsOnContainer { .. } => Feature::VmAfterContainer,
             Requirement::MachineAliases => Feature::MachineAliases,
+            Requirement::Tools { .. } => Feature::Tools,
             Requirement::Ulimits { .. } => Feature::Ulimits,
             Requirement::TrafficControl => Feature::TrafficControl,
             Requirement::Ipv6 { .. } => Feature::Ipv6,
@@ -308,6 +326,7 @@ impl Requirement {
             Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
             Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
             Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
+            Requirement::ExistingHostSettings { .. } => Feature::ExistingHostSettings,
             Requirement::ExistingHostScriptCheck { .. } => Feature::ExistingHostScriptChecks,
             Requirement::ExistingHostCheckFromNoHost { .. } => Feature::ExistingHostChecksFromNoHost,
             Requirement::Tpm { .. } => Feature::Tpm,
@@ -356,10 +375,14 @@ impl fmt::Display for Requirement {
                 "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export"
             ),
             Requirement::VmDependsOnContainer { vm, container } => {
-                write!(f, "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment")
+                write!(f, "VM `{vm}` depends on container `{container}`: VMs start before the containers beside them")
             }
             // Only Kubernetes lacks these today: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
+            Requirement::Tools { tool } => write!(
+                f,
+                "tool `{tool}` (`tools:`) is added beside the environment on the Docker and Vagrant targets only"
+            ),
             Requirement::Ulimits { machine } => write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits"),
             Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
             Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry"),
@@ -371,6 +394,7 @@ impl fmt::Display for Requirement {
             Requirement::BridgedNetwork { network } => crate::outside::no_bridge(f, network),
             Requirement::OwnedProjectFile { machine, path } => crate::machine_files::no_owned_project_file(f, machine, path),
             Requirement::ExistingHostFiles { machine } => crate::machine_files::no_existing_host_files(f, machine),
+            Requirement::ExistingHostSettings { machine, field } => crate::machine_files::no_existing_host_settings(f, machine, field),
             Requirement::ExistingHostScriptCheck { check } => crate::existing_hosts::no_script_check(f, check),
             Requirement::ExistingHostCheckFromNoHost { check } => crate::existing_hosts::no_host_to_run_from(f, check),
             Requirement::Tpm { machine } => crate::hardware::no_tpm(f, machine),
@@ -478,6 +502,10 @@ pub(crate) fn of(spec: &Spec) -> Vec<Requirement> {
     out.extend(crate::links::requirements(spec));
     out.extend(crate::private_dns::requirements(spec));
     out.extend(crate::storage::requirements(spec));
+    // Last: a target that refuses the environment for another reason too says that one first.
+    if let Some(tool) = spec.tools.keys().next() {
+        out.push(Requirement::Tools { tool: tool.clone() });
+    }
     out
 }
 

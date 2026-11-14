@@ -168,12 +168,6 @@ fn no_secret_value_reaches_a_generated_file() -> Outcome {
     let pods = find(&generated, "kubernetes/environment.yaml")?;
     assert!(pods.contains("secretName: isoloom-secrets"), "{pods}");
     find(&generated, "resolved.json")?;
-    // The docker-vm host waits for the secrets the runner delivers, then hands them to Compose.
-    let dvm = find(&generated, "docker-vm/Vagrantfile")?;
-    assert!(
-        dvm.contains("/var/lib/isoloom/secrets/.delivered") && dvm.contains("ISOLOOM_SECRET_DB_PASSWORD"),
-        "{dvm}"
-    );
     // On cloud-docker, Terraform makes the VM only; the run manifest starts Compose over SSH with
     // the containers' secrets forwarded to it (SendEnv), the value in no generated file.
     let run = find(&generated, "cloud-docker/aws/run.json")?;
@@ -188,7 +182,7 @@ fn no_secret_value_reaches_a_vm_target_file() -> Outcome {
     // The VM targets' set-up waits for the secrets the runner delivers (Proxmox refuses them:
     // nothing could deliver them behind its router).
     assert!(find(&generated, "proxmox/main.tf").is_err(), "proxmox refuses secrets");
-    for vm in ["vagrant/Vagrantfile", "hybrid/Vagrantfile", "cloud-vm/aws/main.tf"] {
+    for vm in ["vagrant/Vagrantfile", "cloud-vm/aws/main.tf"] {
         assert!(
             find(&generated, vm)?.contains("/var/lib/isoloom/secrets/.delivered"),
             "{vm} doesn't wait for the secrets"

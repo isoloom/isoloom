@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::shell;
 
 /// A command line: a text the shell runs, or a list of arguments run as they are.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum CommandLine {
     /// A text run by the machine's shell (`/bin/sh -c`; PowerShell on a Windows VM), with its
@@ -15,6 +15,29 @@ pub enum CommandLine {
     Shell(String),
     /// Arguments run as they are, the program first (no shell in between).
     Exec(Vec<String>),
+}
+
+impl<'de> Deserialize<'de> for CommandLine {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<CommandLine, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = CommandLine;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a text the shell runs, or a list of arguments run as they are")
+            }
+            fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<CommandLine, E> {
+                Ok(CommandLine::Shell(text.to_owned()))
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<CommandLine, A::Error> {
+                let mut args = Vec::new();
+                while let Some(a) = seq.next_element::<String>()? {
+                    args.push(a);
+                }
+                Ok(CommandLine::Exec(args))
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 impl CommandLine {

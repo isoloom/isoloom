@@ -54,13 +54,19 @@ pub(super) fn image_res(vm: Vm<'_>) -> String {
     if is_arm(vm.plan) { format!("{o}_arm64") } else { o }
 }
 
-/// Why an arm64 machine can't run here, if one can't: Windows, or an OS with no arm64 image of
-/// Isoloom's and none of its own.
+/// Why an arm64 machine can't run here, if one can't: Windows, an OS with no arm64 image of
+/// Isoloom's and none of its own, or VMs inside it (`nested_virtualization`), which an emulated
+/// CPU has no virtualization for (only an amd64 VM takes the server's own, `cpu.type = host`).
 pub(super) fn refusal(env: &Environment) -> Option<String> {
     env.vms().filter(|vm| is_arm(vm.plan)).find_map(|vm| {
         let (name, mp, o) = (vm.name, vm.plan, vm.os);
-        (mp.is_windows() || (pinned(o).is_none() && !super::image::has_own(mp))).then(|| {
-            format!("machine `{name}`: no arm64 Proxmox image for `{o}` (Debian 11 to 13, Ubuntu 20.04 to 24.04, or `overrides.proxmox.machines.{name}.image`)")
+        if mp.is_windows() || (pinned(o).is_none() && !super::image::has_own(mp)) {
+            return Some(format!(
+                "machine `{name}`: no arm64 Proxmox image for `{o}` (Debian 11 to 13, Ubuntu 20.04 to 24.04, or `overrides.proxmox.machines.{name}.image`)"
+            ));
+        }
+        mp.hardware.nested_virtualization.then(|| {
+            format!("machine `{name}` runs VMs inside (`nested_virtualization`), and an arm64 VM's CPU is emulated on this server, with no virtualization to give it")
         })
     })
 }

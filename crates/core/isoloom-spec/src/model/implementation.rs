@@ -129,7 +129,7 @@ pub enum Appliance {
 pub struct VmImpl {
     /// The OS, as `<family>@<version>` (`debian@12`) or a family alone for its pinned default;
     /// each target maps it to an image. Once parsed, it holds the image table's name for the OS
-    /// ([`KNOWN_OS`], see [`crate::os::Os::name`]), as lowering writes it. Defaults to the machine's
+    /// ([`crate::os::Os::name`]), as lowering writes it. Defaults to the machine's
     /// `os`, which it must agree with when both are set. May come from `common:` or a group
     /// (`vm: {}` in the machine).
     #[serde(default)]
@@ -322,38 +322,6 @@ pub struct Provision {
     #[serde(default)]
     pub requirements: Option<String>,
 }
-
-/// The image table's OS names, the ones every target maps to its own images (e.g. Windows from
-/// an evaluation ISO locally, a license-included image in the cloud). A spec writes the OS as
-/// `<family>@<version>` ([`crate::os`]); a parsed spec's `vm.os` holds one of these names. In
-/// the order of [`crate::os::DISTROS`].
-pub const KNOWN_OS: &[&str] = &[
-    "debian-11",
-    "debian-12",
-    "debian-13",
-    "ubuntu-14.04",
-    "ubuntu-16.04",
-    "ubuntu-18.04",
-    "ubuntu-20.04",
-    "ubuntu-22.04",
-    "ubuntu-24.04",
-    "rocky-9",
-    "almalinux-9",
-    "alpine-3.7",
-    "alpine-3.19",
-    "alpine-3.24",
-    "kali",
-    "fedora-42",
-    "centos-7",
-    "windows-10",
-    "windows-11",
-    "windows-server-2008r2",
-    "windows-server-2012r2",
-    "windows-server-2016",
-    "windows-server-2019",
-    "windows-server-2022",
-    "windows-server-2025",
-];
 
 #[cfg(test)]
 mod tests {

@@ -48,7 +48,7 @@ pub fn assert_problem(yaml: &str, at: &str, fragment: &str) {
 
 /// `lab` planned for `target`; a plan that fails is one problem saying why.
 fn planned(lab: &Lab, target: Target) -> Outcome<Environment> {
-    Environment::build(&lab.for_target(target), target, None)
+    lab.plan(&lab.for_target(target), target, None)
         .map_err(|e| vec![Problem::new(syntax::Code::Conflict, syntax::FieldPath::new("machines"), e.to_string())])
 }
 

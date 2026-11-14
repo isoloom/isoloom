@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "generator": {
     "name": "isoloom",
-    "version": "2.1.9"
+    "version": "3.0.0"
   },
   "environment": {
     "name": "web-portal",
@@ -619,10 +619,9 @@
     "teardown": []
   },
   "recovery": {
-    "stale_markers": [
-      "is already in use by container",
-      "network with name",
-      "has incorrect label"
+    "leftovers": [
+      "container_name_taken",
+      "network_left"
     ],
     "steps": [
       {

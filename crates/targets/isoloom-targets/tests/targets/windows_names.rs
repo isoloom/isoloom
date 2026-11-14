@@ -14,7 +14,7 @@ fn every_vm_target_refuses_two_long_windows_names_the_clouds_included() -> Outco
     )?;
     let why = "machine `windows-server-01`: Windows computer names are at most 15 characters";
     for target in [Target::Vagrant, Target::Proxmox, Target::Esxi, Target::CloudVm] {
-        let refused = isoloom_targets::refusal(&long, target).unwrap_or_default();
+        let refused = isoloom_targets::refusal(&long, target).unwrap().unwrap_or_default();
         assert!(refused.contains(why), "{target:?}: {refused}");
         assert!(
             matches!(generate(&long, target), Err(Error::Generate(GenerateError::Unsupported { .. }))),

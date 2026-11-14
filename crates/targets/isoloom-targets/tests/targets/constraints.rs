@@ -141,19 +141,6 @@ fn every_linux_vm_runs_the_preamble_first() -> Outcome {
             "the Docker host on {cloud}: {setup}"
         );
     }
-    // On Proxmox, before cloud-init installs the guest agent (through the proxy); Docker and the
-    // rest run from setup.sh over SSH, where the prelude leads too.
-    let pve_docker = file(&spec, Target::DockerVm, "docker-vm/proxmox/main.tf")?;
-    assert!(pve_docker.contains("bootcmd = [\n        \"sh -c 'set -e\\n# The proxy"), "{pve_docker}");
-    let setup = file(&spec, Target::DockerVm, "docker-vm/proxmox/setup.sh")?;
-    assert!(setup.contains("# The proxy") && setup.contains("get.docker.com"), "{setup}");
-    let docker_vm = file(&spec, Target::DockerVm, "docker-vm/Vagrantfile")?;
-    let first = docker_vm
-        .lines()
-        .filter(|l| l.contains("config.vm.provision"))
-        .find(|l| !l.contains("\"nat-route\""))
-        .unwrap();
-    assert!(first.contains("\"constraints\", type: \"shell\""), "{first}");
     Ok(())
 }
 
@@ -255,14 +242,10 @@ fn isoloom_s_own_vms_trust_the_certificate_authority_before_they_install_anythin
     let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
     let router = between(&vf, "define \"isoloom-router\"", "config.vm.define")?;
     in_order(router, &["name: \"project\"", TRUST, "apt-get install -y -qq nftables"]);
-    // The containers' Docker host: on Vagrant, and as the set-up script a cloud's or Proxmox's
-    // run manifest pipes in once the project is copied.
-    let docker_vm = file(&lab, Target::DockerVm, "docker-vm/Vagrantfile")?;
-    in_order(&docker_vm, &["\"project\", type: \"isoloom_project\"", TRUST, "download.docker.com"]);
+    // The containers' Docker host: the set-up script a cloud's run manifest pipes in once the
+    // project is copied.
     let setup = file(&lab, Target::CloudDocker, "cloud-docker/aws/setup.sh")?;
     in_order(&setup, &[TRUST, "download.docker.com"]);
-    let hybrid = file(&example_with_ca("mixed-office")?, Target::Hybrid, "hybrid/Vagrantfile")?;
-    in_order(&hybrid, &["\"isoloom_project\", name: \"project\"", TRUST, "download.docker.com"]);
     // The controller, before Ansible: on Vagrant and on the clouds.
     let paired = example_with_ca("ansible-pair")?;
     let vagrant = file(&paired, Target::Vagrant, "vagrant/Vagrantfile")?;

@@ -23,7 +23,7 @@ fn plan(example: &str) -> Outcome<Environment> {
     if !problems.is_empty() {
         return Err(format!("{example} isn't valid: {problems:?}").into());
     }
-    Ok(Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?)
+    Ok(lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?)
 }
 
 /// The files the Vagrant backend renders for an example, from its plan.
@@ -43,7 +43,7 @@ fn vagrantfile(example: &str) -> Outcome<String> {
 /// A spec written in a test, planned for Vagrant.
 fn parsed(yaml: &str) -> Outcome<Environment> {
     let lab = isoloom_plan::Lab::parse(yaml).map_err(|problems| format!("{problems:?}"))?;
-    Ok(Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?)
+    Ok(lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?)
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn a_machine_without_a_box_is_refused_without_rendering() -> Outcome {
     let mut spec = lab.for_target(Target::Vagrant);
     // Parsing refuses an OS it doesn't know; a spec built in code can still name one.
     spec.machines.get_mut("m").and_then(|m| m.vm.as_mut()).ok_or("a VM")?.os = "plan9".into();
-    let env = Environment::build(&spec, Target::Vagrant, None)?;
+    let env = lab.plan(&spec, Target::Vagrant, None)?;
     let why = VagrantBackend.refusal(&env).ok_or("not refused")?;
     assert!(why.contains("no Vagrant box for `plan9`"), "{why}");
     let refused = VagrantBackend.render(&env).err().ok_or("rendered")?;
@@ -635,9 +635,62 @@ fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() 
     let said: Vec<&str> = out.lines().collect();
     assert_eq!(
         said,
-        ["up true", "joined true", "left true", "destroyed nil []"],
-        "the hub runs on through the visit and goes, files and all, with the environment"
+        ["up true", "joined true", "left true", "destroyed nil [\"app.lock\"]"],
+        "the hub runs on through the visit and goes, files and all (its lock kept), with the environment"
     );
+    Ok(())
+}
+
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and starts network `app`'s
+/// VMs on QEMU at once, as Vagrant does (`parallel: true`): each VM's trigger asks for the hub on
+/// a thread of its own. QEMU's hub is stood in for by a start that takes a while (its ports to
+/// listen on) before it writes its pid file, and a stop that ends whatever hub runs. It prints how
+/// many hubs were started and stopped, and whether one runs.
+#[cfg(unix)]
+const QEMU_HUB_RACE_RB: &str = r#"
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); end
+end
+module IsoloomQemu; end
+$started = 0
+$stopped = 0
+IsoloomQemu.singleton_class.prepend(Module.new {
+  def running(net); File.exist?(pid_file(net)) ? 4242 : nil; end
+  def stop(net)
+    $stopped += 1 if running(net)
+    File.delete(pid_file(net)) if running(net)
+  end
+  def system(*args, **_opts)
+    sleep 0.3
+    $started += 1
+    File.write(args[args.index("-pidfile") + 1], "4242\n")
+    true
+  end
+})
+load ARGV[0]
+net = "app"
+vms = QEMU_HUBS[net]
+vms.keys.map { Thread.new { IsoloomQemu.hub(net, vms) } }.each(&:join)
+puts "started #{$started} stopped #{$stopped} running #{!IsoloomQemu.running(net).nil?}"
+"#;
+
+/// Regression: two VMs of one network started at once (Vagrant starts QEMU's VMs in parallel) each
+/// found no hub and started one, the second stopping the first's hub under the VM that had just
+/// connected to it. A network's hub is decided under its lock: one start, the other VM joining it.
+#[cfg(unix)]
+#[test]
+fn vms_starting_at_once_on_qemu_share_one_hub() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-race-").tempdir()?;
+    let (vagrantfile, mut ruby) = loadable("solo-web", scratch.path())?;
+    ruby.arg("-e").arg(QEMU_HUB_RACE_RB).arg(&vagrantfile);
+    let out = printed(ruby)?;
+    assert_eq!(out.trim(), "started 1 stopped 0 running true", "one hub for the VMs starting at once");
     Ok(())
 }
 
@@ -659,7 +712,6 @@ IsoloomQemu.virtiofs_squash.each { |a| puts a }
 /// What [`VIRTIOFS_RB`] prints with `virtiofsd` on the PATH answering `--help` with `help`.
 #[cfg(unix)]
 fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
-    use std::os::unix::fs::PermissionsExt;
     let scratch = tempfile::Builder::new().prefix("isoloom-virtiofs-").tempdir()?;
     let yaml = "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /shared }] }\n";
     let mut vagrantfile = None;
@@ -676,8 +728,9 @@ fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
     let bin = scratch.path().join("bin");
     std::fs::create_dir_all(&bin)?;
     let virtiofsd = bin.join("virtiofsd");
-    std::fs::write(&virtiofsd, format!("#!/bin/sh\nprintf '%s\\n' '{help}'\n"))?;
-    std::fs::set_permissions(&virtiofsd, std::fs::Permissions::from_mode(0o755))?;
+    // Written by a child process: one this test wrote itself could be busy ("Text file busy") in
+    // a process another test forked meanwhile, when Ruby runs it.
+    isoloom_test_support::write_executable(&virtiofsd, &format!("#!/bin/sh\nprintf '%s\\n' '{help}'\n"), true)?;
     let mut ruby = Command::new("ruby");
     ruby.arg("-I")
         .arg(scratch.path())
@@ -719,19 +772,107 @@ fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() 
     Ok(())
 }
 
-/// The run manifest names each network as the Vagrantfile makes it: VirtualBox's internal
-/// network and libvirt's network, both `isoloom-<environment>-<network>`.
+/// The Vagrantfile names each network after the environment, its key and the network, VirtualBox's
+/// internal network and libvirt's alike (`isoloom-<environment>-#{ISOLOOM_KEY}-<network>`); the
+/// run manifest names none, since only the Vagrantfile reads the key.
 #[test]
-fn the_run_manifest_names_each_network_as_the_vagrantfile_makes_it() -> Outcome {
+fn each_network_is_named_with_the_copys_key_and_the_manifest_names_none() -> Outcome {
     let env = plan("segmented")?;
     let manifest = VagrantBackend.run_manifest(&env)?.ok_or("a run manifest")?;
     let file = vagrantfile("segmented")?;
     assert_eq!(manifest.networks.len(), env.networks.len());
     for n in &manifest.networks {
-        let native = n.native.as_ref().map(ToString::to_string).ok_or("a native name")?;
-        assert!(native.starts_with(isoloom_manifest::contract::RESERVED_PREFIX), "{native}");
-        assert!(file.contains(&format!("virtualbox__intnet: \"{native}\"")), "{native}");
-        assert!(file.contains(&format!("libvirt__network_name: \"{native}\"")), "{native}");
+        assert!(n.native.is_none(), "{}", n.name);
+        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{}", isoloom_manifest::contract::RESERVED_PREFIX, n.name);
+        assert!(file.contains(&format!("virtualbox__intnet: \"{keyed}\"")), "{keyed}");
+        assert!(file.contains(&format!("libvirt__network_name: \"{keyed}\"")), "{keyed}");
     }
+    Ok(())
+}
+
+/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant that records every name it
+/// gives on the host, one `<what> <name>` line each: a VM's (`name=`, `vmname=`, `guest_name=`,
+/// VMware's `displayName`), libvirt's domain prefix, and each private network's internal network
+/// and libvirt network.
+const HOST_NAMES_RB: &str = r##"
+Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map)
+NAMED = %i[name= vmname= guest_name= default_prefix=].freeze
+class Rec
+  def initialize(path = []); @path = path; end
+  def respond_to_missing?(*); true; end
+  def method_missing(name, *args, &blk)
+    puts "#{name.to_s.chomp("=")} #{args[0]}" if NAMED.include?(name) && args[0].is_a?(String)
+    puts "displayName #{args[1]}" if name == :[]= && args[0] == "displayName"
+    if name == :network && args[1].is_a?(Hash)
+      %i[virtualbox__intnet libvirt__network_name].each { |k| puts "#{k} #{args[1][k]}" if args[1][k] }
+    end
+    # A trigger's code runs when Vagrant acts, not when it reads the file.
+    return Rec.new if @path.last == :trigger
+    blk.call(*Array.new([blk.arity, 1].max) { Rec.new }) if blk
+    Rec.new(@path + [name])
+  end
+end
+module Vagrant
+  module Util; end
+  module Errors; class VagrantError < StandardError; end; end
+  def self.configure(_version); yield Rec.new; end
+  def self.user_data_path; "/nonexistent"; end
+  def self.has_plugin?(*); false; end
+end
+load ARGV[0]
+"##;
+
+/// The names `example`'s Vagrantfile gives on the host when loaded from the copy at `dir`, with
+/// `ISOLOOM_KEY` set to `key` (unset: the Vagrantfile makes one from its folder).
+fn vagrant_host_names(example: &str, dir: &Path, key: Option<&str>) -> Outcome<std::collections::BTreeSet<String>> {
+    let (vagrantfile, mut ruby) = loadable(example, dir)?;
+    ruby.arg("-e").arg(HOST_NAMES_RB).arg(&vagrantfile);
+    match key {
+        Some(key) => ruby.env("ISOLOOM_KEY", key),
+        None => ruby.env_remove("ISOLOOM_KEY"),
+    };
+    Ok(printed(ruby)?.lines().map(str::to_owned).collect())
+}
+
+/// Two copies of one environment (one spec, two folders, no instance number) never share a VM,
+/// network or libvirt prefix name on any provider (#285): each name carries the copy's key, the
+/// runner's (`ISOLOOM_KEY`) or, run by hand, one made from the copy's folder, the same at every
+/// read.
+#[test]
+fn two_copies_of_one_environment_never_share_a_name_on_the_host() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-copy-names-").tempdir()?;
+    for example in ["solo-web", "segmented"] {
+        let (one, two) = (scratch.path().join(example).join("one"), scratch.path().join(example).join("two"));
+        let by_hand_one = vagrant_host_names(example, &one, None)?;
+        let by_hand_two = vagrant_host_names(example, &two, None)?;
+        assert!(by_hand_one.len() >= 4, "{example}: {by_hand_one:?}");
+        let shared: Vec<_> = by_hand_one.intersection(&by_hand_two).collect();
+        assert!(shared.is_empty(), "{example}: {shared:?}");
+        assert_eq!(vagrant_host_names(example, &one, None)?, by_hand_one, "{example}: read again");
+        let runs_a = vagrant_host_names(example, &one, Some("aaaaa1"))?;
+        let runs_b = vagrant_host_names(example, &one, Some("bbbbb2"))?;
+        assert!(runs_a.is_disjoint(&runs_b), "{example}: two runs' keys");
+        assert!(!runs_a.is_empty() && runs_a.iter().all(|l| l.contains("-aaaaa1")), "{example}: {runs_a:?}");
+        assert!(runs_a.contains(&format!("default_prefix {example}-aaaaa1_")), "{example}: {runs_a:?}");
+        let label = format!("name {example}-aaaaa1 - ");
+        assert!(runs_a.iter().any(|l| l.starts_with(&label)), "{example}: {runs_a:?}");
+    }
+    Ok(())
+}
+
+/// A key the runner gives that isn't one is refused when the Vagrantfile loads, never put in a name.
+#[test]
+fn a_malformed_key_is_refused() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let scratch = tempfile::Builder::new().prefix("isoloom-bad-key-").tempdir()?;
+    let err = vagrant_host_names("solo-web", scratch.path(), Some("Bad Key")).unwrap_err().to_string();
+    assert!(err.contains("ISOLOOM_KEY"), "{err}");
     Ok(())
 }

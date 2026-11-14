@@ -70,9 +70,18 @@ pub(crate) fn virtualbox_tpm(r: &mut Ruby) {
     r.call(Call::new("v.customize").arg(Value::array(args)));
 }
 
+/// The providers that give a TPM, as a refusal names them (`VirtualBox, Hyper-V and libvirt`).
+fn with_tpm() -> String {
+    let names: Vec<&str> = Provider::profiles().filter(|p| p.tpm).map(|p| p.label).collect();
+    match names.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        _ => names.concat(),
+    }
+}
+
 /// Why `provider` can't run this environment's VMs, if it can't: a machine that requires a TPM
 /// on a provider that gives none.
-pub(crate) fn tpm_refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
+pub(crate) fn tpm_refusal(env: &Environment, provider: Provider) -> Option<String> {
     if provider.has_tpm() {
         return None;
     }
@@ -81,8 +90,9 @@ pub(crate) fn tpm_refusal(env: &Environment, provider: Provider<'_>) -> Option<S
         .iter()
         .find(|(_, mp)| mp.shape == MachineShape::Vm && mp.tpm == Some(Tpm::Required))?;
     Some(format!(
-        "machine `{name}` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's {} provider gives none (VirtualBox, libvirt and Hyper-V do)",
-        provider.id()
+        "machine `{name}` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's {} provider gives none ({} do)",
+        provider.id(),
+        with_tpm()
     ))
 }
 

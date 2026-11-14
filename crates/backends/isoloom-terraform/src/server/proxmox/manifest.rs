@@ -7,8 +7,6 @@
 //!   binary's provider off the LAN), and `ssh`.
 //! - **Networks** named after the VNet (the node's bridge) each is, or whose VLAN it is.
 
-pub(super) mod docker_vm;
-
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{Error as ManifestError, GoneError, GoneText, HostOs, Manifest, PinnedImage, SnakeName, Tool};

@@ -178,7 +178,7 @@
           },
           "description": "The VLANs this LAN is split into, by id (1-4094), each with its own block inside the\nLAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming\nthe LAN covers all of its VLANs. Each VLAN becomes a network of its own,\n`<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.",
           "propertyNames": {
-            "pattern": "^[1-9][0-9]{0,3}$"
+            "pattern": "^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$"
           }
         },
         "switch": {
@@ -543,7 +543,7 @@
               "$ref": "#/$defs/Port"
             }
           },
-          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
+          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
         },
         "command": {
           "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
@@ -604,7 +604,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -2074,6 +2074,10 @@
           "type": "boolean",
           "description": "Only answers once something wakes it: nothing waits for it.",
           "default": false
+        },
+        "login": {
+          "$ref": "#/$defs/Login",
+          "description": "The account its service ships with, `{ user, password }`: shown to the user beside the\nport so they can sign in. For a training environment's published sign-in only, never a\nsecret (a secret is an input)."
         }
       },
       "description": "A port written in full."
@@ -2144,6 +2148,25 @@
         }
       ],
       "description": "`publish:` as written, for the schema."
+    },
+    "Login": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "The account's name."
+        },
+        "password": {
+          "type": "string",
+          "description": "Its password."
+        }
+      },
+      "required": [
+        "user",
+        "password"
+      ],
+      "description": "The fixed account a port's service ships with, shown to the user beside the port: a training\nenvironment's published sign-in, never a secret (a secret is an input)."
     },
     "Command": {
       "anyOf": [
@@ -2460,7 +2483,7 @@
         "from",
         "path"
       ],
-      "description": "A folder of the computer that runs the environment, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `docker-vm` on a local\nprovider, `vagrant`); the others refuse a spec that asks for one."
+      "description": "A folder of the computer that runs the environment, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `vagrant`); the others refuse\na spec that asks for one."
     },
     "Tmpfs": {
       "anyOf": [
@@ -3004,7 +3027,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -3145,7 +3168,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -3398,7 +3421,7 @@
       "additionalProperties": false,
       "properties": {
         "docker": {
-          "description": "Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.",
+          "description": "Every target that runs the Compose file: `docker`, `hosted`, `cloud-docker`.",
           "$ref": "#/$defs/DockerOverrides"
         },
         "kubernetes": {
@@ -3406,7 +3429,7 @@
           "$ref": "#/$defs/KubernetesOverrides"
         },
         "vagrant": {
-          "description": "The `vagrant` target, and the VMs of `hybrid`.",
+          "description": "The `vagrant` target.",
           "$ref": "#/$defs/VagrantOverrides"
         },
         "proxmox": {
@@ -3881,11 +3904,6 @@
         },
         {
           "type": "string",
-          "const": "docker-vm",
-          "description": "Docker on one VM: on this machine, an ESXi host or a Proxmox server."
-        },
-        {
-          "type": "string",
           "const": "cloud-docker",
           "description": "Docker on one cloud VM."
         },
@@ -3893,11 +3911,6 @@
           "type": "string",
           "const": "kubernetes",
           "description": "The containers on a Kubernetes cluster."
-        },
-        {
-          "type": "string",
-          "const": "hybrid",
-          "description": "Containers and VMs together on the same networks (local VMs): each machine as a\ncontainer when it can be one, else as a VM."
         },
         {
           "type": "string",

@@ -61,7 +61,7 @@ mod tests {
     fn found(yaml: &str) -> Vec<(usize, String)> {
         let m: syntax::Machine = serde_yaml_ng::from_str(yaml).unwrap_or_else(|e| panic!("{yaml}: {e}"));
         let os = m.os.expect("an os");
-        unstarted(os, &m, &DaemonTable::common())
+        unstarted(os, &m, &crate::testing::daemons())
             .into_iter()
             .map(|u| (u.step, u.unit.to_string()))
             .collect()

@@ -10,8 +10,50 @@ use crate::model::{NetworkDocker, Spec};
 use crate::net::Cidr;
 use crate::net::Cidr6;
 use crate::net::docker_cidrs;
-use crate::{Error, Result};
 use isoloom_manifest::contract::OUTPUT_DIR;
+
+/// Why a spec can't be made an instance of itself ([`apply`]).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum InstanceError {
+    /// An instance number outside 1 to [`MAX`].
+    #[error("an instance number is 1 to {MAX}")]
+    Number(u8),
+    /// An environment's name too long once it carries its instance.
+    #[error("`{0}` is too long for an instance name (at most {max} characters with the suffix)", max = crate::validate::NAME_MAX)]
+    Name(String),
+    /// A published port too high to shift for the instance.
+    #[error("machines.{machine}.ports: published port {port} leaves no room for instance {instance} (ports shift by 100 per instance)")]
+    Port {
+        /// The machine.
+        machine: String,
+        /// The published port.
+        port: u16,
+        /// The instance.
+        instance: u8,
+    },
+    /// A Docker network's block too high to shift for the instance: its second octet would go
+    /// past 255 and wrap onto another block.
+    #[error("networks.{network}.docker.cidr: {cidr} leaves no room for instance {instance} (Docker blocks move by the instance in their second octet)")]
+    Docker {
+        /// The network.
+        network: String,
+        /// Its Docker block.
+        cidr: String,
+        /// The instance.
+        instance: u8,
+    },
+    /// An IPv6 block too high to shift for the instance.
+    #[error("networks.{network}.ipv6.cidr: {cidr} leaves no room for instance {instance}")]
+    Ipv6 {
+        /// The network.
+        network: String,
+        /// Its IPv6 block.
+        cidr: String,
+        /// The instance.
+        instance: u8,
+    },
+}
 
 /// The highest instance number.
 pub const MAX: u8 = 99;
@@ -29,25 +71,31 @@ pub fn output_dir(instance: Option<u8>) -> String {
 ///
 /// # Errors
 ///
-/// [`Error::InstanceNumber`] outside 1 to [`MAX`], [`Error::InstanceName`] when the name with its
-/// suffix is too long, and [`Error::InstancePort`] or [`Error::InstanceIpv6`] when a published
-/// port or an IPv6 block leaves no room to shift.
-pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
+/// [`InstanceError::Number`] outside 1 to [`MAX`], [`InstanceError::Name`] when the name with its
+/// suffix is too long, and [`InstanceError::Port`], [`InstanceError::Docker`] or
+/// [`InstanceError::Ipv6`] when a published port, a Docker block or an IPv6 block leaves no room
+/// to shift.
+pub fn apply(spec: &Spec, n: u8) -> Result<Spec, InstanceError> {
     if n == 0 || n > MAX {
-        return Err(Error::InstanceNumber(n));
+        return Err(InstanceError::Number(n));
     }
     let mut copy = spec.clone();
     copy.name = format!("{}-{n}", spec.name);
     // The limit the environment's name has (a Kubernetes namespace's), its suffix included.
     if copy.name.len() > crate::validate::NAME_MAX {
-        return Err(Error::InstanceName(copy.name));
+        return Err(InstanceError::Name(copy.name));
     }
     // Docker blocks: the second octet moves by n (10.61.10.0/24 -> 10.63.10.0/24 for instance 2),
     // staying inside 10.0.0.0/8; networks keep their distance from each other.
     for (name, block) in docker_cidrs(spec) {
         let [_, second, third, fourth] = block.address().octets();
         // The low octets are the block's own, so the shifted one is a block too.
-        let Some(shifted) = Cidr::new(u32::from_be_bytes([10, second.wrapping_add(n), third, fourth]), block.prefix()) else {
+        let moved = second.checked_add(n).ok_or_else(|| InstanceError::Docker {
+            network: name.clone(),
+            cidr: block.to_string(),
+            instance: n,
+        })?;
+        let Some(shifted) = Cidr::new(u32::from_be_bytes([10, moved, third, fourth]), block.prefix()) else {
             continue;
         };
         if let Some(net) = copy.networks.get_mut(&name) {
@@ -60,7 +108,7 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
         for port in &mut m.ports {
             if let Some(published) = port.publish {
                 let shifted = u32::from(published) + 100 * u32::from(n);
-                let moved = u16::try_from(shifted).map_err(|_| Error::InstancePort {
+                let moved = u16::try_from(shifted).map_err(|_| InstanceError::Port {
                     machine: machine.clone(),
                     port: published,
                     instance: n,
@@ -74,11 +122,11 @@ pub fn apply(spec: &Spec, n: u8) -> Result<Spec> {
 
 /// IPv6 blocks: the third group moves by n (`fd00:20::/64` -> `fd00:20:2::/64` for instance 2), on
 /// every target, since Docker refuses two networks on one IPv6 subnet too.
-fn shift_ipv6(copy: &mut Spec, n: u8) -> Result<()> {
+fn shift_ipv6(copy: &mut Spec, n: u8) -> Result<(), InstanceError> {
     for (name, net) in &mut copy.networks {
         let Some(v6) = net.ipv6.as_mut() else { continue };
         let Some(block) = Cidr6::parse(&v6.cidr) else { continue };
-        let moved = Cidr6::new(block.base().wrapping_add(u128::from(n) << 80)).ok_or_else(|| Error::InstanceIpv6 {
+        let moved = Cidr6::new(block.base().wrapping_add(u128::from(n) << 80)).ok_or_else(|| InstanceError::Ipv6 {
             network: name.clone(),
             cidr: v6.cidr.clone(),
             instance: n,
@@ -121,7 +169,7 @@ mod tests {
     fn instances_are_numbered_1_to_99() -> Result<(), String> {
         let spec = web(8080)?;
         for n in [0, 100] {
-            assert!(matches!(apply(&spec, n), Err(Error::InstanceNumber(m)) if m == n), "instance {n}");
+            assert!(matches!(apply(&spec, n), Err(InstanceError::Number(m)) if m == n), "instance {n}");
         }
         for n in [1, 99] {
             assert_eq!(apply(&spec, n).map(|s| s.name).ok(), Some(format!("t-{n}")), "instance {n}");
@@ -135,7 +183,7 @@ mod tests {
         spec.name = "a".repeat(53);
         assert_eq!(apply(&spec, 1).map(|s| s.name.len()).ok(), Some(55));
         spec.name = "a".repeat(54);
-        assert!(matches!(apply(&spec, 1), Err(Error::InstanceName(name)) if name.len() == 56));
+        assert!(matches!(apply(&spec, 1), Err(InstanceError::Name(name)) if name.len() == 56));
         Ok(())
     }
 
@@ -148,13 +196,28 @@ mod tests {
     }
 
     #[test]
+    fn a_docker_block_too_high_to_move_is_refused_not_wrapped() -> Result<(), String> {
+        let spec = model(
+            "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.0.0.0/24, docker: { cidr: 10.250.0.0/24 } }\nmachines:\n  web: { docker: { image: nginx }, networks: { lan: 10 } }\n",
+        )?;
+        let copy = apply(&spec, 5).map_err(|e| e.to_string())?;
+        assert_eq!(copy.networks["lan"].docker, Some(NetworkDocker { cidr: "10.255.0.0/24".into() }));
+        // Regression: 250 + 9 wrapped to 10.3.0.0/24, a block another network or instance may hold.
+        assert!(matches!(
+            apply(&spec, 9),
+            Err(InstanceError::Docker { network, instance: 9, .. }) if network == "lan"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn published_ports_move_100_per_instance() -> Result<(), String> {
         let copy = apply(&web(8080)?, 3).map_err(|e| e.to_string())?;
         assert_eq!(copy.machines["web"].ports[0].publish, Some(8380));
         assert_eq!(copy.machines["web"].ports[0].port, 80, "the machine's own port stays");
         assert!(matches!(
             apply(&web(65_500)?, 1),
-            Err(Error::InstancePort { machine, port: 65_500, instance: 1 }) if machine == "web"
+            Err(InstanceError::Port { machine, port: 65_500, instance: 1 }) if machine == "web"
         ));
         Ok(())
     }
@@ -170,7 +233,7 @@ mod tests {
         assert_eq!(copy.networks["lan"].ipv6.as_ref().map(|v6| v6.cidr.as_str()), Some("fd00:20:2::/64"));
         assert!(matches!(
             apply(&spec("fdff:ffff:ffff::/64")?, 1),
-            Err(Error::InstanceIpv6 { network, instance: 1, .. }) if network == "lan"
+            Err(InstanceError::Ipv6 { network, instance: 1, .. }) if network == "lan"
         ));
         Ok(())
     }

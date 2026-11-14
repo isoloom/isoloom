@@ -31,6 +31,7 @@ pub(crate) mod published;
 pub(crate) mod reach;
 pub(crate) mod rules;
 pub(crate) mod seal;
+pub(crate) mod sizes;
 pub(crate) mod windows;
 
 use std::net::Ipv4Addr;
