@@ -46,7 +46,7 @@ override_resource {
 }
 
 override_resource {
-  target          = oci_core_route_table.lan
+  target          = oci_core_route_table.sealed_lan
   override_during = plan
   values          = { id = "ocid1.routetable.oc1..lan" }
 }
@@ -79,6 +79,7 @@ variables {
   compartment_id       = "ocid1.compartment.oc1..tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "every_network_is_a_subnet_of_the_vcn_at_its_exact_range" {
@@ -106,11 +107,11 @@ run "each_network_has_its_table_sending_the_others_through_fw" {
     error_message = "dmz's subnet must move to dmz's own route table"
   }
   assert {
-    condition     = [oci_core_route_table_attachment.lan.subnet_id, oci_core_route_table_attachment.lan.route_table_id] == ["ocid1.subnet.oc1..lan", "ocid1.routetable.oc1..lan"]
+    condition     = [oci_core_route_table_attachment.sealed_lan.subnet_id, oci_core_route_table_attachment.sealed_lan.route_table_id] == ["ocid1.subnet.oc1..lan", "ocid1.routetable.oc1..lan"]
     error_message = "lan's subnet must move to lan's own route table"
   }
   assert {
-    condition     = sort([for r in oci_core_route_table.outside.route_rules : r.destination]) == sort(["0.0.0.0/0", "10.70.10.0/24", "10.70.20.0/24"]) && sort([for r in oci_core_route_table.dmz.route_rules : r.destination]) == sort(["0.0.0.0/0", "10.70.0.0/24", "10.70.20.0/24"]) && sort([for r in oci_core_route_table.lan.route_rules : r.destination]) == sort(["0.0.0.0/0", "10.70.0.0/24", "10.70.10.0/24"])
+    condition     = sort([for r in oci_core_route_table.outside.route_rules : r.destination]) == sort(["0.0.0.0/0", "10.70.10.0/24", "10.70.20.0/24"]) && sort([for r in oci_core_route_table.dmz.route_rules : r.destination]) == sort(["0.0.0.0/0", "10.70.0.0/24", "10.70.20.0/24"]) && sort([for r in oci_core_route_table.sealed_lan.route_rules : r.destination]) == sort(["203.0.113.7/32", "10.70.0.0/24", "10.70.10.0/24"])
     error_message = "each network's table must route the internet and every other network"
   }
   # A route to another network names fw's private IP there, which a data source finds once fw's
@@ -204,24 +205,17 @@ run "the_outputs_name_the_way_in_and_the_ready_file" {
   }
 }
 
-# The spec: lan has `internet: false` and `gateway: fw`. During set-up lan's security list lets
-# its machines out to every public block (they set themselves up over SSH); once every machine is
-# ready the runner applies with `isoloom_sealed = true` (the manifest's `seal`), and lan's
-# security list keeps no egress rule to a public block, so the internet is closed at the network
-# (the list judges the destination, not the next hop), while lan still reaches the other networks.
-# The seal is where root in the guest can't lift it, and cache keeps its public address, the way
-# the runner reaches it. (Only the egress rules are asserted: a failing assertion that reads a
-# route table's `route_rules` crashes Terraform 1.16's JSON view, the rules carry a deprecated
-# attribute's mark.)
+# The spec: lan has `internet: false` and `gateway: fw`. During set-up lan's subnet has the
+# internet table (the VCN routes between its subnets itself) and its security list lets its
+# machines out; once every machine is set up, the same apply attaches lan's own table, which goes
+# through fw to the other networks and to allowed_cidr alone, never 0.0.0.0/0 (asserted above
+# with the other tables), so the internet is closed at the network, where root in the guest can't
+# lift it.
 run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
-  variables {
-    isoloom_sealed = true
-  }
-
   assert {
-    condition     = length([for r in oci_core_security_list.lan.egress_security_rules : r.destination if r.protocol == "all" && !startswith(r.destination, "10.")]) == 0
-    error_message = "once sealed, lan (internet: false, routed by fw) must keep no egress rule to a public block"
+    condition     = oci_core_route_table_attachment.sealed_lan.subnet_id == "ocid1.subnet.oc1..lan"
+    error_message = "lan's sealed table must be attached to its subnet once the machines are set up"
   }
 }

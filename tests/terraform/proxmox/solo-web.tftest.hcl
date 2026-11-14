@@ -39,6 +39,7 @@ variables {
   proxmox_endpoint = "https://pve.test:8006/"
   node             = "pve-test"
   ssh_public_key   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "the_network_is_a_vnet_the_router_stands_on_at_254" {
