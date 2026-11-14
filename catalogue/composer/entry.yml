@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The composer entry: PHP's dependency manager, as the composer image ships it at
+# /usr/bin/composer, which a Dockerfile copies out of it (`COPY --from=composer:2.8
+# /usr/bin/composer /usr/bin/composer`). An exact release's composer.phar from getcomposer.org,
+# pinned by its SHA-256 in `vars`, on any OS with PHP (the machine's own PHP runs it). Each
+# series labs ask for has its newest release. Nothing for `cargo xtask catalogue refresh composer`
+# to pin: every release is a download.
+name: composer
+description: >-
+  Composer, PHP's dependency manager, as the composer image ships it: an exact release's
+  composer.phar at /usr/bin/composer.
+upstream: https://getcomposer.org/
+licence:
+  software: MIT
+
+releases:
+  - version: "2.7.9"
+    source: download
+    os: [debian@11, debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { sha256: b6de5e65c199d80ba11897fbe1364e063e858d483f6a81a176c4d60f2b1d6347 }
+  - version: "2.8.12"
+    source: download
+    os: [debian@11, debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { sha256: f446ea719708bb85fcbf4ef18def5d0515f1f9b4d703f6d820c9c1656e10a2f2 }
+  - version: "2.11.2"
+    source: download
+    os: [debian@11, debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { sha256: dd158c0afd41d15fac89e1b4e47b5d42911fe316c3687cd5edac98319b25d028 }
+default: "2.11.2"
+
+recipe:
+  install:
+    - file: { path: /usr/bin/composer, url: "https://getcomposer.org/download/{{ version }}/composer.phar", sha256: "{{ vars.sha256 }}", mode: "0755" }
+
+  configure: []
+
+  start: []

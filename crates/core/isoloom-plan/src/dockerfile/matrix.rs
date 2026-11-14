@@ -134,6 +134,18 @@ pub fn split(image: &str) -> (String, String) {
     }
 }
 
+/// The catalogue entry an image a Dockerfile copies files out of (`COPY --from=composer:2.8
+/// /usr/bin/composer …`) installs where the image has them, on the VM itself: `None` for an image
+/// it copies nothing out of.
+#[must_use]
+pub fn copied(image: &str) -> Option<EntryCall> {
+    let (name, tag) = split(image);
+    match name.as_str() {
+        "composer" | "composer/composer" => Base::entry("composer", &tag, &[], &[]).entry,
+        _ => None,
+    }
+}
+
 /// The base image `image` as a VM.
 ///
 /// # Errors
@@ -337,6 +349,14 @@ mod tests {
         assert_eq!(call("postgres:15.4-alpine"), Some(("postgres", Some("15.4".to_owned()))));
         assert_eq!(call("mongo:4.0.4"), Some(("mongodb", Some("4.0.4".to_owned()))));
         assert_eq!(call("debian:12"), None);
+    }
+
+    #[test]
+    fn composer_is_copied_out_of_its_catalogue_entry() {
+        let copied = |image: &str| copied(image).map(|c| (c.entry, c.version));
+        assert_eq!(copied("composer:2.8"), Some(("composer", Some("2.8".to_owned()))));
+        assert_eq!(copied("composer:latest"), Some(("composer", None)));
+        assert_eq!(copied("node:20"), None);
     }
 
     #[test]

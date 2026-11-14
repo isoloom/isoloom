@@ -298,11 +298,7 @@ impl<'a> Run<'a> {
                 return Err(f.at(line, "`RUN --mount`/`--network` needs BuildKit's build sandbox".to_owned(), "a plain `RUN`"));
             }
             Instruction::Run { command, .. } => self.run(st, command),
-            Instruction::Copy(c) | Instruction::Add(c) => {
-                let add = matches!(line.instruction, Instruction::Add(_));
-                let body = copy(f, i, c, add, st).map_err(|(reason, fix)| f.at(line, reason, fix))?;
-                self.push(st, &body, true);
-            }
+            Instruction::Copy(_) | Instruction::Add(_) => self.copy(f, i, st, line)?,
             Instruction::Volume(paths) => {
                 let dirs: Vec<String> = paths.iter().map(|p| quote(&absolute(&st.img.workdir, &substitute(p, &st.vars())))).collect();
                 self.push(st, &format!("mkdir -p {}", dirs.join(" ")), true);
@@ -338,6 +334,22 @@ impl<'a> Run<'a> {
             (Command::Exec(a), _) => argv(a),
         };
         self.push(st, &body, false);
+    }
+
+    /// The `COPY`/`ADD` at `line` of stage `i`; out of an image the catalogue has an entry for, the
+    /// entry first, installing the files where the image has them on the VM itself.
+    fn copy(&mut self, f: &File<'_>, i: usize, st: &Stage, line: &Line) -> Result<(), Untranslatable> {
+        let (Instruction::Copy(c) | Instruction::Add(c)) = &line.instruction else {
+            return Ok(());
+        };
+        let add = matches!(line.instruction, Instruction::Add(_));
+        if let Some(call) = copied_entry(f, c, st) {
+            let op = release(&call, Some(&st.img.os)).map_err(|(reason, fix)| f.at(line, reason, &fix))?;
+            self.steps.push(Op::Entry(op));
+        }
+        let body = copy(f, i, c, add, st).map_err(|(reason, fix)| f.at(line, reason, fix))?;
+        self.push(st, &body, true);
+        Ok(())
     }
 
     /// The image `image_ref` (a `FROM` at `line` of `f`) as a VM: the matrix's entry, else a
@@ -453,14 +465,26 @@ fn release(call: &EntryCall, wanted: Option<&str>) -> Result<EntryOp, (String, S
     })
 }
 
-/// A `COPY`/`ADD`'s shell (stage `i` of `f`), or why it has none and the fix.
+/// The catalogue entry `c` copies out of: its `--from` names an image (not a stage) the matrix
+/// knows files of ([`matrix::copied`]).
+fn copied_entry(f: &File<'_>, c: &Copy, st: &Stage) -> Option<EntryCall> {
+    match &c.source {
+        Source::From(name) if stage_index(&f.stages, name).is_none() && name.parse::<usize>().is_err() => matrix::copied(&substitute(name, &st.vars())),
+        _ => None,
+    }
+}
+
+/// A `COPY`/`ADD`'s shell (stage `i` of `f`), or why it has none and the fix. Out of an image a
+/// catalogue entry installed ([`copied_entry`]), its files are on the VM itself.
 fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<String, (String, &'static str)> {
+    let installed = copied_entry(f, c, st).is_some();
     let vars = st.vars();
     let dest = substitute(&c.dest, &vars);
     let into = dest.ends_with('/') || dest == "." || c.sources.len() > 1;
     let dest = absolute(&st.img.workdir, &dest);
     let root = match &c.source {
         Source::Context => Some(format!("/opt/isoloom/{}", f.df.context.trim_end_matches('/'))),
+        Source::From(_) if installed => Some(String::new()),
         Source::From(stage) => match stage_index(&f.stages, stage).or_else(|| stage.parse().ok()) {
             Some(j) if j < i => None,
             _ => {
@@ -514,8 +538,8 @@ fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool) -> Result<Stri
 
 /// `COPY`'s semantics as shell functions: a folder's contents into the destination, a file to
 /// it (or into it, when it is a folder), a missing source an error.
-const COPY_HELPERS: &str = r#"isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+const COPY_HELPERS: &str = r#"isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
 isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
 isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
 "#;
