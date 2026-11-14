@@ -23,6 +23,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/proxmox/main.tf
 .isoloom/resolved.json
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/configure/lib/configure.sh: identical in the `docker` snapshot

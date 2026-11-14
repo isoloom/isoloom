@@ -524,6 +524,12 @@ fn listing(name: &str, entry: &str) -> Outcome<Scratch> {
 /// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `outside` be;
 /// `generate` writes nothing before it refuses (a generated file removed stays removed).
 fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Path) -> Outcome {
+    let listed = format!("`.isoloom/.generated` lists `{entry}`");
+    refuses_with(dir, outside, [listed.as_str(), listed.as_str()])
+}
+
+/// [`refuses_the_list`], each command (`generate`, then `check`) refusing with its reason.
+fn refuses_with(dir: &std::path::Path, outside: &std::path::Path, reasons: [&str; 2]) -> Outcome {
     // A home of the project's own: the tests calling this run at once.
     let project = dir.file_name().and_then(|n| n.to_str()).unwrap_or_default();
     let home = scratch(&format!("{project}-refused-home"))?;
@@ -531,10 +537,10 @@ fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Pat
     if compose.exists() {
         std::fs::remove_file(&compose)?;
     }
-    for command in ["generate", "check"] {
+    for (command, reason) in ["generate", "check"].into_iter().zip(reasons) {
         let o = isoloom(&home, &[&command, &dir])?;
         assert_eq!(o.code, Some(2), "{command}: {o:?}");
-        assert!(o.stderr.contains(&format!("`.isoloom/.generated` lists `{entry}`")), "{command}: {}", o.stderr);
+        assert!(o.stderr.contains(reason), "{command}: {}", o.stderr);
         assert!(outside.is_file(), "{command} removed {}", outside.display());
         assert!(!compose.exists(), "{command} wrote files before refusing the list");
     }
@@ -584,7 +590,9 @@ fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
     std::fs::remove_dir_all(dir.join(".isoloom"))?;
     std::fs::write(elsewhere.join(".generated"), list)?;
     std::os::unix::fs::symlink(&elsewhere, dir.join(".isoloom"))?;
-    refuses_the_list(&dir, entry, &outside)
+    // generate refuses the linked folder before it takes its turn there; check reads the list.
+    let listed = format!("`.isoloom/.generated` lists `{entry}`");
+    refuses_with(&dir, &outside, [".isoloom/.generated.lock is reached through a symbolic link", listed.as_str()])
 }
 
 /// A generated project (`docker`) whose `.isoloom/docker/<file>` is replaced by a link to

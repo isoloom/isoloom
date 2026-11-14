@@ -17,6 +17,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/proxmox/main.tf
 .isoloom/resolved.json
 
+## .isoloom/.generated.lock: identical in the `vagrant` snapshot
+
 ## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/proxmox/checks/isoloom-networks.sh

@@ -33,6 +33,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/docker/compose.yml
 .isoloom/resolved.json
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/cloud-docker/aws/main.tf

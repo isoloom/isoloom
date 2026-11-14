@@ -20,6 +20,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 ## .isoloom/.generated: identical in the `docker` snapshot
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/configure/api/run: identical in the `docker` snapshot
