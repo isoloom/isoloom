@@ -104,6 +104,7 @@ enum Ruleset {
     Open,
     /// The `internet: false` networks are closed.
     Sealed,
+}
 
 /// The seal, when the run has an `internet: false` network: `terraform_data.isoloom_seal`
 /// signs in to the router at its uplink address as `isoloom` and applies the sealed ruleset

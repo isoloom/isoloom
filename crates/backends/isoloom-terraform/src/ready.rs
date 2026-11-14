@@ -119,7 +119,7 @@ impl Wait {
             self.as_root.prefix(),
             quote(&format!(
                 "{}{outputs} && mkdir -p {STATE_DIR} && touch {}",
-                steps::project_unpack(steps::Archive::Uploaded, true),
+                steps::project_unpack(steps::Archive::Uploaded, steps::TopFolder::Stripped),
                 crate::machine::user_data::DELIVERED
             ))
         )
