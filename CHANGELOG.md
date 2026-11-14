@@ -39,6 +39,12 @@ stable spec format.
 
 ### Fixed
 
+- **`isoloom import compose` drafts a host folder read from the shell as a folder, and says when a
+  variable is set from another one (#301).** A short volume `${DATA:-./data}:/path` was split on
+  the `:` inside `${...}` and drafted as a named volume `-./data}`, so the draft didn't validate;
+  it is split outside `${...}` now, and a source read from the shell or on a Windows drive is a
+  host folder. `KEY: ${OTHER:-default}` drafted the input `OTHER` under its own name with no word
+  that the container never gets `KEY` nor the default: such an entry now gets a "changed" note.
 - **VMs of one network started at once on QEMU share one hub.** Vagrant starts QEMU's VMs in
   parallel: two could each find no hub and start one, the second failing on the ports or
   stopping the hub the first VM had just connected to. A network's hub is now started, joined and

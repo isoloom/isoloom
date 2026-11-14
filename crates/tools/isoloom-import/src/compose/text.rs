@@ -21,6 +21,27 @@ pub(super) fn flat(v: &Value) -> String {
     }
 }
 
+/// The parts of a short entry (`ports`, `volumes`), split on `:` outside `${...}`: a variable's
+/// default (`${DATA:-./data}`) is one part with its variable.
+pub(super) fn colon_parts(entry: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let (mut depth, mut cur) = (0_u32, String::new());
+    for ch in entry.chars() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            ':' if depth == 0 => {
+                parts.push(std::mem::take(&mut cur));
+                continue;
+            }
+            _ => {}
+        }
+        cur.push(ch);
+    }
+    parts.push(cur);
+    parts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
