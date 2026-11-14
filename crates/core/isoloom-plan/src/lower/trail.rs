@@ -5,16 +5,16 @@
 
 use isoloom_spec::syntax::{self, FieldPath, Step};
 
-use super::overrides::keyed_for_machine;
+use super::overrides::for_machine;
 
 /// Lowered paths back to written ones.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Trail {
     /// (lowered prefix, written path), the longest prefix wins.
     entries: Vec<(String, String)>,
-    /// (section, machine, key): the `overrides.<section>.machines` key a machine took its entry
-    /// from when it isn't the machine's own name (a group's, its counted machine's).
-    keys: Vec<(String, String, String)>,
+    /// (section, machine, where): where the `overrides.<section>.machines` entry a machine took
+    /// is written (its own key, a group's, its counted machine's).
+    overrides: Vec<(String, String, FieldPath)>,
 }
 
 impl Trail {
@@ -52,41 +52,39 @@ impl Trail {
         }
     }
 
-    /// The `overrides.<section>.machines` entries machine `name` takes its images, its LXC flag
-    /// and its existing host from, when one is written under another key: a group's, its counted
-    /// machine's.
+    /// Where the `overrides.<section>.machines` entries machine `name` takes its images, its LXC
+    /// flag and its existing host from are written.
     pub(super) fn overrides(&mut self, source: &syntax::Spec, name: &str) {
         let o = &source.overrides;
-        let mut found: Vec<(&str, Option<&str>)> = vec![
-            (
-                "vagrant",
-                o.vagrant.as_ref().and_then(|v| keyed_for_machine(source, &v.machines, name)).map(|(k, _)| k),
-            ),
-            (
-                "proxmox",
-                o.proxmox.as_ref().and_then(|p| keyed_for_machine(source, &p.machines, name)).map(|(k, _)| k),
-            ),
-            (
-                "external",
-                o.external.as_ref().and_then(|x| keyed_for_machine(source, &x.machines, name)).map(|(k, _)| k),
-            ),
+        let mut found = vec![
+            o.vagrant
+                .as_ref()
+                .and_then(|v| for_machine(source, "vagrant", &v.machines, name))
+                .map(|f| ("vagrant", f.at)),
+            o.proxmox
+                .as_ref()
+                .and_then(|p| for_machine(source, "proxmox", &p.machines, name))
+                .map(|f| ("proxmox", f.at)),
+            o.external
+                .as_ref()
+                .and_then(|x| for_machine(source, "external", &x.machines, name))
+                .map(|f| ("external", f.at)),
         ];
         for (cloud, c) in o.clouds() {
-            found.push((cloud, c.and_then(|c| keyed_for_machine(source, &c.machines, name)).map(|(k, _)| k)));
+            found.push(c.and_then(|c| for_machine(source, cloud, &c.machines, name)).map(|f| (cloud, f.at)));
         }
-        for (section, key) in found {
-            if let Some(key) = key.filter(|k| *k != name) {
-                self.keys.push((section.to_owned(), name.to_owned(), key.to_owned()));
-            }
+        for (section, at) in found.into_iter().flatten() {
+            self.overrides.push((section.to_owned(), name.to_owned(), at));
         }
     }
 
-    /// The key of `overrides.<section>.machines` machine `machine`'s entry is written under.
-    fn key<'a>(&'a self, section: &str, machine: &'a str) -> &'a str {
-        self.keys
-            .iter()
-            .find(|(s, m, _)| s == section && m == machine)
-            .map_or(machine, |(_, _, k)| k.as_str())
+    /// Where machine `machine`'s `overrides.<section>.machines` entry is written: as recorded,
+    /// else under its own name (no entry gave the field; it is reported where one would go).
+    fn written(&self, section: &str, machine: &str) -> FieldPath {
+        self.overrides.iter().find(|(s, m, _)| s == section && m == machine).map_or_else(
+            || FieldPath::new("overrides").key(section).key("machines").key(machine),
+            |(_, _, at)| at.clone(),
+        )
     }
 
     /// The spec's inputs, and the secrets lowering made of the files they fill.
@@ -149,23 +147,24 @@ fn machine_field(recorded: &Trail, m: &str, rest: &str) -> String {
         .split_once(['.', '['])
         .map_or((rest, ""), |(h, _)| (h, rest.get(h.len()..).unwrap_or_default()));
     let image = |key: &str| -> String {
-        let v = recorded.key("vagrant", m);
+        let v = recorded.written("vagrant", m);
         match key {
-            "vagrant" => format!("overrides.vagrant.machines.{v}.box"),
-            "vagrant_version" => format!("overrides.vagrant.machines.{v}.box_version"),
-            "qemu" | "hyperv" => format!("overrides.vagrant.machines.{v}.boxes.{key}"),
-            "box_url" | "box_server_url" | "winrm" | "winssh" => format!("overrides.vagrant.machines.{v}.{key}"),
-            "proxmox" => format!("overrides.proxmox.machines.{}.image", recorded.key("proxmox", m)),
-            "" => format!("overrides.vagrant.machines.{v}"),
-            cloud => format!("overrides.{cloud}.machines.{}.image", recorded.key(cloud, m)),
+            "vagrant" => v.key("box"),
+            "vagrant_version" => v.key("box_version"),
+            "qemu" | "hyperv" => v.key("boxes").key(key),
+            "box_url" | "box_server_url" | "winrm" | "winssh" => v.key(key),
+            "proxmox" => recorded.written("proxmox", m).key("image"),
+            "" => v,
+            cloud => recorded.written(cloud, m).key("image"),
         }
+        .to_string()
     };
     match (head, tail) {
         ("docker", t) => match t.trim_start_matches('.').split(['.', '[']).next().unwrap_or_default() {
             "image" | "appliance" | "config" | "firmware" => format!("{at}.app{t}"),
             "build" | "dockerfile" | "target" | "args" => format!("{at}.app.build"),
             "init" => format!("{at}.setup{}", t.trim_start_matches(".init")),
-            "lxc" => format!("overrides.proxmox.machines.{}.lxc", recorded.key("proxmox", m)),
+            "lxc" => recorded.written("proxmox", m).key("lxc").to_string(),
             "idle" => format!("{at}.os"),
             _ => format!("{at}.app"),
         },
@@ -184,7 +183,7 @@ fn machine_field(recorded: &Trail, m: &str, rest: &str) -> String {
         },
         ("arch" | "gpus" | "devices" | "nested_virtualization", t) => format!("{at}.hardware.{head}{t}"),
         ("working_dir", _) => format!("{at}.command.cwd"),
-        ("external", _) => format!("overrides.external.machines.{}.ssh", recorded.key("external", m)),
+        ("external", _) => recorded.written("external", m).key("ssh").to_string(),
         ("more_addresses", t) => format!("{at}.networks{t}"),
         _ => format!("{at}.{rest}"),
     }
@@ -277,26 +276,49 @@ mod tests {
     }
 
     #[test]
-    fn an_override_a_group_or_a_counted_machine_gives_points_at_its_own_key() {
-        let lab = crate::testing::lab(
-            "version: 1\nname: t\ngroups: { windows: { members: [dc1] } }\nmachines:\n  dc1: { os: debian@12 }\n  w: { os: debian@12, count: 2 }\noverrides:\n  vagrant: { machines: { windows: { box: a/b }, w: { box: a/w } } }\n  proxmox: { machines: { windows: { image: local:x, lxc: true } } }\n  aws: { machines: { w: { image: ami-1 } } }\n  external: { machines: { windows: { ssh: { address: 192.0.2.7, user: ops } } } }\n",
-        );
+    fn every_override_form_is_reported_at_a_path_the_spec_writes() {
+        // Each section's entry written three ways: under the machine (`own`), a group (`dc1`
+        // through `windows`) and a counted machine (`w-01` through `w`).
+        let entry = |section: &str| match section {
+            "vagrant" => "{ box: a/b, box_version: 1.0.0, box_url: https://example.com/b, boxes: { qemu: a/q, hyperv: a/h }, winrm: ssl }",
+            "proxmox" => "{ image: local:x, lxc: true }",
+            "external" => "{ ssh: { address: 192.0.2.7, user: ops } }",
+            _ => "{ image: img-1 }",
+        };
+        let sections = ["vagrant", "proxmox", "external", "aws", "azure", "gcp", "digitalocean", "linode", "oci"];
+        let overrides = sections
+            .iter()
+            .map(|s| format!("  {s}: {{ machines: {{ own: {e}, windows: {e}, w: {e} }} }}\n", e = entry(s)))
+            .collect::<Vec<_>>()
+            .concat();
+        let lab = crate::testing::lab(&format!(
+            "version: 1\nname: t\ngroups: {{ windows: {{ members: [dc1] }} }}\nmachines:\n  own: {{ os: debian@12 }}\n  dc1: {{ os: debian@12 }}\n  w: {{ os: debian@12, count: 2 }}\noverrides:\n{overrides}"
+        ));
         let mut t = Trail::default();
-        for m in ["dc1", "w-01"] {
-            t.overrides(lab.source(), m);
-        }
-        for (lowered, written) in [
-            ("machines.dc1.vm.image.vagrant", "overrides.vagrant.machines.windows.box"),
-            ("machines.dc1.vm.image.qemu", "overrides.vagrant.machines.windows.boxes.qemu"),
-            ("machines.dc1.vm.image.proxmox", "overrides.proxmox.machines.windows.image"),
-            ("machines.dc1.docker.lxc", "overrides.proxmox.machines.windows.lxc"),
-            ("machines.dc1.external.address", "overrides.external.machines.windows.ssh"),
-            ("machines.dc1.vm.image.aws", "overrides.aws.machines.dc1.image"),
-            ("machines.w-01.vm.image.vagrant", "overrides.vagrant.machines.w.box"),
-            ("machines.w-01.vm.image.aws", "overrides.aws.machines.w.image"),
-            ("machines.w-01.vm.image.proxmox", "overrides.proxmox.machines.w-01.image"),
-        ] {
-            assert_eq!(t.path(lowered).as_str(), written, "{lowered}");
+        for (machine, key) in [("own", "own"), ("dc1", "windows"), ("w-01", "w")] {
+            t.overrides(lab.source(), machine);
+            let mut fields: Vec<(String, String)> = [
+                ("vm.image.vagrant", "vagrant.machines.{k}.box"),
+                ("vm.image.vagrant_version", "vagrant.machines.{k}.box_version"),
+                ("vm.image.box_url", "vagrant.machines.{k}.box_url"),
+                ("vm.image.qemu", "vagrant.machines.{k}.boxes.qemu"),
+                ("vm.image.hyperv", "vagrant.machines.{k}.boxes.hyperv"),
+                ("vm.image.winrm", "vagrant.machines.{k}.winrm"),
+                ("vm.image.proxmox", "proxmox.machines.{k}.image"),
+                ("docker.lxc", "proxmox.machines.{k}.lxc"),
+                ("external.address", "external.machines.{k}.ssh"),
+            ]
+            .iter()
+            .map(|(l, w)| ((*l).to_owned(), (*w).to_owned()))
+            .collect();
+            for cloud in &sections[3..] {
+                fields.push((format!("vm.image.{cloud}"), format!("{cloud}.machines.{{k}}.image")));
+            }
+            for (lowered, written) in fields {
+                let reported = t.path(&format!("machines.{machine}.{lowered}"));
+                assert_eq!(reported.as_str(), format!("overrides.{}", written.replace("{k}", key)), "{machine}: {lowered}");
+                assert!(lab.source().spans.contains(&reported), "{machine}: {reported} isn't written in the spec");
+            }
         }
     }
 
