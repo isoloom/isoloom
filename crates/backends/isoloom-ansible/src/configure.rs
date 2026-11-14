@@ -31,8 +31,12 @@ pub use role::files as role_files;
 pub use role::role_name;
 
 /// The project variable each play sets to the project folder, so a role's `copy` and `script`
-/// find a project file wherever `site.yml` is run from (relative to the playbook's own folder).
-const PROJECT_VAR: &str = "{{ (playbook_dir + '/../..') | realpath }}";
+/// find a project file wherever `site.yml` is run from: `site.yml`'s folder `base`, climbed back
+/// to the project (`.isoloom/external` -> `../..`).
+fn project_var(base: &str) -> String {
+    let up: Vec<&str> = base.split('/').filter(|part| !part.is_empty() && *part != ".").map(|_| "..").collect();
+    format!("{{{{ (playbook_dir + '/{}') | realpath }}}}", up.join("/"))
+}
 
 /// The Ansible project for `env`, its files under `base` (`.isoloom/external`): `site.yml` running
 /// each host's role, the roles themselves, and `requirements.yml` when a role names a pinned
@@ -59,8 +63,9 @@ pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<Genera
 }
 
 /// `site.yml`: one play per configured host, applying its role as `isoloom` the host over the
-/// inventory, each play setting [`PROJECT_VAR`].
+/// inventory, each play setting [`project_var`].
 fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
+    let project = project_var(base);
     let plays: Vec<Value> = configured
         .iter()
         .map(|(name, _)| {
@@ -68,7 +73,7 @@ fn site(base: &str, configured: &[(String, Configured<'_>)]) -> GeneratedFile {
                 "name": format!("Configure {name}"),
                 "hosts": name,
                 "become": true,
-                "vars": { "isoloom_project": task::jinja(PROJECT_VAR) },
+                "vars": { "isoloom_project": task::jinja(&project) },
                 "roles": [role_name(name)],
             })
         })
