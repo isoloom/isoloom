@@ -904,7 +904,9 @@ version = "3.0.0"
 dependencies = [
  "indexmap",
  "insta",
+ "isoloom-catalogue",
  "isoloom-manifest",
+ "isoloom-plan",
  "isoloom-spec",
  "isoloom-targets",
  "proptest",

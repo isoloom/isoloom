@@ -1,8 +1,10 @@
 //! The drawing's nodes as Isoloom machines.
 //!
-//! A container node is a custom app from its image (`app.image`), kept running idle with its own
-//! `command` when the image runs nothing of its own; a Cisco node is an appliance (`app.appliance`
-//! with its image, or the firmware Dynamips boots). A VM node is its OS (`os`), set up by its
+//! A container node takes every form Isoloom has of its image ([`forms`]): its OS, or a catalogue
+//! service, both of which are a container and a VM; else a custom app from its image
+//! (`app.image`, a container only), kept running idle with its own `command` when the image runs
+//! nothing of its own. A Cisco node is an appliance (`app.appliance` with its image, or the
+//! firmware Dynamips boots). A VM node is its OS (`os`), set up by its
 //! provisioning steps (`app.steps`): each target decides how to deliver it. A Windows machine's
 //! playbooks run from Isoloom's controller instead (see `controller`).
 
@@ -12,6 +14,7 @@ use isoloom_spec::syntax::{OsRef, ProjectPath, is_yaml_file};
 use crate::controller::ControllerPlaybook;
 use crate::document::{AppDoc, MachineDoc, StepDoc};
 use crate::draft::Draft;
+use crate::forms::{self, Forms};
 use crate::project::{config_path, firmware_path, own_config};
 use crate::{Error, Kind, Node, Result, Topology, ports};
 
@@ -52,11 +55,22 @@ fn machine(name: &str, node: &Node) -> Result<(MachineDoc, Vec<ControllerPlayboo
             Vec::new()
         }
         Kind::Container { image, idle, .. } => {
-            m.app = Some(AppDoc {
-                image: Some(image.clone()),
-                ..AppDoc::default()
-            });
-            m.command = idle.then(|| IDLE_COMMAND.map(str::to_owned).to_vec());
+            match forms::of(image, &node.services) {
+                Forms::Os(os) => m.os = Some(os),
+                Forms::Service { os, service } => {
+                    // The entry names its own ports, which hold every drawn one.
+                    m.os = Some(os);
+                    m.service = Some(service);
+                    m.ports.clear();
+                }
+                Forms::Image => {
+                    m.app = Some(AppDoc {
+                        image: Some(image.clone()),
+                        ..AppDoc::default()
+                    });
+                    m.command = idle.then(|| IDLE_COMMAND.map(str::to_owned).to_vec());
+                }
+            }
             Vec::new()
         }
         Kind::Vm { os, provision } => {
