@@ -22,7 +22,6 @@ pub(crate) mod gateways;
 pub(crate) mod gpus;
 pub(crate) mod hooks;
 pub(crate) mod interfaces;
-pub(crate) mod manifest;
 pub(crate) mod nested;
 pub(crate) mod outputs;
 pub(crate) mod own_image;
@@ -40,7 +39,7 @@ use crate::hcl_builder::{Expression, Module};
 use isoloom_plan::{Capabilities, Environment, Feature, Vm};
 use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::{Backend, Files, Placed};
+use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
 
 use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
@@ -282,34 +281,9 @@ impl CloudVmBackend {
     }
 }
 
-impl CloudVmModule {
-    /// Its run manifest, `.isoloom/cloud-vm/<cloud>/run.json` (its message left to the caller).
-    ///
-    /// # Errors
-    ///
-    /// [`crate::Error::Manifest`] for a value the manifest's types refuse (a bug of this backend).
-    fn run_manifest(self, env: &Environment) -> Result<isoloom_manifest::Manifest> {
-        manifest::manifest(env, self.0, &self.driver()).map_err(|source| crate::Error::Manifest {
-            target: Target::CloudVm,
-            source,
-        })
-    }
-}
-
 impl Backend for CloudVmBackend {
     fn target(&self) -> Target {
         Target::CloudVm
-    }
-
-    /// A run manifest per cloud that takes the environment, beside its module.
-    fn run_manifests(&self, env: &Environment) -> std::result::Result<Vec<Placed>, RenderError> {
-        let mut out = Vec::new();
-        for (cloud, why) in self.refusals(env) {
-            if why.is_none() {
-                out.push(Placed::under(cloud.id(), CloudVmModule(cloud).run_manifest(env)?));
-            }
-        }
-        Ok(out)
     }
 
     fn capabilities(&self) -> Capabilities {

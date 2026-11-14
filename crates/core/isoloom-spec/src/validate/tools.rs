@@ -1,7 +1,7 @@
 //! `tools`: the helpers Isoloom adds on every network (a shell, a browser...), at the addresses
 //! just below the controller.
 
-use isoloom_manifest::KEBAB_MAX;
+use crate::contract::KEBAB_MAX;
 
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Spec, TOOL_RECIPES};

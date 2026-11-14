@@ -20,7 +20,6 @@
 //!   addresses.
 //! - **The containers' shared parts:** [`container`]; the check runners (the sh runner a
 //!   position's checks become, where a check reaches its host): [`checks`].
-//! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
 //! - **What an ESXi host is told about a VM** (its guest OS type), which the `esxi` target and
 //!   Vagrant's ESXi provider share: [`esxi`].
 //! - **Numbers from names** that are the same on every build: [`stable_hash`].
@@ -62,7 +61,6 @@ mod network;
 mod output;
 pub mod powershell;
 pub mod project;
-pub mod run_manifest;
 pub mod secrets;
 pub mod stable_hash;
 pub mod steps;

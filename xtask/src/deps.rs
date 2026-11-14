@@ -2,10 +2,8 @@
 //! `cargo metadata` says: spec → plan → render → backends → targets → cli and the front-ends. A
 //! crate depends only on crates below it, so no backend depends on another backend, the tools
 //! (import) depend on the core alone, a front-end (the topology compiler, its WebAssembly engine)
-//! builds on the targets and the front-ends before it, the manifest crate depends on no other crate of the workspace (it is the
-//! serde-only contract the runner reads too, whose names the spec uses), and nothing depends on
-//! the xtask (which may use
-//! any crate: the catalogue's refresh reads the catalogue's types).
+//! builds on the targets and the front-ends before it, and nothing depends on the xtask (which
+//! may use any crate: the catalogue's refresh reads the catalogue's types).
 //!
 //! The product boundary too: no crate of the runner (`isothrum`, `isothrum-*`) is anywhere in the
 //! resolved graph, directly or transitively.
@@ -45,10 +43,8 @@ impl Level {
     }
 }
 
-/// The core crates, in their order; the manifest crate sits at the bottom, under the spec (which
-/// reads the contract's names: its reserved prefix, the output folder).
-const CORE: [(&str, u8); 5] = [
-    ("isoloom-manifest", 0),
+/// The core crates, in their order.
+const CORE: [(&str, u8); 4] = [
     ("isoloom-spec", 1),
     ("isoloom-catalogue", 2),
     ("isoloom-plan", 3),
@@ -57,28 +53,6 @@ const CORE: [(&str, u8); 5] = [
 
 /// The front-ends, in their order: the WebAssembly engine runs the topology compiler.
 const FRONTENDS: [(&str, u8); 2] = [("isoloom-topology", 0), ("isoloom-wasm", 1)];
-
-/// What the manifest crate may build on: serde and its schema, nothing else, so the runner reads
-/// the contract without pulling in the converter.
-const MANIFEST_DEPS: [&str; 5] = ["serde", "serde_json", "serde_path_to_error", "schemars", "thiserror"];
-
-/// The manifest crate's dependencies beyond [`MANIFEST_DEPS`] (its tests' aside).
-fn manifest_extras(package: &Value) -> Vec<String> {
-    package["dependencies"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|d| d["kind"].is_null())
-        .filter_map(|d| d["name"].as_str())
-        .filter(|n| !MANIFEST_DEPS.contains(n))
-        .map(|n| {
-            format!(
-                "isoloom-manifest depends on {n}: the manifest crate stays serde-only ({})",
-                MANIFEST_DEPS.join(", ")
-            )
-        })
-        .collect()
-}
 
 /// The level of the crate `name` whose folder is `dir` (relative to the workspace, with `/`).
 fn level(name: &str, dir: &str) -> Result<Level, String> {
@@ -137,9 +111,6 @@ pub(crate) fn violations(metadata: &Value) -> Vec<String> {
     let level_of = |n: &str| levels.iter().find(|(name, _)| name == n).map(|(_, l)| *l);
     for p in &packages {
         let name = p["name"].as_str().unwrap_or("");
-        if name == "isoloom-manifest" {
-            problems.extend(manifest_extras(p));
-        }
         let Some(from) = level_of(name) else { continue };
         for d in p["dependencies"].as_array().into_iter().flatten() {
             let dep = d["name"].as_str().unwrap_or("");
@@ -282,20 +253,14 @@ mod tests {
     }
 
     #[test]
-    fn the_manifest_stands_alone_and_nothing_uses_the_xtask() {
+    fn nothing_uses_the_xtask() {
         let found = check(&[
             package("isoloom-spec", "crates/core/isoloom-spec", &[]),
-            package(
-                "isoloom-manifest",
-                "crates/core/isoloom-manifest",
-                &[("isoloom-spec", None), ("serde", None), ("proptest", Some("dev"))],
-            ),
             package("isoloom", "crates/cli/isoloom", &[("xtask", Some("dev"))]),
             // The xtask may use any crate (the catalogue's refresh reads its types).
             package("xtask", "xtask", &[("isoloom-spec", None)]),
         ]);
-        // isoloom-spec twice: a workspace crate, and not serde.
-        assert_eq!(found.len(), 3, "{found:?}");
+        assert_eq!(found.len(), 1, "{found:?}");
     }
 
     #[test]

@@ -22,7 +22,7 @@
 //!
 //! A module gets only the lists it reads ([`lists`]).
 
-pub use isoloom_manifest::ignore;
+pub use isoloom_spec::ignore;
 
 /// How a Terraform module copies the project into its machines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

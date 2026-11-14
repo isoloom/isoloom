@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use super::machines::Subject;
-use isoloom_manifest::is_kebab;
+use crate::contract::is_kebab;
 
 use super::Problems;
 use crate::model::{SharedVolume, Spec};

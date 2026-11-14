@@ -16,10 +16,7 @@
 //! - [`Provision`]: a provisioner, its script a string or a squiggly heredoc (`<<~'SH'`, nothing
 //!   expanded, its tag never a line of the script); [`Ruby::provision`] writes it.
 //! - [`Ruby::configure`] writes the `Vagrant.configure` block and [`Ruby::define`] a VM's
-//!   `config.vm.define` block in it; as they are written, the builder records what Vagrant
-//!   applies to each VM only when it boots ([`BootStatements`]): every statement of the configure
-//!   block but comments and provisioners (known by their type, never by their text), those of a
-//!   define for its VM, the others for every VM.
+//!   `config.vm.define` block in it.
 
 use std::fmt;
 
@@ -162,9 +159,7 @@ impl fmt::Display for Call {
 }
 
 /// A provisioner: `<var>.vm.provision "<name>", key: value`, with its script as a keyword
-/// argument (a string, or a heredoc after the call). [`Ruby::provision`] writes it; being one by
-/// construction, it is never recorded as what a VM boots with (`vagrant up --provision` runs it on
-/// a running VM).
+/// argument (a string, or a heredoc after the call). [`Ruby::provision`] writes it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Provision {
     call: Call,
@@ -239,38 +234,6 @@ pub(crate) enum Start {
 pub(crate) struct Ruby {
     out: String,
     depth: usize,
-    /// What the configure block being written applies at boot, while it is written.
-    recording: Option<Recording>,
-    /// What the configure block applied at boot, once written.
-    boot: BootStatements,
-}
-
-/// The statements of a Vagrantfile's configure block that Vagrant applies to a VM only when it
-/// boots it (`vagrant up` of a stopped VM, `vagrant reload`): synced folders, networks, forwarded
-/// ports, size, provider settings. Comments and provisioners ([`Provision`], which `vagrant up
-/// --provision` runs on a running VM) are left out; each statement is indented to its depth in
-/// its scope. Nothing outside the configure block is recorded: what a VM boots with must be
-/// written in it, never read from a constant the spec sets above it (the ESXi port groups are
-/// each define's own indexes, not a lookup in a list of the networks). The constants above it
-/// that boot settings read come from the host running Vagrant, not from the spec: `ROOT`,
-/// `HOST_ARCH`, `ESXI_NETWORKS`, `HYPERV_SWITCH` and the host ports the runner chose
-/// (`ISOLOOM_HOSTPORTS`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct BootStatements {
-    /// The configure block's own statements, outside every define: what all its VMs share.
-    pub(crate) shared: Vec<String>,
-    /// Each define's statements, by its VM's name, in the file's order.
-    pub(crate) defines: Vec<(String, Vec<String>)>,
-}
-
-/// The configure block being written: the statements so far and the scope a statement lands in.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct Recording {
-    statements: BootStatements,
-    /// The depth of the configure block's body.
-    base: usize,
-    /// The define being written, with the depth of its body.
-    define: Option<(usize, usize)>,
 }
 
 impl Ruby {
@@ -280,21 +243,18 @@ impl Ruby {
     }
 
     /// Prepared Ruby, added as it is (its own indentation and line ends): a library outside the
-    /// configure block, so nothing Vagrant applies at boot is recorded from it.
+    /// configure block.
     pub(crate) fn text(&mut self, ruby: &str) -> &mut Ruby {
         self.out.push_str(ruby);
         self
     }
 
-    /// One line of code at the current depth, recorded when it is a statement Vagrant applies at
-    /// boot ([`BootStatements`]).
+    /// One line of code at the current depth.
     pub(crate) fn line(&mut self, code: impl fmt::Display) -> &mut Ruby {
-        let code = code.to_string();
-        self.record(&code);
-        self.write(&code)
+        self.write(&code.to_string())
     }
 
-    /// One line at the current depth, not recorded.
+    /// One line at the current depth.
     fn write(&mut self, code: &str) -> &mut Ruby {
         self.indent();
         self.out.push_str(code);
@@ -302,41 +262,17 @@ impl Ruby {
         self
     }
 
-    /// `code`, a statement at the current depth, in the scope it is written in (a define, else
-    /// the configure block's own), unless no configure block is being written.
-    fn record(&mut self, code: &str) {
-        let depth = self.depth;
-        let Some(rec) = self.recording.as_mut() else {
-            return;
-        };
-        let (scope, at) = match rec.define {
-            Some((i, at)) => (rec.statements.defines.get_mut(i).map(|(_, s)| s), at),
-            None => (Some(&mut rec.statements.shared), rec.base),
-        };
-        if let Some(scope) = scope {
-            scope.push(format!("{}{code}", "  ".repeat(depth.saturating_sub(at))));
-        }
-    }
-
-    /// `Vagrant.configure("2") do |config|`, `body` one level deeper, then `end`, recording what
-    /// Vagrant applies at boot ([`Ruby::boot`]).
+    /// `Vagrant.configure("2") do |config|`, `body` one level deeper, then `end`.
     pub(crate) fn configure(&mut self, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
         self.write("Vagrant.configure(\"2\") do |config|");
         self.depth += 1;
-        self.recording = Some(Recording {
-            base: self.depth,
-            ..Recording::default()
-        });
         body(self);
-        if let Some(rec) = self.recording.take() {
-            self.boot = rec.statements;
-        }
         self.depth -= 1;
         self.write("end")
     }
 
     /// `config.vm.define "<name>" do |m|` (`autostart: false` for a VM started [`Start::OnDemand`]),
-    /// `body` one level deeper, then `end`: VM `name`, whose statements are recorded as its own.
+    /// `body` one level deeper, then `end`: VM `name`.
     pub(crate) fn define(&mut self, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
         let mut call = Call::new("config.vm.define").arg(Value::str(name));
         if start == Start::OnDemand {
@@ -344,21 +280,9 @@ impl Ruby {
         }
         self.write(&format!("{call} do |m|"));
         self.depth += 1;
-        let outer = self.recording.as_mut().map(|rec| {
-            rec.statements.defines.push((name.to_owned(), Vec::new()));
-            rec.define.replace((rec.statements.defines.len() - 1, self.depth))
-        });
         body(self);
-        if let (Some(rec), Some(outer)) = (self.recording.as_mut(), outer) {
-            rec.define = outer;
-        }
         self.depth -= 1;
         self.write("end")
-    }
-
-    /// What the configure block written applies at boot (empty before [`Ruby::configure`]).
-    pub(crate) fn boot(&self) -> &BootStatements {
-        &self.boot
     }
 
     /// An empty line.
@@ -367,7 +291,7 @@ impl Ruby {
         self
     }
 
-    /// A comment, one `#` line per line of `text` (never recorded).
+    /// A comment, one `#` line per line of `text`.
     pub(crate) fn comment(&mut self, text: &str) -> &mut Ruby {
         for l in text.lines() {
             self.write(&format!("# {l}"));
@@ -406,9 +330,8 @@ impl Ruby {
     }
 
     /// A provisioner: its call, then its heredoc's lines one level deeper and its closing tag,
-    /// when it has one. Never recorded ([`BootStatements`]).
+    /// when it has one.
     pub(crate) fn provision(&mut self, p: Provision) -> &mut Ruby {
-        let recording = self.recording.take();
         match p.heredoc {
             None => self.line(p.call),
             Some((key, tag, script)) => {
@@ -416,7 +339,6 @@ impl Ruby {
                 self.heredoc_body(&tag, &script)
             }
         };
-        self.recording = recording;
         self
     }
 
@@ -626,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn the_configure_block_records_what_each_vm_boots_with() {
+    fn an_on_demand_define_is_not_started_by_up() {
         let mut r = Ruby::new();
         r.assign("ROOT", Value::raw("1"));
         r.configure(|r| {
@@ -640,15 +562,6 @@ mod tests {
                 r.provision(Provision::new("m", "shell").script("inline", "b"));
             });
         });
-        let boot = r.boot().clone();
-        assert_eq!(boot.shared, ["config.vm.boot_timeout = 900"]);
-        assert_eq!(
-            boot.defines,
-            [(
-                "web".to_owned(),
-                vec!["m.vm.provider \"utm\" do |_, o|".to_owned(), "  o.memory = 512".to_owned(), "end".to_owned()]
-            )]
-        );
         assert!(r.finish().contains("config.vm.define \"web\", autostart: false do |m|\n"));
     }
 }

@@ -145,7 +145,7 @@ fn exec(n: &str, command: &str) -> Resolved {
 #[cfg(unix)]
 #[test]
 fn what_a_runner_prints_reads_back_as_its_checks_lines() {
-    use isoloom_manifest::CheckLine;
+    use isoloom_spec::check_line::CheckLine;
 
     let sh = runner(&[exec("it's up", "true"), exec("db ready", "echo refused; false")], false);
     let out = std::process::Command::new("sh").arg("-c").arg(&sh).output().expect("sh runs");

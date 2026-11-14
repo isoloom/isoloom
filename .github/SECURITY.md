@@ -47,12 +47,11 @@ date. A vulnerability already being exploited is fixed and announced as fast as 
 In scope:
 
 - **Generated output.** Files Isoloom writes under `.isoloom/` (Compose files, Kubernetes
-  manifests and the Helm chart, Vagrantfiles, Terraform modules, scripts, check runners, the run
-  manifest) that leave an environment less isolated or less protected than its spec says. For
+  manifests and the Helm chart, Vagrantfiles, Terraform modules, scripts, check runners) that leave an environment less isolated or less protected than its spec says. For
   example: a service reachable from a network `reach` doesn't allow, a port published beyond the
   host's loopback (or beyond `allowed_cidr` on a cloud) when the spec doesn't ask for it, an
   `internet: false` network that reaches the internet once sealed, a firewall rule wider than the
-  spec's, or a secret's value written into a generated file or the run manifest.
+  spec's, or a secret's value written into a generated file.
 - **The command line.** `isoloom` itself: code execution through a spec, a profile, a defaults
   file or an imported file beyond what [the trust model](../docs/explanation/security.md#trust-model)
   says, path traversal outside the project, and unsafe handling of `~/.isoloom/`.
@@ -65,7 +64,7 @@ In scope:
   Vagrant and its providers, Terraform and its providers, Ansible, OpenSSH) or in the images and
   boxes an environment runs: report those upstream. If Isoloom's output turns an upstream
   weakness on where it would otherwise be off, that is in scope.
-- What a runner does with the run manifest: report it to the runner (Isothrum's policy is in
+- What a runner does with the generated files: report it to the runner (Isothrum's policy is in
   [its repository](https://github.com/Isothrum/isothrum/security)).
 - What a spec asks for on purpose: a machine given wide `reach`, published ports,
   `ISOLOOM_PUBLISH_ADDRESS=0.0.0.0`, privileged containers, a literal password in a `user` step.
@@ -86,9 +85,9 @@ The full model: [security considerations](../docs/explanation/security.md).
 
 - **Isoloom converts and runs nothing.** It reads the project and writes files, opens no network
   connection and has no telemetry.
-- **Secrets never land in a file.** A secret or input is a slot (a name and a destination) in the
-  run manifest; its value comes from its store at run time and reaches the machine as a file, over
-  SSH standard input, never in a generated file, the resolved snapshot or a command line.
+- **Secrets never land in a file.** A secret or input is named in the generated files; its value
+  reaches each tool the native way at run time (its environment, a sensitive Terraform variable),
+  never in a generated file, the resolved snapshot or a command line.
 - **Published ports stay local.** Compose and Vagrant publish on `127.0.0.1`; Kubernetes publishes
   as ClusterIP; a cloud VM accepts SSH, WinRM and published ports only from `allowed_cidr`, which
   has no default.

@@ -1,8 +1,8 @@
 //! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
 //! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
-use isoloom_manifest::contract::RESERVED_PREFIX;
-use isoloom_manifest::is_kebab;
+use crate::contract::RESERVED_PREFIX;
+use crate::contract::is_kebab;
 
 use super::{Problems, is_variable};
 use crate::model::Spec;

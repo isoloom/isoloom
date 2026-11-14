@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use isoloom_manifest::HostOs;
+use super::HostOs;
 use isoloom_spec::model::Target;
 use serde::Deserialize;
 

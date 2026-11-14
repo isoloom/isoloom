@@ -48,7 +48,7 @@ fn names(s: &mut Value) {
     let kebab = "^[a-z][a-z0-9]*(-[a-z0-9]+)*$";
     set(s, &["properties", "name"], "pattern", json!("^[a-z0-9]+(-[a-z0-9]+)*$"));
     set(s, &["properties", "name"], "maxLength", json!(crate::validate::NAME_MAX));
-    let network = json!({ "pattern": kebab, "maxLength": isoloom_manifest::KEBAB_MAX });
+    let network = json!({ "pattern": kebab, "maxLength": crate::contract::KEBAB_MAX });
     set(s, &["properties", "networks"], "propertyNames", network);
     let machine = json!({ "pattern": kebab, "maxLength": crate::validate::MACHINE_NAME_MAX });
     set(s, &["properties", "machines"], "propertyNames", machine);

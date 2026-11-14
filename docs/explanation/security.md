@@ -12,15 +12,16 @@ decide when you run it. To report a vulnerability: [SECURITY.md](../../.github/S
   network connection and starts no program, except `d2`/`dot` for `isoloom graph -o` and Ruby for
   `isoloom import vagrant`, which evaluates the Vagrantfile it imports (import only Vagrantfiles
   you trust).
-- **The generated files and the run manifest are trusted input** for whatever runs them: they name
+- **The generated files are trusted input** for whatever runs them: they name
   the commands that run.
 
 ## Secrets never land in a file
 
 A secret or input is declared by name and source (`env`, `file`, Vault, SOPS). Its value is never
-in the spec, a generated file, `resolved.json` or the run manifest: the manifest holds a slot (a
-name and a destination). A runner reads the value at run time and delivers it as the slot says,
-usually as a file in the machine over SSH standard input, never on a command line. Vagrant hands
+in the spec, a generated file or `resolved.json`: the files name it, and each tool takes the value
+the native way at run time (Compose from its environment, the Vagrantfile from its provisioner's
+environment, Terraform as a sensitive `TF_VAR_<name>` variable, delivered by user data or
+cloud-init and kept in Terraform's state), never on a command line. Vagrant hands
 a value to a provisioner in its environment, which it writes into a shell string: every
 Vagrantfile passes it in base64, which the provisioner's script decodes, so a `$(...)` or a
 backquote in a value is read as text, never run. Cloud credentials reach only the Terraform
@@ -46,7 +47,7 @@ then, whatever that file says: Isoloom's outputs but those the machine reads (a 
 `.isoloom*` entry is left out, and a machine has no use for the file), version control, and what the tools write at
 any depth: Terraform's cache, state, lock and crash logs, and Vagrant's machine folders (their
 private keys). One rule,
-`isoloom_manifest::ignore::copy_rules`, which `.isoloom/.gitignore` shares.
+`isoloom_spec::ignore::copy_rules`, which `.isoloom/.gitignore` shares.
 
 ## Published ports
 
@@ -59,7 +60,7 @@ private keys). One rule,
 
 ## Graphical consoles
 
-A VM's graphical console (its screen, [run manifest](../reference/run-manifest.md#graphical-consoles))
+A VM's graphical console (its screen)
 listens only on the loopback of the computer that runs Vagrant: libvirt's and QEMU's VNC, VMware's
 VNC server and VirtualBox's remote display all bind `127.0.0.1`. VMware's takes a password the
 runner makes for each run and keeps until `down` (VMware writes it in the VM's `.vmx`, as it does

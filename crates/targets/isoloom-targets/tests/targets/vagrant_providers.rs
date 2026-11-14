@@ -102,8 +102,8 @@ fn qemu_sizes_the_disk_only_above_the_box() -> Outcome {
 #[test]
 fn the_vagrant_target_has_no_utm_provider() -> Outcome {
     // Every machine is on a network (validation asks it), and vagrant_utm gives a VM none: UTM
-    // could run no environment's VMs, so the Vagrantfile has no block for it, the run manifest
-    // doesn't offer it, and asking for it says so; the other providers run the environment.
+    // could run no environment's VMs, so the Vagrantfile has no block for it, and asking for it
+    // says so; the other providers run the environment.
     let spec = lab(THREE)?;
     let why = refusal_on(&spec, Target::Vagrant, Some("utm")).unwrap().ok_or("UTM taken")?;
     assert!(
@@ -113,11 +113,6 @@ fn the_vagrant_target_has_no_utm_provider() -> Outcome {
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
     let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
     assert!(!vf.contains("\"utm\"") && !vf.contains("ISOLOOM_NAT_ROUTE"), "{vf}");
-    let manifest = isoloom_manifest::parse(&generated(&spec, Target::Vagrant, "vagrant/run.json")?)?;
-    let isoloom_manifest::Identity::Vagrant(v) = manifest.identity else {
-        return Err("a vagrant identity".into());
-    };
-    assert!(v.providers.iter().all(|p| p.id != isoloom_manifest::Provider::Utm), "{:?}", v.providers);
     Ok(())
 }
 

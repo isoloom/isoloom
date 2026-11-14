@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 
 use super::*;
 use crate::tiers::Tier;
@@ -155,8 +155,7 @@ enum Sealed {
     /// By the module, within its apply, once the machines are set up: resources that wait for
     /// every readiness wait, out of a guest's reach (a cloud's firewalls, a server's router).
     ByTheModule,
-    /// By what the target makes, from the start (`why` says how): its run manifest, if it has
-    /// one, has no seal of its own.
+    /// By what the target makes, from the start (`why` says how).
     AsMade(&'static str),
 }
 
@@ -173,8 +172,8 @@ fn sealed_by(target: Target) -> Option<Sealed> {
 }
 
 /// The matrix's ✓ for `networks.*.internet = false` is what the generators write: every column
-/// that takes it seals the network, and a target sealed by the run (a cloud, Proxmox, ESXi)
-/// writes the seal into its run manifest. ESXi's ✓ once stood for a router that never sealed.
+/// that takes it seals the network, and a target sealed by its module (a cloud, Proxmox, ESXi)
+/// writes the seal into it. ESXi's ✓ once stood for a router that never sealed.
 #[test]
 fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
     let m = built();
@@ -194,16 +193,11 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
         let how = sealed_by(column.target).unwrap_or_else(|| panic!("{}: takes the row, but says nothing of a seal", column.id()));
         let lab = &labs.iter().find(|(t, _)| *t == column.target).unwrap().1;
         let files = crate::generate(lab, column.target).unwrap();
-        // The column's own run manifests: a cloud's in its folder, every other target's in its own.
+        // The column's own modules: a cloud's in its folder, every other target's in its own.
         let folder = match column.variant.filter(|_| column.target == Target::CloudVm) {
             Some(cloud) => format!(".isoloom/{}/{cloud}/", column.target.id()),
             None => format!(".isoloom/{}/", column.target.id()),
         };
-        let manifests: Vec<isoloom_manifest::Manifest> = files
-            .iter()
-            .filter(|f| f.path.starts_with(&folder) && f.path.ends_with("/run.json"))
-            .map(|f| isoloom_manifest::parse(&f.contents).unwrap())
-            .collect();
         match how {
             Sealed::ByTheModule => {
                 let modules: Vec<&str> = files
@@ -219,16 +213,9 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
                         || (module.contains("sealed") && module.contains("terraform_data.isoloom_ready_"));
                     assert!(seals, "{}: ✓ in the matrix, but its module doesn't seal", column.id());
                 }
-                for man in &manifests {
-                    assert!(man.lifecycle.seal.is_none(), "{}: the module seals, not the run", column.id());
-                }
                 by_the_module.insert(column.target);
             }
-            Sealed::AsMade(why) => {
-                for man in &manifests {
-                    assert!(man.lifecycle.seal.is_none(), "{}: said sealed by {why}, yet its run seals", column.id());
-                }
-            }
+            Sealed::AsMade(_) => {}
         }
     }
     assert_eq!(by_the_module, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
@@ -285,7 +272,7 @@ fn every_step_row_is_decided_on_the_step_itself() {
 }
 
 /// The matrix's ✓ for a check is what the generators write: every column that takes a row about
-/// `checks[]` writes the check (its run manifest entry, its runner line) in its own files, the
+/// `checks[]` writes the check (its runner line) in its own files, the
 /// folder of its cloud or provider where it has one (`cloud-vm/aws/`), else its target's.
 /// `external` once had a ✓ for script and playbook checks, and for probes with no host to run
 /// from, while its runners left them out; and the test once looked at one column per target, in

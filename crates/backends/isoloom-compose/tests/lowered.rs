@@ -40,61 +40,6 @@ fn plan_of(source: &str) -> Outcome<Environment> {
     Ok(lab.plan(&lowered.spec, Target::Docker, None)?)
 }
 
-/// The `up` lifecycle of the Docker run manifest, as text. In a host Compose manifest `--build`
-/// appears only in the `up` step and `--ignore-pull-failures` only in the pull step, so a run's
-/// pull-or-build behaviour is readable from this text.
-fn up_lifecycle_text(env: &Environment) -> Outcome<String> {
-    let backend = isoloom_compose::ComposeBackend::DOCKER;
-    let manifest = isoloom_render::backend::Backend::run_manifest(&backend, env)?.ok_or("no run manifest")?;
-    Ok(format!("{:?}", manifest.lifecycle.up))
-}
-
-/// The argv of each `down` step of `env`'s Docker run manifest, by step id, as text.
-fn down_steps(env: &Environment) -> Outcome<Vec<(String, String)>> {
-    let backend = isoloom_compose::ComposeBackend::DOCKER;
-    let manifest = isoloom_render::backend::Backend::run_manifest(&backend, env)?.ok_or("no run manifest")?;
-    Ok(manifest.lifecycle.down.iter().map(|s| (s.id.to_string(), format!("{s:?}"))).collect())
-}
-
-/// Regression (the Cyber CTF rig's ubuntu2404 e2e:lab, six anonymous volumes left): an
-/// environment that keeps a volume (`persistent: true`) went down without `--volumes`, so the
-/// persistent one survived, and so did every container's anonymous volume (an image's own
-/// `VOLUME`, MySQL's data directory), one more each start and stop. The containers now go first
-/// with their anonymous volumes (`rm --volumes`, which never takes a named one), the persistent
-/// volume is named by no step, and an environment that keeps nothing still goes `down --volumes`
-/// in one step.
-#[test]
-fn a_lab_that_keeps_a_volume_removes_its_containers_anonymous_volumes_but_never_the_kept_one() -> Outcome {
-    let kept = plan_of(
-        "version: 1\nname: case-file\nnetworks: { app: { cidr: 10.70.0.0/24 } }\nvolumes:\n  evidence: { owner: database, persistent: true }\n  scratch: { owner: database }\nmachines:\n  database: { networks: { app: 5 }, app: { image: mysql }, volumes: { evidence: /srv/evidence, scratch: /srv/scratch } }\n",
-    )?;
-    let steps = down_steps(&kept)?;
-    let ids: Vec<&str> = steps.iter().map(|(id, _)| id.as_str()).collect();
-    assert_eq!(ids[..2], ["anonymous-volumes", "down"], "{steps:?}");
-    let (_, rm) = &steps[0];
-    assert!(
-        rm.contains("\"rm\"") && rm.contains("\"--stop\"") && rm.contains("\"--force\"") && rm.contains("\"--volumes\""),
-        "{rm}"
-    );
-    let (_, down) = &steps[1];
-    assert!(!down.contains("\"--volumes\""), "the kept volume survives the down: {down}");
-    let named: Vec<&String> = steps.iter().map(|(_, s)| s).filter(|s| s.contains("evidence")).collect();
-    assert!(named.is_empty(), "no step names the kept volume: {named:?}");
-    assert!(
-        steps.iter().any(|(id, s)| id == "volumes" && s.contains("scratch")),
-        "the environment's own still goes: {steps:?}"
-    );
-
-    let plain = plan_of(
-        "version: 1\nname: plain\nnetworks: { app: { cidr: 10.70.0.0/24 } }\nmachines:\n  database: { networks: { app: 5 }, app: { image: mysql } }\n",
-    )?;
-    let once = down_steps(&plain)?;
-    assert_eq!(once[0].0, "down", "{once:?}");
-    assert!(once[0].1.contains("\"--volumes\""), "{once:?}");
-    assert!(!once.iter().any(|(id, _)| id == "anonymous-volumes"), "{once:?}");
-    Ok(())
-}
-
 /// The text of the file at `path` among `files`.
 fn file<'a>(files: &'a [GeneratedFile], path: &str) -> Outcome<&'a str> {
     let found = files.iter().find(|f| f.path == path).ok_or_else(|| format!("no {path}"))?;
@@ -152,46 +97,19 @@ fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outc
     Ok(())
 }
 
-/// Compose writes the file again from the variable each time it starts the container, and won't
-/// start it without the variable: the value goes to `start` (resume) as well as `up`.
-#[test]
-fn an_input_file_reaches_the_steps_that_create_and_start_its_machine() -> Outcome {
-    let backend = isoloom_compose::ComposeBackend::DOCKER;
-    let manifest = isoloom_render::backend::Backend::run_manifest(&backend, &plan("help-desk")?)?.ok_or("no run manifest")?;
-    let slot = manifest
-        .secrets
-        .iter()
-        .find(|s| s.name.to_string() == "DEMO_SECRET")
-        .ok_or("no DEMO_SECRET slot")?;
-    let [
-        isoloom_manifest::Delivery::Env {
-            var,
-            steps: isoloom_manifest::StepSelection::Only(steps),
-        },
-    ] = slot.deliver.as_slice()
-    else {
-        return Err(format!("{:?}", slot.deliver).into());
-    };
-    assert_eq!(var.to_string(), "DEMO_SECRET");
-    assert_eq!(steps.iter().map(ToString::to_string).collect::<Vec<_>>(), ["up", "start"]);
-    Ok(())
-}
-
 /// A machine that publishes an image it also builds (the Compose build+image combo) makes the run
 /// pull the published image first; `up` then drops `--build`, so a user runs the published
 /// image and only an image that could not be pulled is built. An environment that only builds locally keeps
 /// `--build` and gains no pull step, so an author's edits always rebuild.
 #[test]
 fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() -> Outcome {
-    let combo = up_lifecycle_text(&plan_of(
-        "version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n",
-    )?)?;
-    assert!(combo.contains("--ignore-pull-failures"), "a published build pulls first: {combo}");
+    let start = |spec: &str| -> Outcome<String> { Ok(isoloom_compose::vm_start(&plan_of(spec)?)?.start.join("\n")) };
+    let combo = start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n")?;
+    assert!(combo.contains("pull --ignore-pull-failures"), "a published build pulls first: {combo}");
     assert!(!combo.contains("--build"), "a published build must not force a local build: {combo}");
-
-    let local = up_lifecycle_text(&plan_of("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      build: { context: web }\n")?)?;
+    let local = start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      build: { context: web }\n")?;
     assert!(!local.contains("--ignore-pull-failures"), "a local build gains no pull step: {local}");
-    assert!(local.contains("--build"), "a local build still forces a build: {local}");
+    assert!(local.contains("up --detach --build") && local.contains("--wait"), "a local build still forces a build: {local}");
     Ok(())
 }
 

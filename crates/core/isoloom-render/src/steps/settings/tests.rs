@@ -151,7 +151,11 @@ fn run_dns(sh: &str, resolved: bool, resolv_conf: &str) -> Option<tempfile::Temp
         std::fs::create_dir_all(etc.join(sub)).expect("a folder");
     }
     std::fs::write(etc.join("resolv.conf"), resolv_conf).expect("resolv.conf");
-    std::fs::write(etc.join("dhcp/dhclient.conf"), "request subnet-mask;\nsupersede domain-name-servers 1.1.1.1; # isoloom\n").expect("dhclient.conf");
+    std::fs::write(
+        etc.join("dhcp/dhclient.conf"),
+        "request subnet-mask;\nsupersede domain-name-servers 1.1.1.1; # isoloom\n",
+    )
+    .expect("dhclient.conf");
     let calls = dir.path().join("systemctl");
     let shim = format!(
         "systemctl() {{ printf '%s\\n' \"$*\" >> {calls}; case \"$*\" in 'is-active -q systemd-resolved') {resolved} ;; is-active*) false ;; esac; }}\n",
@@ -201,14 +205,20 @@ fn a_vms_resolver_is_written_where_its_resolver_manager_keeps_it() {
         "[Resolve]\nDNS=10.9.0.53 10.9.0.54\nDomains=lab.test corp.test ~.\n"
     );
     assert_eq!(in_stub("resolv.conf"), "nameserver 127.0.0.53\nsearch lab.test corp.test\noptions ndots:2\n");
-    assert!(std::fs::read_to_string(stub.path().join("systemctl")).unwrap_or_default().contains("restart systemd-resolved"));
+    assert!(
+        std::fs::read_to_string(stub.path().join("systemctl"))
+            .unwrap_or_default()
+            .contains("restart systemd-resolved")
+    );
 }
 
 #[test]
 fn a_resolver_with_no_servers_keeps_the_ones_the_machine_has() {
     let spec = testing::spec(DNS);
     let sh = linux(&spec.machines["plain"]).expect("the resolver is a setting");
-    let Some(dir) = run_dns(&sh, false, "nameserver 10.0.2.3\nsearch old.test\n") else { return };
+    let Some(dir) = run_dns(&sh, false, "nameserver 10.0.2.3\nsearch old.test\n") else {
+        return;
+    };
     assert_eq!(
         std::fs::read_to_string(dir.path().join("etc/resolv.conf")).unwrap_or_default(),
         "nameserver 10.0.2.3\nsearch corp.test\n"

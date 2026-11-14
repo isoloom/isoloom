@@ -1,7 +1,6 @@
 //! The `vagrant` target as a backend: what Vagrant can run, why it refuses an environment, and
 //! its files.
 
-use isoloom_manifest::Manifest;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
@@ -24,11 +23,6 @@ impl Backend for VagrantBackend {
 
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         Ok(vms::render(env)?)
-    }
-
-    /// The run manifest of the Vagrantfile `render` writes: every provider's, one file.
-    fn run_manifest(&self, env: &Environment) -> Result<Option<Manifest>, RenderError> {
-        Ok(Some(crate::manifest::vagrant(env)?))
     }
 
     /// The plan's requirements against the capabilities, then the machines Vagrant can't build,

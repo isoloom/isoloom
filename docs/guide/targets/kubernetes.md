@@ -10,8 +10,8 @@ The `kubernetes` target writes the environment three ways, under `.isoloom/kuber
 | `checks/` | `kubectl apply -k .isoloom/kubernetes/checks`: the checks as Jobs |
 
 Tier 2: the files pass `kubeconform` and `helm lint`, and CI runs three examples on a kind
-cluster with Calico, but no real run from every host OS is recorded. There is no run manifest:
-you run the files with `kubectl` or Helm.
+cluster with Calico, but no real run from every host OS is recorded. You run the files with `kubectl` or
+Helm.
 
 ## Prerequisites
 

@@ -46,7 +46,7 @@ fn archive(dir: &Path, root: &Path, outputs: &[&str], out: &str) -> Outcome<Stri
     let script = format!(
         "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\").sub(/^QEMU_HUBS = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, rules: ARGV[3]) }}"
     );
-    let rules = isoloom_manifest::ignore::copy_rules(outputs);
+    let rules = isoloom_spec::ignore::copy_rules(outputs);
     let st = Command::new("ruby")
         .arg("-e")
         .arg(script)

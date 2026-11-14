@@ -70,12 +70,6 @@ fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_vagrant()
         assert!(named(&names, &format!("names-#{{ISOLOOM_KEY}} - {own}")), "{own}: {names:?}");
         assert!(named(&names, &format!("names-#{{ISOLOOM_KEY}}-{own}")), "{own}: {names:?}");
     }
-    let manifest = isoloom_manifest::parse(file(&files, "vagrant/run.json")?)?;
-    let runners: Vec<&str> = manifest.checks.runners.iter().map(|r| r.step.id.as_str()).collect();
-    assert!(
-        runners.contains(&"check-controller") && runners.contains(&"check-isoloom-controller"),
-        "{runners:?}"
-    );
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
     for runner in ["vagrant/checks/controller.sh", "vagrant/checks/isoloom-controller.sh"] {
         assert!(paths.iter().any(|p| p.ends_with(runner)), "{runner}: {paths:?}");

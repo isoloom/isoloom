@@ -6,7 +6,7 @@
 //! Vagrantfile makes from its own folder. So two copies of one environment, numbered or not, never
 //! share a name.
 
-use isoloom_manifest::contract::RESERVED_PREFIX;
+use isoloom_spec::contract::RESERVED_PREFIX;
 
 /// The variable a Vagrantfile reads the copy's key from when it loads: what a runner sets for
 /// every Vagrant command of a run, the same at each, so the run's names never change. Unset (a

@@ -1,10 +1,10 @@
 //! The first line of a machine's ready file, written and read back: the `isoloom-ready/1`
-//! grammar ([`ReadyGrammar::V1`](crate::ReadyGrammar::V1)).
+//! grammar (the ready grammar `isoloom-ready/1`).
 
 use std::fmt;
 
 /// The first line of a ready file, as the `isoloom-ready/1` grammar defines it
-/// ([`ReadyGrammar::V1`](crate::ReadyGrammar::V1)): the set-up is done, or at a step, or stopped
+/// (the ready grammar `isoloom-ready/1`): the set-up is done, or at a step, or stopped
 /// at one. Read with [`ReadyLine::parse`], written with `Display`. No file, or any other line,
 /// means the machine is still booting.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +38,7 @@ impl ReadyLine {
     /// # Example
     ///
     /// ```
-    /// use isoloom_manifest::ReadyLine;
+    /// use isoloom_spec::ready_line::ReadyLine;
     ///
     /// assert_eq!(ReadyLine::parse("ready\n"), Some(ReadyLine::Ready));
     /// assert_eq!(ReadyLine::parse("failed: setup.sh"), Some(ReadyLine::Failed { step: "setup.sh".into() }));

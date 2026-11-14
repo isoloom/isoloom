@@ -7,14 +7,14 @@
 //! `terraform init` chose, so a project that commits its generated files commits it too, and
 //! every machine then installs the same providers.
 
-use isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE};
 use isoloom_render::GeneratedFile;
+use isoloom_spec::ignore::{TERRAFORM_STATE, VAGRANT_STATE};
 
 /// Where it is written, relative to the project folder.
 pub const PATH: &str = ".isoloom/.gitignore";
 
 /// The patterns, each group under the comment that says whose files they are: the tools' state
-/// no copy of the project takes either ([`isoloom_manifest::ignore::never_copied`]).
+/// no copy of the project takes either ([`isoloom_spec::ignore::never_copied`]).
 const SECTIONS: [(&str, &[&str]); 2] = [
     (
         "Terraform: the provider cache, the state and its backups (secrets in plain text), the state's lock, crash logs.",
@@ -43,7 +43,7 @@ pub(crate) fn file() -> GeneratedFile {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_manifest::contract::OUTPUT_DIR;
+    use isoloom_spec::contract::OUTPUT_DIR;
 
     use super::*;
 
@@ -100,7 +100,6 @@ mod tests {
             "cloud-vm/aws/.terraform.lock.hcl",
             "cloud-vm/aws/main.tf",
             "docker/compose.yml",
-            "docker/run.json",
         ] {
             assert!(!ignores(&text, path), "{path}:\n{text}");
         }

@@ -6,9 +6,8 @@
 use isoloom_compose::ComposeBackend;
 use isoloom_plan::{Capabilities, Environment};
 use isoloom_render::Error as RenderError;
-use isoloom_render::backend::{self, Backend, Files, Placed};
-use isoloom_render::run_manifest::guest::{COMPOSE_OUTPUTS, GuestCompose};
-use isoloom_render::steps::AsRoot;
+use isoloom_render::backend::{self, Backend, Files};
+use isoloom_render::container::COMPOSE_OUTPUTS;
 use isoloom_spec::model::Target;
 
 /// `env` planned for the `docker` target: what a Docker host runs. It plans, since `env` did; a
@@ -24,18 +23,11 @@ fn docker_files(env: &Environment) -> Result<Files, RenderError> {
     ComposeBackend::DOCKER.render(&on_docker(env)?).map_err(|e| e.on(env.target))
 }
 
-/// What runs inside the VM for `env`: the `docker` target's Compose file, and the commands that
-/// start, check and read it there, as root as `as_root` says. A refusal or failure is `env`'s
-/// target's.
-fn guest(env: &Environment, as_root: AsRoot) -> Result<GuestCompose, RenderError> {
-    isoloom_compose::guest(&on_docker(env)?, as_root).map_err(|e| RenderError::from(e).on(env.target))
-}
-
 /// What the Docker host runs: the folders of the `docker` target's `files` it gets with the
 /// project, and the commands that start the Compose file there as root, with the values they
 /// read from their environment.
 fn host(env: &Environment, files: &Files) -> Result<isoloom_terraform::CloudDockerHost, RenderError> {
-    let in_vm = guest(env, AsRoot::Root)?;
+    let in_vm = isoloom_compose::vm_start(&on_docker(env)?).map_err(|e| RenderError::from(e).on(env.target))?;
     let outputs = COMPOSE_OUTPUTS
         .iter()
         .filter(|dir| files.iter().any(|f| f.path.starts_with(&format!("{dir}/"))))
@@ -43,8 +35,8 @@ fn host(env: &Environment, files: &Files) -> Result<isoloom_terraform::CloudDock
         .collect();
     Ok(isoloom_terraform::CloudDockerHost {
         outputs,
-        start: in_vm.start.iter().map(|c| c.command.to_string()).collect(),
-        values: in_vm.forwarded(),
+        start: in_vm.start,
+        values: in_vm.values,
     })
 }
 
@@ -73,12 +65,6 @@ impl Backend for CloudDockerBackend {
         let host = host(env, &files)?;
         files.extend(isoloom_terraform::cloud_docker_modules(env, &host)?);
         Ok(files)
-    }
-
-    /// A run manifest per cloud that can host the containers, built on the Compose-in-a-VM plan
-    /// (`guest`, from the `docker` target's environment) as the cloud's host user gets root.
-    fn run_manifests(&self, env: &Environment) -> Result<Vec<Placed>, RenderError> {
-        isoloom_terraform::cloud_docker_manifests(env, &|as_root| guest(env, as_root))
     }
 
     fn refusal(&self, env: &Environment) -> Option<String> {

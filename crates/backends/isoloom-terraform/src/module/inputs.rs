@@ -12,9 +12,9 @@
 //! snippet) and in Terraform's state, as every value a module takes does.
 
 use crate::hcl_builder::{Block, Expression, Template, call, list, reference, string};
-use isoloom_manifest::contract::secret_variable;
 use isoloom_plan::{Environment, MachinePlan, MachineShape, SecretFile, ValueSource};
 use isoloom_render::steps;
+use isoloom_spec::contract::secret_variable;
 
 use super::variable::Variable;
 

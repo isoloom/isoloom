@@ -1,7 +1,7 @@
 //! A module's first lines: the generated-file header, then how to start and stop it.
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_render::header;
+use isoloom_spec::contract::OUTPUT_DIR;
 
 /// The operator's SSH key: the machines let its public half in, and Terraform signs in with its
 /// private half to set them up or to wait for their set-up.

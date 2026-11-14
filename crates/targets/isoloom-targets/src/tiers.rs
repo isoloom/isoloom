@@ -18,13 +18,25 @@ mod tests;
 use std::collections::BTreeSet;
 use std::fmt;
 
-use isoloom_manifest::HostOs;
 use isoloom_spec::model::Target;
 use serde_json::{Value, json};
 
 use crate::Result;
 
 pub use file::{Date, RunResult};
+
+/// A host operating system a run was made on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum HostOs {
+    /// Linux.
+    Linux,
+    /// macOS.
+    Macos,
+    /// Windows.
+    Windows,
+}
 
 /// The list, as `cargo xtask tiers record` writes it.
 const DATA: &str = include_str!("../tiers.json");
@@ -231,7 +243,7 @@ fn shown(run: &Run) -> String {
     format!("{how}{} ({})", os_id(run.os), run.date)
 }
 
-/// A host OS by the name `tiers.json` and the run manifest write it with.
+/// A host OS by the name `tiers.json` writes it with.
 #[must_use]
 pub(crate) fn os_id(os: HostOs) -> &'static str {
     match os {

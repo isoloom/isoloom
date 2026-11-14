@@ -13,10 +13,10 @@
 mod packages;
 
 use indexmap::IndexMap;
-use isoloom_manifest::RelPath;
-use isoloom_manifest::ignore;
 use isoloom_spec::Spec;
+use isoloom_spec::ignore;
 use isoloom_spec::net::NetworkBlock;
+use isoloom_spec::path::RelPath;
 use isoloom_spec::syntax::{Machine, Octets, OsRef, Step, has_extension};
 
 use crate::ProjectFile;

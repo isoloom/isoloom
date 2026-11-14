@@ -1,6 +1,5 @@
 //! Why a Compose file isn't rendered (or read back), and how a backend reports it.
 
-use isoloom_manifest::Error as ManifestError;
 use isoloom_plan::Refusal;
 use isoloom_render::Error as RenderError;
 use isoloom_spec::model::Target;
@@ -26,24 +25,10 @@ pub enum Error {
         #[source]
         source: serde_yaml_ng::Error,
     },
-    /// A value of the run manifest was refused by the manifest's own types: a bug of this
-    /// backend, which builds every one of them.
-    #[error("{}: {MANIFEST_REFUSED}", Target::Docker.id())]
-    Manifest {
-        /// What the manifest's types refused.
-        #[source]
-        source: ManifestError,
-    },
 }
 
 /// A result whose error is this crate's [`Error`].
 pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-impl From<ManifestError> for Error {
-    fn from(source: ManifestError) -> Error {
-        Error::Manifest { source }
-    }
-}
 
 impl From<Error> for RenderError {
     /// The error as every backend reports it: the plan's refusal, or a failure of this backend
@@ -53,20 +38,15 @@ impl From<Error> for RenderError {
         match e {
             Error::Refused { target, refusal } => RenderError::Refused { target, refusal },
             Error::Unwritable { target, source } => RenderError::internal(target, UNWRITABLE, source),
-            Error::Manifest { source } => RenderError::internal(Target::Docker, MANIFEST_REFUSED, source),
         }
     }
 }
 
 /// What an [`Error::Unwritable`] is, after its target.
 const UNWRITABLE: &str = "the Compose file couldn't be written as YAML";
-/// What an [`Error::Manifest`] is, after its target.
-const MANIFEST_REFUSED: &str = "the run manifest refused a value of this backend";
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error as _;
-
     use isoloom_plan::Requirement;
 
     use super::*;
@@ -82,16 +62,5 @@ mod tests {
         };
         assert_eq!(e.to_string(), format!("hosted: {refusal}"));
         assert_eq!(RenderError::from(e).to_string(), format!("hosted: {refusal}"));
-    }
-
-    #[test]
-    fn a_manifest_bug_keeps_its_cause_and_names_the_run_manifest() {
-        let source = isoloom_manifest::EnvironmentName::parse("Not A Name").expect_err("refused");
-        let e = Error::from(source);
-        assert!(e.source().is_some());
-        let reported = RenderError::from(e);
-        assert_eq!(reported.to_string(), "docker: the run manifest refused a value of this backend");
-        assert!(reported.source().is_some());
-        assert_eq!(reported.refusal(), None);
     }
 }

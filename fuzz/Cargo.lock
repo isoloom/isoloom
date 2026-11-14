@@ -224,7 +224,6 @@ name = "isoloom-catalogue"
 version = "3.0.0"
 dependencies = [
  "indexmap",
- "isoloom-manifest",
  "isoloom-spec",
  "regex",
  "schemars",
@@ -238,7 +237,6 @@ dependencies = [
 name = "isoloom-fuzz"
 version = "0.0.0"
 dependencies = [
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -250,23 +248,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "isoloom-manifest"
-version = "3.0.0"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "thiserror",
-]
-
-[[package]]
 name = "isoloom-plan"
 version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-catalogue",
- "isoloom-manifest",
  "isoloom-spec",
  "serde",
  "serde_json",
@@ -280,7 +266,6 @@ version = "3.0.0"
 dependencies = [
  "flate2",
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-spec",
  "serde_json",
@@ -293,7 +278,6 @@ name = "isoloom-spec"
 version = "3.0.0"
 dependencies = [
  "indexmap",
- "isoloom-manifest",
  "saphyr-parser",
  "schemars",
  "serde",
@@ -309,7 +293,6 @@ version = "3.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -322,7 +305,8 @@ name = "isoloom-topology"
 version = "3.0.0"
 dependencies = [
  "indexmap",
- "isoloom-manifest",
+ "isoloom-catalogue",
+ "isoloom-plan",
  "isoloom-spec",
  "serde",
  "serde_yaml_ng",
@@ -334,7 +318,6 @@ name = "isoloom-vagrant"
 version = "3.0.0"
 dependencies = [
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",

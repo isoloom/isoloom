@@ -62,14 +62,13 @@ isoloom generate --target docker
 ✓ .isoloom/docker/compose.yml
 ✓ .isoloom/docker/checks/isoloom-networks.sh
 ...
-✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
 ```
 
 Everything is written under `.isoloom/`. `compose.yml` is a plain Compose file: read it, run it
-by hand, or commit it. `run.json` is the run manifest a runner reads. `isoloom generate` with no
-`--target` writes every target the spec allows.
+by hand, or commit it. `isoloom generate` with no `--target` writes every target the spec
+allows.
 
 ## 5. Run it with Docker Compose
 
@@ -106,7 +105,7 @@ docker compose -f .isoloom/docker/compose.yml down -v
 
 ## 6. Run it with Isothrum
 
-A runner reads `run.json` and does all of the above for you: it checks the tools' versions,
+A runner runs the same Compose file and does all of the above for you: it checks the tools' versions,
 brings the environment up, waits until it is ready, runs every check (from each machine's
 position too), and removes everything at the end. [Isothrum](https://github.com/Isothrum/isothrum)
 is the reference runner; install it from its releases or with `cargo install --locked

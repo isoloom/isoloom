@@ -865,17 +865,13 @@ fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() 
 }
 
 /// The Vagrantfile names each network after the environment, its key and the network, VirtualBox's
-/// internal network and libvirt's alike (`isoloom-<environment>-#{ISOLOOM_KEY}-<network>`); the
-/// run manifest names none, since only the Vagrantfile reads the key.
+/// internal network and libvirt's alike (`isoloom-<environment>-#{ISOLOOM_KEY}-<network>`).
 #[test]
-fn each_network_is_named_with_the_copy_key_and_the_manifest_names_none() -> Outcome {
+fn each_network_is_named_with_the_copy_key() -> Outcome {
     let env = plan("segmented")?;
-    let manifest = VagrantBackend.run_manifest(&env)?.ok_or("a run manifest")?;
     let file = vagrantfile("segmented")?;
-    assert_eq!(manifest.networks.len(), env.networks.len());
-    for n in &manifest.networks {
-        assert!(n.native.is_none(), "{}", n.name);
-        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{}", isoloom_manifest::contract::RESERVED_PREFIX, n.name);
+    for name in env.networks.keys() {
+        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{name}", isoloom_spec::contract::RESERVED_PREFIX);
         assert!(file.contains(&format!("virtualbox__intnet: \"{keyed}\"")), "{keyed}");
         assert!(file.contains(&format!("libvirt__network_name: \"{keyed}\"")), "{keyed}");
     }

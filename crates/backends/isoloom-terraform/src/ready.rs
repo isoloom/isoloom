@@ -27,6 +27,12 @@ use crate::hcl_builder::{Block, Expression, list, reference, string};
 use crate::machine::provisioner::{self, Connection, Upload};
 use crate::module::ident;
 
+/// How long a machine's set-up may take once it can run (after the apply, the project in).
+pub(crate) const SETUP_S: u32 = 2400;
+
+/// How long the controller's playbooks may take.
+pub(crate) const PLAYBOOKS_S: u32 = 7200;
+
 /// How many lines of the set-up's output a failed wait prints.
 const LOG_LINES: u32 = 40;
 
@@ -144,7 +150,7 @@ impl Wait {
              if [ \"$t\" -ge {within} ]; then echo \"{who}: not set up after {within} s (${{s:-no ready file}}); the end of {log}:\"; {tail}; exit 1; fi\n\
              sleep {POLL_S}; t=$((t + {POLL_S}))\n\
              done",
-            ready = isoloom_manifest::ReadyLine::READY,
+            ready = isoloom_spec::ready_line::ReadyLine::READY,
             failed = steps::failed_pattern(),
             log = self.log,
             within = self.within_s,

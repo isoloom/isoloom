@@ -14,7 +14,6 @@ exclude = ["tests/"]
 publish = true
 
 [dependencies]
-isoloom-manifest.workspace = true
 thiserror.workspace = true
 isoloom-spec.workspace = true
 hcl.workspace = true

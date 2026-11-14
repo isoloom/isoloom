@@ -21,7 +21,6 @@ use serde_json::{Map, Value, json};
 
 use crate::{Error, Result};
 
-pub(crate) use message::manifest_message;
 pub use message::{fill, lookup, render_message, render_message_on};
 
 /// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's

@@ -34,7 +34,6 @@ mod image;
 mod links;
 mod lxc;
 mod machine;
-mod manifest;
 mod outside;
 mod router;
 mod uplink;
@@ -172,16 +171,9 @@ impl Backend for ProxmoxBackend {
     fn refusal(&self, env: &Environment) -> Option<String> {
         PARTS.refusal(&self.capabilities(), env)
     }
-
-    /// The run manifest (`.isoloom/proxmox/run.json`): Terraform applies the infrastructure, the
-    /// runner runs the checks over SSH through the router (the module itself waits for every
-    /// set-up and seals).
-    fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
-        Ok(Some(manifest::manifest(&prepared(env))?))
-    }
 }
 
-/// `env` as Proxmox runs it, for its module and its run manifest alike: without the derived
+/// `env` as Proxmox runs it, for its module: without the derived
 /// checks its LXC containers can't run (`lxc::checked`), its virtiofs volumes host folders
 /// (`virtiofs::mounted`).
 fn prepared(env: &Environment) -> Cow<'_, Environment> {
@@ -257,13 +249,13 @@ fn waits(env: &Environment, m: &mut Module) -> Vec<String> {
     for vm in env.vms().filter(|vm| !vm.plan.is_windows()) {
         if let Some(at) = vm.plan.addresses.values().next() {
             let reboots = crate::ready::reboots(&vm.plan.lifecycle);
-            wait(vm.name, &crate::module::ident(vm.name), *at, crate::module::manifest::SETUP_S, reboots);
+            wait(vm.name, &crate::module::ident(vm.name), *at, crate::ready::SETUP_S, reboots);
         }
     }
     if core_controller::needed(env)
         && let Some(at) = core_controller::addresses(env).values().next()
     {
-        wait(core_controller::NAME, "isoloom_controller", *at, crate::module::manifest::PLAYBOOKS_S, 0);
+        wait(core_controller::NAME, "isoloom_controller", *at, crate::ready::PLAYBOOKS_S, 0);
     }
     waited
 }

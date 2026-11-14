@@ -178,7 +178,10 @@ fn linux_dns(d: &Dns) -> String {
     let stub = if options.is_empty() {
         String::new()
     } else {
-        format!("rm -f /etc/resolv.conf && printf %s {} > /etc/resolv.conf\n", quote(&lines("nameserver 127.0.0.53\n")))
+        format!(
+            "rm -f /etc/resolv.conf && printf %s {} > /etc/resolv.conf\n",
+            quote(&lines("nameserver 127.0.0.53\n"))
+        )
     };
     let nameservers = if own.is_empty() {
         "\"$(grep '^nameserver' /etc/resolv.conf 2>/dev/null || true)\n\"".to_owned()

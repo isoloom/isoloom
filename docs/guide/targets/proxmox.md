@@ -3,7 +3,7 @@
 The `proxmox` target writes a Terraform module (`.isoloom/proxmox/main.tf`, provider
 `bpg/proxmox ~> 0.116.1`) that makes one VM per machine on a Proxmox VE server, with an SDN zone
 and VNet per network, a resource pool, a router VM (between the networks, by the `reach` rules,
-and out to the internet), and Proxmox firewall rules. It writes a run manifest.
+and out to the internet), and Proxmox firewall rules.
 
 Tier 2: real runs from macOS are recorded; Linux and Windows hosts are pending.
 

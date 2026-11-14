@@ -65,7 +65,7 @@ run on `isoloom-controller`, which halts once set up unless `controller.keep_run
 `vagrant up isoloom-controller --no-provision` boots it first. The comment at the top of the
 Vagrantfile lists these commands for your spec.
 
-A runner reads `.isoloom/vagrant/run.json` and runs the same steps, then the checks:
+A runner runs the same Vagrantfile, then the checks:
 
 ```sh
 isothrum up . --target vagrant --provider libvirt

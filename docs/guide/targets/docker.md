@@ -2,7 +2,7 @@
 
 The `docker` target turns each machine into a container on your Docker host, with one Docker
 network per spec network and the spec's addresses. `hosted` writes the same Compose file for a
-hosting service that runs Compose files itself, without a run manifest.
+hosting service that runs Compose files itself.
 
 Tier: `docker` is Tier 1 (real runs from Linux, macOS and Windows); `hosted` is Tier 2.
 
@@ -47,7 +47,7 @@ it. The comment at the top of the generated `compose.yml` lists these commands f
 and the variables it reads: each input by its own name (`${NAME}`, empty when unset), each
 secret as `ISOLOOM_SECRET_<NAME>`, from Compose's environment (the shell's, else `.env`).
 
-Or hand the run manifest to a runner, which does all of the above and reports each check:
+Or let a runner run the same Compose file, which does all of the above and reports each check:
 
 ```sh
 isothrum up . --target docker

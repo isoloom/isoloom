@@ -72,7 +72,7 @@ the next `isoloom generate` ([commit the generated files](commit-generated-files
 **Where does Terraform state go?** Locally, in the runner's state folder, or the module's folder
 when you apply by hand ([remote state](remote-terraform-state.md)).
 
-**Which runner should I use?** Any program that follows [the run manifest](../reference/run-manifest.md);
+**Which runner should I use?** Any program that runs the native files;
 [Isothrum](https://github.com/Isothrum/isothrum) is the reference one. Or run each tool's files by
 hand.
 

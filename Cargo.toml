@@ -34,7 +34,6 @@ isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "3.0.0" 
 isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "3.0.0" }
 isoloom-targets = { path = "crates/targets/isoloom-targets", version = "3.0.0" }
 isoloom-import = { path = "crates/tools/isoloom-import", version = "3.0.0" }
-isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "3.0.0" }
 isoloom-topology = { path = "crates/frontends/isoloom-topology", version = "3.0.0" }
 xtask-quality = { path = "crates/tools/xtask-quality" }
 isoloom-test-support = { path = "crates/tools/isoloom-test-support" }

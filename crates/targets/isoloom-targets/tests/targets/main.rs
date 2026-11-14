@@ -8,7 +8,6 @@
 )]
 
 mod appliances;
-mod boot_digest;
 mod chart;
 mod checks;
 mod clones;
@@ -48,16 +47,13 @@ mod reboot;
 mod report;
 mod reserved_names;
 mod resolved;
-mod run_manifest;
 mod server_slot;
 mod shared_volumes;
 mod spaced_paths;
 mod tags;
 mod tc;
 mod testing;
-mod tiers;
 mod tools;
 mod trunks;
-mod vagrant_manifest;
 mod vagrant_providers;
 mod windows_names;

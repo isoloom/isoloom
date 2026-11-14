@@ -150,7 +150,11 @@ fn one_host_port_for_all(base: &str, m: &Mapping, count: u8) -> Option<Problem> 
         };
         Some(Problem::new(
             Code::InvalidValue,
-            FieldPath::new("machines").key(base).key("ports").key(name.as_str().unwrap_or_default()).key("publish"),
+            FieldPath::new("machines")
+                .key(base)
+                .key("ports")
+                .key(name.as_str().unwrap_or_default())
+                .key("publish"),
             format!("its {count} clones (`count`) can't all have host port {host}: `publish: true` gives each a free host port"),
         ))
     })

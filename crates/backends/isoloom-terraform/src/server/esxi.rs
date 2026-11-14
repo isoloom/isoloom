@@ -40,7 +40,6 @@ mod boot;
 mod disks;
 mod guest;
 mod machines;
-mod manifest;
 mod networks;
 mod outside;
 mod router;
@@ -166,13 +165,6 @@ impl Backend for EsxiBackend {
 
     fn refusal(&self, env: &Environment) -> Option<String> {
         PARTS.refusal(&self.capabilities(), env)
-    }
-
-    /// The run manifest (`.isoloom/esxi/run.json`): Terraform makes the environment, sets its
-    /// machines up and seals the `internet: false` networks at the router; the runner runs the
-    /// checks over SSH through the router.
-    fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
-        Ok(Some(manifest::manifest(env)?))
     }
 }
 

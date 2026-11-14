@@ -22,8 +22,7 @@ PAGES='--spec docs/spec.md
 
 # The schema tests: each rewrites its schema with ISOLOOM_WRITE_FIXTURES=1, and fails without it
 # when the committed one is stale.
-SCHEMA_TESTS='isoloom-catalogue catalogue the_generated_schemas_are_current
-isoloom-manifest schema the_committed_schema_is_current'
+SCHEMA_TESTS='isoloom-catalogue catalogue the_generated_schemas_are_current'
 
 STALE="a generated file is stale: run .githooks/regenerate, then commit what it changed"
 

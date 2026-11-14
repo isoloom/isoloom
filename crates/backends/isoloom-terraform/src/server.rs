@@ -2,12 +2,11 @@
 //! ([`proxmox`]) and a standalone ESXi host ([`esxi`]). Both put the environment behind a router
 //! VM of their own ([`router`]), boot a machine's disk through the hypervisor's firmware
 //! ([`boot`]), name what they create after the environment's `slot` on the server
-//! ([`slotted`]), and write the same run manifest ([`manifest`]), which seals their `internet:
-//! false` networks at the router.
+//! ([`slotted`]), and seal their `internet: false` networks at the router once the machines are
+//! set up (`crate::seal`).
 
 pub(crate) mod boot;
 pub(crate) mod esxi;
-pub(crate) mod manifest;
 pub(crate) mod proxmox;
 pub(crate) mod router;
 
@@ -185,8 +184,7 @@ pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
 pub(crate) const ISO: &str = "iso";
 
 /// A name unique per environment on the server: `prefix`, the run's slot, `suffix`. The module
-/// writes it with the slot as `var.slot` ([`SlotName::hcl`]), the run manifest with the slot as
-/// `${run.slot}` ([`SlotName::manifest`]), so the names a runner reads are the module's.
+/// writes it with the slot as `var.slot` ([`SlotName::hcl`]).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SlotName<'a> {
     prefix: &'a str,
@@ -205,16 +203,6 @@ impl SlotName<'_> {
             .with_expr(reference("var.slot"))
             .with_text(self.suffix)
             .into_expression()
-    }
-
-    /// The name in the run manifest, after `${run.slot}`.
-    pub(crate) fn manifest(self) -> isoloom_manifest::Template {
-        use isoloom_manifest::{Part, Placeholder, RunVar};
-        isoloom_manifest::Template::from_parts([
-            Part::Text(self.prefix.into()),
-            Part::Placeholder(Placeholder::Run(RunVar::Slot)),
-            Part::Text(self.suffix.into()),
-        ])
     }
 }
 

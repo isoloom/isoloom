@@ -3,9 +3,9 @@
 //! machine (a Vagrant provisioner, cloud-init, `remote-exec`, WinRM), so every target sets a
 //! machine up the same way.
 
-use isoloom_manifest::ReadyLine;
 use isoloom_plan::Environment;
 use isoloom_plan::lifecycle::{RunKind, Step};
+use isoloom_spec::ready_line::ReadyLine;
 use isoloom_spec::shell::quote;
 use isoloom_spec::windows::ISOLOOM_DIR;
 
@@ -31,15 +31,6 @@ pub const MAKE_STATE_DIR: &str = concat!("mkdir -p ", isoloom_spec::linux_state_
 pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
 /// The project's archive on a Windows VM, uploaded before the steps run.
 pub const WINDOWS_PROJECT_ARCHIVE: &str = "C:\\Windows\\Temp\\isoloom-project.tgz";
-/// The sshd drop-in directory where a VM readied over SSH learns which variables it accepts from a
-/// session (the launch's values): the runner forwards them with `SendEnv`, and sshd drops any not
-/// listed in [`ACCEPT_ENV_FILE`]. A bare VM may ship without it: it is created first.
-const ACCEPT_ENV_DIR: &str = "/etc/ssh/sshd_config.d";
-/// The drop-in naming the variables sshd accepts ([`accept_env_line`]).
-pub const ACCEPT_ENV_FILE: &str = "/etc/ssh/sshd_config.d/isoloom-env.conf";
-/// sshd reloaded, whichever of its two unit names the OS gives it; one not running yet (it reads
-/// the drop-in when it starts) doesn't fail the set-up.
-pub const RELOAD_SSHD: &str = "systemctl reload ssh || systemctl reload sshd || true";
 
 /// How a command run over SSH as a VM's login user gets root: the one rule every way into a VM
 /// shares. A user other than root goes through `sudo`; root runs the command as it is, since its
@@ -124,23 +115,6 @@ pub fn windows_project_unpack(top: TopFolder) -> String {
         "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{ISOLOOM_DIR}'; $strip = {}\n{}",
         u8::from(top == TopFolder::Stripped),
         powershell::UNTAR
-    )
-}
-
-/// The line of [`ACCEPT_ENV_FILE`] letting sshd accept `forwarded`, environment variables' names
-/// (upper snake case, so no quoting is needed).
-#[must_use]
-pub fn accept_env_line(forwarded: &[String]) -> String {
-    format!("AcceptEnv {}", forwarded.join(" "))
-}
-
-/// As root, sshd accepting `forwarded` from a session: [`ACCEPT_ENV_FILE`] written, then sshd
-/// reloaded.
-#[must_use]
-pub fn accept_env(forwarded: &[String]) -> String {
-    format!(
-        "mkdir -p {ACCEPT_ENV_DIR} && echo \"{}\" > {ACCEPT_ENV_FILE} && ({RELOAD_SSHD})",
-        accept_env_line(forwarded)
     )
 }
 

@@ -4,8 +4,8 @@
 
 #![no_main]
 
-use isoloom_manifest::RelPath;
-use isoloom_manifest::ignore::{OUTPUTS, Rules};
+use isoloom_spec::path::RelPath;
+use isoloom_spec::ignore::{OUTPUTS, Rules};
 use isoloom_topology::{Error, Topology, compile};
 use libfuzzer_sys::fuzz_target;
 

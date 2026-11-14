@@ -1,9 +1,8 @@
 //! What the targets' tests share: the repository's examples as environments or plans, specs written in
 //! a test, their problems, and the files a target generates, found by path.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use isoloom_manifest::{Manifest, Version};
 use isoloom_plan::Environment;
 use isoloom_spec::Spec;
 use isoloom_spec::model::Target;
@@ -116,23 +115,4 @@ machines:
     app: {{ steps: [{{ run: p.sh }}] }}
 "
     )
-}
-
-/// The shared run-manifest fixture `name`.
-pub(crate) fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-manifest/fixtures").join(name)
-}
-
-/// `generated` against the fixture `name`; `ISOLOOM_WRITE_FIXTURES=1` writes it instead.
-pub(crate) fn matches_fixture(mut generated: Manifest, name: &str) -> Outcome {
-    let path = fixture(name);
-    if std::env::var_os("ISOLOOM_WRITE_FIXTURES").is_some() {
-        std::fs::write(&path, isoloom_manifest::to_json(&generated)?)?;
-    }
-    let mut fixture = isoloom_manifest::parse(&std::fs::read_to_string(&path)?)?;
-    // A release changes the version, not the contract.
-    generated.generator.version = Version::parse("0.0.0")?;
-    fixture.generator.version = Version::parse("0.0.0")?;
-    assert_eq!(generated, fixture, "{name}");
-    Ok(())
 }

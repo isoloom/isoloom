@@ -1,8 +1,7 @@
 //! Folders of the computer that runs the environment, shared into a VM both ways (`host_folders`): each
 //! provider's own two-way shared folder, set in that provider's block (its `override`), so only
 //! the provider `vagrant up` runs shares them. A provider with none stops `vagrant up` with the
-//! reason before creating the VM (and the run manifest's provider says it can't run the environment),
-//! rather than fall back to a one-way copy (rsync).
+//! reason before creating the VM, rather than fall back to a one-way copy (rsync).
 //!
 //! - VirtualBox: `virtualbox` (vboxsf, the box's Guest Additions). Vagrant mounts it as the VM's
 //!   SSH user and group with the folder's own mode on the computer (a home folder's 0755: only

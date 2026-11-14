@@ -25,7 +25,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use isoloom_targets::{GeneratedFile, Lab};
 
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 
 use crate::error::{CliError, Result};
 

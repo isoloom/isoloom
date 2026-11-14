@@ -30,14 +30,12 @@ if any count goes up. Drive counts down, never up.
 When a change is meant to alter output, review the snapshot diffs with `cargo insta review`,
 commit the accepted snapshots, and explain each kind of difference in the pull request.
 
-Isoloom generates files; it runs nothing. To run an environment for real, generate it and hand
-its run manifest to a runner ([the run manifest](../docs/reference/run-manifest.md)), or run each tool's files
-by hand:
+Isoloom generates files; it runs nothing. To run an environment for real, generate it and run
+each tool's files with the tool, by hand or through a runner such as Isothrum:
 
 ```sh
 cargo build -q -p isoloom && export PATH=$PWD/target/debug:$PATH
 cd examples/hello-stack && isoloom generate
-# a runner reads .isoloom/docker/run.json (up, check, down); by hand:
 (cd .isoloom/docker && docker compose up -d --build --wait && docker compose down)
 ```
 
@@ -277,10 +275,10 @@ and the schema's source, waiting for the deploy.
 All crates share one version. They are published in dependency order, and the workflow skips any
 crate whose version is already on crates.io, so re-running it after a partial failure is safe:
 
-1. `isoloom-manifest`, 2. `isoloom-spec`, 3. `isoloom-catalogue`, 4. `isoloom-plan`,
-5. `isoloom-render`, 6. `isoloom-compose`, 7. `isoloom-kubernetes`, 8. `isoloom-terraform`,
-9. `isoloom-vagrant`, 10. `isoloom-ansible`, 11. `isoloom-targets`, 12. `isoloom-import`,
-13. `isoloom` (the command line).
+1. `isoloom-spec`, 2. `isoloom-catalogue`, 3. `isoloom-plan`, 4. `isoloom-render`,
+5. `isoloom-compose`, 6. `isoloom-kubernetes`, 7. `isoloom-terraform`, 8. `isoloom-vagrant`,
+9. `isoloom-ansible`, 10. `isoloom-targets`, 11. `isoloom-import`, 12. `isoloom` (the command
+line).
 
 Not published (`publish = false`, the workspace default): `xtask`, `xtask-quality` and the fuzz
 workspace.
@@ -304,10 +302,10 @@ it points at, and `build.rs` reads that copy when the repository's isn't there.
 #### Dry run
 
 ```sh
-cargo publish --dry-run -p isoloom-manifest
+cargo publish --dry-run -p isoloom-spec
 ```
 
-The other crates (`isoloom-spec` included: it builds on `isoloom-manifest`) depend on sibling crates that are not on crates.io at the new version until they
+The other crates depend on sibling crates that are not on crates.io at the new version until they
 are published: point those at
 the checkout with a `[patch.crates-io]` table passed to cargo
 (`cargo --config patch.toml publish --dry-run -p <crate>`).
@@ -319,8 +317,8 @@ To publish the crates without a tag, run **Publish crates** from the Actions tab
 - Check the release page: five archives, `isoloom.cdx.json`, `SHA256SUMS`,
   `SHA256SUMS.sigstore.json`, and the notes.
 - Check that `release.yml`'s `website` job passed ([publish the website](#publish-the-website)).
-- Bump the consumers (Isothrum's `isoloom-*` dependencies) when the run manifest or the supported
-  API changed.
+- Bump the consumers (Isothrum's `isoloom-*` dependencies) when the supported API or the
+  contract's names (`isoloom_spec::contract`) changed.
 - A security fix: publish the GitHub security advisory ([SECURITY.md](SECURITY.md)).
 
 ## License

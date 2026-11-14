@@ -13,7 +13,6 @@ categories = ["config"]
 publish = true
 
 [dependencies]
-isoloom-manifest.workspace = true
 isoloom-spec.workspace = true
 isoloom-catalogue.workspace = true
 isoloom-plan.workspace = true

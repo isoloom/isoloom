@@ -4,8 +4,6 @@
 //! user data (`crate::cloud::docker::Host`): the project Terraform brings in, then
 //! [`setup_body`] (Docker), then the Compose file started.
 
-use isoloom_manifest::{Error as ManifestError, Machine, Output, OutputRole};
-use isoloom_render::run_manifest;
 use isoloom_render::steps::{self, CLOUD_INIT_WAIT, PUBLISHED_FROM_OUTSIDE, install_docker};
 
 use crate::hcl_builder::{Expression, list, string};
@@ -38,26 +36,6 @@ pub(crate) fn tcp_ports(env: &Environment) -> Vec<u16> {
 /// The ports as strings (`["22", "8080"]`), for the firewalls that take them so.
 pub(crate) fn port_strings(ports: &[u16]) -> Expression {
     list(ports.iter().map(|p| string(p.to_string())))
-}
-
-/// The outputs of a Docker host Terraform made: its address (`ip`, where SSH reaches it and the
-/// published ports answer) and its SSH user (`ssh_user`), then each of `machines`' published
-/// ports at that address.
-///
-/// # Errors
-///
-/// A name the manifest refuses.
-pub(crate) fn docker_host_outputs(machines: &[Machine]) -> Result<Vec<Output>, ManifestError> {
-    let mut out = vec![
-        crate::module::manifest::terraform_output(
-            "ip",
-            OutputRole::Address,
-            "The Docker host's address: SSH reaches it there, and its containers' published ports answer there.",
-        )?,
-        crate::module::manifest::terraform_output("ssh_user", OutputRole::Info, "The user the runner's key lets in on the Docker host.")?,
-    ];
-    out.extend(run_manifest::outputs_on_their_hosts(machines)?);
-    Ok(out)
 }
 
 /// The Docker host's set-up as root, once the project is in, as one script for `sh -c`: once

@@ -4,8 +4,8 @@
 
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, call, conditional, list, number, object, reference, string};
 use crate::module::ProjectCopy;
-use isoloom_manifest::contract::{EXPIRES_TAG, EXPIRES_WORD, INSTANCE_TAG};
 use isoloom_plan::Environment;
+use isoloom_spec::contract::{EXPIRES_TAG, EXPIRES_WORD, INSTANCE_TAG};
 
 /// The tags on every resource: the spec's own (`tags:`), then the environment, who manages it,
 /// its instance and its expiry (what a reaper reads).

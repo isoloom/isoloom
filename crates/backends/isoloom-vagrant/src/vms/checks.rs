@@ -5,12 +5,12 @@
 //! (`vagrant provision <vm> --provision-with checks`) runs them too, the project's check scripts
 //! read from the host first.
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::inventory::CONTROLLER_INVENTORY;
 use isoloom_render::steps::PROJECT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::linux::STATE_DIR;
 use isoloom_spec::shell::quote;
 
@@ -125,7 +125,7 @@ pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Positi
 
 /// A position's checks, on demand. The Vagrantfile is read on every `vagrant` command, so the
 /// project's check scripts are read then and written over the VM's copy first: an edited
-/// script runs at the runner's next `check`, not the copy made when the VM was provisioned. Then
+/// script runs at the next `--provision-with checks`, not the copy made when the VM was provisioned. Then
 /// the runner itself.
 pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
     let runner = format!("checks/{file}.sh");

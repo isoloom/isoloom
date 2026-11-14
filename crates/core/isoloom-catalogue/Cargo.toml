@@ -17,7 +17,6 @@ build = "build.rs"
 
 [dependencies]
 isoloom-spec.workspace = true
-isoloom-manifest.workspace = true
 indexmap.workspace = true
 regex.workspace = true
 schemars.workspace = true

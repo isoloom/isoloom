@@ -181,12 +181,12 @@ fn check_tells_a_missing_file_from_one_it_cant_read() -> Outcome {
         std::fs::remove_file(&compose)?;
     }
     std::fs::create_dir(&compose)?;
-    std::fs::remove_file(dir.join(".isoloom/docker/run.json"))?;
+    std::fs::remove_file(dir.join(".isoloom/resolved.json"))?;
     let checked = isoloom(&dir, &[&"check", &dir])?;
     assert_eq!(checked.code, Some(1), "{checked:?}");
     assert!(checked.stdout.contains("✗ .isoloom/docker/compose.yml can't be read: "), "{}", checked.stdout);
     assert!(!checked.stdout.contains("compose.yml is missing"), "{}", checked.stdout);
-    assert!(checked.stdout.contains("✗ .isoloom/docker/run.json is missing"), "{}", checked.stdout);
+    assert!(checked.stdout.contains("✗ .isoloom/resolved.json is missing"), "{}", checked.stdout);
     Ok(())
 }
 
@@ -371,9 +371,7 @@ fn defaults_shows_the_image_table_and_the_command_lines_layers() -> Outcome {
 }
 
 #[test]
-fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
-    // The region the run manifest's `region` param defaulted to was the built-in one, which a
-    // runner gives Terraform (TF_VAR_region), undoing the person's.
+fn a_users_default_region_reaches_the_module() -> Outcome {
     let home = scratch("default-region-home")?;
     std::fs::write(home.join("defaults.yml"), "cloud: { aws: { region: eu-north-1 } }\n")?;
     let dir = scratch("default-region")?;
@@ -386,14 +384,6 @@ fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
     assert_eq!(o.code, Some(0), "{o:?}");
     let module = std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/main.tf"))?;
     assert!(module.contains("default = \"eu-north-1\""), "{module}");
-    let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/run.json"))?)?;
-    let region = manifest["params"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|p| p["name"] == "region")
-        .ok_or("no region param")?;
-    assert_eq!(region["default"], "eu-north-1", "{region}");
     // `isoloom check` sees the same files.
     let checked = isoloom(&home, &[&"check", &dir, &"--target", &"cloud-vm"])?;
     assert_eq!(checked.code, Some(0), "{checked:?}");
@@ -447,7 +437,7 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     ] {
         assert!(!out.join(gone).exists(), "{gone} is left");
     }
-    assert!(!out.join("cloud-vm/gcp/main.tf").exists() && !out.join("cloud-vm/gcp/run.json").exists());
+    assert!(!out.join("cloud-vm/gcp/main.tf").exists());
     assert!(out.join("cloud-vm/gcp/.terraform.lock.hcl").is_file(), "a tool's file is kept");
     assert!(out.join("vagrant/Vagrantfile").is_file() && out.join("cloud-vm/aws/main.tf").is_file());
     let clean = isoloom(&home, &[&"check", &dir])?;
@@ -615,13 +605,13 @@ fn generate_and_check_refuse_to_write_through_a_linked_generated_file() -> Outco
     let elsewhere = scratch("linked-file-victim")?;
     let victim = elsewhere.join("keys");
     std::fs::write(&victim, "someone else's\n")?;
-    let dir = with_linked_output("linked-file", "run.json", &victim)?;
+    let dir = with_linked_output("linked-file", "compose.yml", &victim)?;
     let home = scratch("linked-file-refused-home")?;
     for command in ["generate", "check"] {
         let o = isoloom(&home, &[&command, &dir, &"--target", &"docker"])?;
         assert_eq!(o.code, Some(2), "{command}: {o:?}");
         assert!(
-            o.stderr.contains(".isoloom/docker/run.json is reached through a symbolic link"),
+            o.stderr.contains(".isoloom/docker/compose.yml is reached through a symbolic link"),
             "{command}: {}",
             o.stderr
         );
@@ -898,7 +888,9 @@ fn clones_publishing_a_free_host_port_are_generated_where_the_format_picks_one()
     let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
     for clone in ["web-01", "web-02"] {
         let ports = compose["services"][clone]["ports"].as_sequence().cloned().unwrap_or_default();
-        let [port] = &ports[..] else { panic!("{clone}: one published port: {ports:?}") };
+        let [port] = &ports[..] else {
+            panic!("{clone}: one published port: {ports:?}")
+        };
         let port = port.as_str().unwrap_or_default();
         assert!(port.ends_with(":${ISOLOOM_PUBLISH_FIXED:+80}:80"), "{clone}: {port}");
     }

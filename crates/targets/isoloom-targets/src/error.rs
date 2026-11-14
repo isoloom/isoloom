@@ -75,6 +75,13 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]
 pub enum GenerateError {
+    /// The spec has problems (`Lab::problems`): nothing is generated for a spec that isn't
+    /// valid, whatever the target. Each problem as `path: reason`.
+    #[error("the spec isn't valid: {}", .problems.join("; "))]
+    Invalid {
+        /// Its problems, each as `path: reason`.
+        problems: Vec<String>,
+    },
     /// The environment's machines have no form this target runs (see `isoloom targets`).
     #[error("{}: not possible for this spec (see `isoloom targets`)", .0.id())]
     NotPossible(Target),
@@ -166,7 +173,7 @@ mod tests {
     fn only_a_refusal_of_the_lab_is_a_refusal() {
         let failed = GenerateError::from(isoloom_render::Error::internal(
             Target::Vagrant,
-            "the run manifest refused a value of this backend",
+            "the module couldn't be written",
             std::io::Error::other("bad"),
         ));
         assert!(matches!(failed, GenerateError::Internal { target: Target::Vagrant, .. }));

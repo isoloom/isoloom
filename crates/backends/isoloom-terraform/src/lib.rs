@@ -48,14 +48,13 @@ mod module;
 mod ready;
 mod seal;
 mod server;
-mod ssh;
 mod target;
 #[cfg(test)]
 mod testing;
 
 pub use cloud::Cloud;
 pub use cloud::docker::{
-    Host as CloudDockerHost, manifests as cloud_docker_manifests, modules as cloud_docker_modules, refusal as cloud_docker_refusal,
+    Host as CloudDockerHost, modules as cloud_docker_modules, refusal as cloud_docker_refusal,
     refusals as cloud_docker_refusals,
 };
 pub use cloud::services::CloudServicesBackend;

@@ -1,10 +1,9 @@
 # Keep Terraform state remotely
 
 **The state is local.** Every generated Terraform module declares `backend "local" {}`.
-A runner keeps each run's state in its own state folder: the run manifest's `init` step passes
-`-backend-config=path=${run.state_dir}/terraform.tfstate` and sets `TF_DATA_DIR` there, so
-nothing lands in `.isoloom/`. Applied by hand, the state is `terraform.tfstate` in the module's
-folder.
+Applied by hand, the state is `terraform.tfstate` in the module's folder. A runner may keep each
+run's state in a state folder of its own (with `-backend-config=path=…` and `TF_DATA_DIR`), so
+nothing lands in `.isoloom/`.
 
 Local state is fine for short-lived environments a runner creates and destroys. For one a team
 shares, or one that must survive the loss of a laptop or a CI runner, back up the runner's state
@@ -40,9 +39,9 @@ tools' state).
 
 ## Limits
 
-- **Not with a runner, as generated.** The run manifest's `init` passes a `path` meant for the
-  local backend, which another backend refuses; the runner also keeps the state's location per run.
-  Use the override when you run the module with Terraform yourself.
+- **Not with a runner that keeps its own state.** A runner passing `-backend-config=path=…` means
+  the local backend, which another backend refuses. Use the override when you run the module with
+  Terraform yourself.
 - **One state per module.** Each target and cloud has its own module and needs its own `key`.
 - **Secrets in state.** As with any Terraform state, it can hold sensitive values (generated
   passwords, the controller's private key): encrypt the backend and restrict who reads it.

@@ -226,7 +226,9 @@ fn a_free_host_port_is_asked_for_by_any_number_of_machines_and_a_number_once() {
     assert_eq!(both, []);
     for publish in ["8080", "{ host: 8080 }", "{ host: 8080, fixed: true }"] {
         let found = web(&format!("count: 3, ports: {{ web: {{ port: 80, publish: {publish} }} }}"));
-        let [p] = &found[..] else { panic!("{publish}: one problem, on the machine as written: {found:?}") };
+        let [p] = &found[..] else {
+            panic!("{publish}: one problem, on the machine as written: {found:?}")
+        };
         assert_eq!(p.path.to_string(), "machines.web.ports.web.publish", "{publish}");
         assert!(
             p.reason.contains("its 3 clones (`count`) can't all have host port 8080: `publish: true`"),

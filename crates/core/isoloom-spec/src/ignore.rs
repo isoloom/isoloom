@@ -24,7 +24,7 @@
 //! them. It reads text only: walking the project is the caller's.
 //!
 //! ```
-//! use isoloom_manifest::ignore::Rules;
+//! use isoloom_spec::ignore::Rules;
 //!
 //! let rules = Rules::parse("*.log\n!keep.log\nbuild/\n");
 //! assert!(rules.ignored("logs/x.log") && !rules.ignored("keep.log"));
@@ -65,7 +65,7 @@ pub const VAGRANT_STATE: &[&str] = &[".vagrant/"];
 /// ([`TERRAFORM_STATE`], [`VAGRANT_STATE`]), in the outputs a machine reads too.
 ///
 /// ```
-/// use isoloom_manifest::ignore::{Rules, copy_rules};
+/// use isoloom_spec::ignore::{Rules, copy_rules};
 ///
 /// let rules = Rules::parse(&copy_rules(&[".isoloom/docker"]));
 /// assert!(rules.ignored(".isoloom/cloud-vm/aws/main.tf") && !rules.ignored(".isoloom/docker/compose.yml"));

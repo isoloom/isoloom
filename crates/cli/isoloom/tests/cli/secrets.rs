@@ -168,11 +168,10 @@ fn no_secret_value_reaches_a_generated_file() -> Outcome {
     let pods = find(&generated, "kubernetes/environment.yaml")?;
     assert!(pods.contains("secretName: isoloom-secrets"), "{pods}");
     find(&generated, "resolved.json")?;
-    // On cloud-docker, Terraform makes the VM only; the run manifest starts Compose over SSH with
-    // the containers' secrets forwarded to it (SendEnv), the value in no generated file.
-    let run = find(&generated, "cloud-docker/aws/run.json")?;
-    assert!(run.contains("ISOLOOM_SECRET_DB_PASSWORD") && run.contains("\"via\": \"env\""), "{run}");
-    assert!(!run.contains("/var/lib/isoloom/secrets/.delivered"), "{run}");
+    // On cloud-docker, the module takes the containers' secrets as sensitive variables, the
+    // value in no generated file.
+    let module = find(&generated, "cloud-docker/aws/main.tf")?;
+    assert!(module.contains("variable \"ISOLOOM_SECRET_DB_PASSWORD\""), "{module}");
     Ok(())
 }
 
@@ -213,36 +212,9 @@ fn no_secret_value_reaches_a_windows_machines_file() -> Outcome {
 }
 
 #[test]
-fn every_issued_input_is_an_optional_sensitive_slot_and_a_file_never_an_environment_value() -> Outcome {
+fn every_issued_input_is_a_file_never_an_environment_value() -> Outcome {
     let generated = generated(ISSUED, "issued")?;
-    // The targets whose runner delivers a machine's inputs: Compose's secrets, Vagrant's guest
-    // delivery.
-    for target in ["docker", "vagrant"] {
-        let path = PathBuf::from(target).join("run.json");
-        let text = find(&generated, &format!("{target}/run.json"))?;
-        let manifest: serde_json::Value = serde_json::from_str(text)?;
-        let slots = manifest["secrets"].as_array().ok_or_else(|| format!("{} has no slots", path.display()))?;
-        for input in SECRET_INPUTS {
-            let slot = slots
-                .iter()
-                .find(|s| s["name"] == input)
-                .ok_or_else(|| format!("{} has no slot {input}", path.display()))?;
-            // A runner gives a value only when the backend issues it: without one, the slot
-            // is empty (the lab's development value), never refused, never shown.
-            assert_eq!(
-                (&slot["kind"], &slot["required"], &slot["sensitive"], &slot["default"]),
-                (&"input".into(), &false.into(), &true.into(), &"".into()),
-                "{} {input}",
-                path.display()
-            );
-            assert!(
-                slot["deliver"].as_array().is_some_and(|d| !d.is_empty()),
-                "{} {input} isn't delivered",
-                path.display()
-            );
-        }
-    }
-    // On containers, each input is a secret file read from the runner's environment, never one of
+    // On containers, each input is a secret file read from the environment, never one of
     // the container's variables; on a VM, a secret file the guest delivery writes, never a line of
     // the inputs file the machine's scripts read.
     let compose = find(&generated, "docker/compose.yml")?;

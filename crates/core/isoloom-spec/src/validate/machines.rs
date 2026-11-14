@@ -97,7 +97,7 @@ pub(super) fn each(spec: &Spec, blocks: &Blocks, problems: &mut Problems) {
 // controller, the check stand-in, the check runners and their scripts, the route sidecars, the
 // init jobs, a machine's published Kubernetes Service): a spec's machine or alias starting so
 // would collide with them.
-use isoloom_manifest::contract::RESERVED_PREFIX;
+use crate::contract::RESERVED_PREFIX;
 
 /// The longest machine name: its published ports' Kubernetes Service, `isoloom-<name>`, is a
 /// 63-character DNS label.

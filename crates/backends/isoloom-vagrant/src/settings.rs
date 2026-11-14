@@ -1,9 +1,7 @@
 //! The variables a Vagrantfile reads from the host's environment, each with the default it falls
-//! back to, written once: the Vagrantfile reads them from here (`ENV.fetch`), and the run
-//! manifest's params advertise the same names and defaults (`crate::manifest`), so the runner
-//! never sees one default and the Vagrantfile use another.
+//! back to, written once: the Vagrantfile reads them from here (`ENV.fetch`).
 
-use isoloom_manifest::contract;
+use isoloom_spec::contract;
 
 use crate::ruby::Value;
 
@@ -28,7 +26,7 @@ pub(crate) enum Fallback {
 }
 
 impl Setting {
-    /// Its fallback text, the default as the run manifest's param gives it.
+    /// Its fallback text.
     pub(crate) fn fallback_text(self) -> Option<String> {
         match self.fallback {
             Fallback::None => None,
@@ -71,7 +69,7 @@ pub(crate) const ESXI_USERNAME: Setting = Setting {
     fallback: Fallback::Text("root"),
 };
 
-/// The ESXi user's password: a secret slot of the run manifest, read by the ESXi plugin itself
+/// The ESXi user's password, from the environment, read by the ESXi plugin itself
 /// (`env:ESXI_PASSWORD`), never by the Vagrantfile.
 pub(crate) const ESXI_PASSWORD: Setting = Setting {
     name: "ESXI_PASSWORD",

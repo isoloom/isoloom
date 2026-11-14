@@ -48,7 +48,7 @@ mod tests;
 
 use std::collections::BTreeSet;
 
-use isoloom_manifest::is_kebab;
+use crate::contract::is_kebab;
 
 use crate::model::{Machine, Spec};
 use crate::net::Cidr;

@@ -21,10 +21,10 @@ Docker Compose, Kubernetes manifests with a Kustomize overlay and a Helm chart, 
 Terraform modules for Proxmox VE, ESXi and six clouds, and Ansible inventories and playbooks.
 Every target produces the same behavior from the same spec, and the same checks prove it.
 
-**Isoloom is a converter. It runs nothing.** Next to most targets' files it writes a versioned
-**run manifest** (`run.json`) saying how to bring the environment up, check it and tear it down.
-You run the files with their own tools, or hand the manifest to a runner:
-[**Isothrum**](https://github.com/Isothrum/isothrum) is the reference runner.
+**Isoloom is a converter. It runs nothing.** It writes each tool's native files only, complete
+enough that the tool alone brings the environment to ready: you run them with their own tools,
+or let a runner run them: [**Isothrum**](https://github.com/Isothrum/isothrum) is the reference
+runner.
 
 ## Who it is for
 
@@ -91,7 +91,7 @@ cp -R isoloom-src/examples/hello-stack . && cd hello-stack
 
 isoloom validate                    # ✓ hello-stack is valid
 isoloom targets                     # where it can run, and each target's tier
-isoloom generate --target docker    # writes .isoloom/docker/compose.yml and run.json
+isoloom generate --target docker    # writes .isoloom/docker/compose.yml
 
 docker compose -f .isoloom/docker/compose.yml up -d --build --wait
 docker compose -f .isoloom/docker/compose.yml port web 80     # 127.0.0.1:<port>
@@ -138,18 +138,18 @@ real runs: **Tier 1**, a full real run (up, checks, down) from every host OS it 
 **Tier 2**, every generated file passes its format's official validator. The
 [target matrix](docs/matrix.md) (`isoloom matrix`) has the evidence.
 
-| Target | Converts the spec into | Tier | Run manifest | Guide |
-|---|---|---|---|---|
-| `docker` | A Compose project for your Docker | **1** (Linux, macOS, Windows) | yes | [Docker](docs/guide/targets/docker.md) |
-| `hosted` | The same Compose file, for a hosting service | 2 | no | [Docker](docs/guide/targets/docker.md) |
-| `kubernetes` | Manifests with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart | 2 | no | [Kubernetes](docs/guide/targets/kubernetes.md) |
-| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU, remote ESXi | **1** on libvirt (Linux) and Hyper-V (Windows); 2 on the others | yes | [Vagrant](docs/guide/targets/vagrant.md) |
-| `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | 2 | yes | [Proxmox](docs/guide/targets/proxmox.md) |
-| `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | yes | [ESXi](docs/guide/targets/esxi.md) |
-| `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | 2 | yes, per cloud | [Clouds](docs/guide/targets/cloud.md) |
-| `cloud-docker` | A Terraform module per cloud: the containers on one cloud VM | 2 | yes, per cloud | [Clouds](docs/guide/targets/cloud.md) |
-| `cloud-services` | Your own Terraform module, applied into your AWS, Azure or Google Cloud account | 2 | yes | [Clouds](docs/guide/targets/cloud.md) |
-| `external` | Hosts that already exist, set up and checked over SSH with Ansible | 2 | no | [Existing hosts](docs/guide/targets/external.md) |
+| Target | Converts the spec into | Tier | Guide |
+|---|---|---|---|
+| `docker` | A Compose project for your Docker | **1** (Linux, macOS, Windows) | [Docker](docs/guide/targets/docker.md) |
+| `hosted` | The same Compose file, for a hosting service | 2 | [Docker](docs/guide/targets/docker.md) |
+| `kubernetes` | Manifests with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart | 2 | [Kubernetes](docs/guide/targets/kubernetes.md) |
+| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU, remote ESXi | **1** on libvirt (Linux) and Hyper-V (Windows); 2 on the others | [Vagrant](docs/guide/targets/vagrant.md) |
+| `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | 2 | [Proxmox](docs/guide/targets/proxmox.md) |
+| `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | [ESXi](docs/guide/targets/esxi.md) |
+| `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | 2 | [Clouds](docs/guide/targets/cloud.md) |
+| `cloud-docker` | A Terraform module per cloud: the containers on one cloud VM | 2 | [Clouds](docs/guide/targets/cloud.md) |
+| `cloud-services` | Your own Terraform module, applied into your AWS, Azure or Google Cloud account | 2 | [Clouds](docs/guide/targets/cloud.md) |
+| `external` | Hosts that already exist, set up and checked over SSH with Ansible | 2 | [Existing hosts](docs/guide/targets/external.md) |
 
 The cloud targets' default regions are all in Europe; [change them](docs/guide/targets/cloud.md#regions)
 in your defaults.
@@ -190,9 +190,10 @@ What belongs to you or your site rather than to the environment lives outside th
 ## Running what Isoloom generates
 
 Each tool's files run by hand (`docker compose up`, `kubectl apply -k`, `vagrant up`,
-`terraform apply`, `ansible-playbook`); each file's header says how. A runner reads the run
-manifest instead: it checks the tools' versions, brings the environment up, delivers secrets
-(never written into a file), waits until it is ready, runs every check, and tears it down.
+`terraform apply`, `ansible-playbook`); each file's header says how. A runner runs the same
+native files for you: it checks the tools' versions, brings the environment up, gives the
+secrets (never written into a file), waits until it is ready, runs every check, and tears it
+down.
 
 - **The tools alone bring an environment to ready.** `docker compose up -d --wait` waits for the
   healthchecks and init jobs; `vagrant up` ends after each machine's last provisioner, its
@@ -201,10 +202,9 @@ manifest instead: it checks the tools' versions, brings the environment up, deli
   apply. The values given at launch reach each tool from its environment: Compose interpolates
   `${NAME}`, the Vagrantfile reads `ENV.fetch`, Terraform takes `TF_VAR_<NAME>`.
 - **A runner is optional** everywhere: it adds cloud expiry and reaps leftovers.
-- `kubernetes`, `external` and `hosted` have no run manifest: run them by hand.
 
-[Isothrum](https://github.com/Isothrum/isothrum) is the reference runner; any program that follows
-[the run manifest contract](docs/reference/run-manifest.md) can be one.
+[Isothrum](https://github.com/Isothrum/isothrum) is the reference runner: it runs the native files
+as they are.
 
 ## Stability
 
@@ -214,9 +214,8 @@ Isoloom follows Semantic Versioning ([policies](docs/reference/policies.md)):
 |---|---|
 | The spec format (`version: 1`) | Strict: a spec valid on a release stays valid, with the same meaning, for the whole major version |
 | The command line | Strict: commands, flags, exit codes and `--json` output |
-| The run manifest | Versioned: `manifest_version: 1`; a minor release may add an optional field, which a runner reads once it upgrades the `isoloom-manifest` it pins |
 | Catalogue entries | Removable with notice: deprecated in a minor release, removed no earlier than three months later |
-| The library API | `isoloom-spec`, `isoloom-targets` and `isoloom-manifest` are supported; the other crates are building blocks whose API may change |
+| The library API | `isoloom-spec` and `isoloom-targets` are supported; the other crates are building blocks whose API may change |
 | The generated files | Their behavior, proven by the checks; their text may change in any release |
 
 Version 2.0 removes library API and refuses a few specs 1.x took:
@@ -226,8 +225,8 @@ Version 2.0 removes library API and refuses a few specs 1.x took:
 
 The [documentation index](docs/README.md) has the guides (getting started, one per target, corporate
 networks, CI, offline use), the reference (the [spec](docs/spec.md), the
-[command line](docs/reference/cli.md), the [target matrix](docs/matrix.md), configuration, the run
-manifest) and the explanations (architecture, [security considerations](docs/explanation/security.md),
+[command line](docs/reference/cli.md), the [target matrix](docs/matrix.md), configuration) and the
+explanations (architecture, [security considerations](docs/explanation/security.md),
 determinism). The [CHANGELOG](CHANGELOG.md) lists every change.
 
 ## Using the library
@@ -237,10 +236,9 @@ The crates are on [crates.io](https://crates.io/crates/isoloom), all at one vers
 ```toml
 isoloom-spec = "2"       # parse, load and validate a spec; the spec model
 isoloom-targets = "2"    # generate every target's files, refusals, the resolved snapshot, tiers
-isoloom-manifest = "2"   # the run manifest's types, for a runner
 ```
 
-Those three are the supported API. `isoloom-catalogue`, `isoloom-plan`, `isoloom-render`, the
+Those two are the supported API. `isoloom-catalogue`, `isoloom-plan`, `isoloom-render`, the
 backends (`isoloom-compose`, `isoloom-kubernetes`, `isoloom-vagrant`, `isoloom-terraform`,
 `isoloom-ansible`), `isoloom-import`, `isoloom` (the command line), `isoloom-topology` and
 `isoloom-wasm` (a topology editor's compiler and its WebAssembly engine) are published so the

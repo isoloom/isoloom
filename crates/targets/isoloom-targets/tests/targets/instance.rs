@@ -136,24 +136,6 @@ fn host_names(lab: &isoloom_targets::Lab, target: Target, n: Option<u8>) -> Outc
         assert!(name.contains("#{ISOLOOM_KEY}"), "{}: network {name} holds the copy's key", target.id());
         names.insert(format!("network {name}"));
     }
-    if let Some(run) = files.iter().find(|f| f.path.ends_with("/run.json")) {
-        let manifest: serde_json::Value = serde_json::from_str(&run.contents)?;
-        let list = |key: &str| manifest.get(key).and_then(serde_json::Value::as_array).cloned().unwrap_or_default();
-        for machine in list("machines") {
-            let vm_names = machine
-                .get("native")
-                .and_then(|native| native.get("vm_names"))
-                .and_then(serde_json::Value::as_object);
-            assert!(
-                vm_names.is_none_or(serde_json::Map::is_empty),
-                "{}: the manifest names a VM: {machine}",
-                target.id()
-            );
-        }
-        for net in list("networks") {
-            assert!(net.get("native").is_none(), "{}: the manifest names a network: {net}", target.id());
-        }
-    }
     Ok(names)
 }
 

@@ -2,19 +2,18 @@
 //! stand, the ready marker, the checks, the published services.
 
 use crate::hcl_builder::{Expression, Module, null, object, reference, string};
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Vm};
 use isoloom_render::steps::AsRoot;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::Target;
 
 use crate::checks::{Invocation, Runner, output_block};
 use crate::machine::controller;
 use crate::machine::provisioner::Connection;
 use crate::machine::user_data::SETUP_LOG;
-use crate::module::manifest::{PLAYBOOKS_S, SETUP_S};
-use crate::module::output;
-use crate::ready::Wait;
+use crate::module::{ident, output};
+use crate::ready::{PLAYBOOKS_S, SETUP_S, Wait};
 
 /// How the operator reaches the machines, for the outputs and the readiness waits.
 pub(crate) struct Reach<'a> {
@@ -23,8 +22,7 @@ pub(crate) struct Reach<'a> {
     /// A machine's instance id (the controller's by its name, `controller::NAME`): what makes
     /// its readiness wait again when it is made again.
     pub(crate) instance: &'a dyn Fn(&str) -> Expression,
-    /// The SSH user on a machine of an OS: the cloud's (`crate::cloud::Base::user`), the one
-    /// its run manifest gives too.
+    /// The SSH user on a machine of an OS: the cloud's (`crate::cloud::Base::user`).
     pub(crate) user: fn(&str) -> &'static str,
     /// The controller's public address, when there is one (its user: `user` of its OS).
     pub(crate) controller: Option<Expression>,
@@ -35,6 +33,16 @@ impl Reach<'_> {
     fn user_of(&self, vm: Vm<'_>) -> &'static str {
         (self.user)(vm.os)
     }
+}
+
+/// The output holding `machine`'s public address.
+pub(crate) fn address_output(machine: &str) -> String {
+    format!("address_{}", ident(machine).to_ascii_lowercase())
+}
+
+/// The output holding the SSH user the operator's key lets in on `machine`.
+pub(crate) fn ssh_user_output(machine: &str) -> String {
+    format!("ssh_user_{}", ident(machine).to_ascii_lowercase())
 }
 
 /// The resource of machine `name` (the controller's `isoloom_controller`), its instance being a
@@ -119,7 +127,7 @@ fn waits(env: &Environment, reach: &Reach, m: &mut Module) {
 }
 
 /// The outputs every cloud module gives: `machines`, each machine's `address_<m>` and
-/// `ssh_user_<m>` (what the run manifest reads), `ssh_users` (for an operator reading
+/// `ssh_user_<m>`, `ssh_users` (for an operator reading
 /// `terraform output`), `ip`, `ready_file`, `checks` and `published`.
 pub(crate) fn write(env: &Environment, reach: &Reach, module: &mut Module) {
     waits(env, reach, module);
@@ -127,13 +135,13 @@ pub(crate) fn write(env: &Environment, reach: &Reach, module: &mut Module) {
     let users: Vec<(&str, Expression)> = env.vms().map(|vm| (vm.name, string(reach.user_of(vm)))).collect();
     module.block(output("machines", object(machines)));
     for vm in env.vms() {
-        module.block(output(&super::manifest::address_output(vm.name), (reach.public_ip)(vm.name)));
-        module.block(output(&super::manifest::ssh_user_output(vm.name), string(reach.user_of(vm))));
+        module.block(output(&address_output(vm.name), (reach.public_ip)(vm.name)));
+        module.block(output(&ssh_user_output(vm.name), string(reach.user_of(vm))));
     }
     if let Some(address) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
-        module.block(output(&super::manifest::address_output(controller::NAME), address.clone()));
+        module.block(output(&address_output(controller::NAME), address.clone()));
         module.block(output(
-            &super::manifest::ssh_user_output(controller::NAME),
+            &ssh_user_output(controller::NAME),
             string((reach.user)(controller::OS)),
         ));
     }
@@ -190,9 +198,8 @@ mod tests {
 
     use crate::cloud::{aws, azure, digitalocean, gcp, linode, oci};
 
-    /// Each `ssh_user_<machine>` output is the user the cloud's driver gives the run manifest's
-    /// guest: the readiness wait signs in as the one, the run manifest's SSH steps as the
-    /// other, so a difference locks the delivery out.
+    /// Each `ssh_user_<machine>` output is the user the cloud's driver signs in as, the one the
+    /// readiness wait uses.
     #[test]
     fn every_clouds_ssh_user_outputs_are_its_drivers_users() {
         let spec = "version: 1\nname: u\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n  api: { networks: { lan: 11 }, os: ubuntu@24.04 }\n";
@@ -210,7 +217,7 @@ mod tests {
             let text = m.render().unwrap();
             for vm in env.vms() {
                 let (name, user) = (vm.name, (driver.base.user)(vm.os));
-                let output = format!("output \"{}\" {{\n  value = \"{user}\"\n}}", super::super::manifest::ssh_user_output(name));
+                let output = format!("output \"{}\" {{\n  value = \"{user}\"\n}}", super::ssh_user_output(name));
                 assert!(text.contains(&output), "{name}: {output}\n{text}");
             }
         }

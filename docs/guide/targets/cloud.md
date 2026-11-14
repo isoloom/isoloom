@@ -2,7 +2,7 @@
 
 - **`cloud-vm`**: one cloud VM per machine, set up by the machine's steps, on AWS, Azure, Google
   Cloud, DigitalOcean, Linode or Oracle Cloud. `.isoloom/cloud-vm/<cloud>/`, one Terraform module
-  and run manifest per cloud that can take the environment.
+  per cloud that can take the environment.
 - **`cloud-docker`**: the `docker` target's containers on one cloud VM, on the same six clouds.
   `.isoloom/cloud-docker/<cloud>/`.
 - **`cloud-services`**: your own Terraform module (the spec's `cloud:`), applied into your account
@@ -216,8 +216,8 @@ Isoloom doesn't know your prices and bills nothing. What it gives you to keep co
   containers' total memory, and the size is a module variable (`instance_type`, `size`,
   `machine_type` or `type`), except on Oracle Cloud, whose shape takes its OCPUs and memory from
   that total, with no variable. `isoloom resources` adds up what the machines ask for.
-- **Expiry.** A run manifest carries an expiry (240 minutes by default; `isothrum up --lifetime`
-  changes it). The runner sets `expires_at`: every resource is tagged `isoloom-expires-at`, and the
+- **Expiry.** A runner gives a run an expiry (Isothrum: 240 minutes by default; `isothrum up
+  --lifetime` changes it) and sets `expires_at`: every resource is tagged `isoloom-expires-at`, and the
   machines shut themselves down at that time (an AWS `cloud-vm` instance that shuts itself down is
   terminated). A stopped machine stops most compute charges, not disks or addresses: `isothrum reap <cloud>` destroys the runs past their expiry and lists what
   the cloud still holds past its expiry that no run records. Run it on a schedule. Applied by hand,
@@ -249,6 +249,13 @@ address, its user and the command (`cd /opt/isoloom && … sh .isoloom/cloud-vm/
 the runner scripts Terraform brought in with the project). A runner such as
 [Isothrum](https://github.com/Isothrum/isothrum) runs the same commands, with no contract of its
 own.
+
+`cloud-services` writes the spec's fixed variables only (`.isoloom/cloud-services/terraform.tfvars.json`):
+you apply your own module with them, `terraform -chdir=<your module> apply
+-var-file=<project>/.isoloom/cloud-services/terraform.tfvars.json`, and give each variable that
+takes a launch-time input as `TF_VAR_<name>`. No generated file acts on the spec's `cloud.before`,
+`cloud.env`, `cloud.apply_retries` or `cloud.requires`: run the `before` scripts, set the
+environment, retry and install the tools yourself (or let a runner do it).
 
 ## Teardown
 

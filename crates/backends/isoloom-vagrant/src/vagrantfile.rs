@@ -36,7 +36,7 @@ pub(crate) fn host_name(name: &HostName) -> Value {
 /// The derived-checks switch as a check provisioner's `env`: `{ "ISOLOOM_DERIVED" => ... }`, read
 /// from the host's environment when Vagrant runs (on, `1`, unless the host sets it).
 pub(crate) fn derived_from_host() -> Value {
-    let name = isoloom_manifest::contract::DERIVED;
+    let name = isoloom_spec::contract::DERIVED;
     Value::hash([(Value::str(name), Value::raw(format!("ENV.fetch({}, {})", Value::str(name), Value::str("1"))))])
 }
 
