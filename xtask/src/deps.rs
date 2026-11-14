@@ -102,6 +102,10 @@ fn level(name: &str, dir: &str) -> Result<Level, String> {
     }
 }
 
+/// The crate of helpers the tests share (unpublished, on no workspace crate): a dev-dependency
+/// any crate may take.
+const TEST_SUPPORT: &str = "isoloom-test-support";
+
 /// Whether `from` may depend on `to`.
 fn allowed(from: Level, to: Level) -> bool {
     match (from, to) {
@@ -137,6 +141,10 @@ pub(crate) fn violations(metadata: &Value) -> Vec<String> {
         for d in p["dependencies"].as_array().into_iter().flatten() {
             let dep = d["name"].as_str().unwrap_or("");
             let Some(to) = level_of(dep) else { continue };
+            // The tests' shared helpers sit beneath every crate: any crate's tests may use them.
+            if dep == TEST_SUPPORT && d["kind"].as_str() == Some("dev") {
+                continue;
+            }
             if !allowed(from, to) {
                 let kind = d["kind"].as_str().map(|k| format!(" ({k})")).unwrap_or_default();
                 problems.push(format!(
@@ -184,6 +192,21 @@ mod tests {
             upward[0].starts_with("isoloom-spec (Core(1)) depends on isoloom-plan (Core(3)) (dev)"),
             "{upward:?}"
         );
+    }
+
+    #[test]
+    fn any_crate_s_tests_may_use_the_shared_test_helpers_and_nothing_else_may() {
+        let helpers = || package(TEST_SUPPORT, "crates/tools/isoloom-test-support", &[]);
+        let ok = check(&[
+            helpers(),
+            package("isoloom-vagrant", "crates/backends/isoloom-vagrant", &[(TEST_SUPPORT, Some("dev"))]),
+        ]);
+        assert!(ok.is_empty(), "{ok:?}");
+        let built = check(&[
+            helpers(),
+            package("isoloom-vagrant", "crates/backends/isoloom-vagrant", &[(TEST_SUPPORT, None)]),
+        ]);
+        assert_eq!(built.len(), 1, "{built:?}");
     }
 
     #[test]
