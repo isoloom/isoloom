@@ -28,6 +28,7 @@ pub mod compose;
 mod draft;
 mod error;
 mod naming;
+mod os_name;
 mod quantity;
 pub mod terraform;
 pub mod vagrant;

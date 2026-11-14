@@ -53,6 +53,10 @@ stable spec format.
 
 ### Fixed
 
+- **`isoloom import vagrant` and `isoloom import terraform` read a box or a cloud image's OS with
+  its version and family (#303):** `ubuntu/jammy64` drafts Ubuntu 22.04, `windows-10` Windows 10,
+  and Rocky, CentOS, Alpine and Fedora boxes their family; a shell provisioner's `args`, `env`,
+  `privileged` and `run` are noted in the draft instead of dropped.
 - **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer
   fails on a running command (#289).** The setup mark and the command script lived in
   `C:\isoloom`, the project folder, which every unpack replaces: the mark was gone and the setup
