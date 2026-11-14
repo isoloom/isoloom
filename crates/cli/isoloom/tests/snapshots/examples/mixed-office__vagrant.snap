@@ -185,8 +185,7 @@ crash.*.log
       "hosted": "machines.files01.os: Windows has no container form",
       "cloud-docker": "machines.files01.os: Windows has no container form",
       "kubernetes": "machines.files01.os: Windows has no container form",
-      "external": "overrides.external.machines.files01: the external target reaches machines that exist already, and `files01` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.files01: the external target reaches machines that exist already, and `files01` names no host"
     },
     "clouds": {
       "cloud-vm": {

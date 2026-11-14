@@ -415,8 +415,7 @@ function Enable-IsoloomFirewallPort {
       "hosted": "machines.iis.os: Windows has no container form",
       "cloud-docker": "machines.iis.os: Windows has no container form",
       "kubernetes": "machines.iis.os: Windows has no container form",
-      "external": "overrides.external.machines.iis: the external target reaches machines that exist already, and `iis` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.iis: the external target reaches machines that exist already, and `iis` names no host"
     },
     "clouds": {
       "cloud-vm": {

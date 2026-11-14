@@ -191,8 +191,7 @@ crash.*.log
       "kubernetes": "environment-level provisioning (`provision:`) runs on the VM targets only"
     },
     "not_possible": {
-      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host"
     },
     "clouds": {
       "cloud-vm": {

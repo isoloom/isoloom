@@ -1152,8 +1152,7 @@ volumes:
       "esxi": "Isoloom routes no network through a `gateway` machine on ESXi"
     },
     "not_possible": {
-      "external": "overrides.external.machines.fw: the external target reaches machines that exist already, and `fw` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.fw: the external target reaches machines that exist already, and `fw` names no host"
     },
     "clouds": {
       "cloud-docker": {

@@ -676,8 +676,7 @@ secrets:
     ],
     "refused": {},
     "not_possible": {
-      "external": "overrides.external.machines.database: the external target reaches machines that exist already, and `database` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.database: the external target reaches machines that exist already, and `database` names no host"
     },
     "clouds": {
       "cloud-docker": {

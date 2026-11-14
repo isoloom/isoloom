@@ -1,0 +1,112 @@
+---
+source: crates/core/isoloom-plan/tests/examples.rs
+expression: example(&name).unwrap().spec()
+---
+version: 1
+name: invoice-portal-api
+networks:
+  lab:
+    cidr: 10.20.0.0/24
+    internet: true
+    gateway: ~
+    docker: ~
+reach: []
+inputs:
+  - name: CTF_API_URL
+    sensitive: false
+  - name: CTF_LAUNCH_TOKEN
+    sensitive: true
+secrets:
+  input-ctf-launch-token:
+    input: CTF_LAUNCH_TOKEN
+machines:
+  database:
+    networks:
+      lab: 32
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 3207
+        name: mysql
+        http: false
+        publish: ~
+    inputs:
+      - CTF_API_URL
+    secrets:
+      - source: input-ctf-launch-token
+        target: /run/lab/launch-token
+        mode: "0400"
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+    depends_on: []
+    volumes:
+      evidence: /var/lib/ctf
+    access: false
+    docker:
+      image: ~
+      build: build/database
+      init:
+        - build/database/evidence.sh
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/database.sh
+      image: ~
+  web:
+    networks:
+      lab: 31
+    os: debian@12
+    arch: amd64
+    privileged: false
+    read_only: false
+    tmpfs: []
+    shm_size: ~
+    dns: ~
+    ports:
+      - port: 80
+        name: portal
+        http: true
+        publish: 8080
+        fixed: true
+    inputs: []
+    resources:
+      cpus: 1
+      memory_mb: 1024
+      disk_gb: ~
+    depends_on:
+      - database
+    volumes: {}
+    access: false
+    docker:
+      image: ~
+      build: build/web
+      init: []
+      idle: false
+    vm:
+      os: debian-12
+      provision:
+        - provision/web.sh
+      image: ~
+common: ~
+groups: {}
+provision: []
+checks:
+  - name: the API refuses a request without its key
+    from: ~
+    http: "http://web/api/invoices/INV-1042"
+    tcp: ~
+    exec: ~
+    script: ~
+    expect: 401
+    wait: ~
+  - build/check/check.sh
+targets: ~
+message: "The invoice portal API answers at {{ machines.web.ports.portal.url }}.\nIts documentation is on its home page; the invoice to look up is INV-1042.\n"
