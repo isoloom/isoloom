@@ -24,6 +24,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 isoloom-render = { workspace = true, features = ["test-support"] }
+isoloom-test-support.workspace = true
 insta.workspace = true
 proptest.workspace = true
 tempfile.workspace = true

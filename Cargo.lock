@@ -689,6 +689,7 @@ dependencies = [
  "isoloom-manifest",
  "isoloom-spec",
  "isoloom-targets",
+ "isoloom-test-support",
  "serde",
  "serde_json",
  "serde_yaml_ng",
@@ -881,10 +882,20 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "isoloom-test-support",
  "proptest",
  "serde_json",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "isoloom-test-support"
+version = "3.0.0"
+dependencies = [
+ "hcl-rs",
+ "serde_yaml_ng",
+ "tempfile",
 ]
 
 [[package]]
@@ -913,6 +924,7 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "isoloom-test-support",
  "proptest",
  "sha2",
  "tempfile",

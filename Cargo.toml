@@ -37,6 +37,7 @@ isoloom-import = { path = "crates/tools/isoloom-import", version = "3.0.0" }
 isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "3.0.0" }
 isoloom-topology = { path = "crates/frontends/isoloom-topology", version = "3.0.0" }
 xtask-quality = { path = "crates/tools/xtask-quality" }
+isoloom-test-support = { path = "crates/tools/isoloom-test-support" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"

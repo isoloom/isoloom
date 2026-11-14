@@ -131,7 +131,7 @@ mod tests {
             ("[{ name: web, tcp: 'a:80' }]", "check \"web\" has no host to run from"),
         ] {
             let env = environment(&format!("  a: {{ networks: {{ lab: 5 }}, os: debian@12 }}\n{hosts}checks: {checks}\n"));
-            let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+            let refusal = ExternalBackend.refusal(&env).unwrap_or_else(|| panic!("{checks}: not refused"));
             assert!(refusal.contains(why), "{checks}: {refusal}");
             assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })), "{checks}");
         }

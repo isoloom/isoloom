@@ -712,7 +712,6 @@ IsoloomQemu.virtiofs_squash.each { |a| puts a }
 /// What [`VIRTIOFS_RB`] prints with `virtiofsd` on the PATH answering `--help` with `help`.
 #[cfg(unix)]
 fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
-    use std::os::unix::fs::PermissionsExt;
     let scratch = tempfile::Builder::new().prefix("isoloom-virtiofs-").tempdir()?;
     let yaml = "version: 1\nname: shared-desk\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  desk: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /shared }] }\n";
     let mut vagrantfile = None;
@@ -729,8 +728,9 @@ fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
     let bin = scratch.path().join("bin");
     std::fs::create_dir_all(&bin)?;
     let virtiofsd = bin.join("virtiofsd");
-    std::fs::write(&virtiofsd, format!("#!/bin/sh\nprintf '%s\\n' '{help}'\n"))?;
-    std::fs::set_permissions(&virtiofsd, std::fs::Permissions::from_mode(0o755))?;
+    // Written by a child process: one this test wrote itself could be busy ("Text file busy") in
+    // a process another test forked meanwhile, when Ruby runs it.
+    isoloom_test_support::write_executable(&virtiofsd, &format!("#!/bin/sh\nprintf '%s\\n' '{help}'\n"), true)?;
     let mut ruby = Command::new("ruby");
     ruby.arg("-I")
         .arg(scratch.path())
