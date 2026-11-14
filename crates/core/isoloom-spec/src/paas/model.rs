@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 /// A service of the environment, by its `kind`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
-#[non_exhaustive]
 pub enum Service {
     /// A managed PostgreSQL database: RDS, Azure Database for PostgreSQL flexible server, Cloud
     /// SQL; the catalogue's `postgres` (a container or a Debian VM) everywhere else.
