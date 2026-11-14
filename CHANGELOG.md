@@ -71,6 +71,8 @@ stable spec format.
 
 ### Fixed
 
+- **An external machine's `files[].secret` and `files[].input` are refused (#317),** as on Proxmox
+  and ESXi: nothing delivered them there, though the backend said a runner would.
 - **Two `isoloom generate` runs in one project at once no longer fail each other (#297):** each
   writes its fresh copy of a file under a name of its own before renaming it into place, where they
   shared one and could remove or rename the other's half-written copy.

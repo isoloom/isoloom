@@ -54,9 +54,8 @@ fn capabilities() -> Capabilities {
         // The hosts are already on their networks, outside ones included.
         Feature::ExternalNetworks,
         Feature::BridgedNetworks,
-        // Delivered by the runner over the host's SSH, owners included.
-        Feature::Secrets,
-        Feature::SecretOwners,
+        // No secrets: no secret value goes into the generated files, and the target has no run
+        // manifest, so nothing would deliver one to a host.
     ])
 }
 
@@ -153,6 +152,16 @@ mod tests {
             );
             assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })), "{settings}");
         }
+    }
+
+    #[test]
+    fn a_secret_file_is_refused_not_dropped() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12, files: [{ path: /run/secrets/api-key, secret: api-key }] }\ninputs: { TOKEN: { sensitive: true } }\nsecrets: { api-key: { env: TOKEN } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        let refusal = ExternalBackend.refusal(&env).unwrap_or_default();
+        assert!(refusal.contains("nothing delivers them"), "{refusal}");
+        assert!(matches!(ExternalBackend.render(&env), Err(RenderError::Refused { .. })));
     }
 
     #[test]
