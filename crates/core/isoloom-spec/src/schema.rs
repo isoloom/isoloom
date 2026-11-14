@@ -71,7 +71,8 @@ fn networks(s: &mut Value) {
         s,
         &["$defs", "Network", "properties", "vlans"],
         "propertyNames",
-        json!({ "pattern": "^[1-9][0-9]{0,3}$" }),
+        // Exactly 1 to 4094 (`vlans::VLAN_IDS`), as the validator refuses the rest.
+        json!({ "pattern": "^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$" }),
     );
     set(s, &["$defs", "Vlan", "properties", "cidr"], "pattern", json!(network));
     set(s, &["$defs", "Bridged", "properties", "vlan"], "minimum", json!(1));
