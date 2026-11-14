@@ -22,7 +22,7 @@ pub(crate) fn choices() -> Choices {
     Choices {
         os: isoloom_spec::os::DISTROS
             .iter()
-            .flat_map(|f| f.versions.iter().map(move |(v, _)| format!("{}@{v}", f.name)))
+            .flat_map(|f| f.releases.iter().map(move |r| format!("{}@{}", f.name, r.version)))
             .collect(),
         appliances: values(&schemars::schema_for!(Appliance)),
         protocols: values(&schemars::schema_for!(PortProtocol)),
