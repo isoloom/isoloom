@@ -59,7 +59,7 @@ fn oci_opens_a_published_port_on_its_machine_only() -> Outcome {
 
 #[test]
 fn rendering_twice_gives_the_same_files() -> Outcome {
-    for name in ["solo-web", "hello-stack", "existing-hosts", "supplier-portal-api"] {
+    for name in ["solo-web", "hello-stack", "existing-hosts", "supplier-portal-api", "invoice-portal-api"] {
         let e = env(name)?;
         for module in Cloud::ALL.map(CloudVmModule::new) {
             assert_eq!(module.render(&e), module.render(&e), "{} {name}", module.cloud().id());
