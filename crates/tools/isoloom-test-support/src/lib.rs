@@ -286,6 +286,12 @@ pub fn hcl_values(body: &hcl::Body, key: &str) -> Vec<String> {
     out
 }
 
+/// The expression of attribute `key` set directly in `body` (not in its nested blocks).
+#[must_use]
+pub fn hcl_attribute<'a>(body: &'a hcl::Body, key: &str) -> Option<&'a hcl::Expression> {
+    body.attributes().find(|a| a.key() == key).map(hcl::Attribute::expr)
+}
+
 /// The body of the one `resource "<kind>" "<name>"` of `tf`, parsed.
 ///
 /// # Panics
