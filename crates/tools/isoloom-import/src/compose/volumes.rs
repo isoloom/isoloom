@@ -2,7 +2,7 @@
 
 use serde_yaml_ng::Value;
 
-use super::text::str_of;
+use super::text::{colon_parts, str_of};
 
 /// What a volume entry mounts.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,11 +20,14 @@ pub(super) enum VolumeMount {
 pub(super) fn volume_mount(item: &Value) -> Option<(VolumeMount, String)> {
     match item {
         Value::String(entry) => {
-            let parts: Vec<&str> = entry.split(':').collect();
+            let parts = colon_parts(entry);
             match parts.as_slice() {
-                [path] => Some((VolumeMount::Anonymous, (*path).to_owned())),
-                [source, path, ..] if source.starts_with(['.', '/', '~']) => Some((VolumeMount::Bind, (*path).to_owned())),
-                [source, path, ..] => Some((VolumeMount::Named((*source).to_owned()), (*path).to_owned())),
+                [path] => Some((VolumeMount::Anonymous, path.clone())),
+                [drive, folder, path, ..] if is_drive(drive) && folder.starts_with(['\\', '/']) && path.starts_with('/') => {
+                    Some((VolumeMount::Bind, path.clone()))
+                }
+                [source, path, ..] if is_host_path(source) => Some((VolumeMount::Bind, path.clone())),
+                [source, path, ..] => Some((VolumeMount::Named(source.clone()), path.clone())),
                 [] => None,
             }
         }
@@ -39,6 +42,19 @@ pub(super) fn volume_mount(item: &Value) -> Option<(VolumeMount, String)> {
         }
         _ => None,
     }
+}
+
+/// Whether a short entry's source is a path on the host: relative (`./conf`), absolute, from
+/// the home folder, or read from the shell (`${DATA_DIR:-./data}`, `$PWD/conf`), which Compose
+/// replaces before it reads the entry (a volume's name is never written that way in practice).
+fn is_host_path(source: &str) -> bool {
+    source.starts_with(['.', '/', '~', '$', '\\'])
+}
+
+/// Whether the first part of a short entry is a Windows drive letter (`C:\data:/data`, split on
+/// `:` as `C`, `\data`, `/data`; a volume named `a` reads `a:/x:ro`, its last part no path).
+fn is_drive(part: &str) -> bool {
+    part.len() == 1 && part.chars().all(|c| c.is_ascii_alphabetic())
 }
 
 #[cfg(test)]
@@ -57,6 +73,22 @@ mod tests {
         );
         assert_eq!(mount("./conf:/etc/x")?, Some((VolumeMount::Bind, "/etc/x".to_owned())));
         assert_eq!(mount("/cache")?, Some((VolumeMount::Anonymous, "/cache".to_owned())));
+        Ok(())
+    }
+
+    #[test]
+    fn a_host_path_read_from_the_shell_or_on_a_drive_is_a_bind() -> Result<(), serde_yaml_ng::Error> {
+        let bind = |path: &str| Some((VolumeMount::Bind, path.to_owned()));
+        assert_eq!(mount("${DATA_DIR:-./data}:/var/lib/data")?, bind("/var/lib/data"));
+        assert_eq!(mount("${DATA_DIR}:/var/lib/data:ro")?, bind("/var/lib/data"));
+        assert_eq!(mount("$PWD/conf:/etc/x")?, bind("/etc/x"));
+        assert_eq!(mount("'C:\\data:/data'")?, bind("/data"));
+        assert_eq!(mount("D:/data:/data:ro")?, bind("/data"));
+        assert_eq!(mount("a:/x:ro")?, Some((VolumeMount::Named("a".to_owned()), "/x".to_owned())));
+        assert_eq!(
+            mount("data:/var/lib/x:ro")?,
+            Some((VolumeMount::Named("data".to_owned()), "/var/lib/x".to_owned()))
+        );
         Ok(())
     }
 
