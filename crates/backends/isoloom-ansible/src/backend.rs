@@ -156,6 +156,39 @@ mod tests {
     }
 
     #[test]
+    fn a_step_gets_the_machines_inputs_from_where_ansible_runs() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12, environment: { MODE: { input: MODE } }, app: { steps: [{ run: setup.sh }, { playbook: site.yml }] } }\ninputs: { MODE: { sensitive: false } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        let files = render(&env).expect("renders");
+        let tasks = files
+            .iter()
+            .find(|f| f.path.ends_with("roles/isoloom_machine_a/tasks/main.yml"))
+            .expect("a's role");
+        let tasks: serde_yaml_ng::Value = serde_yaml_ng::from_str(&tasks.contents).expect("the tasks read");
+        let steps: Vec<&serde_yaml_ng::Value> = tasks
+            .as_sequence()
+            .expect("a list of tasks")
+            .iter()
+            .filter(|t| t.get("ansible.builtin.script").is_some() || t.get("ansible.builtin.command").is_some())
+            .collect();
+        assert_eq!(steps.len(), 2, "{}", tasks_text(&files));
+        for step in steps {
+            assert_eq!(
+                step["environment"]["MODE"].as_str(),
+                Some("{{ lookup('ansible.builtin.env', 'MODE') }}"),
+                "{}",
+                tasks_text(&files)
+            );
+        }
+    }
+
+    /// Every generated file's text, for a failing assertion.
+    fn tasks_text(files: &[GeneratedFile]) -> String {
+        files.iter().map(|f| ["# ", &f.path, "\n", &f.contents].concat()).collect()
+    }
+
+    #[test]
     fn rendering_twice_gives_the_same_files() {
         let env = environment(
             "  a: { networks: { lab: 5 }, os: debian@12 }\n  b: { networks: { lab: 6 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } }, b: { ssh: { address: 10.0.0.6 } } } } }\n",

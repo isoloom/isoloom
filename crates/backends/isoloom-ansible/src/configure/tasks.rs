@@ -58,10 +58,16 @@ pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], se
         Resource::Service(s) => services::service(c, s),
         Resource::Command(cmd) => services::command(cmd, notify, &vars, seq),
         Resource::Firewall(ports) => services::firewall(ports, notify, &vars, seq),
-        Resource::Run(run) => vec![services::run(run, notify, &vars)],
+        Resource::Run(run) => vec![services::run(run, notify, &vars, inputs(c))],
         Resource::Reboot => vec![services::reboot()],
-        Resource::Playbook(p) => vec![services::playbook(p, notify, &vars)],
+        Resource::Playbook(p) => vec![services::playbook(p, notify, &vars, inputs(c))],
     })
+}
+
+/// The inputs machine `c` reads (an environment variable from an input), which its `run` and
+/// `playbook` steps get in their environment.
+fn inputs<'a>(c: &Configured<'a>) -> &'a [String] {
+    c.env().machines.get(c.machine()).map_or(&[], |m| m.inputs.as_slice())
 }
 
 /// A mode as Ansible wants it: the octal text (`"0644"`), never a bare number.
