@@ -9,12 +9,12 @@
 //! a Windows one over WinRM), so a routed network still goes out to the internet directly rather
 //! than through its gateway.
 
-use crate::hcl_builder::{Block, Expression, Module, reference, string};
+use crate::hcl_builder::{Block, Expression, Module, string};
 use isoloom_plan::Environment;
 
+use super::resources::{self as res, RouteTable};
 use crate::cloud::aws::{route_out, sealed_route_out};
 use crate::cloud::vm::gateways::{Hop, covering, routed, through, toward};
-use crate::module::{ident, resource};
 
 /// Every network in one VPC block: a /16 at most (AWS's largest).
 const LARGEST: u8 = 16;
@@ -38,12 +38,11 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
 /// The gateway's interface toward `net` (`gateways::toward`): the instance's own when it has
 /// one interface, else the network interface it has there.
 fn interface(hop: &Hop, net: &str) -> Expression {
-    let id = ident(hop.gateway);
     if hop.machine.addresses.len() == 1 {
-        return reference(&format!("aws_instance.{id}.primary_network_interface_id"));
+        return res::instance(hop.gateway).attr("primary_network_interface_id");
     }
     let on = toward(hop.machine, net).map_or(net, |(on, _)| on);
-    reference(&format!("aws_network_interface.{id}_{}.id", ident(on)))
+    res::interface(hop.gateway, on).attr("id")
 }
 
 fn route(cidr: &str, target: (&str, Expression)) -> Block {
@@ -58,8 +57,9 @@ fn route(cidr: &str, target: (&str, Expression)) -> Block {
 /// routed network through its own.
 fn table(env: &Environment, net: &str) -> Block {
     let closed = crate::seal::any(env) && crate::seal::closed(env, net);
-    let b = resource("aws_route_table", &ident(net))
-        .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
+    let b = res::route_table(RouteTable::Own(net))
+        .block()
+        .add_attribute(("vpc_id", res::vpc().attr("id")))
         .add_block(if closed { sealed_route_out() } else { route_out() });
     through(env, net)
         .iter()
