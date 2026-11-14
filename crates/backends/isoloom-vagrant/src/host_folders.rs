@@ -26,32 +26,29 @@ use isoloom_render::container::host_folders;
 use isoloom_spec::model::HostFolder;
 
 use crate::ruby::{Call, Ruby, Value};
-use crate::vms::provider::Provider;
+use crate::vms::provider::{self, Provider};
 
-/// Why `provider` can't share a folder of the computer that runs the environment into a VM, if it can't:
-/// it has no two-way shared folder Isoloom uses, or (`read_only`) it can't make one read-only.
-fn why_not(provider: Provider<'_>, read_only: bool) -> Option<String> {
-    let id = provider.id();
-    match provider {
-        Provider::HyperV => Some(format!(
-            "the `{id}` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`"
-        )),
-        Provider::VmwareEsxi => Some(format!("the `{id}` provider's VMs run on the ESXi host, not on this computer")),
-        Provider::Qemu if read_only => Some(format!(
-            "one is read-only (`read_only`), and the `{id}` provider (vagrant-qemu) mounts its VirtioFS shares read-write"
-        )),
-        _ if provider.known().is_some_and(|k| k.share.is_some()) => None,
-        _ => Some(format!("Isoloom knows no two-way shared folder of the `{id}` provider")),
+/// How `provider` shares a folder of the kind asked (`read_only`: one is read-only): its synced
+/// folder `type:` and the keyword a read-only mount takes `ro` under, or why it can't.
+fn shared_as(provider: Provider, read_only: bool) -> Result<(&'static str, &'static str), &'static str> {
+    match provider.profile().share {
+        provider::Share::Both { kind, ro_option } => Ok((kind, ro_option)),
+        provider::Share::ReadWrite { why, .. } if read_only => Err(why),
+        provider::Share::ReadWrite { kind, .. } => Ok((kind, "mount_options")),
+        provider::Share::None(why) => Err(why),
     }
 }
 
-/// The providers that share the folders (`read_only`: one is read-only), with their kind, in the
-/// order the Vagrantfile writes them.
-fn sharing(read_only: bool) -> impl Iterator<Item = (Provider<'static>, &'static str)> {
-    Provider::ALL
-        .into_iter()
-        .filter_map(|k| Some((k.provider, k.share?)))
-        .filter(move |(p, _)| why_not(*p, read_only).is_none())
+/// Why `provider` can't share a folder of the computer that runs the environment into a VM, if it can't:
+/// it has no two-way shared folder Isoloom uses, or (`read_only`) it can't make one read-only.
+fn why_not(provider: Provider, read_only: bool) -> Option<String> {
+    shared_as(provider, read_only).err().map(str::to_owned)
+}
+
+/// The providers that share the folders (`read_only`: one is read-only), with their kind and
+/// read-only keyword, in the order the Vagrantfile writes them.
+fn sharing(read_only: bool) -> impl Iterator<Item = (Provider, (&'static str, &'static str))> {
+    Provider::ALL.into_iter().filter_map(move |p| Some((p, shared_as(p, read_only).ok()?)))
 }
 
 /// One folder shared into a VM.
@@ -102,7 +99,7 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: Libvir
     }
     r.comment("This computer's folders (`host_folders`), both ways: each provider's own shared folder.");
     let read_only = shares.iter().any(|s| s.read_only);
-    for (p, kind) in sharing(read_only) {
+    for (p, how) in sharing(read_only) {
         let head = Call::new(format!("{scope}.vm.provider")).arg(Value::str(p.id()));
         let params = if matches!(p, Provider::Libvirt | Provider::Qemu) { "v, o" } else { "_, o" };
         r.block(head, params, |r| {
@@ -113,7 +110,7 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: Libvir
                 virtiofs_every_account(r);
             }
             for s in shares {
-                r.call(synced_folder(p, kind, s));
+                r.call(synced_folder(p, how, s));
             }
         });
     }
@@ -135,7 +132,7 @@ const VIRTUALBOX_GROUP_WRITES: [&str; 2] = ["dmode=0775", "fmode=0664"];
 
 /// `o.vm.synced_folder <the folder>, <guest>, type: <kind>, create: true`, read-only as the
 /// provider's mount takes it; VirtualBox's read-write one group-writable.
-fn synced_folder(p: Provider<'_>, kind: &str, s: &Share) -> Call {
+fn synced_folder(p: Provider, (kind, ro_option): (&str, &str), s: &Share) -> Call {
     let call = Call::new("o.vm.synced_folder")
         .arg(Value::raw(format!("File.expand_path({}, ROOT)", Value::str(&s.from))))
         .arg(Value::str(&s.guest))
@@ -144,8 +141,8 @@ fn synced_folder(p: Provider<'_>, kind: &str, s: &Share) -> Call {
     match (s.read_only, p) {
         (false, Provider::VirtualBox) => call.kw("mount_options", Value::array(VIRTUALBOX_GROUP_WRITES.map(Value::str))),
         (false, _) => call,
-        (true, Provider::Libvirt) => call.kw("mount_opts", Value::str("ro")),
-        (true, _) => call.kw("mount_options", Value::array([Value::str("ro")])),
+        (true, Provider::Libvirt) => call.kw(ro_option, Value::str("ro")),
+        (true, _) => call.kw(ro_option, Value::array([Value::str("ro")])),
     }
 }
 
@@ -156,7 +153,7 @@ fn refuse_elsewhere(r: &mut Ruby, scope: &str, read_only: bool) {
     let reason = |why: &str| format!("host folders (`host_folders`): {why}");
     let refused = Provider::ALL
         .into_iter()
-        .filter_map(|k| Some((Value::sym(k.provider.id()), Value::str(&reason(&why_not(k.provider, read_only)?)))));
+        .filter_map(|p| Some((Value::sym(p.id()), Value::str(&reason(&why_not(p, read_only)?)))));
     let why = Value::hash(refused);
     let shared = Value::array(sharing(read_only).map(|(p, _)| Value::sym(p.id())));
     // Any other provider: its name is Vagrant's, a symbol, never the spec's text.
@@ -174,7 +171,7 @@ fn refuse_elsewhere(r: &mut Ruby, scope: &str, read_only: bool) {
 /// if they can't: the first VM with one the provider can't share (it shares none, or none
 /// read-only).
 #[must_use]
-pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
+pub(crate) fn refusal(env: &Environment, provider: Provider) -> Option<String> {
     env.machines
         .iter()
         .filter(|(_, mp)| mp.shape == MachineShape::Vm && !mp.host_folders.is_empty())
@@ -190,7 +187,11 @@ pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<Strin
 #[must_use]
 pub fn docker_vm_refusal(env: &Environment, provider: &str) -> Option<String> {
     let name = host_folders::needing_a_local_vm(env)?;
-    Some(refused(name, &why_not(Provider::from(provider), false)?))
+    let why = match Provider::parse(provider) {
+        Some(p) => why_not(p, false)?,
+        None => format!("Isoloom knows no two-way shared folder of the `{provider}` provider"),
+    };
+    Some(refused(name, &why))
 }
 
 /// Machine `name`'s host folders refused, `why`.

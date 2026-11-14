@@ -84,7 +84,7 @@ pub(super) fn vm(m: &syntax::Machine, service: Service<'_>) -> Result<Vm, NoForm
 /// The OS and its official image, for the container forms built from the OS.
 fn official_image(m: &syntax::Machine) -> Result<(OsRef, &'static str), NoForm> {
     let os = m.os.ok_or_else(|| no_os("the container is built from the OS's image"))?;
-    let image = isoloom_spec::os::container_image(os.name()).ok_or_else(|| NoForm {
+    let image = os.os().container_image().ok_or_else(|| NoForm {
         field: "os".to_owned(),
         reason: format!("`{}` has no official container image", os.os().id()),
         fix: "run it on a VM target, or give the app its own `app.image` or `app.build`".to_owned(),

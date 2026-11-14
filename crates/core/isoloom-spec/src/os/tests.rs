@@ -1,5 +1,4 @@
 use super::*;
-use crate::model::KNOWN_OS;
 
 #[test]
 fn a_family_and_version_map_onto_the_image_tables_name() {
@@ -41,9 +40,9 @@ fn a_family_alone_is_its_pinned_default() {
 
 #[test]
 fn an_image_table_name_is_its_os_once_parsed_never_a_spelling() {
-    for name in KNOWN_OS {
+    for name in all().map(|os| os.name) {
         let os = by_name(name).unwrap_or_else(|| panic!("{name}"));
-        assert_eq!(os.name, *name);
+        assert_eq!(os.name, name);
         assert_eq!(resolve(&os.id()).ok(), Some(os), "{name} is {}", os.id());
     }
     for name in ["debian-12", "windows-server-2019", "almalinux-9", "ubuntu-24.04"] {
@@ -54,8 +53,9 @@ fn an_image_table_name_is_its_os_once_parsed_never_a_spelling() {
 
 #[test]
 fn every_version_is_an_image_table_name() {
-    let names: Vec<&str> = DISTROS.iter().flat_map(|f| f.versions.iter().map(|(_, n)| *n)).collect();
-    assert_eq!(names, KNOWN_OS, "the families cover the image table, in its order");
+    let names: Vec<&str> = all().map(|os| os.name).collect();
+    let unique: std::collections::BTreeSet<&str> = names.iter().copied().collect();
+    assert_eq!(unique.len(), names.len(), "each release has its own image-table name: {names:?}");
     for f in DISTROS {
         assert!(f.get(f.default).is_some(), "{}'s default {} is one of its versions", f.name, f.default);
     }
@@ -82,4 +82,42 @@ fn spellings_cover_every_form_once() {
     }
     assert!(all.iter().all(|s| resolve(s).is_ok()));
     assert!(!all.iter().any(|s| s == "debian-12"), "image-table names are not spellings");
+}
+
+#[test]
+fn every_linux_os_has_a_pinned_image_and_windows_none() {
+    for os in all() {
+        match os.container_image() {
+            Some(image) => assert!(image.contains("@sha256:") && image.len() > 71, "{}: {image}", os.name),
+            None => assert!(os.kind.is_windows(), "{} has no image", os.name),
+        }
+    }
+}
+
+#[test]
+fn each_os_gets_its_own_image() {
+    let name = |os| {
+        by_name(os)
+            .and_then(|o| o.container_image())
+            .and_then(|image| image.split_once('@'))
+            .map(|(name, _)| name)
+    };
+    assert_eq!(name("alpine-3.19"), Some("alpine:3.19"));
+    assert_eq!(name("kali"), Some("kalilinux/kali-rolling"));
+    assert_eq!(name("windows-11"), None);
+}
+
+#[test]
+fn the_kind_is_the_distributions_and_only_apt_releases_have_a_codename() {
+    for d in DISTROS {
+        assert_eq!(d.kind == Kind::Windows, d.installer == Installer::Windows, "{}", d.name);
+        for r in d.releases {
+            assert_eq!(r.codename.is_some(), d.installer == Installer::Apt, "{}", r.name);
+            assert_eq!(Kind::of(r.name), d.kind, "{}", r.name);
+        }
+        assert_eq!(Kind::of(d.name), d.kind, "{}", d.name);
+    }
+    assert_eq!(by_name("debian-12").and_then(|o| o.codename()), Some("bookworm"));
+    let tpm: Vec<&str> = all().filter(Os::expects_tpm).map(|o| o.name).collect();
+    assert_eq!(tpm, ["windows-11"]);
 }

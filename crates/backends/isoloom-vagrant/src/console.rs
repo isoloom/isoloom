@@ -34,23 +34,14 @@ const LOOPBACK: &str = "127.0.0.1";
 const VRDE_PORTS: &str = "3390-3489";
 
 /// Why `provider` gives a VM no graphical console Isoloom offers, when it gives none.
-pub(crate) fn none_note(provider: Provider<'_>) -> Option<&'static str> {
-    match provider {
-        Provider::HyperV => {
-            Some("Hyper-V has no VNC or remote display server of its own; a Windows machine's own Remote Desktop is the way, when the spec opens its port")
-        }
-        Provider::Parallels => Some("Isoloom sets up no graphical console on Parallels Desktop (its VNC server stays off)"),
-        Provider::Utm => Some("UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"),
-        Provider::VmwareEsxi => Some(isoloom_render::esxi::NO_CONSOLE),
-        Provider::VirtualBox | Provider::VmwareDesktop | Provider::Libvirt | Provider::Qemu | Provider::Other(_) => None,
-    }
+pub(crate) fn none_note(provider: Provider) -> Option<&'static str> {
+    provider.profile().no_console
 }
 
 /// An environment VM's consoles, one per provider of the Vagrantfile (every one that runs an
 /// environment's VMs: not UTM), in its order.
 pub(crate) fn consoles() -> Vec<Console> {
-    Provider::ALL
-        .iter()
+    Provider::profiles()
         .filter(|k| k.provider.runs_vms())
         .map(|k| {
             let only = BTreeSet::from([k.manifest]);
@@ -125,7 +116,7 @@ mod tests {
     #[test]
     fn every_provider_says_whether_a_vm_has_a_console_and_how() {
         let cs = consoles();
-        assert_eq!(cs.len(), Provider::ALL.iter().filter(|k| k.provider.runs_vms()).count());
+        assert_eq!(cs.len(), Provider::ALL.iter().filter(|p| p.runs_vms()).count());
         assert!(
             !cs.iter().any(|c| c.providers.contains(&ManifestProvider::Utm)),
             "the Vagrantfile has no UTM block"

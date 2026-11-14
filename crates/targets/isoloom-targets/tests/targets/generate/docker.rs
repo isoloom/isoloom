@@ -143,7 +143,7 @@ fn an_idle_container_is_kept_running() -> Outcome {
     let spec = lab(
         "version: 1\nname: idle\nnetworks:\n  lan: { cidr: 10.10.1.0/24 }\nmachines:\n  box:\n    os: alpine\n    networks: { lan: 10 }\n  web:\n    networks: { lan: 11 }\n    ports: { web: 80 }\n    app: { image: \"nginx:1.27-alpine\" }\n",
     )?;
-    let image = isoloom_spec::os::container_image(spec.source().machines["box"].os.unwrap().name()).unwrap();
+    let image = spec.source().machines["box"].os.unwrap().os().container_image().unwrap();
     let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
     assert!(
         compose.contains(&format!(

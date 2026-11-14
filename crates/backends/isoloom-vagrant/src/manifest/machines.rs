@@ -97,8 +97,7 @@ fn on_every_network(env: &Environment, at: impl Fn(NetworkBlock) -> Option<std::
 }
 
 fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
-    let offered: Vec<Provider> = crate::vms::provider::Provider::ALL
-        .iter()
+    let offered: Vec<Provider> = crate::vms::provider::Provider::profiles()
         .filter(|k| k.provider.runs_vms())
         .map(|k| k.manifest)
         .collect();

@@ -1591,7 +1591,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           ],
           "plugin": "vagrant-vmware-desktop",
           "elevation": "none",
-          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, libvirt and Hyper-V do)"
+          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)"
         },
         {
           "id": "hyperv",
@@ -1608,7 +1608,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           ],
           "plugin": "vagrant-parallels",
           "elevation": "none",
-          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, libvirt and Hyper-V do)"
+          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)"
         },
         {
           "id": "libvirt",
@@ -1627,7 +1627,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           ],
           "plugin": "vagrant-qemu",
           "elevation": "none",
-          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)"
+          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)"
         },
         {
           "id": "vmware_esxi",
@@ -1639,7 +1639,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "plugin": "vagrant-vmware-esxi",
           "elevation": "none",
           "remote": true,
-          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)"
+          "refusal": "machine `files01` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)"
         }
       ],
       "dotfile": "${run.state_dir}/vagrant"
