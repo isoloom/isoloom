@@ -5,7 +5,8 @@ The `proxmox` target writes a Terraform module (`.isoloom/proxmox/main.tf`, prov
 and VNet per network, a resource pool, a router VM (between the networks, by the `reach` rules,
 and out to the internet), and Proxmox firewall rules.
 
-Tier 2: real runs from macOS are recorded; Linux and Windows hosts are pending.
+The module is checked by `terraform validate`, `tflint` and `terraform test` (the provider
+mocked).
 
 ## Prerequisites
 

@@ -180,7 +180,22 @@ fn write_lock(path: &Path, name: &str, mut lock: Lock) -> Res<()> {
 
 /// Today, UTC (`2026-10-16`).
 fn today() -> Res<String> {
-    Ok(crate::tiers::civil_date(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()))
+    Ok(civil_date(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()))
+}
+
+/// The UTC day `secs` seconds after the Unix epoch, `YYYY-MM-DD` (Howard Hinnant's
+/// days-to-civil algorithm, for the proleptic Gregorian calendar).
+fn civil_date(secs: u64) -> String {
+    let days = secs / 86_400 + 719_468;
+    let era = days / 146_097;
+    let doe = days % 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + u64::from(month <= 2);
+    format!("{year:04}-{month:02}-{day:02}")
 }
 
 /// The Galaxy collections pinned: each kept at its version and checked, or pinned at Galaxy's
@@ -250,4 +265,17 @@ fn collection(kept: Option<&Collection>, name: &str, licence: &str, propose: boo
         _ => Some((false, format!("{name} {} pinned", pinned.version))),
     };
     Ok((pinned, change))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_day_is_counted_from_the_unix_epoch_in_utc() {
+        assert_eq!(civil_date(0), "1970-01-01");
+        assert_eq!(civil_date(951_782_400), "2000-02-29");
+        assert_eq!(civil_date(1_791_936_000), "2026-10-14");
+        assert_eq!(civil_date(1_791_936_000 + 86_399), "2026-10-14");
+    }
 }

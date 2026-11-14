@@ -4,18 +4,20 @@
 catalogue service's recipe, or the VM form its Dockerfile translates to), in one Vagrantfile
 that every provider reads. Every machine is a true VM: no container runs inside a helper VM.
 
-## Providers and tiers
+## Providers
 
-| Provider | Host OS | Plugin | `vagrant` tier |
-|---|---|---|---|
-| VirtualBox | Linux, macOS, Windows | none | 2 (real runs from macOS) |
-| libvirt | Linux | `vagrant-libvirt` | **1** (Linux) |
-| Hyper-V | Windows | none | **1** (Windows) |
-| VMware Desktop (Workstation, Fusion) | Linux, macOS, Windows | `vagrant-vmware-desktop` and the VMware Utility | 2 |
-| Parallels | macOS | `vagrant-parallels` | 2 |
-| QEMU | Linux, macOS | `vagrant-qemu` | 2 |
-| UTM | macOS (Apple silicon) | `vagrant_utm` 0.2.0 or later, UTM 4.6.5 or later from GitHub or Homebrew | 2 |
-| Remote ESXi | any | `vagrant-vmware-esxi` | 2 (real runs from macOS) |
+The Vagrantfile is checked by `vagrant validate`. Each provider runs where its hypervisor does:
+
+| Provider | Host OS | Plugin |
+|---|---|---|
+| VirtualBox | Linux, macOS, Windows | none |
+| libvirt | Linux | `vagrant-libvirt` |
+| Hyper-V | Windows | none |
+| VMware Desktop (Workstation, Fusion) | Linux, macOS, Windows | `vagrant-vmware-desktop` and the VMware Utility |
+| Parallels | macOS | `vagrant-parallels` |
+| QEMU | Linux, macOS | `vagrant-qemu` |
+| UTM | macOS (Apple silicon) | `vagrant_utm` 0.2.0 or later, UTM 4.6.5 or later from GitHub or Homebrew |
+| Remote ESXi | any | `vagrant-vmware-esxi` |
 
 On UTM, `vagrant_utm` makes no adapter for a private network and sets no address in the guest,
 so the Vagrantfile does both. Each network is an isolated vmnet network: QEMU's `vmnet-host`

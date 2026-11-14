@@ -25,17 +25,17 @@ use serde_yaml_ng::Value;
 
 use crate::Result;
 use crate::decision::{Code, Column, Decision, Refused, columns, decide};
-use crate::tiers::{TierEntry, tiers};
+use crate::validators::{self, Validated};
 use probe::{Probe, Probes, Uses, merge, with_hosts};
 
-/// The matrix: its columns, the tiers of the targets they are, and its rows.
+/// The matrix: its columns, the validators of the targets they are, and its rows.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Matrix {
     /// The columns, in the order targets are listed.
     pub(crate) columns: Vec<Column>,
-    /// Every tier entry (a target, or one of its providers or clouds).
-    pub tiers: Vec<TierEntry>,
+    /// What each target writes and the validators that check it.
+    pub validators: Vec<Validated>,
     /// The rows.
     pub(crate) rows: Vec<Row>,
 }
@@ -112,8 +112,7 @@ impl Row {
 ///
 /// # Errors
 ///
-/// [`crate::Error::Probe`] when a row of `probes.yml` names what doesn't exist, [`crate::Error::Tiers`] or
-/// [`crate::Error::TiersJson`] when the tier list can't be read (tests keep both readable),
+/// [`crate::Error::Probe`] when a row of `probes.yml` names what doesn't exist,
 /// [`crate::Error::Generate`] when a row's lab doesn't plan for a column's target (a failure of
 /// lowering, never a cell shown as supported).
 pub fn matrix() -> Result<Matrix> {
@@ -122,7 +121,7 @@ pub fn matrix() -> Result<Matrix> {
     let rows = probes.rows.iter().map(|p| row(&probes, p, &columns)).collect::<Result<_>>()?;
     Ok(Matrix {
         columns,
-        tiers: tiers()?,
+        validators: validators::all(),
         rows,
     })
 }
@@ -203,22 +202,7 @@ impl Matrix {
         self.columns.iter().position(|c| c == column).and_then(|i| row.cells.get(i))
     }
 
-    /// The tiers of `column`: its entry's, or every entry's of its target when it stands for
-    /// them all (`cloud-docker`), each tier once, lowest first.
-    #[must_use]
-    pub(crate) fn column_tiers(&self, column: &Column) -> Vec<crate::tiers::Tier> {
-        let mut found: Vec<_> = self
-            .tiers
-            .iter()
-            .filter(|e| e.target == column.target && (column.variant.is_none() || e.variant == column.variant))
-            .map(TierEntry::tier)
-            .collect();
-        found.sort();
-        found.dedup();
-        found
-    }
-
-    /// The matrix as text, for a terminal: the tiers, then each row with the columns that
+    /// The matrix as text, for a terminal: the validators, then each row with the columns that
     /// generate it, those that refuse it and why, and those it means nothing to.
     #[must_use]
     pub fn text(&self) -> String {

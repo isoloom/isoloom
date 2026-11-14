@@ -41,9 +41,9 @@ How-tos:
 
 - [Spec reference](spec.md): every field of `isoloom.yml` (generated from the schema)
 - [Command line](reference/cli.md): every command and flag (generated from the CLI)
-- [Target matrix](matrix.md): what each target does with each spec field, and each target's tier
-  with its evidence (generated)
-- [Targets, providers and tiers](reference/targets.md)
+- [Target matrix](matrix.md): what each target does with each spec field, and the validators
+  that check each target's files (generated)
+- [Targets and providers](reference/targets.md)
 - [Configuration](reference/configuration.md): defaults, `ISOLOOM_*` variables, profiles, the
   image table
 - [Tool versions](reference/tool-versions.md): the tools each target needs, and the Terraform

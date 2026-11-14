@@ -24,7 +24,7 @@ stable spec format.
   schema's `boxes.utm`), else UTM refuses the spec saying so. UTM refuses data disks, bridged
   networks, a TPM and a machine's own boot, stops `vagrant up` on nested virtualization, and
   offers no console (SPICE). `vagrant/utm` is a matrix
-  column again (tier 2, goal 1 on macOS). Breaking for the Rust API: `ProviderBoxes` and
+  column again. Breaking for the Rust API: `ProviderBoxes` and
   `VmImage` have a new public field, `utm`.
 
 - **A machine built from a Dockerfile has a true VM form (#295).** On a target that runs VMs, a
@@ -60,6 +60,11 @@ stable spec format.
 
 ### Changed
 
+- **Targets are presented by what they write and the validators that check it**, not by tiers of
+  real runs: `isoloom targets` ends with each generated target's validators, and `isoloom matrix`
+  and `docs/matrix.md` have a validators table (target, what it writes, validated by) in place of
+  the tiers; the matrix's column headers carry no tier. The validators are the ones `cargo xtask
+  verify` runs, with `terraform test` from `cargo xtask tf-test`.
 - **Two copies of one environment never share a VM, network or libvirt domain name, numbered or
   not (#285).** **Breaking:** every name a Vagrantfile gives on the host carries the copy's key
   after the environment's name: `<env>-<key> - <machine>` (VirtualBox, VMware Desktop,
@@ -92,6 +97,13 @@ stable spec format.
 
 ### Removed
 
+- **The tier list.** `tiers.json`, `cargo xtask tiers record` and `isoloom_targets::tiers` (`Tier`,
+  `TierEntry`, `Run`, `RunResult`, `HostOs`, `Date`) are gone, with every run-evidence claim.
+  Breaking for the Rust API: `tiers::variants` is `isoloom_targets::validators::variants`, and
+  `isoloom_targets::validators` (`Validated`, `of`, `all`) says what each target writes and its
+  validators; `Matrix::tiers` is `Matrix::validators`. Breaking for `--json`: `isoloom targets
+  --json` gives each target's `writes` and `validators` in place of `tiers`, and `isoloom matrix
+  --json` a `validators` list in place of `tiers`, its columns without tiers.
 - **The `docker-vm` and `hybrid` targets.** Every machine now runs in its true form: a container on
   the container targets, a VM on the VM targets (a container machine taking the VM form its
   Dockerfile or its OS gives it). A lab that used `docker-vm` runs on `docker` (its containers) or
@@ -106,8 +118,7 @@ stable spec format.
   `ready_line`, `check_line`). Breaking for the Rust API: `Backend::run_manifest`,
   `Backend::run_manifests` and `Placed` are gone, with `isoloom_render::run_manifest`;
   `isoloom_compose::guest` is replaced by `isoloom_compose::vm_start` (`VmStart { start, values }`);
-  `isoloom_terraform::cloud_docker_manifests` is gone; `isoloom_targets::tiers::HostOs` is
-  isoloom-targets' own type. `cloud-services` writes its fixed variables only
+  `isoloom_terraform::cloud_docker_manifests` is gone. `cloud-services` writes its fixed variables only
   (`terraform.tfvars.json`): its launch inputs are given as `TF_VAR_<name>`, and no generated file
   acts on `cloud.before`, `cloud.env`, `cloud.apply_retries` or `cloud.requires`. The capability
   matrix loses its graphical consoles section, which the run manifests fed.

@@ -38,7 +38,7 @@ Supporting the backbone:
 - **`isoloom-import`** — the reverse direction: a spec drafted from Compose, Vagrant or Terraform
   files.
 - **`isoloom-targets`** — every backend behind one call, the composite targets, refusals, the
-  resolved snapshot, the capability matrix and the tiers.
+  resolved snapshot, the capability matrix and each target's validators.
 - **`isoloom`** — the command line.
 - **`isoloom-topology`** — a front-end: a network drawn in a topology editor (machines, LANs,
   cables) compiled into a spec and the project files it refers to.
@@ -95,8 +95,9 @@ path; an operation that fails its own way has an enum of its own beside it (`iso
 ## Honest proof
 
 Every generated file passes its format's official validator (`cargo xtask verify`, a pinned
-container image). Each target sits in a [tier](docs/matrix.md) worked out from recorded real runs,
-never written by hand. The capability matrix (`isoloom matrix`) is generated from the generators
+container image), and the Terraform modules' logic passes `terraform test` with every provider
+mocked (`cargo xtask tf-test`); each target is presented by what it writes and those validators
+([the matrix](docs/matrix.md)). The capability matrix (`isoloom matrix`) is generated from the generators
 themselves, so it can never claim more than they do.
 
 ## Converting, not running

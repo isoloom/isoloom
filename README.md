@@ -90,7 +90,7 @@ git clone --depth 1 --branch "v$version" https://github.com/isoloom/isoloom.git 
 cp -R isoloom-src/examples/hello-stack . && cd hello-stack
 
 isoloom validate                    # ✓ hello-stack is valid
-isoloom targets                     # where it can run, and each target's tier
+isoloom targets                     # where it can run, and each target's validators
 isoloom generate --target docker    # writes .isoloom/docker/compose.yml
 
 docker compose -f .isoloom/docker/compose.yml up -d --build --wait
@@ -133,23 +133,23 @@ checks:                                        # plus the checks Isoloom derives
 
 `isoloom targets` lists the targets a spec can be generated for, and why the others are refused
 (a Windows machine has no container form, so that environment never gets a broken Compose file).
-Each target sits in a **tier** that states how far it has been proven, worked out from recorded
-real runs: **Tier 1**, a full real run (up, checks, down) from every host OS it exists on;
-**Tier 2**, every generated file passes its format's official validator. The
-[target matrix](docs/matrix.md) (`isoloom matrix`) has the evidence.
+Isoloom is a converter: each target is the files it writes, and every one of those files is
+checked by its format's official validators on every example (`cargo xtask verify`, and
+`cargo xtask tf-test` for `terraform test`). The [target matrix](docs/matrix.md)
+(`isoloom matrix`) lists them with what each target does with each spec field.
 
-| Target | Converts the spec into | Tier | Guide |
+| Target | Converts the spec into | Validated by | Guide |
 |---|---|---|---|
-| `docker` | A Compose project for your Docker | **1** (Linux, macOS, Windows) | [Docker](docs/guide/targets/docker.md) |
-| `hosted` | The same Compose file, for a hosting service | 2 | [Docker](docs/guide/targets/docker.md) |
-| `kubernetes` | Manifests with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart | 2 | [Kubernetes](docs/guide/targets/kubernetes.md) |
-| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU, remote ESXi | **1** on libvirt (Linux) and Hyper-V (Windows); 2 on the others | [Vagrant](docs/guide/targets/vagrant.md) |
-| `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | 2 | [Proxmox](docs/guide/targets/proxmox.md) |
-| `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | 2 | [ESXi](docs/guide/targets/esxi.md) |
-| `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | 2 | [Clouds](docs/guide/targets/cloud.md) |
-| `cloud-docker` | A Terraform module per cloud: the containers on one cloud VM | 2 | [Clouds](docs/guide/targets/cloud.md) |
-| `cloud-services` | Your own Terraform module, applied into your AWS, Azure or Google Cloud account | 2 | [Clouds](docs/guide/targets/cloud.md) |
-| `external` | Hosts that already exist, set up and checked over SSH with Ansible | 2 | [Existing hosts](docs/guide/targets/external.md) |
+| `docker` | A Compose project for your Docker | `docker compose config` | [Docker](docs/guide/targets/docker.md) |
+| `hosted` | The same Compose file, for a hosting service | `docker compose config` | [Docker](docs/guide/targets/docker.md) |
+| `kubernetes` | Manifests with NetworkPolicies for `reach`, a Kustomize overlay and a Helm chart | `kubeconform`, `helm lint` | [Kubernetes](docs/guide/targets/kubernetes.md) |
+| `vagrant` | One local VM per machine: VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU, UTM, remote ESXi | `vagrant validate` | [Vagrant](docs/guide/targets/vagrant.md) |
+| `proxmox` | A Terraform module: one VM per machine on Proxmox VE, with its SDN, router and firewall | `terraform validate`, `tflint`, `terraform test` | [Proxmox](docs/guide/targets/proxmox.md) |
+| `esxi` | A Terraform module: one VM per machine on a standalone ESXi host | `terraform validate`, `tflint`, `terraform test` | [ESXi](docs/guide/targets/esxi.md) |
+| `cloud-vm` | A Terraform module per cloud: one VM per machine on AWS, Azure, Google Cloud, DigitalOcean, Linode or Oracle Cloud | `terraform validate`, `tflint`, `terraform test` | [Clouds](docs/guide/targets/cloud.md) |
+| `cloud-docker` | The Compose file and a Terraform module per cloud: the containers on one cloud VM | `docker compose config`, `terraform validate`, `tflint`, `terraform test` | [Clouds](docs/guide/targets/cloud.md) |
+| `cloud-services` | The fixed variables of your own Terraform module, applied into your AWS, Azure or Google Cloud account | `terraform validate`, `terraform test` | [Clouds](docs/guide/targets/cloud.md) |
+| `external` | Hosts that already exist, set up and checked over SSH with Ansible | `ansible-lint` | [Existing hosts](docs/guide/targets/external.md) |
 
 The cloud targets' default regions are all in Europe; [change them](docs/guide/targets/cloud.md#regions)
 in your defaults.
@@ -235,7 +235,7 @@ The crates are on [crates.io](https://crates.io/crates/isoloom), all at one vers
 
 ```toml
 isoloom-spec = "2"       # parse, load and validate a spec; the spec model
-isoloom-targets = "2"    # generate every target's files, refusals, the resolved snapshot, tiers
+isoloom-targets = "2"    # generate every target's files, refusals, the resolved snapshot, validators
 ```
 
 Those two are the supported API. `isoloom-catalogue`, `isoloom-plan`, `isoloom-render`, the

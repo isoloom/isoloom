@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use isoloom_spec::contract::OUTPUT_DIR;
 
 use super::*;
-use crate::tiers::Tier;
 
 /// The matrix, worked out once per test.
 fn built() -> Matrix {
@@ -101,14 +100,6 @@ fn each_row_is_named_once() {
 }
 
 #[test]
-fn a_column_carries_its_entries_tiers() {
-    let m = built();
-    let column = |id: &str| m.columns.iter().find(|c| c.id() == id).copied().unwrap();
-    assert_eq!(m.column_tiers(&column("vagrant/libvirt")), [Tier::One]);
-    assert_eq!(m.column_tiers(&column("cloud-docker")), [Tier::Two]);
-}
-
-#[test]
 fn the_text_the_markdown_and_the_json_hold_every_row_and_column() {
     let m = built();
     let text = m.text();
@@ -122,7 +113,7 @@ fn the_text_the_markdown_and_the_json_hold_every_row_and_column() {
     assert_eq!(rows.len(), m.rows.len());
     assert!(rows.iter().all(|r| r["cells"].as_object().unwrap().len() == m.columns.len()));
     assert_eq!(json["columns"].as_array().unwrap().len(), m.columns.len());
-    assert_eq!(json["tiers"].as_array().unwrap().len(), m.tiers.len());
+    assert_eq!(json["validators"].as_array().unwrap().len(), m.validators.len());
     let grid = md
         .lines()
         .filter(|l| l.starts_with("| `") && l.contains(" | ✓") || l.contains(" | ✗") || l.contains(" | –"))
@@ -221,7 +212,7 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
     assert_eq!(by_the_module, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
 }
 
-/// A column that generates nothing has no place in the matrix nor a tier: a provider or cloud
+/// A column that generates nothing has no place in the matrix: a provider or cloud
 /// every row refuses isn't a way to run an environment.
 #[test]
 fn every_column_generates_some_row() {
@@ -230,9 +221,9 @@ fn every_column_generates_some_row() {
         let generated = m.rows.iter().filter(|row| row.cells[i] == Cell::Supported).count();
         assert!(generated > 0, "{}: no row is generated there, yet it is a column", column.id());
     }
-    let tiers = crate::tiers::tiers().unwrap();
-    for entry in tiers.iter().filter(|e| e.target == Target::Vagrant) {
-        assert!(m.columns.iter().any(|c| c.id() == entry.id()), "{}: a tier entry with no column", entry.id());
+    for provider in crate::validators::variants(Target::Vagrant) {
+        let id = format!("vagrant/{provider}");
+        assert!(m.columns.iter().any(|c| c.id() == id), "{id}: a provider with no column");
     }
 }
 

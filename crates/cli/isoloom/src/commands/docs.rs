@@ -1,6 +1,6 @@
 //! `isoloom docs`: the reference pages generated from the code, for the repository's `docs/`
 //! folder. `--spec` prints `docs/spec.md`, every field of the spec from its JSON schema;
-//! `--matrix` prints `docs/matrix.md`, what each target does with each field, and the tiers;
+//! `--matrix` prints `docs/matrix.md`, what each target does with each field, and the validators of each target's files;
 //! `--cli` prints `docs/reference/cli.md`, every command and its arguments.
 
 use super::{Console, Result, Verdict};
@@ -13,7 +13,7 @@ pub(crate) struct Args {
     #[arg(long)]
     spec: bool,
     /// The capability matrix (docs/matrix.md): what each target does with each spec field, and
-    /// each target's tier with its evidence.
+    /// the validators of each target's files.
     #[arg(long)]
     matrix: bool,
     /// The command-line reference (docs/reference/cli.md): every command and its arguments.

@@ -1,7 +1,7 @@
-# Targets, providers and tiers
+# Targets and providers
 
 A **target** is one tool Isoloom converts the spec into. The authoritative, always-current grid
-of what each target does with each spec field — and each target's tier with its evidence — is the
+of what each target does with each spec field — and the validators of each target's files — is the
 [target matrix](../matrix.md), generated from the generators themselves (`isoloom matrix`). This page
 is the prose around it.
 
@@ -29,7 +29,7 @@ machine with a Windows OS, a `reboot` or `playbook` step, or VM-only hardware (`
 never gets a broken Compose file. A `targets:` list in the spec can only narrow the derived set.
 
 `isoloom targets` prints the targets a spec can be generated for, the reason each other target is
-refused (naming the field at fault), and the tier of each generated target.
+refused (naming the field at fault), and the validators of each generated target.
 
 ## Providers and clouds
 
@@ -46,47 +46,33 @@ Two targets fan out:
 The Vagrantfile is one file for every provider, chosen at `vagrant up --provider`; the cloud
 targets write one module per cloud (`.isoloom/cloud-vm/<cloud>/main.tf`).
 
-## Tiers: how far a target is proven
+## Validators
 
-Each target sits in a tier that states how far it has been proven. Tiers are worked out from
-recorded real runs, never written by hand, and the [matrix](../matrix.md) shows each with its
-evidence.
+Isoloom is a converter: a target is the files it writes. Every one of them is checked by its
+format's official validators on every example, inside a pinned toolchain image (`cargo xtask
+verify`); the Terraform modules' logic is also checked by `terraform test`, every provider
+mocked and every run a plan (`cargo xtask tf-test`).
 
-- **Tier 1** — proven by a full real run (up, checks, down) from every host OS the target exists
-  on.
-- **Tier 2** — generated and validated: every generated file passes its format's official
-  validator (`cargo xtask verify`), with no full real run recorded from every host.
-- **Tier 3** — experimental.
+| Target | Writes | Validated by |
+|---|---|---|
+| `docker` | a Compose file (`compose.yml`) and the files it mounts | `docker compose config` |
+| `hosted` | the `docker` target's Compose file, for a hosting service | `docker compose config` |
+| `cloud-docker` | the `docker` target's Compose file, and a Terraform module per cloud for its Docker host | `docker compose config`, `terraform validate`, `tflint`, `terraform test` |
+| `kubernetes` | Kubernetes manifests with a Kustomize overlay, and a Helm chart | `kubeconform`, `helm lint` |
+| `vagrant` | a Vagrantfile, every provider's block in it | `vagrant validate` |
+| `proxmox` | a Terraform module for Proxmox VE | `terraform validate`, `tflint`, `terraform test` |
+| `esxi` | a Terraform module for a standalone ESXi host | `terraform validate`, `tflint`, `terraform test` |
+| `cloud-vm` | a Terraform module per cloud | `terraform validate`, `tflint`, `terraform test` |
+| `external` | an Ansible inventory and playbook for hosts that exist | `ansible-lint` |
+| `cloud-services` | the fixed variables (`terraform.tfvars.json`) of the environment's own Terraform module | `terraform validate`, `terraform test` |
 
-A later failing run takes a target's Tier 1 back; a target aiming for Tier 1 lists the host OSes
-still pending.
-
-### Tier 1 today
-
-| Target | Proven from |
-|---|---|
-| `docker` | Linux, macOS, Windows |
-| `vagrant` on Hyper-V | Windows |
-| `vagrant` on libvirt | Linux |
-
-Every other target, provider and cloud is Tier 2: its files pass their official validators, and
-some have real runs from one host OS (`proxmox`, `vagrant` on VirtualBox and remote ESXi, and
-`cloud-vm`, `cloud-docker` and `cloud-services` on AWS, from macOS). No target is Tier 3. `isoloom targets` shows the tiers of a spec's targets, and
-`isoloom matrix` all of them, with their evidence.
-
-### What is proven
-
-`isoloom matrix` (and the [target matrix](../matrix.md) generated from it) lists each target's tier
-with its evidence: the real runs recorded, from which host OS and when, and the host OSes a target
-aiming for Tier 1 still needs.
-
-Recording a real run (`cargo xtask tiers record`) updates `tiers.json` and regenerates the
-matrix, so the published tiers always reflect the evidence.
+`isoloom targets` shows the validators of a spec's targets, and `isoloom matrix` (and the
+[target matrix](../matrix.md) generated from it) all of them.
 
 ## See also
 
 - [Spec reference](../spec.md) — the fields each target reads.
-- [The target matrix](../matrix.md) — the generated grid and the full tier table.
+- [The target matrix](../matrix.md) — the generated grid and the validators table.
 - The guide of each target: [Docker](../guide/targets/docker.md),
   [Kubernetes](../guide/targets/kubernetes.md), [Vagrant](../guide/targets/vagrant.md),
   [Proxmox](../guide/targets/proxmox.md), [ESXi](../guide/targets/esxi.md),

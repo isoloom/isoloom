@@ -14,7 +14,7 @@ use isoloom_terraform::{Cloud, CloudVmModule};
 use crate::GenerateError;
 use crate::generation::planned;
 use crate::registry::backend;
-use crate::tiers::VAGRANT_PROVIDERS;
+use crate::validators::VAGRANT_PROVIDERS;
 
 /// A target, or one of its Vagrant providers or clouds where each decides on its own: a column
 /// of the capability matrix.
@@ -30,7 +30,7 @@ impl Column {
     /// Its name: the target's id, then `/` and the provider or cloud (`vagrant/libvirt`).
     #[must_use]
     pub(crate) fn id(&self) -> String {
-        crate::tiers::name(self.target, self.variant)
+        crate::validators::name(self.target, self.variant)
     }
 }
 

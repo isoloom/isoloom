@@ -48,9 +48,8 @@ isoloom targets
 ```
 
 It lists the targets this spec can be generated for (`docker`, `kubernetes`, `vagrant`,
-`proxmox`, the clouds...), why the others can't take it, and each target's
-[tier](../reference/targets.md#tiers-how-far-a-target-is-proven): how far it has been proven by
-real runs.
+`proxmox`, the clouds...), why the others can't take it, and the
+[validators](../reference/targets.md#validators) that check each target's files.
 
 ## 4. Generate the Compose files
 

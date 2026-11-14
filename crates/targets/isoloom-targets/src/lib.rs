@@ -4,7 +4,7 @@
 //! ([`generate`]), why a target refuses it ([`refusal()`], on one Vagrant provider or cloud
 //! [`refusal_on`], every cloud's at once [`cloud_refusals`] as [`CloudRefusal`]s), the resolved
 //! snapshot ([`resolved`]), the tables and diagram drawn from it ([`report`], [`graph`]), the
-//! tiers ([`tiers`]) and the capability matrix ([`matrix`]). It holds no backend's logic: each backend renders its own files.
+//! validators of each target's files ([`validators`]) and the capability matrix ([`matrix`]). It holds no backend's logic: each backend renders its own files.
 //!
 //! Every function is pure (the project's own files the output copies are read only by
 //! [`project_copies`]), so `isoloom check` can regenerate in memory and compare. Output lives
@@ -42,7 +42,7 @@ mod refusal;
 mod registry;
 pub mod report;
 pub mod resolved;
-pub mod tiers;
+pub mod validators;
 
 pub use error::{Error, GenerateError, Result};
 pub use generation::{default_regions, generate, generate_all, generate_instance, project_copies};

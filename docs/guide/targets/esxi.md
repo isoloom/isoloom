@@ -5,7 +5,8 @@ The `esxi` target writes a Terraform module (`.isoloom/esxi/main.tf`, provider
 with a vSwitch and port groups for the networks and a router VM, then sets each machine up over
 SSH through the router.
 
-Tier 2, with a partial real run from macOS. Run the module with Terraform (`terraform apply`
+The module is checked by `terraform validate`, `tflint` and `terraform test` (the provider
+mocked). Run the module with Terraform (`terraform apply`
 waits for every machine's set-up and seals the `internet: false` networks), or with a runner.
 (VMs on a remote ESXi host through Vagrant are the `vagrant` target's `vmware_esxi` provider:
 [Vagrant](vagrant.md).)

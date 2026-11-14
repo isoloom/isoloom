@@ -8,8 +8,9 @@
 - **`cloud-services`**: your own Terraform module (the spec's `cloud:`), applied into your account
   on AWS, Azure or Google Cloud, with the spec's checks. `.isoloom/cloud-services/`.
 
-Every cloud target is Tier 2: CI runs `terraform validate` on every example's modules, and AWS
-has real runs from macOS. `isoloom targets` says which clouds can
+Each cloud's module is checked by `terraform validate`, `tflint` and `terraform test` (every
+provider mocked); `cloud-docker`'s Compose file by `docker compose config` too, and
+`cloud-services`' own module by `terraform validate` and `terraform test`. `isoloom targets` says which clouds can
 take an environment and why the others can't (DigitalOcean takes one machine on one network for
 `cloud-vm`; Windows runs on AWS and Azure only).
 
