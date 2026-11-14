@@ -898,7 +898,9 @@ fn clones_publishing_a_free_host_port_are_generated_where_the_format_picks_one()
     let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
     for clone in ["web-01", "web-02"] {
         let ports = compose["services"][clone]["ports"].as_sequence().cloned().unwrap_or_default();
-        let [port] = &ports[..] else { panic!("{clone}: one published port: {ports:?}") };
+        let [port] = &ports[..] else {
+            panic!("{clone}: one published port: {ports:?}")
+        };
         let port = port.as_str().unwrap_or_default();
         assert!(port.ends_with(":${ISOLOOM_PUBLISH_FIXED:+80}:80"), "{clone}: {port}");
     }
