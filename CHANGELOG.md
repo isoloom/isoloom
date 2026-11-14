@@ -71,6 +71,8 @@ stable spec format.
 
 ### Fixed
 
+- **An external machine's run and playbook steps get its inputs (#316),** through the task's
+  `environment` read from where Ansible runs (`lookup('ansible.builtin.env')`).
 - **An external machine's `files[].secret` and `files[].input` are refused (#317),** as on Proxmox
   and ESXi: nothing delivered them there, though the backend said a runner would.
 - **Two `isoloom generate` runs in one project at once no longer fail each other (#297):** each
