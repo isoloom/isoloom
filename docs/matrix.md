@@ -55,14 +55,14 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.command` | its own command | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.healthcheck` | when it counts as healthy, beyond its ports answering | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.setup` | project scripts run once the machine is up | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.environment` | environment variables | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.environment` | environment variables | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.environment.*.input` | an environment variable from a non-sensitive input | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.depends_on` | a machine waiting for another | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `machines.*.depends_on` | a VM waiting for a container (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
 | `machines.*.resources` | CPUs and memory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.privileged` | kernel-level access | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.dns` | its own resolver settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines` | several machines | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `machines.*.count` | clones of one machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
@@ -138,6 +138,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.os = ubuntu@24.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `machines.*.os = rocky@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = alma@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = alpine@3.7` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = alpine@3.19` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = alpine@3.24` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 | `machines.*.os = kali@rolling` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
@@ -209,13 +210,22 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 
 - `external`: capability `machine-process`: machine `m` sets its own process (`command` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it
 
+### `machines.*.environment`
+
+- `external`: capability `existing-host-settings`: machine `m` sets `environment`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)
+
 ### `machines.*.depends_on`
 
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
 
+### `machines.*.sysctls`
+
+- `external`: capability `existing-host-settings`: machine `m` sets `sysctls`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)
+
 ### `machines.*.ulimits`
 
 - `kubernetes`: capability `ulimits`: machine `m` sets `ulimits`: Kubernetes has no per-container process limits
+- `external`: capability `existing-host-settings`: machine `m` sets `ulimits`: Isoloom doesn't set up a host that already exists, so set them with the lab's own provisioning (a `provision:` playbook, or an Ansible step)
 
 ### `machines`
 
@@ -270,10 +280,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 ### `machines.*.hardware.tpm = required`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: only a VM gives it: a container has no kernel or firmware of its own
-- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)
+- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/digitalocean`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none
 - `cloud-vm/linode`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Linode gives none
@@ -281,10 +291,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 ### `machines.*.hardware.tpm = required`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
-- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, libvirt and Hyper-V do)
-- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, libvirt and Hyper-V do)
+- `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/aws`: cloud: machine `m`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which Isoloom doesn't use
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
@@ -598,6 +608,17 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 - `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `almalinux-9` (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `almalinux-9` (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/oci`: cloud: machine `m`: no Oracle Cloud image for `almalinux-9` (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)
+
+### `machines.*.os = alpine@3.7`
+
+- `proxmox`: target: machine `m`: no Proxmox image for `alpine-3.7` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
+- `esxi`: target: machine `m`: no ESXi image for `alpine-3.7` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
+- `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.7` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
+- `cloud-vm/azure`: cloud: machine `m`: no Azure image for `alpine-3.7` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
+- `cloud-vm/gcp`: cloud: machine `m`: no Google Cloud image for `alpine-3.7` (Debian 12/13, Ubuntu 22.04/24.04)
+- `cloud-vm/digitalocean`: cloud: machine `m`: no DigitalOcean image for `alpine-3.7` (Debian 12/13, Ubuntu 22.04/24.04)
+- `cloud-vm/linode`: cloud: machine `m`: no Linode image for `alpine-3.7` (Debian 12/13, Ubuntu 22.04/24.04)
+- `cloud-vm/oci`: cloud: machine `m`: no Oracle Cloud image for `alpine-3.7` (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)
 
 ### `machines.*.os = alpine@3.19`
 
