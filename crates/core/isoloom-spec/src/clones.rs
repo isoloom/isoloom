@@ -105,7 +105,29 @@ fn count_of(base: &str, m: &Mapping) -> Result<Option<u8>, Problem> {
     if matches!(m.get(key("access")), Some(Value::Bool(true))) {
         return Err(refused("the access machine is one machine; leave `count` out".to_owned()));
     }
+    if let Some((net, first)) = past_last_octet(m, count) {
+        return Err(refused(format!(
+            "{count} clones from .{first} on `{net}` go past the last octet (.{})",
+            u8::MAX
+        )));
+    }
     Ok(Some(count))
+}
+
+/// The first network and address of `m` its `count` clones would shift past an octet's last
+/// value: clone `i` takes the address `i - 1` further along ([`clone_of`]).
+fn past_last_octet(m: &Mapping, count: u8) -> Option<(String, u64)> {
+    let Some(Value::Mapping(nets)) = m.get(key("networks")) else { return None };
+    let last_shift = u64::from(count) - 1;
+    nets.iter().find_map(|(net, octets)| {
+        let one = std::slice::from_ref(octets);
+        let list = match octets {
+            Value::Sequence(list) => list.as_slice(),
+            _ => one,
+        };
+        let first = list.iter().filter_map(Value::as_u64).find(|o| o + last_shift > u64::from(u8::MAX))?;
+        Some((net.as_str().unwrap_or_default().to_owned(), first))
+    })
 }
 
 /// Clone `i` (from 1) of machine `m`: no `count`, each address `i - 1` further along.
@@ -239,6 +261,20 @@ mod tests {
         assert_eq!(doc["machines"]["ws-03"]["networks"]["lan"].as_u64(), Some(52));
         assert_eq!(doc["machines"]["ws-02"]["networks"]["mgmt"][1].as_u64(), Some(31));
         assert!(doc["machines"]["ws-01"].get("count").is_none());
+    }
+
+    #[test]
+    fn clones_shifted_past_the_last_octet_are_refused_at_their_count() {
+        // Regression: `.250` with 10 clones wrote `.259`, refused later as a type error on a
+        // generated clone's address rather than at the `count` that caused it.
+        let (_, clones) = expanded("machines:\n  ws: { count: 10, networks: { lan: 250 } }\n");
+        let problems = clones.unwrap_err();
+        assert_eq!(problems.len(), 1);
+        assert_eq!(problems[0].path.to_string(), "machines.ws.count", "{problems:?}");
+        let (_, clones) = expanded("machines:\n  ws: { count: 6, networks: { lan: [10, 250] } }\n");
+        assert!(clones.is_ok(), "the last clone takes .255 at most");
+        let (_, clones) = expanded("machines:\n  ws: { count: 7, networks: { lan: [10, 250] } }\n");
+        assert!(clones.is_err());
     }
 
     #[test]
