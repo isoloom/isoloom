@@ -110,7 +110,12 @@ machines:
     // Run the mounts against a copy of fstab and of the mount table, with `mount` recorded.
     let Some(mut posix) = crate::test_support::posix_sh() else { return };
     let dir = tempfile::tempdir().expect("a folder");
-    let (fstab, mounts, calls, root) = (dir.path().join("fstab"), dir.path().join("mounts"), dir.path().join("calls"), dir.path().join("root"));
+    let (fstab, mounts, calls, root) = (
+        dir.path().join("fstab"),
+        dir.path().join("mounts"),
+        dir.path().join("calls"),
+        dir.path().join("root"),
+    );
     std::fs::write(&fstab, "UUID=1 / ext4 defaults 0 1\ntmpfs /srv/cache tmpfs size=1m 0 0\n").expect("fstab");
     std::fs::write(&mounts, "/dev/sda1 / ext4 rw 0 0\ntmpfs /run tmpfs rw 0 0\n").expect("the mount table");
     let script = sh

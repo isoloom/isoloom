@@ -85,6 +85,9 @@ stable spec format.
 
 ### Fixed
 
+- **A Linux VM mounts its `tmpfs` entries (#322),** in fstab and at once (or remounts a path that
+  is one already), where the VM targets wrote nothing for them; a Windows machine's `tmpfs` is
+  refused at validation.
 - **A secret's source and a device of the wrong kind say what they take (#320),** where they were
   refused with "data did not match any variant of untagged enum": a source is one store
   (`{ env }`, `{ file }`, `{ vault }` or `{ sops }`), a device a path, `host:guest[:permissions]`

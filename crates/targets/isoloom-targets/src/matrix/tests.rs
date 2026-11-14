@@ -384,14 +384,6 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
 const SUSPECTED_DROPS: &[(&str, &str, &str)] = &[
     ("machines.*.dns", "vagrant", "unverified: Proxmox and ESXi write the resolver, these don't"),
     ("machines.*.dns", "cloud-vm", "unverified: Proxmox and ESXi write the resolver, these don't"),
-    ("machines.*.tmpfs", "vagrant", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs", "proxmox", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs", "esxi", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs", "cloud-vm", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs[].mode", "vagrant", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs[].mode", "proxmox", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs[].mode", "esxi", "unverified: no memory-backed mount in the VM's set-up"),
-    ("machines.*.tmpfs[].mode", "cloud-vm", "unverified: no memory-backed mount in the VM's set-up"),
     (
         "machines.*.hardware.nested_virtualization",
         "proxmox",

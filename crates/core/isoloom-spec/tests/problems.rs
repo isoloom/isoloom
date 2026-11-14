@@ -201,7 +201,11 @@ fn a_secrets_source_and_a_device_of_the_wrong_kind_say_what_they_take() {
     }
     let (_, typo) = reason(&format!("secrets: {{ db: {{ evn: DB }} }}\n{machine}"));
     assert_eq!(typo, "`evn` isn't a field here");
-    let device = |value: &str| reason(&format!("machines:\n  m: {{ app: {{ image: nginx }}, networks: {{ lab: 10 }}, hardware: {{ devices: [{value}] }} }}\n"));
+    let device = |value: &str| {
+        reason(&format!(
+            "machines:\n  m: {{ app: {{ image: nginx }}, networks: {{ lab: 10 }}, hardware: {{ devices: [{value}] }} }}\n"
+        ))
+    };
     let (path, why) = device("5");
     assert_eq!(path, "machines.m.hardware.devices[0]");
     assert!(
