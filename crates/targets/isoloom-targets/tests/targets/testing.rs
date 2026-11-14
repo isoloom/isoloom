@@ -133,3 +133,35 @@ machines:
 "
     )
 }
+
+/// The Vagrantfile `lab` generates, read into its Ruby blocks.
+pub(crate) fn vagrantfile(lab: &Lab) -> Outcome<isoloom_test_support::RubyBlock> {
+    Ok(isoloom_test_support::ruby_blocks(&generated(
+        lab,
+        Target::Vagrant,
+        ".isoloom/vagrant/Vagrantfile",
+    )?))
+}
+
+/// The VMs a Vagrantfile defines (`config.vm.define "<name>"`), in its order.
+pub(crate) fn defined(vf: &isoloom_test_support::RubyBlock) -> Vec<String> {
+    vf.find("config.vm.define \"")
+        .iter()
+        .filter_map(|b| b.head.strip_prefix("config.vm.define \"").and_then(|r| r.split('"').next()).map(str::to_owned))
+        .collect()
+}
+
+/// VM `name`'s block of a Vagrantfile (`config.vm.define "<name>"`).
+pub(crate) fn define<'v>(vf: &'v isoloom_test_support::RubyBlock, name: &str) -> &'v isoloom_test_support::RubyBlock {
+    vf.block(&format!("config.vm.define \"{name}\""))
+}
+
+/// The provisioners VM block `vm` runs, by name (`m.vm.provision "shell", name: "<name>"`), in
+/// order.
+pub(crate) fn provisioners(vm: &isoloom_test_support::RubyBlock) -> Vec<String> {
+    vm.every_statement()
+        .iter()
+        .filter(|s| s.starts_with("m.vm.provision "))
+        .filter_map(|s| s.split("name: \"").nth(1).and_then(|r| r.split('"').next()).map(str::to_owned))
+        .collect()
+}
