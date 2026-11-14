@@ -133,6 +133,11 @@ pub struct Spec {
     /// container image.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub tools: IndexMap<String, Tool>,
+    /// The services a cloud renders as its managed ones (`services:`, the platform level); those
+    /// a target runs as machines are machines here.
+    #[cfg(feature = "paas")]
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub services: IndexMap<String, crate::paas::Service>,
     /// Base machine name -> its clones, for machines that had a `count`. Filled when parsing.
     #[serde(skip)]
     #[schemars(skip)]
@@ -217,6 +222,8 @@ impl Spec {
             message: None,
             tags: IndexMap::new(),
             tools: IndexMap::new(),
+            #[cfg(feature = "paas")]
+            services: IndexMap::new(),
             clones: IndexMap::new(),
         }
     }

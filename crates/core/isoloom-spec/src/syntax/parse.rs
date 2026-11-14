@@ -88,6 +88,8 @@ const FIELDS: &[&str] = &[
     "constraints",
     "cloud",
     "tags",
+    #[cfg(feature = "paas")]
+    "services",
 ];
 
 impl Reader {
@@ -127,6 +129,8 @@ impl Reader {
         self.set(&mut top, "tools", &mut spec.tools);
         self.set(&mut top, "targets", &mut spec.targets);
         self.set(&mut top, "constraints", &mut spec.constraints);
+        #[cfg(feature = "paas")]
+        self.set(&mut top, "services", &mut spec.services);
         if top.remove("cloud").is_some() {
             self.problems.push(Problem::new(
                 Code::RemovedField,

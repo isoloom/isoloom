@@ -30,6 +30,8 @@ pub fn check(spec: &Spec) -> Problems {
     }
     overrides::check(spec, &mut out);
     messages::check(spec, &mut out);
+    #[cfg(feature = "paas")]
+    crate::paas::check(spec, &mut out);
     let mut placed: Problems = out.into_iter().map(|p| spec.spans.place(p)).collect();
     placed.sort_by_key(|p| p.span.map(|s| (s.line, s.column)));
     placed
