@@ -38,6 +38,26 @@ struct Machine {
     steps: Vec<String>,
 }
 
+/// The shell provisioner's options a step has no field for, each with what the step does instead.
+const SHELL_OPTIONS_LEFT_OUT: [(&str, &str); 4] = [
+    ("args", "a step runs its script with no arguments: write them into the script"),
+    (
+        "env",
+        "a step's script has no variables of its own: set them in the script, or use the machine's `environment`",
+    ),
+    ("privileged", "a step runs as root"),
+    ("run", "a step runs once, when the machine is set up"),
+];
+
+/// Whether a shell provisioner's option says what a step does anyway: run as root, once.
+fn is_shell_default(key: &str, v: &Value) -> bool {
+    match key {
+        "privileged" => v.as_bool() == Some(true),
+        "run" => v.as_str() == Some("once"),
+        _ => false,
+    }
+}
+
 /// The step a shell provisioner's `reboot: true` becomes.
 const REBOOT: &str = isoloom_spec::model::REBOOT_STEP;
 
@@ -437,6 +457,15 @@ impl<'a> Import<'a> {
                 .notes
                 .add(at, NoteKind::InImage, "an inline script: put it in a file and list it in `app.steps`"),
             _ => {}
+        }
+        // What the script was run with: a step runs its script as root, once, with no arguments
+        // and no variables of its own.
+        let given: Vec<String> = SHELL_OPTIONS_LEFT_OUT
+            .iter()
+            .filter_map(|(key, why)| c.opt(key).filter(|v| !is_shell_default(key, v)).map(|v| format!("`{key}: {v}` ({why})")))
+            .collect();
+        if !given.is_empty() {
+            self.notes.add(at, NoteKind::Changed, format!("left out: {}", given.join(", ")));
         }
         // `reboot: true`: Vagrant restarts the guest after the script (if any).
         if c.opt("reboot").and_then(Value::as_bool) == Some(true) {

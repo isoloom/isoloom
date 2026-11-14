@@ -78,20 +78,6 @@ fn size(instance_type: &str) -> Option<(u32, u32)> {
         .map(|&(_, cpus, memory_mb)| (cpus, memory_mb))
 }
 
-/// An OS name from what a resource says about its image.
-fn os_from(hint: &str) -> &'static str {
-    let l = hint.to_ascii_lowercase();
-    if l.contains("windows") || l.contains("2019-datacenter") || l.contains("2022-datacenter") {
-        if l.contains("2022") { "windows-server@2022" } else { "windows-server@2019" }
-    } else if l.contains("ubuntu") {
-        "ubuntu@24.04"
-    } else if l.contains("kali") {
-        "kali"
-    } else {
-        "debian@12"
-    }
-}
-
 /// An address from `10.0.1.10/24` or a bare `10.0.1.10`.
 fn address(text: &str) -> Option<Ipv4Addr> {
     text.split_once('/').map_or(text, |(ip, _)| ip).trim().parse().ok()
@@ -211,7 +197,7 @@ pub(super) fn machine(i: &Instance, all: &[Instance], notes: &mut Notes) -> Opti
             "no fixed private address (DHCP or a public one): put on a network at the next free address",
         );
     }
-    let os = os_from(&facts.os_hint);
+    let os = crate::os_name::read(&facts.os_hint);
     notes.add(at, NoteKind::Changed, format!("OS read as {os}: check it"));
     Some(Machine {
         name: label(&i.name_or(i.str(&["name"]))),
@@ -235,10 +221,13 @@ mod tests {
 
     #[test]
     fn the_os_is_read_from_the_image_it_names() {
-        assert_eq!(os_from("ami-0windows2022 windows"), "windows-server@2022");
-        assert_eq!(os_from("2019-Datacenter"), "windows-server@2019");
-        assert_eq!(os_from("ubuntu-2404-lts"), "ubuntu@24.04");
-        assert_eq!(os_from("anything"), "debian@12");
+        let read = crate::os_name::read;
+        assert_eq!(read("ami-0windows2022 windows"), "windows-server@2022");
+        assert_eq!(read("2019-Datacenter"), "windows-server@2019");
+        assert_eq!(read("ubuntu-2404-lts"), "ubuntu@24.04");
+        assert_eq!(read("ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"), "ubuntu@22.04");
+        assert_eq!(read("debian-11"), "debian@11");
+        assert_eq!(read("anything"), "debian@12");
     }
 
     #[test]

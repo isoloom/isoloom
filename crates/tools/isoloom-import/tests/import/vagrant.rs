@@ -191,3 +191,36 @@ fn a_synced_folder_is_a_host_folder() -> Outcome {
     );
     Ok(())
 }
+
+#[test]
+fn a_shell_provisioners_arguments_and_variables_are_noted_not_dropped() -> Outcome {
+    let mut json = recorded_json("recorded.json")?;
+    let calls = json
+        .pointer_mut("/children/vm/calls/1/block/children/vm/calls")
+        .and_then(serde_json::Value::as_array_mut)
+        .ok_or("the fixture's web machine has no calls")?;
+    calls.push(serde_json::json!({"name": "provision", "args": ["shell", {"path": "provision/web.sh", "args": ["a b", "c"], "env": {"MODE": "lab"}, "privileged": true}], "block": null}));
+    let d = draft(&Recording::try_from(json)?, "classic", "Vagrantfile")?;
+    let note = d
+        .notes
+        .iter()
+        .find(|n| n.at == "define web.vm.provision" && n.text.starts_with("left out:"))
+        .ok_or("no note")?;
+    assert!(
+        note.text.contains("`args: [\"a b\",\"c\"]`") && note.text.contains("`env: {\"MODE\":\"lab\"}`"),
+        "{note:?}"
+    );
+    assert!(!note.text.contains("privileged"), "running as root is what a step does: {note:?}");
+    Ok(())
+}
+
+#[test]
+fn a_box_is_read_with_its_version() -> Outcome {
+    let d = draft(&recorded("recorded.json")?, "classic", "Vagrantfile")?;
+    assert_eq!(
+        spec(&d)?.machines["web"].os.map(|o| o.to_string()).as_deref(),
+        Some("ubuntu@22.04"),
+        "ubuntu/jammy64 is 22.04"
+    );
+    Ok(())
+}

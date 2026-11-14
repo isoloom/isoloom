@@ -16,22 +16,17 @@ pub(super) struct BoxOs {
     pub(super) builtin: bool,
 }
 
-/// The OS of a box by its name.
+/// The OS of a box by its name ([`crate::os_name::read`]).
 pub(super) fn os_of(name: &str) -> BoxOs {
     let l = name.to_ascii_lowercase();
-    let (os, builtin) = match l.as_str() {
-        "bento/debian-12" | "generic/debian12" => ("debian@12", true),
-        "bento/ubuntu-24.04" => ("ubuntu@24.04", true),
-        "kalilinux/rolling" => ("kali", true),
-        "stefanscherer/windows_2019" => ("windows-server@2019", true),
-        _ if l.contains("windows") && l.contains("2022") => ("windows-server@2022", false),
-        _ if l.contains("windows") && (l.contains("11") || l.contains("win11")) => ("windows@11", false),
-        _ if l.contains("windows") || l.contains("win2019") => ("windows-server@2019", false),
-        _ if l.contains("kali") => ("kali", false),
-        _ if l.contains("ubuntu") => ("ubuntu@24.04", false),
-        _ => ("debian@12", false),
-    };
-    BoxOs { os, builtin }
+    let builtin = matches!(
+        l.as_str(),
+        "bento/debian-12" | "generic/debian12" | "bento/ubuntu-24.04" | "kalilinux/rolling" | "stefanscherer/windows_2019"
+    );
+    BoxOs {
+        os: crate::os_name::read(name),
+        builtin,
+    }
 }
 
 /// Memory like `4096`, `"4G"`, `"2048M"` in MB (a bare number is MB; gigabytes rounded down).
@@ -61,13 +56,6 @@ mod tests {
             os_of("gusztavvargadr/windows-server-2022"),
             BoxOs {
                 os: "windows-server@2022",
-                builtin: false
-            }
-        );
-        assert_eq!(
-            os_of("ubuntu/jammy64"),
-            BoxOs {
-                os: "ubuntu@24.04",
                 builtin: false
             }
         );
