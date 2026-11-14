@@ -266,7 +266,10 @@ mod tests {
         assert_eq!(linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /data/ } }"), taken("/data/"));
         assert_eq!(windows("{ a: { size_gb: 1, mount: 'E:' }, b: { size_gb: 1, mount: 'e:' } }"), taken("e:"));
         // Regression: Linux paths are case-sensitive, so two disks may mount at `/data` and `/DATA`.
-        assert!(linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /DATA } }").is_empty());
+        assert_eq!(
+            linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /DATA } }"),
+            Vec::<String>::new()
+        );
         assert_eq!(
             named(
                 "web",
