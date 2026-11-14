@@ -151,15 +151,15 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
 /// What the scripts take from the spec: `env`'s names, `apply_retries`, `requires`.
 fn scripts(c: &CloudServices, p: &mut Problems) {
     for k in c.env.keys() {
-        if !env_name(k) {
-            p.add(
-                format!("cloud.env.{k}"),
-                format!("`{k}` isn't a plain environment variable name (upper-case letters, digits, `_`, starting with a letter) or a Terraform variable (`TF_VAR_<name>`)"),
-            );
-        } else if !env_allowed(k) {
+        if !env_allowed(k) {
             p.add(
                 format!("cloud.env.{k}"),
                 format!("`{k}` changes how the tools on this computer run, or is the scripts' own: credentials and tool settings come from the user's own environment; pick a name of the module's"),
+            );
+        } else if !env_name(k) {
+            p.add(
+                format!("cloud.env.{k}"),
+                format!("`{k}` isn't a plain environment variable name (upper-case letters, digits, `_`, starting with a letter) or a Terraform variable (`TF_VAR_<name>`)"),
             );
         }
     }

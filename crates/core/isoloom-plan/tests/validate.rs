@@ -606,7 +606,10 @@ fn file_problems(yaml: &str, dir: &Path) -> Vec<String> {
 fn path_outside_the_project() {
     let dir = project("outside").unwrap();
     let found = file_problems(&with_machine("{ networks: { lab: 5 }, app: { build: ../web } }"), &dir);
-    assert_eq!(found, ["machines.m.app.build: `../web` must be a path inside the project folder"]);
+    assert_eq!(
+        found,
+        ["machines.m.app.build: `../web` must be a path inside the project folder: it goes up a folder (`..`)"]
+    );
 }
 
 #[test]

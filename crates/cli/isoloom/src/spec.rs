@@ -203,7 +203,12 @@ fn read_inside(dir: &Path, path: &str) -> std::result::Result<String, Unreadable
     use isoloom_spec::project_path::{Escape, inside};
     match inside(dir, path) {
         Ok(real) => std::fs::read_to_string(real).map_err(Unreadable::Read),
-        Err(Escape::Missing) => Err(Unreadable::Read(std::io::Error::from(std::io::ErrorKind::NotFound))),
+        // The system's own words for what isn't there, read without opening it.
+        Err(Escape::Missing) => Err(Unreadable::Read(
+            std::fs::metadata(dir.join(path))
+                .err()
+                .unwrap_or_else(|| std::io::Error::from(std::io::ErrorKind::NotFound)),
+        )),
         Err(_) => Err(Unreadable::Escapes),
     }
 }

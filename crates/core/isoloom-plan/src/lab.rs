@@ -158,7 +158,7 @@ impl Lab {
         for scope in scopes {
             let lowered = self.raw(scope);
             for mut r in host_access::of(&lowered.spec) {
-                r.at = lowered.trail.path(&r.at).as_str().to_owned();
+                lowered.trail.path(&r.at).as_str().clone_into(&mut r.at);
                 if !out.iter().any(|o| o.at == r.at && o.access == r.access) {
                     out.push(r);
                 }

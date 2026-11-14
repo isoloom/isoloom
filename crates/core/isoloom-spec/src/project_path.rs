@@ -165,7 +165,7 @@ mod tests {
             std::os::unix::fs::symlink("/nowhere/at/all", dir.join("dangling"))?;
             assert_eq!(inside(dir, "alias/file")?, dir.canonicalize()?.join("real/file"));
             assert!(matches!(inside(dir, "ctx"), Err(Escape::Outside(_))));
-            assert!(matches!(inside(dir, "ctx/hostname"), Err(Escape::Outside(_)) | Err(Escape::Missing)));
+            assert!(matches!(inside(dir, "ctx/hostname"), Err(Escape::Outside(_) | Escape::Missing)));
             assert_eq!(inside(dir, "dangling"), Err(Escape::Missing));
         }
         Ok(())

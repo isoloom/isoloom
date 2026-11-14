@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn a_per_host_argv_names_a_host() {
-        let per: HostArgv = serde_json::from_str(r#"{"windows": ["where", "az"], "default": ["which", "az"]}"#).unwrap();
+        let per: HostArgv = serde_json::from_str(r#"{"windows": ["vagrant.exe", "--version"], "default": ["vagrant", "--version"]}"#).unwrap();
         assert!(matches!(per, HostArgv::PerHost(PerHostArgv { windows: Some(_), .. })));
         assert!(serde_json::from_str::<HostArgv>("{}").unwrap_err().to_string().contains("names no host"));
         assert!(
