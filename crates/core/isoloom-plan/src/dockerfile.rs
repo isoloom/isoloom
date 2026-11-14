@@ -154,6 +154,11 @@ pub fn translate(build: &Build<'_>, sources: &Sources) -> Result<Translation, Un
         keep.clear();
     }
     out.shell(&units_after(&keep));
+    // The entry's own service runs the image's command: it reads the image's environment, which
+    // the Dockerfile may have added to (`ENV MONGO_INITDB_ROOT_USERNAME=…`), from this file.
+    if service.is_none() && image.entry.is_some() {
+        out.shell(&image_env(&image));
+    }
     if let Some((script, user)) = service {
         out.shell(&script);
         let s = match user {
@@ -215,6 +220,19 @@ impl Made {
             files: self.files,
         })
     }
+}
+
+/// Where a translated image's final environment is, for its catalogue entry's own service.
+pub const IMAGE_ENV: &str = "/etc/isoloom/image.env";
+
+/// The step writing [`IMAGE_ENV`]: the image's environment, one `KEY='value'` line each.
+fn image_env(image: &Image) -> String {
+    let lines = image.env.iter().map(|(k, v)| format!("{k}={}\n", quote(v))).collect::<Vec<_>>().concat();
+    format!(
+        "set -e\nmkdir -p {dir}\nprintf %s {b64} | base64 -d > {IMAGE_ENV}\nchmod 644 {IMAGE_ENV}",
+        dir = IMAGE_ENV.rsplit_once('/').map_or("/", |(d, _)| d),
+        b64 = isoloom_spec::shell::base64(lines.as_bytes()),
+    )
 }
 
 /// The start script's step and the service's user, for an image that runs something (a bare

@@ -211,3 +211,26 @@ fn a_php_image_installs_its_series_release_and_its_variants_server() {
     let old = translate(&build("FROM php:7.1.3-apache\n"), &Sources::default()).unwrap_err().to_string();
     assert!(old.contains("no release 7.1.3") && old.contains("7.1.33"), "{old}");
 }
+
+#[test]
+fn a_mongo_image_installs_the_exact_build_and_its_service_reads_the_images_environment() {
+    let build = Build {
+        path: "build/db/Dockerfile",
+        text: "FROM mongo:4.0.4\nENV MONGO_INITDB_ROOT_USERNAME=admin MONGO_INITDB_ROOT_PASSWORD=s3cret\nCOPY seed.js /docker-entrypoint-initdb.d/\n",
+        context: "build/db",
+        args: &[],
+        os: None,
+    };
+    let t = translate(&build, &Sources::default()).unwrap();
+    assert_eq!(t.os.to_string(), "ubuntu@18.04");
+    assert!(t.yaml.contains("catalogue: mongodb@4.0.4 on ubuntu@18.04"), "{}", t.yaml);
+    // The entry's own service runs, and reads the environment the Dockerfile set.
+    assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
+    assert!(t.yaml.contains(IMAGE_ENV), "{}", t.yaml);
+    let latest = Build {
+        text: "FROM mongo:7\n",
+        ..build
+    };
+    let newest = translate(&latest, &Sources::default()).unwrap();
+    assert!(newest.yaml.contains("catalogue: mongodb@7.0.28 on ubuntu@20.04"), "{}", newest.yaml);
+}
