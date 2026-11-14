@@ -50,6 +50,8 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::ExecWithoutContainer,
         Feature::Gateways,
         Feature::MachineAliases,
+        // Each tool a VM of its own on every network.
+        Feature::Tools,
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,

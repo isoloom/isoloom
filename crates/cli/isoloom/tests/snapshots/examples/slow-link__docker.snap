@@ -1073,13 +1073,13 @@ volumes:
       "docker",
       "hosted",
       "cloud-docker",
-      "vagrant",
-      "proxmox",
-      "esxi"
+      "vagrant"
     ],
     "refused": {
       "kubernetes": "link impairment (`tc`) needs a router in the path; Kubernetes has none",
-      "cloud-vm": "no cloud can run it (aws, azure: link impairment (`tc`) needs a router in the path; the cloud's security groups have none; gcp: link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none; digitalocean: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode, oci: link impairment (`tc`) needs a router in the path; the cloud's firewalls have none)"
+      "proxmox": "tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only",
+      "esxi": "tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only",
+      "cloud-vm": "tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only"
     },
     "not_possible": {
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",

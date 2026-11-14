@@ -95,6 +95,8 @@ pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
         Feature::NetworkAppliances,
         Feature::Gateways,
         Feature::MachineAliases,
+        // Each tool a service of its own on every network.
+        Feature::Tools,
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,

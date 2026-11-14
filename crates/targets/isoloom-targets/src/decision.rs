@@ -251,6 +251,31 @@ mod tests {
     }
 
     #[test]
+    fn tools_are_refused_where_no_backend_renders_them() {
+        // `tools:` was generated without its toolbox on these targets (their files were the same
+        // with or without it): each now refuses it, and the targets that render it still do.
+        let tools = "tools: { shell: {} }\n";
+        let containers = lab(&format!(
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, app: {{ image: redis }} }}\n{tools}"
+        ));
+        let vms = lab(&format!(
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lan: 10 }}, app: {{ steps: [{{ run: a.sh }}] }} }}\n{tools}"
+        ));
+        assert_eq!(decide(&containers, Target::Docker, None), Decision::Generated);
+        assert_eq!(decide(&vms, Target::Vagrant, Some("virtualbox")), Decision::Generated);
+        for (lab, column) in [
+            (&containers, on(Target::Kubernetes, None)),
+            (&vms, on(Target::Proxmox, None)),
+            (&vms, on(Target::Esxi, None)),
+            (&vms, on(Target::CloudVm, Some("aws"))),
+        ] {
+            let lacking = refused_on(lab, column);
+            assert_eq!(lacking.code, Code::Capability(Feature::Tools), "{lacking:?}");
+            assert!(lacking.reason.contains("tool `shell` (`tools:`)"), "{lacking:?}");
+        }
+    }
+
+    #[test]
     fn the_provider_step_refuses_with_the_provider_code() {
         let two_networks = lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 }, wan: { cidr: 10.9.1.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lan: 10, wan: 10 }, app: { steps: [{ run: a.sh }] } }\n",
