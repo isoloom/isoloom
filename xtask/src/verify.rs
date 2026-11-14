@@ -138,7 +138,8 @@ pub(crate) fn cksum(data: &[u8]) -> u32 {
 /// Adds `dir` to the archive as `name`, without the [`SKIPPED`] folders, symlinks as links.
 pub(crate) fn add_tree(tar: &mut tar::Builder<File>, dir: &Path, name: &Path) -> Res<()> {
     tar.append_dir(name, dir)?;
-    for entry in std::fs::read_dir(dir)?.flatten() {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
         let file_name = entry.file_name();
         if SKIPPED.iter().any(|s| file_name == *s) {
             continue;

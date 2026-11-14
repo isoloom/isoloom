@@ -1,11 +1,8 @@
-# Vagrant: `vagrant`, `docker-vm` and `hybrid`
+# Vagrant: `vagrant`
 
-- **`vagrant`**: one local VM per machine, set up natively by the machine's `steps` (or its
-  catalogue service's recipe), in one Vagrantfile that every provider reads.
-- **`docker-vm`**: the `docker` target's containers, inside one VM. Useful where Docker can't run
-  on the host, or to keep the environment off it.
-- **`hybrid`**: containers and VMs together on the same networks, when some machines have only a
-  container form and others only a VM form.
+**`vagrant`**: one local VM per machine, set up natively by the machine's `steps` (or its
+catalogue service's recipe, or the VM form its Dockerfile translates to), in one Vagrantfile
+that every provider reads. Every machine is a true VM: no container runs inside a helper VM.
 
 ## Providers and tiers
 
@@ -19,10 +16,8 @@
 | QEMU | Linux, macOS | `vagrant-qemu` | 2 |
 | Remote ESXi | any | `vagrant-vmware-esxi` | 2 (real runs from macOS) |
 
-`docker-vm` is Tier 2 on every provider, UTM (`vagrant_utm`, macOS) included (real runs on
-VirtualBox from macOS); `hybrid` is Tier 2. UTM runs `docker-vm` only: `vagrant_utm` gives a VM
-no private network, and every machine of an environment is on one, so the `vagrant` target has
-no UTM provider. The [target matrix](../../matrix.md) lists what each provider refuses.
+UTM (`vagrant_utm`, macOS) gives a VM no private network, and every machine of an environment
+is on one, so the `vagrant` target has no UTM provider. The [target matrix](../../matrix.md) lists what each provider refuses.
 
 ## Prerequisites
 
@@ -54,7 +49,6 @@ isothrum check . --target vagrant
 isothrum down . --target vagrant
 ```
 
-`docker-vm` is the same with `.isoloom/docker-vm/`.
 
 ### A remote ESXi host
 

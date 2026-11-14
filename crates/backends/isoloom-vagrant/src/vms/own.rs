@@ -25,7 +25,7 @@ use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
 use super::{CONTROLLER, Ctx, Kind, TOOL_SHELL, checks};
-use crate::ruby::{Ruby, Value};
+use crate::ruby::{Ruby, Start, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
 const HELPER_BOX: &str = crate::boxes::DEBIAN_12;
@@ -73,8 +73,8 @@ fn every_machine(env: &Environment) -> Step {
 /// of `at`, at its address there.
 fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
     Guest {
-        label: super::label(env, define),
-        vm_name: super::vm_name(env, define),
+        label: env.names().vm_label(define),
+        vm_name: env.names().vm_name(define),
         size,
         port_groups: super::port_groups(env, at.iter().map(|(net, _)| *net)),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
@@ -124,11 +124,11 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
     let v6 = isoloom_render::ipv6::router_linux(&pairs)
         .map(|s| boot::at_boot("ipv6", "IPv6 addresses of the isoloom router", &s, Trigger::BootAndLinkUp, &[]))
         .unwrap_or_default();
+    let rules = isoloom_spec::shell::heredoc("cat > /etc/nftables.conf", "NFT", &format!("flush ruleset\n{}", router::nftables(spec)));
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
-        router::nftables(spec),
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\n{rules}systemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
     );
-    define(r, router::NAME, false, |r| {
+    define(r, router::NAME, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(router::NAME));
         for (net, ip) in routed {
@@ -158,7 +158,7 @@ pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
 fn tool_shell(r: &mut Ruby, ctx: &Ctx, tool: &ToolPlan) {
     let env = ctx.env;
     let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
-    r.define(TOOL_SHELL, true, |r| {
+    r.define(TOOL_SHELL, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str("shell"));
         for (net, ip) in &tool.addresses {
@@ -226,7 +226,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     steps.extend([every_machine(env), Step::Project]);
     steps.extend(isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()));
     let on_controller = &ctx.checks.controller;
-    define(r, CONTROLLER, false, |r| {
+    define(r, CONTROLLER, Start::WithUp, |r| {
         main.render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
         networks(r, env, |c| Some(c.controller()));
@@ -261,9 +261,9 @@ pub(crate) fn access() -> Access<'static> {
 fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
     let spec = env.spec();
     let setup = format!(
-        "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\n{}",
         controller::INSTALL_ANSIBLE,
-        inventory::render(env, &access())
+        isoloom_spec::shell::heredoc(&format!("cat > {CONTROLLER_INVENTORY}"), "INV", &inventory::render(env, &access()))
     );
     shell(r, "controller", &setup);
     if !spec.provision.is_empty() {

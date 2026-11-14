@@ -80,8 +80,9 @@ struct AppInput {
     #[serde(default)]
     image: Option<String>,
     /// The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,
-    /// target, args }`. The container form; translating it to a VM is never attempted, so add
-    /// `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
+    /// target, args }`. The container form, and on a VM target the VM form it translates to
+    /// (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as
+    /// that published name.
     #[serde(default, deserialize_with = "build")]
     #[schemars(with = "Option<BuildInput>")]
     build: Option<Build>,
@@ -186,15 +187,7 @@ fn appliance(kind: Appliance, image: Option<String>, config: Option<String>, fir
     }
 }
 
-impl JsonSchema for App {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "App".into()
-    }
-
-    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        AppInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(App, AppInput);
 
 #[cfg(test)]
 mod tests;

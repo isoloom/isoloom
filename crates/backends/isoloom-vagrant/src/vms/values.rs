@@ -1,7 +1,7 @@
 //! The values a VM gets at launch, from the host's environment when Vagrant runs (Vagrant's own
 //! way, decided for the Vagrant targets: the runner hands them to `vagrant up` and `vagrant
 //! provision`, never to a generated file): its inputs, and its secret files (an input's file
-//! included). The containers' VMs (`docker-vm`'s, hybrid's host) get their inputs the same way.
+//! included).
 //!
 //! Vagrant passes a provisioner's `env` by writing `NAME="value"` into the shell (or `$env:NAME
 //! = "value"` into the PowerShell) that runs the script, escaping quotes only: a `$(...)` or a
@@ -39,6 +39,7 @@ pub(crate) fn inputs_env(env: &Environment, machine: &str) -> Option<Value> {
 
 /// Shell decoding inputs `names`, each in base64 in its own variable ([`encoded`]), in place and
 /// exported, before the script reads them; a value's last line breaks kept. Empty without any.
+#[cfg(test)]
 pub(crate) fn linux_decode(names: &[String]) -> String {
     names
         .iter()

@@ -1567,10 +1567,9 @@ volumes:
     ]
   },
   "recovery": {
-    "stale_markers": [
-      "is already in use by container",
-      "network with name",
-      "has incorrect label"
+    "leftovers": [
+      "container_name_taken",
+      "network_left"
     ],
     "steps": [
       {
@@ -1869,7 +1868,6 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1880,7 +1878,6 @@ volumes:
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "vagrant",
       "cloud-vm"
@@ -1891,7 +1888,6 @@ volumes:
       "esxi": "Isoloom routes no network through a `gateway` machine on ESXi"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.fw: the external target reaches machines that exist already, and `fw` names no host",
       "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },

@@ -91,9 +91,9 @@ impl<'a> Qemu<'a> {
 #[derive(Debug, Clone)]
 pub(crate) struct Guest<'a> {
     /// Its display name.
-    pub(crate) label: String,
-    /// Its name on ESXi and Hyper-V (`<env>-<machine>`).
-    pub(crate) vm_name: String,
+    pub(crate) label: isoloom_plan::HostName,
+    /// Its name on ESXi and Hyper-V (`<env>-<key>-<machine>`).
+    pub(crate) vm_name: isoloom_plan::HostName,
     /// Its size.
     pub(crate) size: Size,
     /// The ESXi port group of each network it is on, in order, by its index in
@@ -191,15 +191,15 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
 }
 
 /// `m.vm.provider "<id>"`: the head of a provider's block.
-fn provider(p: Provider<'_>) -> Call {
+fn provider(p: Provider) -> Call {
     Call::new("m.vm.provider").arg(Value::str(p.id()))
 }
 
 /// VirtualBox and Parallels: a name, CPUs, memory and linked clones, then what only that
 /// provider sets (`more`).
-fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, more: impl FnOnce(&mut Ruby)) {
+fn desktop(r: &mut Ruby, p: Provider, g: &Guest, more: impl FnOnce(&mut Ruby)) {
     r.block(provider(p), "v", |r| {
-        r.assign("v.name", Value::str(&g.label));
+        r.assign("v.name", crate::vagrantfile::host_name(&g.label));
         r.assign("v.linked_clone", true);
         r.assign("v.cpus", g.size.cpus);
         r.assign("v.memory", g.size.mem);
@@ -213,7 +213,7 @@ fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, more: impl FnOnce(&mut Ruby
 /// VMware Workstation and Fusion: a display name, CPUs and memory, in the VM's `.vmx`.
 fn vmware(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::VmwareDesktop), "v", |r| {
-        r.assign("v.vmx[\"displayName\"]", Value::str(&g.label));
+        r.assign("v.vmx[\"displayName\"]", crate::vagrantfile::host_name(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
         if g.nested {
@@ -364,7 +364,7 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     let nets = Value::array(g.port_groups.iter().map(|&i| Value::raw(i.to_string())));
     vagrantfile::esxi_host(r);
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));
-    r.assign("v.guest_name", Value::str(&g.vm_name));
+    r.assign("v.guest_name", crate::vagrantfile::host_name(&g.vm_name));
     if let Some(os) = g.esxi_guestos {
         r.assign("v.guest_guestos", Value::str(os));
     }

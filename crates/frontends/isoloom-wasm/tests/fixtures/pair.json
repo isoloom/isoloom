@@ -1,0 +1,8 @@
+{
+    "name": "pair",
+    "nodes": {
+        "client": { "kind": { "vm": { "os": "debian@12", "provision": ["provision/client.sh"] } }, "access": true },
+        "server": { "kind": { "container": { "image": "nginx:1.27-alpine" } }, "services": [{ "port": 80, "protocol": "http" }] }
+    },
+    "links": [ { "a": { "node": "client", "port": "eth0" }, "b": { "node": "server", "port": "eth0" } } ]
+}

@@ -117,6 +117,9 @@ pub struct When {
     /// A setting `with:` leaves out, with no default.
     #[serde(default)]
     pub unset: Option<SettingName>,
+    /// `string` settings and the value each has (`{ server: apache }`).
+    #[serde(default)]
+    pub is: Option<indexmap::IndexMap<SettingName, String>>,
 }
 
 /// A distribution's name as a machine's `os:` writes it, before the `@` (`debian`, `rocky`): one

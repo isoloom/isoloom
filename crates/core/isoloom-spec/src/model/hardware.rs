@@ -185,7 +185,7 @@ impl Device {
 }
 
 /// A device as written: `host[:guest[:permissions]]`, or a mapping.
-#[derive(Deserialize, JsonSchema)]
+#[derive(JsonSchema)]
 #[serde(untagged)]
 pub enum DeviceInput {
     /// `/dev/fuse`, `/dev/ttyUSB0:/dev/ttyS1`, `/dev/sda:/dev/xvda:r`.
@@ -206,6 +206,28 @@ pub struct DeviceFull {
     /// `r`, `w` and `m`, in any combination. Default: `rwm`.
     #[serde(default)]
     permissions: Option<String>,
+}
+
+// A string is the short form; a map is the full one. Written by hand (not `untagged`) so a value
+// of the wrong kind says what a device is, and a typo in the map is reported with its field,
+// instead of "no variant matched".
+impl<'de> Deserialize<'de> for DeviceInput {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<DeviceInput, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = DeviceInput;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a device path (`/dev/fuse`, or `host:guest[:permissions]`), or `{ host, guest, permissions }`")
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<DeviceInput, E> {
+                Ok(DeviceInput::Short(v.to_owned()))
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, map: A) -> Result<DeviceInput, A::Error> {
+                DeviceFull::deserialize(serde::de::value::MapAccessDeserializer::new(map)).map(DeviceInput::Full)
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 impl TryFrom<DeviceInput> for Device {

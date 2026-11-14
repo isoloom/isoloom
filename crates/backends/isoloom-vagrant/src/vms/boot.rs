@@ -8,7 +8,7 @@
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::{Boot, Firmware, NetworkBoot, VmImage};
 
-use super::provider::Provider;
+use super::provider::{OwnBoot, Provider};
 use crate::ruby::{Call, Ruby, Value};
 
 /// Where Vagrant gets the box: a URL as written, a box file in the project from the project's
@@ -79,17 +79,17 @@ pub(crate) fn network(call: Call, served: Option<&NetworkBoot>) -> Call {
 /// Why `provider` can't boot a machine of `env` its own way, if it can't. libvirt boots every
 /// field; QEMU sets the firmware's format only (it boots the box's disk through its own
 /// firmware); the other providers boot the box as it is.
-pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<String> {
+pub(crate) fn refusal(env: &Environment, provider: Provider) -> Option<String> {
     let (name, b) = env
         .machines
         .iter()
         .filter(|(_, mp)| mp.shape == MachineShape::Vm)
         .find_map(|(n, mp)| Some((n, mp.boot.as_ref()?)))?;
-    match provider {
-        Provider::Libvirt => (b.firmware == Some(Firmware::Uefi) && b.loader.is_none()).then(|| {
+    match provider.profile().boot {
+        OwnBoot::Own => (b.firmware == Some(Firmware::Uefi) && b.loader.is_none()).then(|| {
             format!("machine `{name}` sets `hardware.boot.firmware: uefi`: libvirt boots UEFI from the firmware file in `hardware.boot.loader`; give it")
         }),
-        Provider::Qemu => {
+        OwnBoot::FirmwareFormat => {
             let beyond = b.beyond_firmware_format();
             (!beyond.is_empty()).then(|| {
                 format!(
@@ -98,9 +98,9 @@ pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<Strin
                 )
             })
         }
-        other => Some(format!(
+        OwnBoot::BoxAsIs => Some(format!(
             "machine `{name}` boots its own way (`hardware.boot`): Vagrant's {} provider boots the box as it is; the libvirt provider boots it",
-            other.id()
+            provider.id()
         )),
     }
 }

@@ -21,7 +21,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/proxmox/run.json
 .isoloom/resolved.json
 
-## .isoloom/.gitignore: identical in the `hybrid` snapshot
+## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/proxmox/checks/user.sh
 #!/bin/sh
@@ -2108,4 +2108,4 @@ locals {
   }
 }
 
-## .isoloom/resolved.json: identical in the `hybrid` snapshot
+## .isoloom/resolved.json: identical in the `vagrant` snapshot

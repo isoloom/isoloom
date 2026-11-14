@@ -7,6 +7,10 @@ use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Spec, TOOL_RECIPES};
 use crate::net::NetworkBlock;
 
+/// How many tools a spec can have: as many as the addresses [`crate::net::NetworkBlock::tool`]
+/// reserves on every network.
+const MAX_TOOLS: usize = 3;
+
 /// Tools take the addresses just below the controller on every network: no machine there.
 pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
     if spec.tools.is_empty() {
@@ -66,8 +70,11 @@ pub(super) fn each(spec: &Spec, p: &mut Problems) {
         {
             p.add(format!("{at}.publish"), format!("host port {port} is already published by a machine"));
         }
-        if spec.tools.len() > 3 {
-            p.add("tools", "at most 3 tools (each takes one of the addresses Isoloom reserves on every network)");
+        if spec.tools.len() > MAX_TOOLS {
+            p.add(
+                "tools",
+                format!("at most {MAX_TOOLS} tools (each takes one of the addresses Isoloom reserves on every network)"),
+            );
             break;
         }
     }

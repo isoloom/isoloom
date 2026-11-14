@@ -221,7 +221,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-catalogue"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-manifest",
@@ -243,13 +243,15 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "isoloom-terraform",
+ "isoloom-topology",
  "isoloom-vagrant",
  "libfuzzer-sys",
+ "serde_json",
 ]
 
 [[package]]
 name = "isoloom-manifest"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "schemars",
  "serde",
@@ -260,18 +262,21 @@ dependencies = [
 
 [[package]]
 name = "isoloom-plan"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-catalogue",
+ "isoloom-manifest",
  "isoloom-spec",
+ "serde",
  "serde_json",
+ "serde_yaml_ng",
  "thiserror",
 ]
 
 [[package]]
 name = "isoloom-render"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "flate2",
  "indexmap",
@@ -285,7 +290,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-spec"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-manifest",
@@ -300,7 +305,7 @@ dependencies = [
 
 [[package]]
 name = "isoloom-terraform"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
@@ -313,8 +318,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "isoloom-topology"
+version = "3.0.0"
+dependencies = [
+ "indexmap",
+ "isoloom-manifest",
+ "isoloom-spec",
+ "serde",
+ "serde_yaml_ng",
+ "thiserror",
+]
+
+[[package]]
 name = "isoloom-vagrant"
-version = "2.1.8"
+version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-manifest",

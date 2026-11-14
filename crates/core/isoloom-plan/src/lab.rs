@@ -14,9 +14,11 @@ use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems, ProjectPath};
 
+use crate::configure::DaemonTable;
 use crate::lower::{Lowered, Scope, lower};
 
 mod access;
+mod dockerfiles;
 mod steps;
 mod templates;
 mod warnings;
@@ -31,15 +33,39 @@ pub struct Lab {
     images: Table,
     regions: BTreeMap<String, String>,
     templates: templates::Texts,
-    catalogue: &'static Catalogue,
+    dockerfiles: BTreeMap<ProjectPath, String>,
+    bases: crate::dockerfile::Sources,
+    loaded: Loaded,
     memo: Memo,
 }
 
-/// The catalogue built into Isoloom, or an empty one when it doesn't load (its own tests rule
-/// that out; [`Lab::problems`] says so at each service it would have resolved).
-fn built_in() -> &'static Catalogue {
-    static EMPTY: OnceLock<Catalogue> = OnceLock::new();
-    Catalogue::embedded().unwrap_or_else(|_| EMPTY.get_or_init(Catalogue::default))
+/// The catalogue a lab resolves its services in, read once when the lab is made, with what
+/// planning reads of it: lowering, planning and the checks take it from here, never from the
+/// global catalogue again.
+#[derive(Debug, Clone, PartialEq)]
+struct Loaded {
+    catalogue: &'static Catalogue,
+    /// Why the catalogue didn't load (`catalogue` is then empty).
+    broken: Option<String>,
+    /// The daemons `catalogue` knows the foreground form of.
+    daemons: DaemonTable,
+}
+
+impl Loaded {
+    /// The catalogue built into Isoloom, or an empty one when it doesn't load (its own tests rule
+    /// that out; [`Lab::problems`] says so at each service it would have resolved).
+    fn built_in() -> Loaded {
+        static EMPTY: OnceLock<Catalogue> = OnceLock::new();
+        let (catalogue, broken) = match Catalogue::embedded() {
+            Ok(catalogue) => (catalogue, None),
+            Err(broken) => (EMPTY.get_or_init(Catalogue::default), Some(broken.to_string())),
+        };
+        Loaded {
+            catalogue,
+            broken,
+            daemons: DaemonTable::from(catalogue),
+        }
+    }
 }
 
 /// [`Scope::Lab`], then one scope per target of [`Target::ALL`].
@@ -54,6 +80,8 @@ struct Memo {
     lowered: [OnceLock<Lowered>; SCOPES],
     /// [`Lab::problems`].
     problems: OnceLock<Problems>,
+    /// The spec with the VM forms its Dockerfiles give, for the targets that run VMs.
+    translated: OnceLock<dockerfiles::Translated>,
 }
 
 impl PartialEq for Memo {
@@ -81,7 +109,9 @@ impl Lab {
             images: Table::default(),
             regions: BTreeMap::new(),
             templates: templates::Texts::new(),
-            catalogue: built_in(),
+            dockerfiles: BTreeMap::new(),
+            bases: crate::dockerfile::Sources::default(),
+            loaded: Loaded::built_in(),
             memo: Memo::default(),
         }
     }
@@ -113,16 +143,24 @@ impl Lab {
         self
     }
 
-    /// The lab planned for `target` (as instance `instance` of `spec`, the lab as that target runs
-    /// it): the plan with the lab's regions. Hidden: it returns a building-block crate's type,
-    /// outside the supported API `isoloom-targets` re-exports [`Lab`] in.
+    /// `spec` (the lab as `target` runs it, [`Lab::for_target`], or a spec derived from it)
+    /// planned for `target` as instance `instance`, with the lab's catalogue and regions: the one
+    /// way to plan an environment. Hidden: it returns a building-block crate's type, outside the
+    /// supported API `isoloom-targets` re-exports [`Lab`] in.
     ///
     /// # Errors
     ///
-    /// As [`Environment::build`](crate::Environment::build).
+    /// [`PlanError::UnresolvedRecipe`](crate::environment::PlanError::UnresolvedRecipe) for a
+    /// machine whose configuration has steps its OS's family can't carry, which lowering refuses
+    /// for the target first; [`PlanError::Catalogue`](crate::environment::PlanError::Catalogue)
+    /// when the catalogue built into Isoloom doesn't load, never a plan with an empty one.
     #[doc(hidden)]
     pub fn plan(&self, spec: &model::Spec, target: Target, instance: Option<u8>) -> Result<crate::Environment, crate::environment::PlanError> {
-        let mut env = crate::Environment::build(spec, target, instance)?;
+        // An empty catalogue would plan the lab's services as if it had none.
+        if let Some(reason) = &self.loaded.broken {
+            return Err(crate::environment::PlanError::Catalogue { reason: reason.clone() });
+        }
+        let mut env = crate::Environment::planned(spec, target, instance, self.loaded.catalogue, &self.loaded.daemons)?;
         env.regions.clone_from(&self.regions);
         Ok(env)
     }
@@ -136,15 +174,73 @@ impl Lab {
         self
     }
 
+    /// The lab with the texts of its builds' Dockerfiles (read by the caller that generates,
+    /// from [`Lab::dockerfile_paths`]): on a target that runs VMs, each such machine takes the
+    /// VM form its Dockerfile translates to, or is refused at the line that has none.
+    #[must_use]
+    pub fn with_dockerfiles(mut self, texts: BTreeMap<ProjectPath, String>) -> Lab {
+        self.dockerfiles = texts;
+        self.memo = Memo::default();
+        self
+    }
+
+    /// The lab with the base images vendored in its project (`isoloom bases fetch`), which a
+    /// Dockerfile's translation starts `FROM` when the service matrix doesn't have them.
+    #[must_use]
+    pub fn with_bases(mut self, bases: crate::dockerfile::Sources) -> Lab {
+        self.bases = bases;
+        self.memo = Memo::default();
+        self
+    }
+
+    /// The Dockerfiles the lab's VM forms are translated from: each build's whose machine has no
+    /// `app.steps` of its own, each once.
+    #[must_use]
+    pub fn dockerfile_paths(&self) -> Vec<ProjectPath> {
+        dockerfiles::paths(&self.source)
+    }
+
+    /// The spec `scope` lowers: the translated one for a target that runs VMs.
+    fn source_for(&self, scope: Scope) -> &syntax::Spec {
+        match scope {
+            Scope::Target(t) if dockerfiles::wants_vm(t) => &self.translated().source,
+            _ => &self.source,
+        }
+    }
+
+    /// The spec with the VM forms its Dockerfiles give, worked out once.
+    fn translated(&self) -> &dockerfiles::Translated {
+        self.memo
+            .translated
+            .get_or_init(|| dockerfiles::translate(&self.source, &self.dockerfiles, &self.bases))
+    }
+
+    /// `l` with each refusal of a Dockerfile that has no VM form saying why.
+    fn explained(&self, scope: Scope, mut l: Lowered) -> Lowered {
+        if matches!(scope, Scope::Target(t) if dockerfiles::wants_vm(t)) {
+            let t = self.translated();
+            l.refusals = l.refusals.into_iter().map(|p| t.explain(p)).collect();
+        }
+        l
+    }
+
     /// The project files the lab's steps fill in as templates, each once.
     #[must_use]
     pub fn template_paths(&self) -> Vec<ProjectPath> {
         templates::paths(&self.source)
     }
 
-    /// `spec` with the image table and the templates' texts applied.
+    /// `spec` with the image table and the templates' texts applied: the project's, and those
+    /// the Dockerfiles' translations bring (catalogue entries' files), once translated.
     fn finish(&self, spec: &model::Spec) -> model::Spec {
-        templates::add(self.images.apply(spec), &self.templates)
+        match self.memo.translated.get().filter(|t| !t.files.is_empty()) {
+            Some(t) => {
+                let mut texts = self.templates.clone();
+                texts.extend(t.files.iter().map(|(k, v)| (k.clone(), v.clone())));
+                templates::add(self.images.apply(spec), &texts)
+            }
+            None => templates::add(self.images.apply(spec), &self.templates),
+        }
     }
 
     /// The spec as written.
@@ -158,7 +254,12 @@ impl Lab {
     #[doc(hidden)]
     #[must_use]
     pub fn catalogue(&self) -> &'static Catalogue {
-        self.catalogue
+        self.loaded.catalogue
+    }
+
+    /// The daemons its catalogue knows the foreground form of.
+    pub(crate) fn daemons(&self) -> &DaemonTable {
+        &self.loaded.daemons
     }
 
     /// The spec lowered for `scope`, the image table applied (what the lowering's tests read).
@@ -172,8 +273,8 @@ impl Lab {
     /// The spec lowered for `scope` before the image table, lowered once.
     fn raw(&self, scope: Scope) -> Cow<'_, Lowered> {
         match slot(scope).and_then(|i| self.memo.lowered.get(i)) {
-            Some(cell) => Cow::Borrowed(cell.get_or_init(|| lower(&self.source, self.catalogue, scope))),
-            None => Cow::Owned(lower(&self.source, self.catalogue, scope)),
+            Some(cell) => Cow::Borrowed(cell.get_or_init(|| self.explained(scope, lower(self.source_for(scope), self.loaded.catalogue, scope)))),
+            None => Cow::Owned(self.explained(scope, lower(self.source_for(scope), self.loaded.catalogue, scope))),
         }
     }
 
@@ -201,8 +302,8 @@ impl Lab {
     /// one rule [`Lab::possible`] and every caller that explains a target left out read. In this
     /// order: cloud services run on `cloud-services` only, which runs nothing else; a spec with no
     /// machines runs nowhere; a machine the target has no form for (the access machine the spec
-    /// leaves to the runner has the forms the image table gives it); `hybrid` takes only an
-    /// environment that mixes containers and VMs; and `targets:` leaves the target out.
+    /// leaves to the runner has the forms the image table gives it); and `targets:` leaves the
+    /// target out.
     #[must_use]
     pub fn not_possible(&self, target: Target) -> Option<NotPossible> {
         let spec = &self.source;
@@ -215,14 +316,16 @@ impl Lab {
         if spec.machines.is_empty() {
             return Some(NotPossible::NoMachines);
         }
-        if let Some(missing) = crate::lower::missing_form(&self.source, self.catalogue, target) {
+        if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.loaded.catalogue, target) {
+            let missing = if dockerfiles::wants_vm(target) {
+                self.translated().explain(missing)
+            } else {
+                missing
+            };
             return Some(NotPossible::MissingForm(self.place(missing)));
         }
         if let Some(missing) = self.unsupplied(target) {
             return Some(NotPossible::Unsupplied(self.place(missing)));
-        }
-        if target == Target::Hybrid && !mixed(&self.spec()) {
-            return Some(NotPossible::NotMixed);
         }
         spec.targets
             .as_ref()
@@ -250,7 +353,7 @@ impl Lab {
     /// [`Lab::problems`], worked out.
     fn find_problems(&self) -> Problems {
         let mut out = syntax::check(&self.source);
-        if let Err(broken) = Catalogue::embedded() {
+        if let Some(broken) = &self.loaded.broken {
             add(
                 &mut out,
                 self.services()
@@ -323,7 +426,7 @@ impl Lab {
             isoloom_spec::validate_files(&lowered.spec, dir).iter().map(|p| translated(&lowered, p)),
         );
         add(&mut out, steps::step_files(&self.source, dir));
-        add(&mut out, steps::setting_files(&self.source, self.catalogue, dir));
+        add(&mut out, steps::setting_files(&self.source, self.loaded.catalogue, dir));
         self.sorted(out)
     }
 
@@ -377,8 +480,6 @@ pub enum NotPossible {
     /// The access machine the spec leaves to the runner, at its `os`: the image table gives it
     /// none of the form the target runs (a fact of this run's table, not of the spec).
     Unsupplied(Problem),
-    /// The target is `hybrid`, and the machines are all containers or all VMs.
-    NotMixed,
     /// The spec's `targets:` leaves the target out.
     LeftOut,
 }
@@ -390,18 +491,9 @@ impl fmt::Display for NotPossible {
             NotPossible::NoCloud => f.write_str("needs `cloud:` (cloud services instead of machines)"),
             NotPossible::NoMachines => f.write_str("the spec has no machines"),
             NotPossible::MissingForm(p) | NotPossible::Unsupplied(p) => f.write_str(&p.line()),
-            NotPossible::NotMixed => f.write_str("only when some machines are containers and others are VMs"),
             NotPossible::LeftOut => f.write_str("left out by `targets:`"),
         }
     }
-}
-
-/// Whether the environment mixes both: a machine that can only be a VM (Windows, say) and one
-/// that can be a container, the access machine aside. Only then is `hybrid` worth it; otherwise
-/// Docker or VMs alone run it.
-fn mixed(spec: &model::Spec) -> bool {
-    let own = || spec.machines.values().filter(|m| !m.access);
-    own().any(|m| m.docker.is_some()) && own().any(|m| m.docker.is_none() && m.vm.is_some())
 }
 
 /// `found` added to `out`, unless a problem at the same field is already there (the authored
@@ -498,12 +590,38 @@ mod tests {
         }
     }
 
+    /// A lab whose built-in catalogue didn't load never plans: an empty catalogue would read as
+    /// a lab with no services.
+    #[test]
+    fn a_lab_whose_catalogue_doesnt_load_fails_to_plan() {
+        let mut lab = testing::lab(LAB);
+        lab.loaded.broken = Some("catalogue/nginx.yml: not YAML".to_owned());
+        let spec = lab.for_target(Target::Docker);
+        assert_eq!(
+            lab.plan(&spec, Target::Docker, None).err(),
+            Some(crate::environment::PlanError::Catalogue {
+                reason: "catalogue/nginx.yml: not YAML".to_owned()
+            })
+        );
+    }
+
     #[test]
     fn two_labs_of_one_spec_are_equal_whatever_each_has_worked_out() {
         let (a, b) = (testing::lab(LAB), testing::lab(LAB));
         assert_eq!(a.problems(), []);
         assert_eq!(a, b);
         assert_ne!(a, testing::lab(&LAB.replace("lan: 10,", "lan: 11,")));
+    }
+
+    #[test]
+    fn every_vlan_problem_is_reported_not_only_the_first() {
+        let lab = testing::lab(
+            "version: 1\nname: t\nnetworks:\n  office: { cidr: 10.10.0.0/16, gateway: pc, vlans: { 5000: { cidr: 10.10.50.0/24 }, 20: { cidr: 10.99.0.0/24 } } }\nmachines:\n  pc: { networks: { office.vlan20: 10 }, app: { image: alpine } }\n",
+        );
+        let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
+        for at in ["networks.office", "networks.office.vlans.5000", "networks.office.vlans.20.cidr"] {
+            assert!(paths.contains(&at.to_owned()), "{at} in {paths:?}");
+        }
     }
 
     #[test]
@@ -514,6 +632,27 @@ mod tests {
         let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
         assert!(paths.contains(&"overrides.proxmox.networks.lan.external".to_owned()), "{paths:?}");
         assert!(paths.contains(&"overrides.docker.networks.lan.external".to_owned()), "{paths:?}");
+    }
+
+    #[test]
+    fn an_image_a_group_or_a_counted_machine_gives_is_checked_under_the_key_it_is_written_at() {
+        let lab = testing::lab(
+            "version: 1\nname: t\ngroups: { windows: { members: [dc1] } }\nmachines:\n  dc1: { os: debian@12 }\n  w: { os: debian@12, count: 2 }\n  a: { os: debian@12 }\noverrides:\n  vagrant: { machines: { windows: { box: 'bad box' }, w: { box: 'bad box' }, a: { box: 'bad box' } } }\n",
+        );
+        let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
+        for written in [
+            "overrides.vagrant.machines.windows.box",
+            "overrides.vagrant.machines.w.box",
+            "overrides.vagrant.machines.a.box",
+        ] {
+            assert!(paths.contains(&written.to_owned()), "{written}: {paths:?}");
+        }
+        assert!(
+            !paths
+                .iter()
+                .any(|p| p.starts_with("overrides.vagrant.machines.dc1") || p.starts_with("overrides.vagrant.machines.w-0")),
+            "no problem at a key nobody wrote: {paths:?}"
+        );
     }
 
     #[test]

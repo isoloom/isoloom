@@ -44,6 +44,10 @@ Supporting the backbone:
 - **`isoloom-targets`** — every backend behind one call, the composite targets, refusals, the
   resolved snapshot, the capability matrix and the tiers.
 - **`isoloom`** — the command line.
+- **`isoloom-topology`** — a front-end: a network drawn in a topology editor (machines, LANs,
+  cables) compiled into a spec and the project files it refers to.
+- **`isoloom-wasm`** — that compiler and the targets in WebAssembly, for an editor in the
+  browser: the spec, every target's files and the zips to download (`cargo xtask wasm`).
 
 ## Lowering, not rewriting
 
@@ -76,9 +80,10 @@ render-twice test.
 
 ## One-way dependencies
 
-The crates sit in groups under `crates/` — `core/`, `backends/`, `tools/`, `targets/`, `cli/` —
-and depend only downward: spec → plan → render → backends → targets → cli. No backend depends on
-another backend; the targets made of two backends (`cloud-docker`, `docker-vm`, `hybrid`) are
+The crates sit in groups under `crates/` — `core/`, `backends/`, `tools/`, `targets/`, `cli/`,
+`frontends/` — and depend only downward: spec → plan → render → backends → targets → cli and the
+front-ends. No backend depends on
+another backend; the target made of two backends (`cloud-docker`) is
 composed in `isoloom-targets`. A test over `cargo metadata` fails on any upward or cross-backend
 edge.
 

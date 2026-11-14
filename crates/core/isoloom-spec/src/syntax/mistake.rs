@@ -62,6 +62,19 @@ impl Mistake {
     }
 }
 
+impl From<crate::Error> for Mistake {
+    /// A spec error a typed read raises, coded by its kind: fields given together that exclude
+    /// each other are a conflict, anything else a wrong value.
+    fn from(e: crate::Error) -> Mistake {
+        use crate::Error;
+        let code = match e {
+            Error::ServiceAndApp | Error::TestAndHttp | Error::FileSources(_) => Code::Conflict,
+            _ => Code::InvalidValue,
+        };
+        Mistake::new(code, e.to_string())
+    }
+}
+
 /// The code `id` names (`missing-field`).
 fn code(id: &str) -> Option<Code> {
     [
@@ -103,6 +116,15 @@ mod tests {
         assert_eq!((p.code, p.path.as_str()), (Code::MissingField, "machines.web.app.steps[2].file.url"));
         assert_eq!((p.reason.as_str(), p.fix.as_deref()), ("every fetch is pinned", Some("`sha256: <hex>`")));
         assert!(m.to_string().starts_with("every fetch is pinned"), "the reason shows first");
+    }
+
+    #[test]
+    fn fields_that_exclude_each_other_are_a_conflict_by_their_error_not_its_wording() {
+        let coded = |e: crate::Error| Mistake::decode(&Mistake::from(e).to_string(), &FieldPath::new("a")).expect("a mistake").code;
+        assert_eq!(coded(crate::Error::ServiceAndApp), Code::Conflict);
+        assert_eq!(coded(crate::Error::TestAndHttp), Code::Conflict);
+        assert_eq!(coded(crate::Error::FileSources(vec!["source", "input"])), Code::Conflict);
+        assert_eq!(coded(crate::Error::NoFileSource), Code::InvalidValue);
     }
 
     #[test]

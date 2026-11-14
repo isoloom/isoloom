@@ -107,6 +107,22 @@ fn a_template_is_an_entry_file_and_a_copy_the_projects() {
     breaks(&files, "a copy places the project's content a setting names");
 }
 
+/// Regression: a copy from `{{with.root}}/` (no spaces) was refused, though the placeholder
+/// grammar reads it as `{{ with.root }}`.
+#[test]
+fn a_copy_from_a_setting_is_taken_however_its_braces_are_spaced() {
+    for from in ["{{ with.root }}/", "{{with.root}}/", "{{  with.root}}/site/"] {
+        let files = edited("demo/entry.yml", |t| {
+            t.replace(
+                "    - service: demo\n",
+                &format!("    - copy: {{ from: \"{from}\", to: /srv/ }}\n    - service: demo\n"),
+            )
+        });
+        let found = findings(&files);
+        assert!(!found.contains("a copy places the project's content"), "{from}: {found}");
+    }
+}
+
 #[test]
 fn a_vendor_package_lock_yml_doesnt_pin_fails_to_resolve() {
     let files = edited("demo/lock.yml", |t| t.replace("      rocky@9: { demo: 2.4.1-1.el9 }\n", ""));

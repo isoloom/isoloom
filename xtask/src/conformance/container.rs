@@ -24,7 +24,9 @@ pub(super) const RUN_ANSIBLE: &str = include_str!("run-ansible.sh");
 
 /// The family's pinned official image.
 fn image(family: Family) -> Res<&'static str> {
-    isoloom_spec::os::container_image(family.id).ok_or_else(|| format!("{} has no pinned container image", family.id).into())
+    isoloom_spec::os::by_name(family.id)
+        .and_then(|os| os.container_image())
+        .ok_or_else(|| format!("{} has no pinned container image", family.id).into())
 }
 
 /// A fresh container of the family's image: the first apply, the probe, the second apply, the

@@ -6,13 +6,14 @@ members = [
   "crates/tools/*",
   "crates/targets/*",
   "crates/cli/*",
+  "crates/frontends/*",
   "xtask",
 ]
 # The fuzz targets are a workspace of their own (nightly, libFuzzer): `cargo xtask fuzz`.
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "2.1.9"
+version = "3.0.0"
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/isoloom/isoloom"
@@ -22,19 +23,21 @@ license = "Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-isoloom-spec = { path = "crates/core/isoloom-spec", version = "2.1.9" }
-isoloom-catalogue = { path = "crates/core/isoloom-catalogue", version = "2.1.9" }
-isoloom-plan = { path = "crates/core/isoloom-plan", version = "2.1.9" }
-isoloom-render = { path = "crates/core/isoloom-render", version = "2.1.9" }
-isoloom-compose = { path = "crates/backends/isoloom-compose", version = "2.1.9" }
-isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes", version = "2.1.9" }
-isoloom-terraform = { path = "crates/backends/isoloom-terraform", version = "2.1.9" }
-isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "2.1.9" }
-isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "2.1.9" }
-isoloom-targets = { path = "crates/targets/isoloom-targets", version = "2.1.9" }
-isoloom-import = { path = "crates/tools/isoloom-import", version = "2.1.9" }
-isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "2.1.9" }
+isoloom-spec = { path = "crates/core/isoloom-spec", version = "3.0.0" }
+isoloom-catalogue = { path = "crates/core/isoloom-catalogue", version = "3.0.0" }
+isoloom-plan = { path = "crates/core/isoloom-plan", version = "3.0.0" }
+isoloom-render = { path = "crates/core/isoloom-render", version = "3.0.0" }
+isoloom-compose = { path = "crates/backends/isoloom-compose", version = "3.0.0" }
+isoloom-kubernetes = { path = "crates/backends/isoloom-kubernetes", version = "3.0.0" }
+isoloom-terraform = { path = "crates/backends/isoloom-terraform", version = "3.0.0" }
+isoloom-vagrant = { path = "crates/backends/isoloom-vagrant", version = "3.0.0" }
+isoloom-ansible = { path = "crates/backends/isoloom-ansible", version = "3.0.0" }
+isoloom-targets = { path = "crates/targets/isoloom-targets", version = "3.0.0" }
+isoloom-import = { path = "crates/tools/isoloom-import", version = "3.0.0" }
+isoloom-manifest = { path = "crates/core/isoloom-manifest", version = "3.0.0" }
+isoloom-topology = { path = "crates/frontends/isoloom-topology", version = "3.0.0" }
 xtask-quality = { path = "crates/tools/xtask-quality" }
+isoloom-test-support = { path = "crates/tools/isoloom-test-support" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml_ng = "0.10"
@@ -62,6 +65,11 @@ sha2 = "0.11"
 # The catalogue's refresh (xtask): a GPG key's fingerprint, and the gzip of package indexes.
 sha1 = "0.11"
 flate2 = "1"
+# The topology editor's engine in the browser (isoloom-wasm): the JavaScript bindings, their
+# tests, and the project's zip.
+wasm-bindgen = "0.2"
+wasm-bindgen-test = "0.3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Every crate inherits these (`[lints] workspace = true`): the strictest set. A lint is at "deny"
 # once its count is zero; while it isn't, it is at "warn", and `cargo xtask quality` counts its

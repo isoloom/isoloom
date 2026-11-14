@@ -91,7 +91,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     .concat()
 }
 
-/// The server's variables, the same in both modules (`proxmox`'s and `docker-vm`'s): the
+/// The server's variables (the `proxmox` module's): the
 /// connection, the node, where the disks, images and snippets go, the uplink bridge (`uplink`
 /// says what it is for), the environment's slot, 1 to [`MAX_SLOT`] (`slot` says how unique) and
 /// the key the `isoloom` user takes.
@@ -109,7 +109,7 @@ pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
             .describe("A datastore with 'snippets' content, for cloud-init"),
         s("uplink_bridge").default(string("vmbr0")).describe(uplink),
         server::slot_variable(MAX_SLOT, slot),
-        variable::ssh_public_key(true).default(string("")),
+        variable::ssh_public_key(variable::SignsIn::Runner).default(string("")),
     ]);
     v
 }

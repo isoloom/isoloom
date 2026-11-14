@@ -20,7 +20,7 @@ pub enum Error {
         number: u8,
         /// Why it can't be made.
         #[source]
-        source: isoloom_spec::Error,
+        source: isoloom_spec::instance::InstanceError,
     },
     /// A `{{ path }}` of the message is one the message can't have, or points at nothing in the
     /// resolved snapshot.
@@ -98,7 +98,7 @@ pub enum GenerateError {
         number: u8,
         /// Why it can't be made.
         #[source]
-        source: Arc<isoloom_spec::Error>,
+        source: isoloom_spec::instance::InstanceError,
     },
     /// The backend failed, not the environment (a bug: a value the run manifest's types refused, a file
     /// its writer couldn't write), with the error it failed with.

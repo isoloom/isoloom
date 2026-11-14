@@ -16,7 +16,7 @@ use super::qemu::Link;
 use super::transport::{self, Os};
 use super::{Ctx, boot, checks, windows};
 use crate::host_folders::Share;
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Ruby, Start, Value};
 use crate::vagrantfile;
 
 /// Whether environment machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
@@ -37,7 +37,8 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     // The access machine is defined but not started by `vagrant up`: the runner hot-adds it,
     // overriding its box with one it is given.
     let access = mp.is_access();
-    define(r, name, access, |r| {
+    let start = if access { Start::OnDemand } else { Start::WithUp };
+    define(r, name, start, |r| {
         boxed(r, &image, mp.arch, access);
         hostname(r, name, os);
         boot::source(r, mp.vm_image.as_ref());
@@ -60,7 +61,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
             super::addresses::provisioner(r, &addresses);
         }
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
-        crate::host_folders::render(r, "m", &shares, crate::host_folders::LibvirtMemory::WithShares);
+        crate::host_folders::render(r, "m", &shares);
         transport::provisioners(r, env, name, os);
         if let Some(g) = group {
             checks::provisioner(r, name, g);
@@ -88,11 +89,12 @@ fn relays(published: &[(&PublishedPort, Value)]) -> Vec<(u16, Value)> {
         .collect()
 }
 
-/// `config.vm.define "<name>" do |m| ... end`, after a blank line. An `on_demand` machine (the
-/// access box) is defined `autostart: false`, so `vagrant up` skips it and the runner hot-adds it.
-pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnce(&mut Ruby)) {
+/// `config.vm.define "<name>" do |m| ... end`, after a blank line. A machine started
+/// [`Start::OnDemand`] (the access box) is defined `autostart: false`, so `vagrant up` skips it
+/// and the runner hot-adds it.
+pub(crate) fn define(r: &mut Ruby, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) {
     r.blank();
-    r.define(name, !on_demand, body);
+    r.define(name, start, body);
 }
 
 /// The main box of a machine booting `image` on CPU `arch`: its version, and its build pinned
@@ -144,13 +146,13 @@ fn hostname(r: &mut Ruby, name: &str, os: Os) {
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
 pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
-    let netname = super::network_name(&env.name, net);
+    let netname = crate::vagrantfile::host_name(&env.names().network(net));
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
         .kw("ip", Value::str(&ip.to_string()))
         .kw("netmask", Value::str(&env.block(net).netmask().to_string()))
-        .kw("virtualbox__intnet", Value::str(&netname))
-        .kw("libvirt__network_name", Value::str(&netname));
+        .kw("virtualbox__intnet", netname.clone())
+        .kw("libvirt__network_name", netname);
     // Every VM on the network carries its network boot: libvirt creates the network with the
     // options of the first VM that comes up on it.
     call = boot::network(call, isoloom_plan::boot::network_boots(&env.machines).get(net));
@@ -174,7 +176,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         .filter(|_| os == Os::Windows)
         .map(|(net, ip)| (*ip, env.block(net).netmask()));
     let hyperv = HyperV {
-        env: &env.name,
+        names: env.names(),
         boxed: image.hyperv.clone(),
         nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
         windows: os == Os::Windows,
@@ -184,8 +186,8 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         keeps_hostname: false,
     };
     Guest {
-        label: super::label(env, name),
-        vm_name: super::vm_name(env, name),
+        label: env.names().vm_label(name),
+        vm_name: env.names().vm_name(name),
         size: Size::of(mp),
         port_groups: super::port_groups(env, mp.addresses.keys().map(String::as_str)),
         libvirt_box: image.libvirt.as_deref(),

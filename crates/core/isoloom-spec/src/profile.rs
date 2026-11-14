@@ -167,7 +167,11 @@ pub fn load(project: &Path, name: &str) -> Result<Profile> {
 /// [`Error::ProfileMapping`] for a `spec` or `defaults` that isn't a mapping, and
 /// [`Error::ProfileInput`] for an input that isn't one value.
 pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile> {
-    let file: File = match serde_yaml_ng::from_str(text) {
+    // A launch value and an environment value are text: kept as written (`1.10`, not 1.1).
+    let file: File = match serde_yaml_ng::from_str::<Value>(text).and_then(|mut doc| {
+        crate::as_written::keep(text, &mut doc, |at| matches!(at, ["inputs", _]) || crate::as_written::environment(at));
+        serde_yaml_ng::from_value(doc)
+    }) {
         Ok(file) => file,
         Err(source) => {
             return Err(Error::ProfileYaml {
@@ -259,11 +263,12 @@ impl Profile {
                 }
             }
         }
-        let declared: Vec<String> = spec
-            .get("inputs")
-            .and_then(Value::as_sequence)
-            .map(|s| s.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
-            .unwrap_or_default();
+        // `inputs` is a list of names or a map of name to `{ sensitive, description }`.
+        let declared: Vec<String> = match spec.get("inputs") {
+            Some(Value::Sequence(list)) => list.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect(),
+            Some(Value::Mapping(inputs)) => inputs.keys().filter_map(|k| k.as_str().map(str::to_owned)).collect(),
+            _ => Vec::new(),
+        };
         for k in self.inputs.keys() {
             if !declared.iter().any(|d| d == k) {
                 problems.push(ProfileProblem::Input {

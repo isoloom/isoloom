@@ -191,10 +191,7 @@ fn the_message_leaves_the_forwarded_port_to_the_runner() -> Outcome {
 /// architecture, as on an x86-64 computer.
 #[test]
 fn on_esxi_vagrant_picks_the_boxes_builds_for_the_esxi_hosts_amd64() -> Outcome {
-    let containers = "version: 1\nname: c\nnetworks:\n  lab: { cidr: 10.62.0.0/24 }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: nginx } }\n";
-    let docker_vm = generate(&lab(containers)?, Target::DockerVm)?;
-    let docker_vm = isoloom_manifest::parse(file(&docker_vm, ".isoloom/docker-vm/run.json")?)?;
-    for m in [manifest(WEB_VM)?, manifest(MINI_AD)?, docker_vm] {
+    for m in [manifest(WEB_VM)?, manifest(MINI_AD)?] {
         let arch = m
             .params
             .iter()

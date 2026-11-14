@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's php entry: the php image's `php-fpm` command, the master
+# in the foreground, reading $PHP_INI_DIR/conf.d as the image's PHP does.
+mkdir -p /run/php
+export PHP_INI_SCAN_DIR="/etc/php/{{ vars.series }}/fpm/conf.d:/usr/local/etc/php/conf.d"
+exec /usr/sbin/php-fpm{{ vars.series }} -F -R "$@"

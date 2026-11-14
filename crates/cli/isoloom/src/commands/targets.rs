@@ -14,7 +14,7 @@ pub(crate) fn run(a: &Listing, profile: &spec::Profile, console: &mut Console) -
     let (lab, _) = spec::with_settings(profile, &a.project.dir, &a.settings)?;
     let lab = spec::checked(lab, &a.project.dir)?;
     let entries = tiers::tiers()?;
-    let ready = ready(&lab);
+    let ready = ready(&lab)?;
     if a.json {
         let listed: Vec<Value> = ready
             .iter()
@@ -22,7 +22,7 @@ pub(crate) fn run(a: &Listing, profile: &spec::Profile, console: &mut Console) -
             .collect();
         console.json(&listed)?;
     } else {
-        for line in listing(&lab).into_iter().chain(tier_lines(&entries, &ready, &lab)) {
+        for line in listing(&lab)?.into_iter().chain(tier_lines(&entries, &ready, &lab)?) {
             console.line(line)?;
         }
     }
@@ -30,14 +30,20 @@ pub(crate) fn run(a: &Listing, profile: &spec::Profile, console: &mut Console) -
 }
 
 /// The targets `generate` really produces: possible by the machines' forms, and not refused by
-/// the generator.
-fn ready(lab: &Lab) -> Vec<Target> {
-    lab.possible().into_iter().filter(|t| isoloom_targets::refusal(lab, *t).is_none()).collect()
+/// the generator. A target whose generation fails fails the listing, as it fails `generate`.
+fn ready(lab: &Lab) -> Result<Vec<Target>> {
+    let mut ready = Vec::new();
+    for t in lab.possible() {
+        if isoloom_targets::refusal(lab, t)?.is_none() {
+            ready.push(t);
+        }
+    }
+    Ok(ready)
 }
 
 /// One line per target, `✓` or `✗` with the reason; under a generated `cloud-vm`, the clouds
 /// whose module is dropped.
-fn listing(lab: &Lab) -> Vec<String> {
+fn listing(lab: &Lab) -> Result<Vec<String>> {
     let mut lines = Vec::new();
     for t in Target::ALL {
         if let Some(why) = lab.not_possible(t) {
@@ -47,26 +53,26 @@ fn listing(lab: &Lab) -> Vec<String> {
         // A target can be possible by its machines' forms and still be refused by its generator
         // (a Windows machine on Proxmox, say). A ✓ here means `generate` really produces it; a
         // refusal shows as ✗ with the generator's reason.
-        match isoloom_targets::refusal(lab, t) {
+        match isoloom_targets::refusal(lab, t)? {
             None => {
                 lines.push(format!("✓ {}", t.id()));
                 // A cloud whose model doesn't fit drops its module, not the target.
-                for r in isoloom_targets::cloud_refusals(lab, t).map(|c| c.refused).unwrap_or_default() {
+                for r in isoloom_targets::cloud_refusals(lab, t)?.map(|c| c.refused).unwrap_or_default() {
                     lines.push(format!("    ✗ {} ({})", r.cloud, r.reason));
                 }
             }
             Some(why) => lines.push(format!("✗ {} ({why})", t.id())),
         }
     }
-    lines
+    Ok(lines)
 }
 
 /// The tiers of the targets generated, after a blank line: a target's tier and its evidence, or,
 /// for a target with providers or clouds, each tier with the ones at it (a cloud whose module is
 /// dropped left out). Nothing when no target is generated.
-fn tier_lines(entries: &[TierEntry], ready: &[Target], lab: &Lab) -> Vec<String> {
+fn tier_lines(entries: &[TierEntry], ready: &[Target], lab: &Lab) -> Result<Vec<String>> {
     if ready.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let width = ready.iter().map(|t| t.id().len()).max().unwrap_or_default();
     let mut lines = vec![
@@ -74,7 +80,7 @@ fn tier_lines(entries: &[TierEntry], ready: &[Target], lab: &Lab) -> Vec<String>
         "Tiers (1: proven by real runs on every host OS it exists on, 2: generated and validated, 3: experimental; `isoloom matrix` has them all):".to_owned(),
     ];
     for t in ready {
-        let dropped: Vec<&str> = isoloom_targets::cloud_refusals(lab, *t)
+        let dropped: Vec<&str> = isoloom_targets::cloud_refusals(lab, *t)?
             .map(|c| c.refused.into_iter().map(|r| r.cloud).collect())
             .unwrap_or_default();
         let mine: Vec<&TierEntry> = tiers::of(entries, *t)
@@ -96,7 +102,7 @@ fn tier_lines(entries: &[TierEntry], ready: &[Target], lab: &Lab) -> Vec<String>
             lines.push(format!("  {name:<width$}  {tier}  {what}"));
         }
     }
-    lines
+    Ok(lines)
 }
 
 #[cfg(test)]
@@ -112,7 +118,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let lines = tier_lines(&entries, &[Target::Docker, Target::Vagrant, Target::CloudVm], &lab);
+        let lines = tier_lines(&entries, &[Target::Docker, Target::Vagrant, Target::CloudVm], &lab).unwrap();
         assert_eq!(lines.first().map(String::as_str), Some(""));
         assert!(lines.iter().any(|l| l.starts_with("  docker    1  real runs: linux (linux-1, ")), "{lines:#?}");
         let vagrant = lines.iter().position(|l| l.starts_with("  vagrant   ")).unwrap();
@@ -123,6 +129,6 @@ mod tests {
             clouds.contains("aws") && !clouds.contains("digitalocean"),
             "DigitalOcean takes one machine: {clouds}"
         );
-        assert_eq!(tier_lines(&entries, &[], &lab), Vec::<String>::new());
+        assert_eq!(tier_lines(&entries, &[], &lab).unwrap(), Vec::<String>::new());
     }
 }

@@ -3,7 +3,13 @@
 
 use isoloom_spec::model::{Spec, Target};
 
+use crate::configure::DaemonTable;
 use crate::{Environment, Lab};
+
+/// The daemons of the catalogue built into Isoloom, as an environment is planned with them.
+pub(crate) fn daemons() -> DaemonTable {
+    DaemonTable::from(isoloom_catalogue::Catalogue::embedded().expect("the built-in catalogue loads"))
+}
 
 /// The environment of `yaml`, written in the authored format.
 pub(crate) fn lab(yaml: &str) -> Lab {
@@ -24,7 +30,7 @@ pub(crate) fn spec(yaml: &str) -> Spec {
 
 /// The environment of `lab`, planned for `target`.
 pub(crate) fn planned(lab: &Lab, target: Target) -> Environment {
-    Environment::build(&lab.for_target(target), target, None).expect("the spec plans")
+    lab.plan(&lab.for_target(target), target, None).expect("the spec plans")
 }
 
 /// The environment of `yaml`, planned for `target`.

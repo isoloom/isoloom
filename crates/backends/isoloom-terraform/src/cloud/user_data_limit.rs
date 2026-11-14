@@ -3,7 +3,7 @@
 use super::Cloud;
 
 /// How large a cloud lets a machine's user data be, in bytes of the document it receives once
-/// decoded from the base64 it travels in (a `docker-vm`, Proxmox or ESXi snippet has no such cap).
+/// decoded from the base64 it travels in (a Proxmox or ESXi snippet has no such cap).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Limit(pub(crate) Cloud);
 

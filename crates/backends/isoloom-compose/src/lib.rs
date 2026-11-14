@@ -24,8 +24,8 @@
 //!   ephemeral host port Docker picks, so two environments publishing the same port never collide; the
 //!   runner reads the real port back from `docker compose ps`. `ISOLOOM_PUBLISH_ADDRESS`
 //!   overrides the address and `ISOLOOM_PUBLISH_FIXED` pins the host port to `publish` (both
-//!   set inside the docker-vm and cloud VMs, where the environment is alone and that fixed port is
-//!   forwarded from loopback).
+//!   set inside the cloud VMs, where the environment is alone and that fixed port is forwarded
+//!   from loopback).
 //! - `volumes:` become named volumes: they survive re-creating a container, and go with
 //!   `docker compose down -v`.
 //! - Network appliances (`docker.appliance`) run router and switch OSes in containers, wired
@@ -34,7 +34,7 @@
 //! It sits with the other backends, above the rendering layer (`isoloom-render`) and below the
 //! targets' registry (`isoloom-targets`), and depends on no other backend: [`ComposeBackend`]
 //! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files, through
-//! typed Compose structs. [`hybrid`] adapts the same file to the `hybrid` target's Docker host.
+//! typed Compose structs.
 //!
 //! # Example
 //!
@@ -52,7 +52,7 @@
 //!   web: { networks: { lan: 10 }, ports: { web: 80 }, app: { image: nginx } }
 //! ",
 //! )?);
-//! let env = Environment::build(&lab.for_target(Target::Docker), Target::Docker, None)?;
+//! let env = lab.plan(&lab.for_target(Target::Docker), Target::Docker, None)?;
 //! let files = ComposeBackend::DOCKER.render(&env)?;
 //! let compose = files.iter().find(|f| f.path == ".isoloom/docker/compose.yml").ok_or("no Compose file")?;
 //! assert!(compose.contents.contains("ipv4_address: 10.9.0.10"));
@@ -64,7 +64,6 @@ mod backend;
 mod check_runners;
 mod error;
 mod file;
-pub mod hybrid;
 mod images;
 mod interpolation;
 mod ipv6;

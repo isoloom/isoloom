@@ -74,57 +74,42 @@ pub(super) fn checked(what: &str, own: &[String]) -> Block {
 /// The command run through a POSIX shell with stand-in tools: Unix only, like the guest it runs on.
 #[cfg(all(test, unix))]
 mod tests {
-    use std::process::Command;
+    use isoloom_test_support::{FakeBin, Outcome};
 
     use super::start_agent_after_uplink;
 
-    /// The command run with a stand-in `ip` printing `addresses` (one `ip -o` line each), a
-    /// `sleep` that counts, and a `systemctl` that logs: the waits, then the calls.
-    fn run(addresses: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
-        let dir = tempfile::Builder::new().prefix("isoloom-uplink-").tempdir()?;
-        let bin = dir.path().join("bin");
-        std::fs::create_dir_all(&bin)?;
-        let log = dir.path().join("log");
-        let lines = addresses
+    /// The command run with a stand-in `ip` printing `addresses` (one `ip -o` line each), and a
+    /// `sleep` and a `systemctl` that record their calls: those calls, in order.
+    fn run(addresses: &[&str]) -> Outcome<Vec<Vec<String>>> {
+        let bin = FakeBin::new()?;
+        let lines: Vec<String> = addresses
             .iter()
             .map(|a| format!("echo '2: eth0    inet {a}/24 brd x scope global eth0'"))
-            .collect::<Vec<_>>()
-            .join(
-                "
-",
-            );
-        let stand_ins = [
-            ("ip", lines),
-            ("sleep", format!("echo sleep >> {}\n", log.display())),
-            ("systemctl", format!("echo \"systemctl $*\" >> {}\n", log.display())),
-        ];
-        for (name, body) in stand_ins {
-            std::fs::write(bin.join(name), format!("#!/bin/sh\n{body}"))?;
-            Command::new("chmod").arg("+x").arg(bin.join(name)).status()?;
-        }
-        for tool in ["awk", "grep"] {
-            let found = Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
-            std::os::unix::fs::symlink(String::from_utf8(found.stdout)?.trim(), bin.join(tool))?;
-        }
-        let script = start_agent_after_uplink(&["10.254.250.254".to_owned()]);
-        let out = Command::new("/bin/sh").arg("-c").arg(script).env_clear().env("PATH", &bin).output()?;
-        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-        Ok(std::fs::read_to_string(log)?)
+            .collect();
+        bin.stand_in("ip", &lines.join("\n"))?
+            .recording("sleep")?
+            .recording("systemctl")?
+            .link_real(&["awk", "grep"])?;
+        bin.calls_of(&start_agent_after_uplink(&["10.254.250.254".to_owned()]), &[])
     }
 
+    const START_AGENT: [&str; 4] = ["systemctl", "enable", "--now", "qemu-guest-agent"];
+
     #[test]
-    fn the_agent_starts_at_once_when_the_uplink_has_an_address() -> Result<(), Box<dyn std::error::Error>> {
-        assert_eq!(run(&["10.254.250.254", "192.168.1.20"])?, "systemctl enable --now qemu-guest-agent\n");
+    fn the_agent_starts_at_once_when_the_uplink_has_an_address() -> Outcome<()> {
+        assert_eq!(run(&["10.254.250.254", "192.168.1.20"])?, [START_AGENT]);
         Ok(())
     }
 
     /// The environment address alone (set statically, before any DHCP answer) isn't the uplink's:
     /// the agent waits, then starts anyway so the check reports the missing address.
     #[test]
-    fn the_environment_address_alone_doesnt_start_the_agent() -> Result<(), Box<dyn std::error::Error>> {
-        let log = run(&["10.254.250.254"])?;
-        assert_eq!(log.matches("sleep").count(), 84, "{log}");
-        assert!(log.ends_with("systemctl enable --now qemu-guest-agent\n"));
+    fn the_environment_address_alone_doesnt_start_the_agent() -> Outcome<()> {
+        let calls = run(&["10.254.250.254"])?;
+        let (last, waits) = calls.split_last().ok_or("no call")?;
+        assert_eq!(last, &START_AGENT);
+        assert_eq!(waits.len(), 84, "{calls:?}");
+        assert!(waits.iter().all(|c| c.first().map(String::as_str) == Some("sleep")), "{calls:?}");
         Ok(())
     }
 }

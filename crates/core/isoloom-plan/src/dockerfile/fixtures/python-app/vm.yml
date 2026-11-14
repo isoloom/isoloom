@@ -1,0 +1,121 @@
+os: debian@12
+app:
+  steps:
+  - command: |
+      set -e
+      mkdir -p /var/lib/isoloom/dockerfile
+      if command -v systemctl >/dev/null; then
+        systemctl list-unit-files --state=enabled --type=service --no-legend | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-before
+      elif command -v rc-update >/dev/null; then
+        rc-update show default | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-before
+      fi
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/001
+    creates: /var/lib/isoloom/dockerfile/001
+  - command: |
+      set -e
+      d=/usr/local/lib/isoloom/shims
+      mkdir -p "$d"
+      cat > "$d/useradd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -u ] || [ "${prev:-}" = --uid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent passwd "$id" >/dev/null; then exec /usr/sbin/useradd -o "$@"; fi
+      exec /usr/sbin/useradd "$@"
+      SHIM
+      cat > "$d/groupadd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -g ] || [ "${prev:-}" = --gid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent group "$id" >/dev/null; then exec /usr/sbin/groupadd -o "$@"; fi
+      exec /usr/sbin/groupadd "$@"
+      SHIM
+      chmod 755 "$d/useradd" "$d/groupadd"
+      if command -v apk >/dev/null; then
+        for tool in adduser addgroup; do
+          cat > "$d/$tool" <<SHIM
+      #!/bin/sh
+      flag=-u; [ $tool = addgroup ] && flag=-g
+      db=passwd; [ $tool = addgroup ] && db=group
+      out=; skip=
+      for a; do
+        if [ -n "\$skip" ]; then skip=; getent "\$db" "\$a" >/dev/null || out="\$out \$flag \$a"; continue; fi
+        if [ "\$a" = "\$flag" ]; then skip=1; continue; fi
+        out="\$out \$a"
+      done
+      exec /bin/busybox $tool \$out
+      SHIM
+          chmod 755 "$d/$tool"
+        done
+      fi
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
+    creates: /var/lib/isoloom/dockerfile/002
+  - catalogue: python@3.8.20 on debian@12
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /app && cd /app
+      mkdir -p /app
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
+    creates: /var/lib/isoloom/dockerfile/003
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /app && cd /app
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/app/requirements.txt
+      for s in /opt/isoloom/build/python-app/app/app/requirements.txt; do isoloom_copy_to "$s" "$dest"; done
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
+    creates: /var/lib/isoloom/dockerfile/004
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /app && cd /app
+      pip install -r requirements.txt
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
+    creates: /var/lib/isoloom/dockerfile/005
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /app && cd /app
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/app
+      for s in /opt/isoloom/build/python-app/app/app; do isoloom_copy_into "$s" "$dest"; done
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/006
+    creates: /var/lib/isoloom/dockerfile/006
+  - command: |
+      set -e
+      keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom)'
+      if command -v systemctl >/dev/null; then
+        systemctl list-unit-files --state=enabled --type=service --no-legend | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-after
+        for u in $(comm -13 /var/lib/isoloom/dockerfile/units-before /var/lib/isoloom/dockerfile/units-after | grep -Ev "$keep" || true); do
+          systemctl disable --now "$u" || true
+        done
+      elif command -v rc-update >/dev/null; then
+        rc-update show default | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-after
+        for u in $(comm -13 /var/lib/isoloom/dockerfile/units-before /var/lib/isoloom/dockerfile/units-after | grep -Ev "$keep" || true); do
+          rc-service "$u" stop || true
+          rc-update del "$u" default || true
+        done
+      fi
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/007
+    creates: /var/lib/isoloom/dockerfile/007
+  - command: |
+      set -e
+      mkdir -p /usr/local/lib/isoloom
+      printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS91c3IvbG9jYWwvc2JpbjovdXNyL2xvY2FsL2JpbjovdXNyL3NiaW46L3Vzci9iaW46L3NiaW46L2JpbgpleHBvcnQgU0VDUkVUX0tFWT1zZWNyZXRrZXkKZXhwb3J0IE1ZU1FMX0VORFBPSU5UPW15c3FsZGItYTcKZXhwb3J0IE1ZU1FMX1BBU1NXT1JEPXBhc3MKZXhwb3J0IE1ZU1FMX1VTRVI9dXNlcgpleHBvcnQgTVlTUUxfREI9YTdkYgpjZCAvYXBwCmV4ZWMgL2Jpbi9zaCAtYyAncHl0aG9uIHJvdXRlcy5weScK | base64 -d > /usr/local/lib/isoloom/app-start
+      chmod 755 /usr/local/lib/isoloom/app-start
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/008
+    creates: /var/lib/isoloom/dockerfile/008
+  - service:
+      name: isoloom-app
+      run:
+      - /usr/local/lib/isoloom/app-start
+      cwd: /app

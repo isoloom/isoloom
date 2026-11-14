@@ -345,6 +345,54 @@ Arguments:
 | --- | --- |
 | `--json` | The matrix as JSON: the columns with their tiers, every tier entry with its evidence, and each row's cell per column (its state, and for a refusal the step and reason). |
 
+## `isoloom bases`
+
+Vendor the published Dockerfiles of the base images the project's builds start FROM that Isoloom's service matrix doesn't have (under vendor/bases/), so those machines get a VM form offline.
+
+```text
+Usage: isoloom bases [OPTIONS] <COMMAND>
+```
+
+## `isoloom bases fetch`
+
+Fetch and vendor the base images the builds need (under vendor/bases/).
+
+```text
+Usage: isoloom bases fetch [OPTIONS] [DIR]
+```
+
+Arguments:
+
+| Argument | Description |
+| --- | --- |
+| `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+
+## `isoloom bases help`
+
+Print this message or the help of the given subcommand(s).
+
+```text
+Usage: isoloom bases help [COMMAND]
+```
+
+## `isoloom bases help fetch`
+
+Fetch and vendor the base images the builds need (under vendor/bases/).
+
+```text
+Usage: isoloom bases help fetch
+```
+
+## `isoloom bases help help`
+
+Print this message or the help of the given subcommand(s).
+
+```text
+Usage: isoloom bases help help
+```
+
 ## `isoloom help`
 
 Print this message or the help of the given subcommand(s).
@@ -495,6 +543,22 @@ Show what each target does with each spec field (✓ generated, ✗ refused, wit
 
 ```text
 Usage: isoloom help matrix
+```
+
+## `isoloom help bases`
+
+Vendor the published Dockerfiles of the base images the project's builds start FROM that Isoloom's service matrix doesn't have (under vendor/bases/), so those machines get a VM form offline.
+
+```text
+Usage: isoloom help bases [COMMAND]
+```
+
+## `isoloom help bases fetch`
+
+Fetch and vendor the base images the builds need (under vendor/bases/).
+
+```text
+Usage: isoloom help bases fetch
 ```
 
 ## `isoloom help help`

@@ -123,7 +123,8 @@ pub(crate) fn needs_ruby(links: &IndexMap<String, Link>, sized: bool) -> bool {
     sized || links.values().any(|l| matches!(l, Link::Hub(_)))
 }
 
-/// How many host ports the hubs pick from (`IsoloomQemu::PORTS`, from 20000).
+/// How many host ports the hubs pick from: `IsoloomQemu::PORTS` in [`QEMU_RB`], which a test
+/// holds to this value.
 const PORTS: u16 = 20_000;
 
 /// The first VM that can't have its network, as the reason.
@@ -137,6 +138,15 @@ pub(crate) fn refusal(links: IndexMap<String, Link>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{HubPort, Link};
+
+    #[test]
+    fn the_hubs_port_count_is_the_rubys() {
+        let ruby = super::QEMU_RB
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("PORTS = "))
+            .map(|n| n.replace('_', "").parse::<u16>());
+        assert_eq!(ruby, Some(Ok(super::PORTS)), "vagrant_qemu.rb's PORTS and qemu.rs's differ");
+    }
 
     fn hub(net: &str, vm: &str) -> Link {
         Link::Hub(HubPort {

@@ -316,6 +316,12 @@ $archive = 'C:\Windows\Temp\isoloom-project.tgz'; $dest = 'C:\isoloom'; $strip =
     }
   }
   $in.Close()
+  # A machine's command runs from the project folder: stopped first, Windows refuses to remove a
+  # folder a process works in (its step starts it again). Before Windows 8 and Server 2012 there
+  # is no ScheduledTasks module, and so no such task.
+  if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {
+    Get-ScheduledTask -TaskName 'isoloom-*' -ErrorAction SilentlyContinue | Stop-ScheduledTask -ErrorAction SilentlyContinue
+  }
   if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
   Move-Item $new $dest
   Remove-Item $archive -Force
@@ -441,6 +447,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -494,7 +509,9 @@ end
 #   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
 #   VM on its network does, unless one runs, with `SPARE` ports more for VMs that join the network
 #   while it runs; it is never restarted under the VMs connected to it, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+#   network's last VM is destroyed: destroying one VM leaves it to the others. Vagrant starts and
+#   destroys QEMU's VMs in parallel (and two Vagrant processes can act on one copy at once), so a
+#   network's hub is started, joined and stopped under that network's lock only (`locked`).
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -527,6 +544,19 @@ module IsoloomQemu
     pid if command.include?(pid_file(net))
   rescue ArgumentError, SystemCallError
     nil
+  end
+
+  # Runs the block holding network `net`'s lock (an exclusive lock on its file in `hubs_dir`,
+  # across threads and processes), so the hub is decided by one VM at a time: two VMs starting at
+  # once would each find no hub and start one (the second stopping the first's under the VM
+  # connected to it), and a start beside the last VM's destroy would find a hub about to stop.
+  def self.locked(net)
+    require "fileutils"
+    FileUtils.mkdir_p(hubs_dir)
+    File.open(File.join(hubs_dir, "#{net}.lock"), File::RDWR | File::CREAT, 0o600) do |f|
+      f.flock(File::LOCK_EX)
+      yield
+    end
   end
 
   # The hub ports: 20000-39999.
@@ -624,6 +654,11 @@ module IsoloomQemu
   # than restarted under the VMs connected to it. A hub without a record Isoloom reads (an older
   # Isoloom started it) is replaced: the VM about to start connects to its new port.
   def self.hub(net, ports)
+    locked(net) { start_or_join(net, ports) }
+  end
+
+  # `hub`'s work, under the network's lock.
+  def self.start_or_join(net, ports)
     rec = record(net)
     if rec
       joined = ports.reject { |vm, port| rec[:vms][vm] == port }
@@ -636,8 +671,6 @@ module IsoloomQemu
       return
     end
     stop(net)
-    require "fileutils"
-    FileUtils.mkdir_p(hubs_dir)
     taken = ports.values.dup
     at = taken.max || start
     spare = Array.new(SPARE) do
@@ -660,10 +693,11 @@ module IsoloomQemu
   # holds) is left besides the one just destroyed. A VM is left while Vagrant keeps its id: a
   # halted one still holds its port, and the hub starts again for it anyway if stopped.
   def self.release(net, vms, env, gone)
-    rec = record(net)
-    left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
-    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
-    stop(net)
+    locked(net) do
+      rec = record(net)
+      left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
+      stop(net) unless left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    end
   end
 
   # Stops the network's hub, if it runs, and forgets it. The hub can be gone, pid file and all, by
@@ -708,7 +742,7 @@ module IsoloomQemu
   # virtiofsd's arguments for a host folder (`host_folders`) every account of the VM writes, as
   # on the other providers: vagrant-qemu maps only its guest user and group to this computer's
   # (`--translate-uid map:1000:<uid>:1`), and an unprivileged virtiofsd refuses any other id
-  # (EPERM: the attack box's player, root in docker-vm's VM), whatever the folder's permissions
+  # (EPERM: an account of the VM other than the guest user), whatever the folder's permissions
   # say. Every other guest uid and gid is squashed to this computer's user and group, in two
   # ranges either side of the mapped one, so no two rules overlap. Only where the virtiofsd
   # vagrant-qemu starts translates ids (1.13 or later, `--translate-uid` in its `--help`, as
@@ -741,22 +775,22 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "ansible-pair_"
+    v.default_prefix = "ansible-pair-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair - web"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair - web"
+      v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -767,7 +801,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair - web"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -804,7 +838,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-web"
+      v.guest_name = "ansible-pair-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -822,17 +856,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "ansible-pair-web"
+      v.vmname = "ansible-pair-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215CFE4F0A1"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", "0215CFE4F0A1"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -890,9 +924,11 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -922,16 +958,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
-    m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair - cache"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair - cache"
+      v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("cache"))
@@ -942,7 +978,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair - cache"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -979,7 +1015,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-cache"
+      v.guest_name = "ansible-pair-#{ISOLOOM_KEY}-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -997,17 +1033,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "ansible-pair-cache"
+      v.vmname = "ansible-pair-#{ISOLOOM_KEY}-cache"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215605C41D5"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", "0215605C41D5"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1065,9 +1101,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1097,20 +1135,20 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair - isoloom-controller"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair - isoloom-controller"
+      v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "768"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair - isoloom-controller"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
@@ -1140,7 +1178,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-isoloom-controller"
+      v.guest_name = "ansible-pair-#{ISOLOOM_KEY}-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 768
     end
@@ -1152,7 +1190,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.memory = 768
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "ansible-pair-isoloom-controller"
+      v.vmname = "ansible-pair-#{ISOLOOM_KEY}-isoloom-controller"
       v.cpus = 1
       v.memory = 768
       v.linked_clone = true
@@ -1161,10 +1199,10 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215B7AAD166"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", "0215B7AAD166"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1222,7 +1260,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
@@ -1365,6 +1403,6 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       run_play ansible-playbook -i /etc/isoloom/inventory.ini -i '/opt/isoloom/ansible/groups.ini' -e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}' 'site.yml'
     SH
     m.vm.provision "shell", name: "halt", inline: "touch /run/isoloom-halting; (sleep 5; poweroff) >/dev/null 2>&1 &"
-    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-answers.sh'"]].map { |p, folder, file| "mkdir -p #{folder} && cat > #{file} <<'ISOLOOM_EOF'\n#{File.read(File.join(ROOT, p))}\nISOLOOM_EOF\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/web-answers.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/web-answers.sh'"]].map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); "mkdir -p #{folder} && cat > #{file} <<'#{tag}'\n#{body}\n#{tag}\n" }.join + File.read(File.join(__dir__, "checks/isoloom-controller.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
   end
 end

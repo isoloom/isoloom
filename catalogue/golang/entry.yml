@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The golang entry: the Go toolchain, as the official golang image has it (/usr/local/go, `go`
+# and `gofmt` on the PATH, GOPATH /go), for a machine that builds or runs a Go app: go.dev's build
+# of the exact release, pinned by the SHA-256 go.dev publishes for it. The image's command is a
+# shell: there is no service, the app's own command runs. lock.yml beside it is written only by
+# `cargo xtask catalogue refresh golang`.
+name: golang
+description: >-
+  The Go toolchain of an exact release, installed the way the official golang image has it
+  (/usr/local/go, GOPATH /go): what an app's build or its own command runs on.
+upstream: https://go.dev/
+licence:
+  software: BSD-3-Clause
+  notes: The release bundles its dependencies under their own licences.
+
+releases:
+  - version: 1.14.15
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://go.dev/dl/go1.14.15.linux-amd64.tar.gz", sha256: c64a57b374a81f7cf1408d2c410a28c6f142414f1ffa9d1062de1d653b0ae0d6 }
+  - version: 1.16.15
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://go.dev/dl/go1.16.15.linux-amd64.tar.gz", sha256: 77c782a633186d78c384f972fb113a43c24be0234c42fef22c2d8c4c4c8e7475 }
+  - version: 1.21.13
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://go.dev/dl/go1.21.13.linux-amd64.tar.gz", sha256: 502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7 }
+  - version: 1.22.12
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://go.dev/dl/go1.22.12.linux-amd64.tar.gz", sha256: 4fa4f869b0f7fc6bb1eb2660e74657fbf04cdd290b5aef905585c86051b34d43 }
+  - version: 1.23.12
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://go.dev/dl/go1.23.12.linux-amd64.tar.gz", sha256: d3847fef834e9db11bf64e3fb34db9c04db14e068eeb064f49af747010454f90 }
+  - version: 1.26.11
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://go.dev/dl/go1.26.11.linux-amd64.tar.gz", sha256: 9849f4e04ee35303714e34fbc3ac8ab44ea3e448a95aa182f91e3b9b79c710ec }
+default: 1.23.12
+
+recipe:
+  install:
+    - packages: [ca-certificates, git, gcc, libc6-dev, make]
+      when: { family: [debian, ubuntu] }
+    - packages: [ca-certificates, git, gcc, glibc-devel, make]
+      when: { family: [rocky] }
+    - file: { path: /var/cache/isoloom/go.tar.gz, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
+    - command: "sh -c 'tar -xzf /var/cache/isoloom/go.tar.gz -C /usr/local && ln -sf /usr/local/go/bin/go /usr/local/bin/go && ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt && mkdir -p /go/bin /go/src'"
+      creates: /usr/local/go/bin/go
+
+  configure: []
+  start: []

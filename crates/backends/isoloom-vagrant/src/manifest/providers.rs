@@ -10,10 +10,10 @@ use isoloom_render::run_manifest;
 
 use super::vagrant_argv;
 use crate::error::Result;
-use crate::vms::provider::{Known, Provider as Vagrant, provider_refusal};
+use crate::vms::provider::{Profile, Provider as Vagrant, provider_refusal};
 
 /// Known provider `k` as a manifest provider, with `elevation` and this environment's `refusal` on it.
-fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<VagrantProvider> {
+fn provider(k: &Profile, elevation: Elevation, refusal: Option<String>) -> Result<VagrantProvider> {
     Ok(VagrantProvider {
         id: k.manifest,
         hosts: k.hosts.iter().copied().collect(),
@@ -27,40 +27,19 @@ fn provider(k: &Known, elevation: Elevation, refusal: Option<String>) -> Result<
 /// The providers the Vagrantfile has a block for ([`Vagrant::runs_vms`]: all but UTM), with
 /// this environment's refusal on each, and Vagrant's state folder for the run.
 pub(super) fn identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
-    let providers = Vagrant::ALL
-        .iter()
+    let providers = Vagrant::profiles()
         .filter(|k| k.provider.runs_vms())
         .map(|k| {
             // Hyper-V takes management commands from an administrator only.
             let elevation = if k.manifest == Provider::Hyperv { Elevation::Hyperv } else { Elevation::None };
             let name = k.provider.id();
-            provider(k, elevation, provider_refusal(env, name))
+            provider(&k, elevation, provider_refusal(env, name))
         })
         .collect::<Result<_>>()?;
     Ok(Identity::Vagrant(VagrantIdentity {
         providers,
         dotfile: Some(dotfile.clone()),
     }))
-}
-
-/// The providers `docker-vm`'s Vagrantfile has a block for (all but Hyper-V), its one VM a plain
-/// Debian one, so only the containers' host folders rule a provider out (one that shares none);
-/// and Vagrant's state folder for the run.
-pub(super) fn docker_vm_identity(env: &Environment, dotfile: &PathTemplate) -> Result<Identity> {
-    let providers = Vagrant::ALL
-        .iter()
-        .filter(|k| docker_vm_offers(k.manifest))
-        .map(|k| provider(k, Elevation::None, crate::host_folders::docker_vm_refusal(env, k.provider.id())))
-        .collect::<Result<_>>()?;
-    Ok(Identity::Vagrant(VagrantIdentity {
-        providers,
-        dotfile: Some(dotfile.clone()),
-    }))
-}
-
-/// Whether `docker-vm` offers `provider`: all but Hyper-V.
-pub(super) fn docker_vm_offers(provider: Provider) -> bool {
-    provider != Provider::Hyperv
 }
 
 /// The oldest Vagrant a run takes: 2.4.0, the first that honours a box's architecture

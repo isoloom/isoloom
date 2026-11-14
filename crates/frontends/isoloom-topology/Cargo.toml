@@ -1,0 +1,39 @@
+[package]
+name = "isoloom-topology"
+description = "Isoloom's topology compiler: a network drawn in a topology editor becomes an Isoloom spec and the project files it refers to."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/isoloom-topology"
+readme = "README.md"
+keywords = ["isoloom", "network", "topology", "compiler"]
+categories = ["compilers", "network-programming"]
+exclude = ["tests/"]
+publish = true
+
+[dependencies]
+# A starter's path: inside the project (`RelPath`) and outside Isoloom's outputs (`ignore`).
+isoloom-manifest.workspace = true
+# A drawn container's VM form: Isoloom's table of images (`dockerfile::matrix`) and its catalogue.
+isoloom-catalogue.workspace = true
+isoloom-plan.workspace = true
+isoloom-spec.workspace = true
+indexmap.workspace = true
+serde.workspace = true
+serde_yaml_ng.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+isoloom-targets.workspace = true
+insta.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+[package.metadata.docs.rs]
+all-features = true

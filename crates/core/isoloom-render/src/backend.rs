@@ -44,10 +44,9 @@ pub trait Backend: Sync {
         Ok(None)
     }
 
-    /// Every run manifest of the target, each with the folder it goes in under the target's own:
-    /// `docker-vm` has two, one per way it makes its VM (`docker-vm/run.json` with Vagrant,
-    /// `docker-vm/proxmox/run.json` with Terraform). By default, [`Backend::run_manifest`]'s, in
-    /// the target's folder.
+    /// Every run manifest of the target, each with the folder it goes in under the target's own
+    /// (`cloud-docker` has one per cloud). By default, [`Backend::run_manifest`]'s, in the
+    /// target's folder.
     ///
     /// # Errors
     ///

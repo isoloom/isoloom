@@ -28,7 +28,6 @@ mod base;
 mod boot;
 mod console;
 mod controller;
-pub(crate) mod docker_host;
 mod firewall;
 mod gpus;
 mod image;

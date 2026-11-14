@@ -9,6 +9,7 @@ use std::str::FromStr;
 use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Deserializer, Serialize};
 
+use super::mistake::Mistake;
 use super::names::{InputName, Text};
 use crate::Error;
 
@@ -173,9 +174,9 @@ struct FileInput {
 }
 
 impl TryFrom<FileInput> for File {
-    type Error = Error;
+    type Error = Mistake;
 
-    fn try_from(f: FileInput) -> Result<File, Error> {
+    fn try_from(f: FileInput) -> Result<File, Mistake> {
         let given: Vec<FileSource> = [
             f.source.map(FileSource::Source),
             f.content.map(FileSource::Content),
@@ -187,8 +188,8 @@ impl TryFrom<FileInput> for File {
         .collect();
         let source = match <[FileSource; 1]>::try_from(given) {
             Ok([one]) => one,
-            Err(given) if given.is_empty() => return Err(Error::NoFileSource),
-            Err(given) => return Err(Error::FileSources(given.iter().map(FileSource::key).collect())),
+            Err(given) if given.is_empty() => return Err(Error::NoFileSource.into()),
+            Err(given) => return Err(Error::FileSources(given.iter().map(FileSource::key).collect()).into()),
         };
         Ok(File {
             path: f.path,

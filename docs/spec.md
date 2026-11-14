@@ -111,7 +111,7 @@ A machine of the environment that routes this network (an edge firewall): it tak
 The VLANs this LAN is split into, by id (1-4094), each with its own block inside the LAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming the LAN covers all of its VLANs. Each VLAN becomes a network of its own, `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
 
 - **Type:** map of name to mapping
-- **Limits:** names match `^[1-9][0-9]{0,3}$`
+- **Limits:** names match `^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$`
 
 ### `networks.*.vlans.*.cidr`
 
@@ -338,7 +338,7 @@ The environment's machines, by name, started in the order written (after their `
 The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default. Required, except for a machine whose only recipe is `app.image`, `app.build` or `app.appliance`, and an `access` machine the runner's image table supplies. Windows has no container form.
 
 - **Type:** string
-- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `alpine@3.24`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
+- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.7`, `alpine@3.19`, `alpine@3.24`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
 
 ### `machines.*.service`
 
@@ -366,7 +366,7 @@ A published image, by tag or digest (`example/clamd:1.4`): the container form. W
 
 ### `machines.*.app.build`
 
-The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form; translating it to a VM is never attempted, so add `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
+The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form, and on a VM target the VM form it translates to (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as that published name.
 
 - **Type:** string or mapping
 
@@ -842,7 +842,7 @@ The machine the user lands on (at most one). Without `os` (and nothing to run), 
 
 ### `machines.*.ports`
 
-Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
+Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
 
 - **Type:** map of name to integer or mapping
 
@@ -892,6 +892,24 @@ Only answers once something wakes it: nothing waits for it.
 
 - **Type:** boolean
 - **Default:** `false`
+
+### `machines.*.ports.*.login`
+
+The account its service ships with, `{ user, password }`: shown to the user beside the port so they can sign in. For a training environment's published sign-in only, never a secret (a secret is an input).
+
+- **Type:** mapping
+
+### `machines.*.ports.*.login.user`
+
+The account's name.
+
+- **Type:** string
+
+### `machines.*.ports.*.login.password`
+
+Its password.
+
+- **Type:** string
 
 ### `machines.*.command`
 
@@ -1103,7 +1121,7 @@ Where it is mounted: an absolute path on Linux and in containers, a drive letter
 
 ### `machines.*.host_folders`
 
-Folders of the computer that runs the environment, mounted in the machine both ways (what it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`, libvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound; UTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
+Folders of the computer that runs the environment, mounted in the machine both ways (what it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
 
 - **Type:** list of mappings
 
@@ -1632,7 +1650,7 @@ Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `prox
 
 ### `overrides.docker`
 
-Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.
+Every target that runs the Compose file: `docker`, `hosted`, `cloud-docker`.
 
 - **Type:** mapping
 
@@ -1687,7 +1705,7 @@ Its name on the platform (a Docker volume, a Kubernetes claim in the environment
 
 ### `overrides.vagrant`
 
-The `vagrant` target, and the VMs of `hybrid`.
+The `vagrant` target.
 
 - **Type:** mapping
 

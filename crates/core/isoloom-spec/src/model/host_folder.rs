@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 /// A folder of the computer that runs the environment, mounted in the machine both ways: what the machine
 /// writes there lands on that computer, and what is put there shows in the machine. Only the
-/// targets whose machines run on that computer mount one (`docker`, `docker-vm` on a local
-/// provider, `vagrant`); the others refuse a spec that asks for one.
+/// targets whose machines run on that computer mount one (`docker`, `vagrant`); the others refuse
+/// a spec that asks for one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HostFolder {

@@ -1,7 +1,7 @@
 //! How to start a Compose file: `wait` for everything but its leaf jobs (`up -d --wait`), then
 //! run each of those jobs attached, in order, failing on its exit code. Computed from the typed
 //! file this backend renders, for the run manifests' start steps and, as one shell line
-//! ([`StartPlan::command`]), the start written atop the file and the hybrid Docker host's.
+//! ([`StartPlan::command`]), the start written atop the file.
 
 use crate::file::ComposeFile;
 

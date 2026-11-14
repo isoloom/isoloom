@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The python entry: CPython, as the official python image has it (under /usr/local, with pip and
+# the scripts it installs on the PATH), for a machine whose app runs on Python. 3.x is
+# python-build-standalone's build of the exact release (the archive the uv tool installs), pinned
+# by its SHA-256; 2.7.18 is Debian 11's own Python 2, with pip's last release for it. The image's
+# interactive shell is its command: there is no service, the app's own command runs. lock.yml
+# beside it is written only by `cargo xtask catalogue refresh python`.
+name: python
+description: >-
+  CPython of an exact release, with pip, installed the way the official python image has it
+  (/usr/local/bin/python, python3 and pip): the runtime an app's own command runs on.
+upstream: https://www.python.org/
+licence:
+  software: PSF-2.0
+  notes: python-build-standalone bundles CPython's dependencies under their own licences.
+
+releases:
+  - version: 2.7.18
+    source: distro
+    os: [debian@11]
+  - version: 3.8.20
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20241002/cpython-3.8.20%2B20241002-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: 285e141c36f88b2e9357654c5f77d1f8fb29cc25132698fe35bb30d787f38e87 }
+  - version: 3.9.10
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20220227/cpython-3.9.10%2B20220227-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: 455089cc576bd9a58db45e919d1fc867ecdbb0208067dffc845cc9bbf0701b70 }
+  - version: 3.9.25
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20251031/cpython-3.9.25%2B20251031-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: 42834f61eb6df43432c3dd6ab9ca3fdf8c06d10a404ebdb53d6902e6b9570b08 }
+  - version: 3.10.22
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.10.22%2B20261009-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: 1780de9ddda04e956d2a4a0ad09b7f5667d92f4f12cd0881ec939de5d542903f }
+  - version: 3.11.18
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.11.18%2B20261110-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: ac0b758b6ae4ba1cb87f7091eb6bb17c9a383a9bcdb5c18493cdd4f34e35ae8c }
+  - version: 3.12.16
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: c2f87d4b4e8db3abddb0f116c6ccfc503d0cbdbb9ee8faacddad1b679ec12e99 }
+  - version: 3.13.18
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04, rocky@9]
+    vars: { url: "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-x86_64-unknown-linux-gnu-install_only.tar.gz", sha256: 50c774f6674740739f791c05a9177ed03e2fe02abebda9bca3512eb7309b37cc }
+default: 3.12.16
+
+recipe:
+  install:
+    # The official (non-slim) image's compilers, which pip's source builds need.
+    - packages: [ca-certificates, build-essential]
+      when: { family: [debian, ubuntu] }
+    - packages: [ca-certificates, gcc, make]
+      when: { family: [rocky] }
+    # 3.x: the release's archive, unpacked where the image has it.
+    - file: { path: /var/cache/isoloom/python.tar.gz, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
+      when: { release: ["3"] }
+    - command: "sh -c 'tar -xzf /var/cache/isoloom/python.tar.gz --strip-components=1 -C /usr/local && ln -sf python3 /usr/local/bin/python && ln -sf pip3 /usr/local/bin/pip'"
+      creates: /usr/local/bin/python
+      when: { release: ["3"] }
+    # 2.7: Debian 11's Python 2, and pip's last release for it.
+    - packages: [python2, python2-dev]
+      when: { release: ["2.7"] }
+    - file: { path: /var/cache/isoloom/get-pip.py, url: "https://bootstrap.pypa.io/pip/2.7/get-pip.py", sha256: 40ee07eac6674b8d60fce2bbabc148cf0e2f1408c167683f110fd608b8d6f416 }
+      when: { release: ["2.7"] }
+    - command: "sh -c 'python2 /var/cache/isoloom/get-pip.py && ln -sf /usr/bin/python2 /usr/local/bin/python'"
+      creates: /usr/local/bin/python
+      when: { release: ["2.7"] }
+
+  configure: []
+  start: []

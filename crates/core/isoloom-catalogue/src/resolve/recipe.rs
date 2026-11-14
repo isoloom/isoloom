@@ -67,6 +67,10 @@ impl Context<'_> {
             && w.release.as_ref().is_none_or(|l| l.iter().any(|word| self.release.is(word)))
             && w.set.as_ref().is_none_or(|s| self.settings.is_set(s.as_str()))
             && w.unset.as_ref().is_none_or(|s| !self.settings.is_set(s.as_str()))
+            && w.is.as_ref().is_none_or(|m| {
+                m.iter()
+                    .all(|(s, v)| matches!(self.settings.get(s.as_str()), Some(SettingValue::Text(t)) if t == v))
+            })
     }
 
     /// The items `step` repeats for: one pass without an item, unless it has `for_each`.
@@ -96,7 +100,9 @@ impl Context<'_> {
     /// A key given by its fingerprint, its SHA-256 written from `lock.yml`.
     fn key(&self, key: &mut Map<String, Value>) -> Result<(), String> {
         let Some(fingerprint) = key.shift_remove("fingerprint") else { return Ok(()) };
-        let url = key.get("url").and_then(Value::as_str).unwrap_or_default().to_owned();
+        let Some(url) = key.get("url").and_then(Value::as_str).map(str::to_owned) else {
+            return Err(format!("a key given by its fingerprint ({fingerprint}) also gives its `url`"));
+        };
         let locked = self.entry.lock().keys.iter().find(|(u, _)| u.as_str() == url).map(|(_, k)| k);
         match locked {
             Some(k) if k.fingerprint.as_deref() == fingerprint.as_str() => {

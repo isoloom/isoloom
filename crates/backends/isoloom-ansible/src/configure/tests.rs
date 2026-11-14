@@ -20,7 +20,7 @@ fn env(m: &str, target: Target, templates: &[(&str, &str)]) -> Environment {
     assert_eq!(lab.problems(), [], "the test spec is valid");
     let texts: BTreeMap<_, _> = templates.iter().filter_map(|(p, t)| Some((p.parse().ok()?, (*t).to_owned()))).collect();
     let lab = lab.with_templates(texts);
-    Environment::build(&lab.for_target(target), target, None).expect("the spec plans")
+    lab.plan(&lab.for_target(target), target, None).expect("the spec plans")
 }
 
 /// Machine `m`'s role `tasks/main.yml` text, rendered for `target`.
@@ -65,10 +65,35 @@ fn a_rocky_package_takes_dnf_and_the_rpm_version_join() {
 #[test]
 fn an_alpine_package_is_a_guarded_command_not_the_community_apk_module() {
     let t = tasks("os: alpine@3.24, app: { steps: [{ packages: [curl] }] }", Target::Vagrant, &[]);
-    assert!(t.contains("ansible.builtin.command:"), "{t}");
-    assert!(t.contains("apk"), "{t}");
-    assert!(!t.contains("community"), "{t}");
-    assert!(t.contains("changed_when:"), "{t}");
+    let parsed: serde_yaml_ng::Value = serde_yaml_ng::from_str(&t).expect("the tasks are YAML");
+    let commands: Vec<&serde_yaml_ng::Value> = parsed
+        .as_sequence()
+        .expect("a task list")
+        .iter()
+        .filter_map(|task| task.get("ansible.builtin.command"))
+        .collect();
+    let argv: Vec<&str> = match commands.as_slice() {
+        [one] => one
+            .get("argv")
+            .and_then(|a| a.as_sequence())
+            .expect("an argv")
+            .iter()
+            .filter_map(|a| a.as_str())
+            .collect(),
+        _ => panic!("one command task, not {}: {t}", commands.len()),
+    };
+    assert_eq!(argv, ["apk", "add", "--no-cache", "curl"], "{t}");
+    assert!(!t.contains("community."), "no community module: {t}");
+    let guarded = parsed
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|task| task.get("ansible.builtin.command").is_some())
+        .and_then(|task| task.get("changed_when"));
+    assert!(
+        guarded.and_then(|g| g.as_str()).is_some_and(|g| g.contains("isoloom_apk.stdout")),
+        "changed only when apk installed something: {t}"
+    );
 }
 
 #[test]
@@ -167,7 +192,7 @@ fn a_service_gets_a_restart_handler_notified_by_the_earlier_steps() {
 fn external_project(body: &str) -> Vec<GeneratedFile> {
     let yaml = format!("version: 1\nname: t\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\n{body}");
     let lab = Lab::new(isoloom_spec::parse(&yaml).expect("parses"));
-    let e = Environment::build(&lab.for_target(Target::External), Target::External, None).expect("the spec plans");
+    let e = lab.plan(&lab.for_target(Target::External), Target::External, None).expect("the spec plans");
     project(&e, ".isoloom/external").expect("rendered")
 }
 
@@ -278,4 +303,11 @@ fn the_specs_text_reaches_ansible_unsafe_so_jinja_in_it_is_never_evaluated() {
     assert!(t.contains("isoloom_machine_m_file: !unsafe \"site/{{ x }}.html\""), "{t}");
     assert!(t.contains("cmd: \"{{ isoloom_project }}/{{ isoloom_machine_m_file }}\""), "{t}");
     assert!(t.contains("isoloom_machine_m_file: !unsafe \"setup/{{ y }}.sh\""), "{t}");
+}
+
+#[test]
+fn each_play_climbs_from_its_folder_back_to_the_project() {
+    assert_eq!(super::project_var(".isoloom/external"), "{{ (playbook_dir + '/../..') | realpath }}");
+    assert_eq!(super::project_var("./.isoloom-2/external/"), "{{ (playbook_dir + '/../..') | realpath }}");
+    assert_eq!(super::project_var("a/b/c"), "{{ (playbook_dir + '/../../..') | realpath }}");
 }

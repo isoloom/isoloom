@@ -25,17 +25,6 @@ machines:
     networks: { lan: 11 }
 ";
 
-/// One container, which `docker-vm` runs in its VM.
-const CONTAINER: &str = "version: 1
-name: one-box
-networks: { lan: { cidr: 10.33.0.0/24 } }
-machines:
-  web:
-    networks: { lan: 10 }
-    ports: { site: { port: 80, protocol: http, publish: 8080 } }
-    app: { image: nginx }
-";
-
 /// Each VM's name and boot digest in the run manifest `target` writes for `yaml` (at `run`).
 fn digests(yaml: &str, target: Target, run: &str) -> Outcome<Vec<(String, String)>> {
     let files = generate(&lab(yaml)?, target)?;
@@ -104,18 +93,5 @@ fn a_network_inserted_ahead_changes_the_digest_of_each_vm_whose_port_group_moved
     let after = digests(&inserted, Target::Vagrant, run)?;
     assert_eq!(digest_of(&after, "web"), digest_of(&before, "web"), "web's port group is where it was");
     assert_ne!(digest_of(&after, "db"), digest_of(&before, "db"), "db's port group moved");
-    Ok(())
-}
-
-#[test]
-fn docker_vms_vm_digest_changes_when_a_container_gets_a_host_folder() -> Outcome {
-    let run = ".isoloom/docker-vm/run.json";
-    let before = digests(CONTAINER, Target::DockerVm, run)?;
-    assert_eq!(before.len(), 1, "{before:?}");
-    assert_eq!(digests(CONTAINER, Target::DockerVm, run)?, before);
-    let shared = format!("{CONTAINER}    host_folders: [{{ from: shared, path: /srv/shared }}]\n");
-    let after = digests(&shared, Target::DockerVm, run)?;
-    assert_eq!(after[0].0, before[0].0);
-    assert_ne!(after[0].1, before[0].1, "the VM shares the container's folder now");
     Ok(())
 }

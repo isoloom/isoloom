@@ -4,28 +4,27 @@
 pub mod testing;
 
 use isoloom_terraform::Cloud;
-use testing::{Outcome, cloud_vm, resource_body};
+use isoloom_test_support::{hcl_attribute, hcl_resource, hcl_values};
+use testing::{Outcome, cloud_vm};
 
 const SPEC: &str = "version: 1\nname: vols\nnetworks: { lab: { cidr: 10.60.0.0/24 } }\nmachines:\n  db:\n    os: debian@12\n    networks: { lab: 10 }\n    disks: { data: { size_gb: 20, mount: /data } }\n";
 
 #[test]
-fn every_clouds_volume_carries_the_environments_tags() -> Outcome {
-    let gcp = cloud_vm(Cloud::Gcp, SPEC)?;
+fn a_google_cloud_volume_carries_the_environments_labels() -> Outcome {
+    let disk = hcl_resource(&cloud_vm(Cloud::Gcp, SPEC)?, "google_compute_disk", "db_data");
     assert!(
-        resource_body(&gcp, "resource \"google_compute_disk\" \"db_data\"").contains("labels = {"),
-        "{gcp}"
+        matches!(hcl_attribute(&disk, "labels"), Some(hcl::Expression::Object(labels)) if !labels.is_empty()),
+        "{disk:?}"
     );
-    let digitalocean = cloud_vm(Cloud::DigitalOcean, SPEC)?;
-    let volume = resource_body(&digitalocean, "resource \"digitalocean_volume\" \"db_data\"");
-    assert!(
-        volume.contains("tags") && volume.contains("concat([\"isoloom\", \"vols\", local.name]"),
-        "{volume}"
-    );
-    let linode = cloud_vm(Cloud::Linode, SPEC)?;
-    let linode_volume = resource_body(&linode, "resource \"linode_volume\" \"db_data\"");
-    assert!(
-        linode_volume.contains("tags") && linode_volume.contains("concat([\"isoloom\", \"vols\", local.name]"),
-        "{linode_volume}"
-    );
+    Ok(())
+}
+
+#[test]
+fn a_digitalocean_and_a_linode_volume_carry_the_environments_tags() -> Outcome {
+    for (cloud, kind) in [(Cloud::DigitalOcean, "digitalocean_volume"), (Cloud::Linode, "linode_volume")] {
+        let volume = hcl_resource(&cloud_vm(cloud, SPEC)?, kind, "db_data");
+        let tags = hcl_values(&volume, "tags");
+        assert!(tags.starts_with(&["isoloom".to_owned(), "vols".to_owned()]), "{cloud}: {tags:?}");
+    }
     Ok(())
 }

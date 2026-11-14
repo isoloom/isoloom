@@ -559,10 +559,9 @@ volumes:
     "teardown": []
   },
   "recovery": {
-    "stale_markers": [
-      "is already in use by container",
-      "network with name",
-      "has incorrect label"
+    "leftovers": [
+      "container_name_taken",
+      "network_left"
     ],
     "steps": [
       {
@@ -700,20 +699,17 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes"
     ],
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes"
     ],
     "refused": {},
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
       "proxmox": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
       "esxi": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",

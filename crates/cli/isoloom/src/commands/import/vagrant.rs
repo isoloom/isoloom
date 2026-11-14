@@ -95,7 +95,6 @@ fn record_with(rubies: &[&str], script: &Path, file: &Path) -> Result<Recording>
 
 #[cfg(all(test, unix))]
 mod tests {
-    use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
 
     use super::{CliError, RECORDER, Recording, record_with};
@@ -112,11 +111,11 @@ mod tests {
         Ok((dir, script, file))
     }
 
-    /// A program at `path` that runs `body` with sh, executable or not.
+    /// A program at `path` that runs `body` with sh, executable or not. Written by a child
+    /// process: written by this one, it failed at random with "Text file busy" when a test beside
+    /// it forked meanwhile (`isoloom_test_support::write_executable`).
     fn program(path: &Path, body: &str, executable: bool) -> std::io::Result<String> {
-        std::fs::write(path, format!("#!/bin/sh\n{body}\n"))?;
-        let mode = if executable { 0o755 } else { 0o644 };
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+        isoloom_test_support::write_executable(path, &format!("#!/bin/sh\n{body}\n"), executable)?;
         Ok(path.to_string_lossy().into_owned())
     }
 

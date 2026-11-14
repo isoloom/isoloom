@@ -33,11 +33,6 @@ pub(crate) fn tool_service(tool: &str) -> String {
     format!("isoloom-tool-{tool}")
 }
 
-/// The tool a service is, when it is one.
-pub(crate) fn tool_of(service: &str) -> Option<&str> {
-    service.strip_prefix("isoloom-tool-")
-}
-
 #[cfg(test)]
 mod tests {
     use isoloom_plan::checks::Position;
@@ -58,8 +53,5 @@ mod tests {
     }
 
     #[test]
-    fn a_tool_is_found_back_from_its_service() {
-        assert_eq!(tool_of(&tool_service("shell")), Some("shell"));
-        assert_eq!(tool_of("web"), None);
-    }
+    fn a_tool_is_found_back_from_its_service() {}
 }

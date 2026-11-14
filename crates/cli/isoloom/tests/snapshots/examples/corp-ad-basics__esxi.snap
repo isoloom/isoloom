@@ -21,7 +21,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/esxi/run.json
 .isoloom/resolved.json
 
-## .isoloom/.gitignore: identical in the `hybrid` snapshot
+## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/esxi/checks/user.sh
 #!/bin/sh
@@ -1544,4 +1544,4 @@ resource "local_file" "isoloom_project" {
   }
 }
 
-## .isoloom/resolved.json: identical in the `hybrid` snapshot
+## .isoloom/resolved.json: identical in the `vagrant` snapshot

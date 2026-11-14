@@ -11,6 +11,8 @@ use isoloom_plan::{Environment, Feature, Lab};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
 
+use crate::GenerateError;
+use crate::generation::planned;
 use crate::registry::backend;
 use crate::tiers::VAGRANT_PROVIDERS;
 
@@ -125,8 +127,7 @@ pub(crate) enum Decision {
     /// It refuses it.
     Refused(Refused),
     /// The environment isn't one the target takes: cloud services on a machine target, machines on
-    /// `cloud-services`, `hybrid` without both containers and VMs, a target `targets:` leaves
-    /// out.
+    /// `cloud-services`, a target `targets:` leaves out.
     NotApplicable,
 }
 
@@ -142,47 +143,46 @@ fn refused(code: Code, field: Option<String>, reason: impl Into<String>) -> Deci
 /// What `target` decides about `lab`, run with `variant` when it names one: the spec's own
 /// problems, lowering, then the backend's capabilities and its own limits (a cloud's, on
 /// `cloud-vm` with a cloud: `aws`), then a provider's: a Vagrant provider's on `vagrant`
-/// (`libvirt`), on `docker-vm` the Proxmox server's (`proxmox`) or a Vagrant provider's.
-#[must_use]
-pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Decision {
+/// (`libvirt`).
+///
+/// # Errors
+///
+/// [`GenerateError::Internal`] when the environment doesn't plan for `target` (a bug of
+/// lowering, or a catalogue that doesn't load), as the generation reports it: never a refusal
+/// that would leave the target out, nor a target said to be generated.
+pub(crate) fn decide(lab: &Lab, target: Target, variant: Option<&str>) -> Result<Decision, GenerateError> {
     if let Some(p) = lab.problems().into_iter().next() {
-        return refused(Code::Invalid, Some(p.path.to_string()), p.reason);
+        return Ok(refused(Code::Invalid, Some(p.path.to_string()), p.reason));
     }
     if let Some(p) = lab.refusal(target) {
-        return refused(Code::Lowering, Some(p.path.to_string()), p.reason);
+        return Ok(refused(Code::Lowering, Some(p.path.to_string()), p.reason));
     }
     if !lab.possible().contains(&target) {
-        return Decision::NotApplicable;
+        return Ok(Decision::NotApplicable);
     }
     let spec = lab.for_target(target);
     if let Some(p) = isoloom_spec::validate::validate(&spec).first() {
-        return refused(Code::Invalid, None, format!("the spec is invalid on {}: {p}", target.id()));
+        return Ok(refused(Code::Invalid, None, format!("the spec is invalid on {}: {p}", target.id())));
     }
     let backend = backend(target);
-    // A lab that doesn't plan is a bug of lowering, which the generation reports as a failure
-    // ([`crate::GenerateError::Internal`]), not a refusal that would leave the target out.
-    let Ok(env) = Environment::build(&spec, target, None) else {
-        return Decision::Generated;
-    };
+    let env = planned(lab, &spec, target, None)?;
     let lacking = isoloom_plan::refusal(&env.requirements, &backend.capabilities());
     let own = match (target, variant.and_then(cloud)) {
         (Target::CloudVm, Some(c)) => CloudVmModule::new(c).refusal(&env).map(|r| (Code::Cloud, r)),
         _ => backend.refusal(&env).map(|r| (Code::Target, r)),
     };
-    match (lacking, own) {
+    Ok(match (lacking, own) {
         (Some(lack), Some((_, reason))) => refused(Code::Capability(lack.requirement.feature()), None, reason),
         (Some(lack), None) => refused(Code::Capability(lack.requirement.feature()), None, lack.to_string()),
         (None, Some((code, reason))) => refused(code, None, reason),
         (None, None) => provider_refusal(&env, target, variant).map_or(Decision::Generated, |r| refused(Code::Provider, None, r)),
-    }
+    })
 }
 
 /// Why `target`'s `provider` can't run the environment it otherwise generates, if it can't.
 fn provider_refusal(env: &Environment, target: Target, provider: Option<&str>) -> Option<String> {
     match (target, provider?) {
         (Target::Vagrant, p) => isoloom_vagrant::provider_refusal(env, p),
-        (Target::DockerVm, crate::composite::PROXMOX) => crate::composite::docker_vm_proxmox_refusal(env),
-        (Target::DockerVm, p) => isoloom_vagrant::docker_vm_refusal(env, p),
         _ => None,
     }
 }
@@ -211,32 +211,72 @@ mod tests {
         let ids: Vec<String> = columns().iter().map(Column::id).collect();
         assert_eq!(ids.len(), Target::ALL.len() - 2 + 7 + 6);
         assert!(ids.contains(&"vagrant/libvirt".to_owned()) && ids.contains(&"cloud-vm/oci".to_owned()));
-        assert!(!ids.contains(&"vagrant".to_owned()) && ids.contains(&"docker-vm".to_owned()));
+        assert!(!ids.contains(&"vagrant".to_owned()) && ids.contains(&"cloud-docker".to_owned()));
     }
 
     /// What `column` refuses `lab` for; a test failure when it doesn't.
     fn refused_on(lab: &Lab, column: Column) -> Refused {
-        match decide(lab, column.target, column.variant) {
+        match decide(lab, column.target, column.variant).unwrap() {
             Decision::Refused(r) => r,
             other => panic!("{}: {other:?}", column.id()),
         }
     }
 
     #[test]
-    fn each_step_refuses_with_its_own_code() {
-        let two = lab(TWO);
-        assert_eq!(decide(&two, Target::Docker, None), Decision::Generated);
-        let cloud = refused_on(&two, on(Target::CloudVm, Some("digitalocean")));
+    fn a_lab_the_target_takes_is_generated() {
+        assert_eq!(decide(&lab(TWO), Target::Docker, None).unwrap(), Decision::Generated);
+    }
+
+    #[test]
+    fn the_cloud_step_refuses_with_the_cloud_code() {
+        let cloud = refused_on(&lab(TWO), on(Target::CloudVm, Some("digitalocean")));
         assert_eq!(cloud.code, Code::Cloud, "{cloud:?}");
         assert!(cloud.reason.contains("one machine on one network"), "{cloud:?}");
+    }
+
+    #[test]
+    fn the_lowering_step_refuses_with_the_lowering_code_and_the_field() {
         let image = lab("version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, app: { image: redis } }\n");
         let lowering = refused_on(&image, on(Target::Vagrant, Some("virtualbox")));
         assert_eq!((lowering.code, lowering.field.as_deref()), (Code::Lowering, Some("machines.a.app.image")));
+    }
+
+    #[test]
+    fn the_capability_step_refuses_with_the_missing_feature() {
         let aliased = lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { networks: { lan: 10 }, aliases: [www.x.test], app: { image: redis } }\n",
         );
         let lacking = refused_on(&aliased, on(Target::Kubernetes, None));
         assert_eq!(lacking.code, Code::Capability(Feature::MachineAliases), "{lacking:?}");
+    }
+
+    #[test]
+    fn tools_are_refused_where_no_backend_renders_them() {
+        // `tools:` was generated without its toolbox on these targets (their files were the same
+        // with or without it): each now refuses it, and the targets that render it still do.
+        let tools = "tools: { shell: {} }\n";
+        let containers = lab(&format!(
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ networks: {{ lan: 10 }}, app: {{ image: redis }} }}\n{tools}"
+        ));
+        let vms = lab(&format!(
+            "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lan: 10 }}, app: {{ steps: [{{ run: a.sh }}] }} }}\n{tools}"
+        ));
+        assert_eq!(decide(&containers, Target::Docker, None).unwrap(), Decision::Generated);
+        assert_eq!(decide(&vms, Target::Vagrant, Some("virtualbox")).unwrap(), Decision::Generated);
+        for (lab, column) in [
+            (&containers, on(Target::Kubernetes, None)),
+            (&vms, on(Target::Proxmox, None)),
+            (&vms, on(Target::Esxi, None)),
+            (&vms, on(Target::CloudVm, Some("aws"))),
+        ] {
+            let lacking = refused_on(lab, column);
+            assert_eq!(lacking.code, Code::Capability(Feature::Tools), "{lacking:?}");
+            assert!(lacking.reason.contains("tool `shell` (`tools:`)"), "{lacking:?}");
+        }
+    }
+
+    #[test]
+    fn the_provider_step_refuses_with_the_provider_code() {
         let two_networks = lab(
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 }, wan: { cidr: 10.9.1.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lan: 10, wan: 10 }, app: { steps: [{ run: a.sh }] } }\n",
         );
@@ -247,7 +287,6 @@ mod tests {
     #[test]
     fn a_lab_a_target_doesnt_take_is_not_applicable_there() {
         let two = lab(TWO);
-        assert_eq!(decide(&two, Target::CloudServices, None), Decision::NotApplicable);
-        assert_eq!(decide(&two, Target::Hybrid, None), Decision::NotApplicable, "no VM-only machine");
+        assert_eq!(decide(&two, Target::CloudServices, None).unwrap(), Decision::NotApplicable);
     }
 }

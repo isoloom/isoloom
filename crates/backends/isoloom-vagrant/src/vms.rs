@@ -21,9 +21,7 @@
 //!   listen port per VM), each VM on one network; the QEMU provider's refusal ([`provider`])
 //!   says when a spec doesn't fit. A disk size grows the box's disk, never below the box's own.
 //! - UTM (`vagrant_utm`) gives a VM no private network, and every machine is on one, so the
-//!   `vagrant` target has no UTM block ([`provider::Provider::runs_vms`]); `docker-vm`'s one VM
-//!   runs on it, its default route through UTM's shared network rather than the plugin's slow
-//!   emulated one ([`utm`]).
+//!   `vagrant` target has no UTM block ([`provider::Provider::runs_vms`]).
 //! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
@@ -42,17 +40,17 @@ pub(crate) mod provider;
 pub(crate) mod providers;
 pub(crate) mod qemu;
 mod transport;
-pub(crate) mod utm;
 pub(crate) mod values;
 mod windows;
 
-/// The name of a network on the host, `isoloom-<environment>-<network>` (after the contract's
-/// [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)): its VirtualBox internal
-/// network, its libvirt network and its Hyper-V private switch, as the Vagrantfile makes them and
-/// the run manifest names them.
+/// The name of a network on the host as a report shows it, `isoloom-<environment>-<key>-<network>`
+/// (after the contract's [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)), the
+/// copy's key written `<key>`: its VirtualBox internal network, its libvirt network and its
+/// Hyper-V private switch, as the Vagrantfile makes them with the key it reads
+/// ([`isoloom_plan::Names::network`]).
 #[must_use]
 pub fn network_name(environment: &str, network: &str) -> String {
-    format!("{}{environment}-{network}", isoloom_manifest::contract::RESERVED_PREFIX)
+    isoloom_plan::Names::new(environment).network(network).with_key("<key>")
 }
 
 use indexmap::IndexMap;
@@ -61,7 +59,7 @@ use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header, router, steps};
-use isoloom_spec::model::{Spec, Target};
+use isoloom_spec::model::Target;
 
 use crate::backend::capabilities;
 use crate::boxes::ARM_HOST;
@@ -85,14 +83,16 @@ const TOOL_SHELL: &str = "isoloom-tool-shell";
 /// ([`steps::project_unpack`] as root on Linux, [`steps::windows_project_unpack`] on Windows).
 /// Every Vagrantfile Isoloom writes carries it, after `ROOT`.
 pub(crate) fn project_rb() -> String {
+    let unpack = steps::windows_project_unpack(steps::TopFolder::Kept);
+    // A Ruby heredoc ends at the first line that is its terminator, as sh's does.
+    let tag = isoloom_spec::shell::here_tag("PS1", &unpack);
     format!(
-        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,\n# with no tar.exe before Windows Server 2019).\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::LINUX_UNPACK = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\nIsoloomProject::WINDOWS_UNPACK = <<'PS1'\n{}PS1\n",
+        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,\n# with no tar.exe before Windows Server 2019).\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::LINUX_UNPACK = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\nIsoloomProject::WINDOWS_UNPACK = <<'{tag}'\n{unpack}{tag}\n",
         include_str!("vagrant_project.rb"),
         copy_rules(&[]),
         Value::str(steps::PROJECT_ARCHIVE),
-        Value::str(&steps::project_unpack(steps::Archive::Uploaded, false)),
+        Value::str(&steps::project_unpack(steps::Archive::Uploaded, steps::TopFolder::Kept)),
         Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
-        steps::windows_project_unpack(false)
     )
 }
 
@@ -102,8 +102,7 @@ pub(crate) fn copy_rules(outputs: &[&str]) -> Value {
     Value::str(&isoloom_manifest::ignore::copy_rules(outputs))
 }
 
-/// Where a Vagrantfile goes and what it carries besides the environment's VMs: `hybrid` writes
-/// its VMs to `.isoloom/hybrid/`, with its Docker host as one more `config.vm.define` block.
+/// Where a Vagrantfile goes and what it carries besides the environment's VMs.
 #[derive(Clone, Copy)]
 pub(crate) struct Layout<'a> {
     /// The folder under `.isoloom/`.
@@ -136,15 +135,6 @@ pub(crate) fn boot(env: &Environment) -> Result<BootStatements> {
 
 /// The `vagrant` target's layout: its folder, nothing after the VMs.
 const VAGRANT: Layout<'static> = Layout { dir: DIR, extra: &|_| {} };
-
-/// The VMs of `spec` (the `vagrant` target's plan of it) into `layout`: the `hybrid` target's.
-pub(crate) fn render_spec_in(spec: &Spec, layout: &Layout) -> Result<Files> {
-    let env = Environment::build(spec, Target::Vagrant, None).map_err(|source| Error::Unplanned {
-        target: Target::Vagrant,
-        source,
-    })?;
-    Ok(render_in(&env, layout)?.0)
-}
 
 /// [`render`], into `layout`, with what its Vagrantfile applies at boot.
 fn render_in(env: &Environment, layout: &Layout) -> Result<(Files, BootStatements)> {
@@ -220,6 +210,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(&project_rb());
     r.text(&hyperv::hyperv_rb());
     r.text(vagrantfile::PORT_CHECK_RB);
+    r.text(vagrantfile::KEY_RB);
     if env.vms().next().is_some() {
         r.text(crate::console::CONSOLE_RB);
     }
@@ -290,25 +281,12 @@ fn settings(r: &mut Ruby, env: &Environment) {
     );
     r.assign("config.vm.boot_timeout", 900u32);
     vagrantfile::ssh_proxy(r, "config");
-    vagrantfile::libvirt_prefix(r, "config", &env.name);
+    vagrantfile::libvirt_prefix(r, "config", &env.names().libvirt_prefix());
 }
 
 /// Whether the Vagrantfile has a controller: to run the environment's playbooks, or checks.
 fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
     env.controller.is_some() || !checks.controller.is_empty()
-}
-
-/// A VM's display name, as VirtualBox, VMware, Parallels and UTM show it: `<env> - <define>`,
-/// after its define name (an environment machine's, or one of Isoloom's own under `isoloom-`). ASCII only:
-/// Vagrant interpolates it into its own messages, and a reload fails on a non-ASCII name
-/// (`incompatible character encodings: UTF-8 and ASCII-8BIT`).
-pub(crate) fn label(env: &Environment, define: &str) -> String {
-    format!("{} - {define}", env.name)
-}
-
-/// A VM's name on ESXi and Hyper-V, with no space: `<env>-<define>`.
-pub(crate) fn vm_name(env: &Environment, define: &str) -> String {
-    format!("{}-{define}", env.name)
 }
 
 /// What one `config.vm.define` of the Vagrantfile is.

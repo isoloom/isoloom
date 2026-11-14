@@ -7,8 +7,7 @@
 //!   per [`Cloud`] ([`CloudVmModule`] renders one); `cloud-services` ([`CloudServicesBackend`]),
 //!   the project's own module applied into the user's account.
 //! - **The Terraform halves of the composite targets** `isoloom-targets` puts together: the
-//!   Docker host on each cloud for `cloud-docker` ([`cloud_docker_modules`]), and on a Proxmox
-//!   server for `docker-vm` ([`docker_vm_module`], its run manifest [`docker_vm_manifest`]).
+//!   Docker host on each cloud for `cloud-docker` ([`cloud_docker_modules`]).
 //!
 //! Every VM target sets its machines up through one core (a cloud machine's own user data,
 //! cloud-init, `remote-exec` over SSH, WinRM, cloudbase-init, the Ansible controller), so a step
@@ -24,7 +23,7 @@
 //! let lab = Lab::new(isoloom_spec::parse(
 //!     "version: 1\nname: lab\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, app: { steps: [{ run: web.sh }] } }\n",
 //! )?);
-//! let env = Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)?;
+//! let env = lab.plan(&lab.for_target(Target::Proxmox), Target::Proxmox, None)?;
 //! let files = ProxmoxBackend.render(&env)?;
 //! assert!(files.iter().any(|f| f.path == ".isoloom/proxmox/main.tf"));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -63,4 +62,3 @@ pub fn hcl_quote(text: &str) -> String {
 }
 pub use server::esxi::EsxiBackend;
 pub use server::proxmox::ProxmoxBackend;
-pub use server::proxmox::docker_host::{manifest as docker_vm_manifest, module as docker_vm_module};

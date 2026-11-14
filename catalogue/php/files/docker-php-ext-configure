@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's php entry: the archive's extensions come built, with
+# nothing to configure.
+exit 0

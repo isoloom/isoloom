@@ -72,7 +72,7 @@ networks:
   lab: { cidr: 10.9.0.0/24 }
   back: { cidr: 10.8.0.0/24 }
 groups:
-  servers: { members: [web, dc, box] }
+  servers: { members: [web, dc] }
 machines:
   web:
     networks: { back: 10, lab: 10 }
@@ -80,12 +80,9 @@ machines:
   dc:
     networks: { lab: 20 }
     os: windows-server@2022
-  box:
-    networks: { lab: 30 }
-    app: { image: alpine }
 provision:
   - ansible: site.yml
-    groups: { dcs: [dc], boxes: [box] }
+    groups: { dcs: [dc], boxes: [] }
     host_vars:
       web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
 overrides:
@@ -116,7 +113,7 @@ pub fn example(name: &str, target: isoloom_spec::model::Target) -> Result<isoloo
     if !problems.is_empty() {
         return Err(format!("{name} isn't valid: {problems:?}"));
     }
-    isoloom_plan::Environment::build(&lab.for_target(target), target, None).map_err(|e| e.to_string())
+    lab.plan(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }
 
 /// The plan of `yaml` for `target`.
@@ -126,7 +123,7 @@ pub fn example(name: &str, target: isoloom_spec::model::Target) -> Result<isoloo
 /// Why the spec doesn't parse, or can't be planned.
 pub fn planned(yaml: &str, target: isoloom_spec::model::Target) -> Result<isoloom_plan::Environment, String> {
     let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).map_err(|e| e.to_string())?);
-    isoloom_plan::Environment::build(&lab.for_target(target), target, None).map_err(|e| e.to_string())
+    lab.plan(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }
 
 /// A sensitive input slot `name` delivered to every step as the environment variable `var`.

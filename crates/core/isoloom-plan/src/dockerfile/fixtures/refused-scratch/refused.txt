@@ -1,0 +1,2 @@
+refused: build/refused-scratch/Dockerfile line 1 (`FROM`): `FROM scratch` has no OS to install onto
+fix: give the machine `os` and `app.steps`: its VM form

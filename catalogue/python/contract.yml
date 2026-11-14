@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What python does, proven on both forms: the release asked for answers as `python`, with pip.
+cases:
+  default: {}
+
+checks:
+  - name: python reports the release asked for
+    exec: python --version 2>&1
+    expect: "{{ version }}"
+  - name: pip answers
+    exec: pip --version
+    expect: "pip"
+
+facts:
+  - name: the interpreter
+    exec: python --version 2>&1

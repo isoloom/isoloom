@@ -3,7 +3,7 @@
 //! constraints' prelude and the Docker install. `var` is the block variable the statement is
 //! for: `config` in a single-VM file, `m` inside a `config.vm.define`.
 
-use isoloom_plan::{Environment, Step};
+use isoloom_plan::{Environment, HostName, Step};
 use isoloom_render::steps;
 use isoloom_spec::model::Protocol;
 
@@ -14,6 +14,24 @@ use crate::settings;
 /// reads every port as in use there (Ruby bug #22223), so a VM's fixed forwarded ports fail as
 /// collisions before it boots. Emitted after the project helpers in every Vagrantfile.
 pub(crate) const PORT_CHECK_RB: &str = include_str!("vagrant_port_check.rb");
+
+/// The copy's key, read once at a Vagrantfile's top (`vagrant_key.rb`): the runner's
+/// ([`isoloom_plan::KEY_VAR`]), else one made from the folder's path. Every name the file gives on
+/// the host holds it ([`host_name`]).
+pub(crate) const KEY_RB: &str = include_str!("vagrant_key.rb");
+
+/// The Ruby constant [`KEY_RB`] defines.
+const KEY: &str = "ISOLOOM_KEY";
+
+/// `name` as the Vagrantfile gives it: a string literal with the copy's key ([`KEY_RB`]) read
+/// into it when Vagrant loads the file (`"solo-web-#{ISOLOOM_KEY} - web"`).
+pub(crate) fn host_name(name: &HostName) -> Value {
+    let (before, after) = name.around_key();
+    let (before, after) = (crate::ruby::quote(&before), crate::ruby::quote(after));
+    // Two literals joined around the key: `"<before>` and `<after>"`, each quoted as a whole.
+    let (open, close) = (before.strip_suffix('"').unwrap_or_default(), after.strip_prefix('"').unwrap_or_default());
+    Value::raw(format!("{open}#{{{KEY}}}{close}"))
+}
 
 /// The derived-checks switch as a check provisioner's `env`: `{ "ISOLOOM_DERIVED" => ... }`, read
 /// from the host's environment when Vagrant runs (on, `1`, unless the host sets it).
@@ -53,10 +71,11 @@ pub(crate) fn ssh_proxy(r: &mut Ruby, var: &str) {
 }
 
 /// libvirt names a domain `<prefix><machine>`, the prefix defaulting to the folder's name: the
-/// environment's name keeps two environments' domains apart.
-pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, env: &str) {
+/// copy's own ([`isoloom_plan::Names::libvirt_prefix`]) keeps two environments', two instances'
+/// and two copies' domains apart.
+pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, prefix: &HostName) {
     r.block(Call::new(format!("{var}.vm.provider")).arg(Value::str("libvirt")), "v", |r| {
-        r.assign("v.default_prefix", Value::str(&format!("{env}_")));
+        r.assign("v.default_prefix", host_name(prefix));
     });
 }
 
@@ -102,8 +121,6 @@ pub(crate) fn forwarded_port(var: &str, guest: u16, host: impl Into<Value>, prot
 
 /// The constraints' provisioner.
 pub(crate) const CONSTRAINTS: &str = "constraints";
-/// The Docker install's provisioner.
-pub(crate) const DOCKER: &str = "docker";
 
 /// The spec's constraints (proxy, mirrors, NTP) as the VM's first provisioner, rendered by the
 /// plan's [`Step::Prelude`]. Nothing when the spec has none.

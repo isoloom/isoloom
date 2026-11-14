@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use super::{Blocks, Problems, block, dns_label};
 use crate::model::{Appliance, DockerImpl, Machine, Protocol, Spec, VmImpl};
 use crate::net::NetworkBlock;
+use crate::sizing::{MIN_CONTAINER_MEMORY_MB, MIN_VM_DISK_GB, MIN_VM_MEMORY_MB};
 
 /// One machine being checked: the spec, its name and definition, and its path.
 pub(super) struct Subject<'a> {
@@ -197,11 +198,17 @@ fn more_addresses(s: &Subject, blocks: &Blocks, taken: &mut HashMap<(String, u8)
 fn resources(s: &Subject, p: &mut Problems) {
     let Some(r) = s.m.resources else { return };
     if s.m.vm.is_some() {
-        if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 256) || r.disk_gb.is_some_and(|v| v < 5) {
-            p.add(format!("{}.resources", s.at), "too small for a VM: at least 1 cpu, 256 MB and 5 GB");
+        if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < MIN_VM_MEMORY_MB) || r.disk_gb.is_some_and(|v| v < MIN_VM_DISK_GB) {
+            p.add(
+                format!("{}.resources", s.at),
+                format!("too small for a VM: at least 1 cpu, {MIN_VM_MEMORY_MB} MB and {MIN_VM_DISK_GB} GB"),
+            );
         }
-    } else if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < 16) {
-        p.add(format!("{}.resources", s.at), "too small: at least 1 cpu and 16 MB");
+    } else if r.cpus == Some(0) || r.memory_mb.is_some_and(|v| v < MIN_CONTAINER_MEMORY_MB) {
+        p.add(
+            format!("{}.resources", s.at),
+            format!("too small: at least 1 cpu and {MIN_CONTAINER_MEMORY_MB} MB"),
+        );
     }
 }
 

@@ -9,6 +9,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
+use super::mistake::Mistake;
 use super::names::{InputName, PortName};
 use crate::Error;
 use crate::model::CommandLine;
@@ -87,15 +88,7 @@ impl From<CommandInput> for Command {
     }
 }
 
-impl JsonSchema for Command {
-    fn schema_name() -> Cow<'static, str> {
-        "Command".into()
-    }
-
-    fn json_schema(g: &mut SchemaGenerator) -> Schema {
-        CommandInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(Command, CommandInput);
 
 /// A port a healthcheck names: one of the machine's ports by name, or a port number.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
@@ -176,14 +169,14 @@ struct HealthcheckInput {
 }
 
 impl TryFrom<HealthcheckInput> for Healthcheck {
-    type Error = Error;
+    type Error = Mistake;
 
-    fn try_from(h: HealthcheckInput) -> Result<Healthcheck, Error> {
+    fn try_from(h: HealthcheckInput) -> Result<Healthcheck, Mistake> {
         let probe = match (h.test, h.http) {
             (Some(test), None) => HealthProbe::Test(test),
             (None, Some(page)) => HealthProbe::Http(page),
-            (Some(_), Some(_)) => return Err(Error::TestAndHttp),
-            (None, None) => return Err(Error::NoHealthProbe),
+            (Some(_), Some(_)) => return Err(Error::TestAndHttp.into()),
+            (None, None) => return Err(Error::NoHealthProbe.into()),
         };
         Ok(Healthcheck {
             probe,
@@ -195,15 +188,7 @@ impl TryFrom<HealthcheckInput> for Healthcheck {
     }
 }
 
-impl JsonSchema for Healthcheck {
-    fn schema_name() -> Cow<'static, str> {
-        "Healthcheck".into()
-    }
-
-    fn json_schema(g: &mut SchemaGenerator) -> Schema {
-        HealthcheckInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(Healthcheck, HealthcheckInput);
 
 /// An environment variable's value: a fixed text (a number or a boolean read as its text), or a
 /// non-sensitive input's value.

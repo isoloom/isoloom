@@ -10,20 +10,6 @@
 //! and fix.
 
 /// The JSON Schema of `$ty` is that of `$written`, the shape it is written in.
-macro_rules! schema_as {
-    ($ty:ident, $written:ident) => {
-        impl schemars::JsonSchema for $ty {
-            fn schema_name() -> std::borrow::Cow<'static, str> {
-                stringify!($ty).into()
-            }
-
-            fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
-                <$written as schemars::JsonSchema>::json_schema(g)
-            }
-        }
-    };
-}
-
 mod accounts;
 mod files;
 mod input;
@@ -139,3 +125,19 @@ impl schemars::JsonSchema for Step {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod kind_keys {
+    use super::input::KIND_KEYS;
+
+    /// The keys the input lists are the kinds the steps name, `reboot` aside: one list.
+    #[test]
+    fn every_kind_key_names_a_step_kind() {
+        let yaml = KIND_KEYS.iter().map(|k| format!("- {{ {k}: x }}")).collect::<Vec<_>>().join("\n");
+        let parsed: Result<Vec<super::Step>, _> = serde_yaml_ng::from_str(&yaml);
+        // Each key is known (a wrong value fails on the value, never as an unknown kind).
+        if let Err(e) = parsed {
+            assert!(!e.to_string().contains("needs one of"), "{e}");
+        }
+    }
+}

@@ -1,0 +1,50 @@
+---
+source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
+expression: "compiled(\"windows-domain\", &[\"vagrant\"])"
+---
+version: 1
+name: windows-domain
+networks:
+  corp:
+    cidr: 10.50.1.0/24
+machines:
+  dc01:
+    os: windows-server@2022
+    app:
+      steps:
+      - run: provision/dc01.ps1
+    networks:
+      corp: 10
+    ports:
+      dns: 53
+      dns-udp:
+        port: 53
+        protocol: udp
+      ldap: 389
+      smb: 445
+  ws01:
+    os: windows@11
+    networks:
+      corp: 11
+    ports:
+      rdp: 3389
+  workstation:
+    os: debian@12
+    networks:
+      corp: 50
+    access: true
+  intranet:
+    os: ubuntu@24.04
+    app:
+      steps:
+      - run: provision/intranet.sh
+      - playbook: provision/intranet.yml
+    networks:
+      corp: 12
+    ports:
+      https:
+        port: 443
+        protocol: https
+      http-alt:
+        port: 8080
+        protocol: http

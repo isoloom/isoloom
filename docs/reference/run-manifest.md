@@ -224,7 +224,7 @@ runner can tell a user why there is no screen to show. A container lists none.
 
 | `source.from` | Protocol | Where | How a runner finds it |
 |---|---|---|---|
-| `libvirt` | VNC | `127.0.0.1`, a port libvirt picks at boot | `virsh domdisplay <domain>` (the machine's `native.vm_names.libvirt`), on the connection Vagrant uses |
+| `libvirt` | VNC | `127.0.0.1`, a port libvirt picks at boot | `virsh domdisplay <domain>` (the domain's UUID Vagrant records, `<dotfile>/machines/<define>/libvirt/id`), on the connection Vagrant uses |
 | `qemu_monitor` | VNC | `127.0.0.1`, the first free port from 5900 | the VM's QEMU monitor (vagrant-qemu's socket): `info vnc` |
 | `vrde` | RDP | `127.0.0.1`, a free port of 3390 to 3489 | `VBoxManage showvminfo`; on only with the Oracle VM VirtualBox Extension Pack installed when the VM boots |
 | `runner` | VNC | `127.0.0.1`, at a port the runner picks | the runner chooses the port and an 8-character password for the run, keeps them until `down`, and gives them to the run's own Vagrant processes in `ISOLOOM_CONSOLES` (`{"<machine>": {"port": 5901, "password": "…"}}`), never to a command it hands an embedder |

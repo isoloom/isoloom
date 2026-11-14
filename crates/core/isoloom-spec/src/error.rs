@@ -258,38 +258,12 @@ pub enum Error {
         /// The target asked for.
         asked: String,
     },
-    /// An instance number outside 1 to [`crate::instance::MAX`].
-    #[error("an instance number is 1 to {}", crate::instance::MAX)]
-    InstanceNumber(u8),
-    /// An environment's name too long once it carries its instance.
-    #[error("`{0}` is too long for an instance name (at most 55 characters with the suffix)")]
-    InstanceName(String),
     /// Text that isn't an IPv4 block.
     #[error("`{0}` isn't an IPv4 block: write the network's own address, `/` and the prefix length (`10.20.0.0/24`)")]
     Cidr(String),
     /// Text that isn't an IPv6 /64 block.
     #[error("`{0}` isn't an IPv6 block: write a unique local or global network address and `/64` (`fd00:20::/64`)")]
     Cidr6(String),
-    /// A published port too high to shift for the instance.
-    #[error("machines.{machine}.ports: published port {port} leaves no room for instance {instance} (ports shift by 100 per instance)")]
-    InstancePort {
-        /// The machine.
-        machine: String,
-        /// The published port.
-        port: u16,
-        /// The instance.
-        instance: u8,
-    },
-    /// An IPv6 block too high to shift for the instance.
-    #[error("networks.{network}.ipv6.cidr: {cidr} leaves no room for instance {instance}")]
-    InstanceIpv6 {
-        /// The network.
-        network: String,
-        /// Its IPv6 block.
-        cidr: String,
-        /// The instance.
-        instance: u8,
-    },
 }
 
 /// What a function of this crate returns.
