@@ -45,7 +45,7 @@ pub struct Postgres {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ObjectStorage {
-    /// The bucket's name, 3 to 63 lowercase letters, digits and `-`. On a cloud, the copy's
+    /// The bucket's name, 3 to 46 lowercase letters, digits and `-`. On a cloud, the copy's
     /// unique prefix goes before it (bucket names are global).
     pub bucket: String,
     /// The API its clients speak.

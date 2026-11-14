@@ -45,6 +45,8 @@ mod hcl_builder;
 mod limits;
 mod machine;
 mod module;
+#[cfg(feature = "paas")]
+mod paas;
 mod ready;
 mod seal;
 mod server;

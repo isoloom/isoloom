@@ -211,7 +211,10 @@ impl CloudVmModule {
     /// it measures).
     fn own_refusal(self, env: &Environment) -> Option<String> {
         let driver = self.driver();
-        (driver.refusal)(env).or_else(|| match (driver.write)(env, &mut Module::default()) {
+        let own = (driver.refusal)(env);
+        #[cfg(feature = "paas")]
+        let own = own.or_else(|| crate::paas::refusal(self.0, env));
+        own.or_else(|| match (driver.write)(env, &mut Module::default()) {
             Err(crate::Error::Refused { reason, .. }) => Some(reason),
             _ => None,
         })
@@ -274,6 +277,8 @@ impl CloudVmBackend {
         for (cloud, why) in self.refusals(env) {
             if why.is_none() {
                 files.push(CloudVmModule(cloud).module(env)?);
+                #[cfg(feature = "paas")]
+                files.extend(crate::paas::file(cloud, env)?);
             }
         }
         files.extend(checks::runners(env, Target::CloudVm.id()));

@@ -150,12 +150,12 @@ fn postgres(at: &FieldPath, p: &Postgres, out: &mut Problems) {
 fn object_storage(at: &FieldPath, o: &ObjectStorage, out: &mut Problems) {
     let b = &o.bucket;
     let ok =
-        (3..=40).contains(&b.len()) && b.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-') && !b.starts_with('-') && !b.ends_with('-');
+        (3..=46).contains(&b.len()) && b.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-') && !b.starts_with('-') && !b.ends_with('-');
     if !ok {
         out.push(Problem::new(
             Code::InvalidValue,
             at.key("bucket"),
-            format!("`{b}`: 3 to 40 lowercase letters, digits and `-` (a cloud adds the copy's 23-character prefix)"),
+            format!("`{b}`: 3 to 46 lowercase letters, digits and `-` (a cloud adds the copy's 17-character prefix)"),
         ));
     }
 }
