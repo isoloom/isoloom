@@ -14,7 +14,9 @@ fn fixtures() -> PathBuf {
 /// The fetched bases a fixture vendors: `base.Dockerfile` as the image its `FROM` names.
 fn sources(dir: &Path, dockerfile: &str) -> Sources {
     let mut out = Sources::default();
-    let Ok(base) = std::fs::read_to_string(dir.join("base.Dockerfile")) else { return out };
+    let Ok(base) = std::fs::read_to_string(dir.join("base.Dockerfile")) else {
+        return out;
+    };
     for image in sources::wanted(dockerfile, &Sources::default()) {
         let origin = sources::publisher(&image).expect("a fixture's base has a publisher");
         out.insert(
@@ -51,7 +53,11 @@ fn outcome(dir: &Path) -> (String, &'static str) {
 #[test]
 fn every_fixture_translates_to_its_golden_form() {
     let write = std::env::var_os("ISOLOOM_WRITE_FIXTURES").is_some();
-    let mut dirs: Vec<PathBuf> = std::fs::read_dir(fixtures()).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(fixtures())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_dir())
+        .collect();
     dirs.sort();
     assert!(dirs.len() >= 10, "the fixtures are there");
     let mut wrong = Vec::new();
@@ -72,9 +78,15 @@ fn every_fixture_translates_to_its_golden_form() {
 #[test]
 fn a_refusal_names_the_file_the_line_and_the_instruction() {
     let (copied, _) = outcome(&fixtures().join("refused-copy-from-image"));
-    assert!(copied.starts_with("refused: build/refused-copy-from-image/Dockerfile line 2 (`COPY`): `--from=composer:2.8`"), "{copied}");
+    assert!(
+        copied.starts_with("refused: build/refused-copy-from-image/Dockerfile line 2 (`COPY`): `--from=composer:2.8`"),
+        "{copied}"
+    );
     let (unknown, _) = outcome(&fixtures().join("refused-unknown-base"));
-    assert!(unknown.contains("line 1 (`FROM`): `vulhub/tomcat:8.5` is in neither the service matrix nor the fetched bases"), "{unknown}");
+    assert!(
+        unknown.contains("line 1 (`FROM`): `vulhub/tomcat:8.5` is in neither the service matrix nor the fetched bases"),
+        "{unknown}"
+    );
     assert!(unknown.contains("isoloom bases fetch"), "{unknown}");
 }
 

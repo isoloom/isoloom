@@ -1,7 +1,7 @@
 use isoloom_plan::{Health, HealthTest};
 use isoloom_spec::model::{CommandLine, Target};
 
-use super::{copied_from_project, docker_net, exec_runner, host_environment, init_names, probe, project_variables, ready_test, variable};
+use super::{copied_from_project, exec_runner, host_environment, init_names, probe, project_variables, ready_test, variable};
 use crate::testing;
 
 /// `web` serves two ports (one dormant) and has two setup jobs; `api` waits for `db`, whose job
@@ -72,7 +72,6 @@ fn only_a_project_file_with_an_owner_or_a_mode_goes_through_compose_s_environmen
         project_variables(&testing::env(&SPEC.replace("app: { image: nginx }", "os: debian@12"), Target::Vagrant)),
         []
     );
-    assert_eq!(docker_net(&env, "lan"), "isoloom-c-lan");
 }
 
 #[test]

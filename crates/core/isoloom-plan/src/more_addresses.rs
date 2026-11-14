@@ -60,7 +60,7 @@ pub(crate) fn step(spec: &Spec, m: &Machine) -> Option<Step> {
 
 /// What they ask of the backend: for each shape the target gives such machines, the first
 /// machine with several addresses on a network. A VM's and a container's ask for different
-/// things, so a target running both (`hybrid`) is asked about each.
+/// things, so a target running both (Proxmox with LXC containers) is asked about each.
 pub(crate) fn requirements(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
     let mut out: Vec<Requirement> = Vec::new();
     for (name, m) in &spec.machines {
@@ -129,24 +129,5 @@ machines:
         assert!(matches!(vm, Requirement::MoreAddresses { shape: MachineShape::Vm, .. }));
         let container = need(Target::Docker).unwrap();
         assert!(container.to_string().contains("a container has one address per network"), "{container}");
-    }
-
-    /// The `several-addresses` example's shape on `hybrid`: a VM with several addresses first,
-    /// then a container. Only the VM's used to be asked about, so the container's reached the
-    /// renderer before it was refused.
-    #[test]
-    fn a_target_running_vms_and_containers_is_asked_about_the_first_of_each() {
-        let lab = testing::lab(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: [10, 11] }, ports: { web: 80 }, app: { steps: [{ run: w.sh }] } }\n  block: { os: debian@12, networks: { lan: [40, 41] }, app: { steps: [{ run: d.sh }] } }\n  more: { os: debian@12, networks: { lan: [50, 51] }, app: { steps: [{ run: m.sh }] } }\n",
-        );
-        let asked: Vec<(String, MachineShape)> = testing::planned(&lab, Target::Hybrid)
-            .requirements
-            .into_iter()
-            .filter_map(|r| match r {
-                Requirement::MoreAddresses { machine, shape, .. } => Some((machine, shape)),
-                _ => None,
-            })
-            .collect();
-        assert_eq!(asked, [("web".to_owned(), MachineShape::Vm), ("block".to_owned(), MachineShape::Container)]);
     }
 }

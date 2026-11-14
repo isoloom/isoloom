@@ -1063,7 +1063,6 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1074,7 +1073,6 @@ volumes:
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "vagrant",
       "proxmox",
@@ -1085,7 +1083,6 @@ volumes:
       "cloud-vm": "no cloud can run it (aws, azure: link impairment (`tc`) needs a router in the path; the cloud's security groups have none; gcp: link impairment (`tc`) needs a router in the path; the cloud's firewall rules have none; digitalocean: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address; linode, oci: link impairment (`tc`) needs a router in the path; the cloud's firewalls have none)"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },

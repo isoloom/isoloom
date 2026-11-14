@@ -357,10 +357,8 @@ crash.*.log
     "not_possible": {
       "docker": "cloud services run on `cloud-services` only",
       "hosted": "cloud services run on `cloud-services` only",
-      "docker-vm": "cloud services run on `cloud-services` only",
       "cloud-docker": "cloud services run on `cloud-services` only",
       "kubernetes": "cloud services run on `cloud-services` only",
-      "hybrid": "cloud services run on `cloud-services` only",
       "vagrant": "cloud services run on `cloud-services` only",
       "proxmox": "cloud services run on `cloud-services` only",
       "esxi": "cloud services run on `cloud-services` only",

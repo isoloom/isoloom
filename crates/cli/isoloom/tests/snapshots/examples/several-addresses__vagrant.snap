@@ -220,7 +220,6 @@ crash.*.log
   "published": [],
   "targets": {
     "possible": [
-      "hybrid",
       "vagrant",
       "proxmox",
       "esxi",
@@ -232,13 +231,10 @@ crash.*.log
       "esxi",
       "cloud-vm"
     ],
-    "refused": {
-      "hybrid": "machine `block` has several addresses on `office`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"
-    },
+    "refused": {},
     "not_possible": {
       "docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "hosted": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
-      "docker-vm": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "cloud-docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "kubernetes": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
@@ -1065,7 +1061,7 @@ module IsoloomQemu
   # virtiofsd's arguments for a host folder (`host_folders`) every account of the VM writes, as
   # on the other providers: vagrant-qemu maps only its guest user and group to this computer's
   # (`--translate-uid map:1000:<uid>:1`), and an unprivileged virtiofsd refuses any other id
-  # (EPERM: the attack box's player, root in docker-vm's VM), whatever the folder's permissions
+  # (EPERM: an account of the VM other than the guest user), whatever the folder's permissions
   # say. Every other guest uid and gid is squashed to this computer's user and group, in two
   # ranges either side of the mapped one, so no two rules overlap. Only where the virtiofsd
   # vagrant-qemu starts translates ids (1.13 or later, `--translate-uid` in its `--help`, as

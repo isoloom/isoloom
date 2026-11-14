@@ -201,7 +201,7 @@ systemctl daemon-reload
 systemctl enable --now isoloom-published.service
 ";
 
-/// The Docker Engine a Docker host gets (`docker-vm`, `cloud-docker`, `hybrid`), exactly: the
+/// The Docker Engine a Docker host gets (`cloud-docker`), exactly: the
 /// version Isoloom's Compose files are proven with, so two runs of one environment get the same engine.
 const DOCKER_VERSION: &str = "29.9.0";
 

@@ -12,13 +12,13 @@ use crate::model::{External, Target, Virtiofs, Winrm};
 #[derive(Debug, Clone, PartialEq, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Overrides {
-    /// Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.
+    /// Every target that runs the Compose file: `docker`, `hosted`, `cloud-docker`.
     #[serde(default)]
     pub docker: Option<DockerOverrides>,
     /// The `kubernetes` target.
     #[serde(default)]
     pub kubernetes: Option<KubernetesOverrides>,
-    /// The `vagrant` target, and the VMs of `hybrid`.
+    /// The `vagrant` target.
     #[serde(default)]
     pub vagrant: Option<VagrantOverrides>,
     /// The `proxmox` target.
@@ -270,9 +270,9 @@ impl Overrides {
     #[must_use]
     pub fn targets_of(key: &str) -> &'static [Target] {
         match key {
-            "docker" => &[Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker],
+            "docker" => &[Target::Docker, Target::Hosted, Target::CloudDocker],
             "kubernetes" => &[Target::Kubernetes],
-            "vagrant" => &[Target::Vagrant, Target::Hybrid],
+            "vagrant" => &[Target::Vagrant],
             "proxmox" => &[Target::Proxmox],
             "esxi" => &[Target::Esxi],
             "external" => &[Target::External],
@@ -288,12 +288,9 @@ mod tests {
 
     #[test]
     fn each_override_key_applies_to_its_targets() {
-        assert_eq!(
-            Overrides::targets_of("docker"),
-            [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker]
-        );
+        assert_eq!(Overrides::targets_of("docker"), [Target::Docker, Target::Hosted, Target::CloudDocker]);
         assert_eq!(Overrides::targets_of("kubernetes"), [Target::Kubernetes]);
-        assert_eq!(Overrides::targets_of("vagrant"), [Target::Vagrant, Target::Hybrid]);
+        assert_eq!(Overrides::targets_of("vagrant"), [Target::Vagrant]);
         assert_eq!(Overrides::targets_of("proxmox"), [Target::Proxmox]);
         assert_eq!(Overrides::targets_of("esxi"), [Target::Esxi]);
         assert_eq!(Overrides::targets_of("external"), [Target::External]);

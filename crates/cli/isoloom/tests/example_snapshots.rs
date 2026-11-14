@@ -10,7 +10,7 @@
 //! Each run copies the example, without any generated `.isoloom/` outputs, into a fresh folder,
 //! and runs the binary with an empty `ISOLOOM_HOME` and no other `ISOLOOM_*` variable, so the
 //! user's defaults and profile never leak in. A file a target shares with an earlier target of the
-//! same example (the Compose file under `docker-vm`, `resolved.json` everywhere), byte for byte,
+//! same example (`resolved.json` everywhere), byte for byte,
 //! is written once, in the earlier snapshot; the later one names it and says where it is.
 
 use std::collections::BTreeMap;

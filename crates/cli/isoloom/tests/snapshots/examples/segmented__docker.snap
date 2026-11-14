@@ -1612,7 +1612,6 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1623,7 +1622,6 @@ volumes:
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1633,7 +1631,6 @@ volumes:
     ],
     "refused": {},
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.cache: the external target reaches machines that exist already, and `cache` names no host",
       "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },

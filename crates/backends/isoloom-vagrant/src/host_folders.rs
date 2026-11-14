@@ -22,7 +22,6 @@
 //! - ESXi: none: its VMs run on the ESXi host, not on the computer that runs the environment.
 
 use isoloom_plan::{Environment, MachineShape};
-use isoloom_render::container::host_folders;
 use isoloom_spec::model::HostFolder;
 
 use crate::ruby::{Call, Ruby, Value};
@@ -77,26 +76,15 @@ impl Share {
 }
 
 /// libvirt's memory for a VM that shares folders: virtiofsd reads the VM's memory, so it is
-/// shared, and backed by a memory file. libvirt can't add it to a VM that runs, so a VM that may
-/// get folders later (`docker_vm`'s host, when a machine with host folders is added to the
-/// environment) has it from the start.
-pub(crate) fn libvirt_shared_memory(r: &mut Ruby) {
+/// shared, and backed by a memory file.
+fn libvirt_shared_memory(r: &mut Ruby) {
     r.call(Call::new("v.memorybacking").arg(Value::sym("access")).kw("mode", Value::str("shared")));
     r.call(Call::new("v.memorybacking").arg(Value::sym("source")).kw("type", Value::str("memfd")));
 }
 
-/// Whether [`render`] sets libvirt's shared memory itself, or the VM's own libvirt block does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LibvirtMemory {
-    /// [`render`] sets it, with the shares.
-    WithShares,
-    /// The VM's block sets it always ([`libvirt_shared_memory`]).
-    Always,
-}
-
 /// The providers' blocks sharing `shares` into the VM `scope` configures (`m`, `config`), then a
 /// trigger stopping `vagrant up` on the providers that can't. Nothing without shares.
-pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: LibvirtMemory) {
+pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
     if shares.is_empty() {
         return;
     }
@@ -106,7 +94,7 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share], memory: Libvir
         let head = Call::new(format!("{scope}.vm.provider")).arg(Value::str(p.id()));
         let params = if matches!(p, Provider::Libvirt | Provider::Qemu) { "v, o" } else { "_, o" };
         r.block(head, params, |r| {
-            if p == Provider::Libvirt && memory == LibvirtMemory::WithShares {
+            if p == Provider::Libvirt {
                 libvirt_shared_memory(r);
             }
             if p == Provider::Qemu {
@@ -184,15 +172,6 @@ pub(crate) fn refusal(env: &Environment, provider: Provider<'_>) -> Option<Strin
         })
 }
 
-/// Why `docker-vm`'s VM, under Vagrant's `provider`, can't share its containers' host folders, if
-/// it can't. The VM shares them read-write (a read-only one is bound read-only into its
-/// container), so only the providers with no shared folder refuse.
-#[must_use]
-pub fn docker_vm_refusal(env: &Environment, provider: &str) -> Option<String> {
-    let name = host_folders::needing_a_local_vm(env)?;
-    Some(refused(name, &why_not(Provider::from(provider), false)?))
-}
-
 /// Machine `name`'s host folders refused, `why`.
 fn refused(name: &str, why: &str) -> String {
     format!("machine `{name}` mounts a folder of the computer that runs the environment (`host_folders`): {why}")
@@ -204,7 +183,7 @@ mod tests {
 
     fn ruby(shares: &[Share]) -> String {
         let mut r = Ruby::new();
-        render(&mut r, "m", shares, LibvirtMemory::WithShares);
+        render(&mut r, "m", shares);
         r.finish()
     }
 

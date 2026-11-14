@@ -1,8 +1,8 @@
 //! The run manifests the targets write (`.isoloom/<target>/run.json`): the design's web-portal
-//! spec and the solo-web example write the shared docker, docker-vm and proxmox fixtures the
+//! spec and the solo-web example write the shared docker and proxmox fixtures the
 //! runner tests against, check runners get the time their waits need, and `hosted` and
-//! `kubernetes` write none. Every example's manifest on `docker`, `vagrant`, `proxmox`, `esxi`
-//! and `docker-vm` (two: Vagrant's and Proxmox's) parses and matches the schema, and leaves the
+//! `kubernetes` write none. Every example's manifest on `docker`, `vagrant`, `proxmox` and
+//! `esxi` parses and matches the schema, and leaves the
 //! runner no slot it may skip.
 
 use isoloom_manifest::{Manifest, OutputSource, Part, Placeholder};
@@ -65,32 +65,12 @@ fn cloud_docker_publishes_each_port_through_the_run_manifest() -> Outcome {
     Ok(())
 }
 
-/// cloud-docker lists the environment's networks as docker-vm does, by their Compose names in the VM: the
-/// runner reads them for the environment's status. An empty list left a runner's UI drawing networks
-/// guessed from the machines' addresses.
-#[test]
-fn cloud_docker_lists_the_labs_networks() -> Outcome {
-    let files = generate(&lab(WEB_PORTAL)?, Target::CloudDocker)?;
-    let cloud = run_json(&files, ".isoloom/cloud-docker/aws/run.json")?;
-    let local = run_json(&generate(&lab(WEB_PORTAL)?, Target::DockerVm)?, ".isoloom/docker-vm/run.json")?;
-    assert!(!cloud.networks.is_empty(), "{:?}", cloud.networks);
-    assert_eq!(cloud.networks, local.networks, "the same networks as docker-vm's");
-    Ok(())
-}
-
 #[test]
 fn the_web_portal_spec_writes_the_shared_docker_fixture() -> Outcome {
     matches_fixture(
         run_json(&generate(&lab(WEB_PORTAL)?, Target::Docker)?, ".isoloom/docker/run.json")?,
         "docker.run.json",
     )
-}
-
-#[test]
-fn the_web_portal_spec_writes_the_shared_docker_vm_fixtures() -> Outcome {
-    let files = generate(&lab(WEB_PORTAL)?, Target::DockerVm)?;
-    matches_fixture(run_json(&files, ".isoloom/docker-vm/run.json")?, "docker-vm.run.json")?;
-    matches_fixture(run_json(&files, ".isoloom/docker-vm/proxmox/run.json")?, "docker-vm-proxmox.run.json")
 }
 
 #[test]
@@ -138,13 +118,11 @@ fn the_message_leaves_published_ports_to_the_runner() -> Outcome {
 
 /// The targets that write a run manifest, where they write it, and how many examples each
 /// generates at least.
-const WRITERS: [(Target, &str, usize); 6] = [
+const WRITERS: [(Target, &str, usize); 4] = [
     (Target::Docker, ".isoloom/docker/run.json", 15),
     (Target::Vagrant, ".isoloom/vagrant/run.json", 10),
     (Target::Proxmox, ".isoloom/proxmox/run.json", 10),
     (Target::Esxi, ".isoloom/esxi/run.json", 10),
-    (Target::DockerVm, ".isoloom/docker-vm/run.json", 10),
-    (Target::DockerVm, ".isoloom/docker-vm/proxmox/run.json", 10),
 ];
 
 /// Every example `target` generates.
@@ -348,10 +326,8 @@ checks:
 ";
 
 /// Every container target's run manifest, with where it is written.
-const CONTAINER_MANIFESTS: [(Target, &str); 4] = [
+const CONTAINER_MANIFESTS: [(Target, &str); 2] = [
     (Target::Docker, ".isoloom/docker/run.json"),
-    (Target::DockerVm, ".isoloom/docker-vm/run.json"),
-    (Target::DockerVm, ".isoloom/docker-vm/proxmox/run.json"),
     (Target::CloudDocker, ".isoloom/cloud-docker/aws/run.json"),
 ];
 
@@ -389,49 +365,6 @@ fn a_lab_without_an_access_machine_has_no_stand_in_to_start_or_take_down() -> Ou
         assert_eq!(ids(&m.checks.teardown), Vec::<String>::new(), "{path}");
     }
     Ok(())
-}
-
-#[test]
-fn the_vagrantfiles_checks_run_the_manifests_stand_ins_and_runners() -> Outcome {
-    let files = generate(&lab(ACCESS_SEAT)?, Target::DockerVm)?;
-    let vf = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
-    let manifest = isoloom_manifest::parse(file(&files, ".isoloom/docker-vm/run.json")?)?;
-    let checks = vf.split("name: \"checks\"").nth(1).ok_or("no checks provisioner")?;
-    let checks = checks.split("\n  config.vm").next().unwrap_or_default();
-    let up = at(checks, "--profile check up --detach --wait --no-deps isoloom-access || exit 1")?;
-    let down = at(
-        checks,
-        "--profile check rm --stop --force isoloom-access || echo 'stand-ins-down: failed, tolerated'",
-    )?;
-    // Each runner of the run manifest, between them, its failure the provisioner's.
-    let runners = &manifest.checks.runners;
-    assert_eq!(checks.matches(" || failed=1").count(), runners.len(), "{checks}");
-    for r in runners {
-        let runner = at(checks, &format!("--env ISOLOOM_DERIVED=\\\"$ISOLOOM_DERIVED\\\" {} || failed=1", r.id))?;
-        assert!(up < runner && runner < down, "{checks}");
-    }
-    assert!(
-        checks.contains("\nexit \\\"$failed\\\"\", env: "),
-        "the runners' verdict is the provisioner's: {checks}"
-    );
-    Ok(())
-}
-
-#[test]
-fn the_vagrantfile_tolerates_what_the_manifest_tolerates_and_stops_at_the_rest() -> Outcome {
-    let published = "version: 1\nname: pub\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: 'ghcr.io/example/lab-web:1', build: { context: web } } }\n";
-    let files = generate(&lab(published)?, Target::DockerVm)?;
-    let vf = file(&files, ".isoloom/docker-vm/Vagrantfile")?;
-    let start = vf.split("name: \"environment\"").nth(1).ok_or("no environment provisioner")?;
-    let pull = at(start, "pull --ignore-pull-failures || echo 'pull: failed, tolerated' >&2")?;
-    let up = at(start, "--wait-timeout 600 || exit 1")?;
-    assert!(pull < up && up < at(start, "echo ready")?, "{start}");
-    Ok(())
-}
-
-/// Where `what` is in `text`.
-fn at(text: &str, what: &str) -> Outcome<usize> {
-    Ok(text.find(what).ok_or_else(|| format!("no {what} in {text}"))?)
 }
 
 /// One VM-or-container machine reading a secret and an input as files and another input in its

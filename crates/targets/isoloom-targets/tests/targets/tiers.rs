@@ -1,6 +1,5 @@
 //! The tier list against what the code says of the targets: each Vagrant provider exists on the
-//! host OSes the `vagrant` run manifest gives it, `docker-vm`'s Vagrant providers on the same, and
-//! every entry names the providers and clouds each target really has.
+//! host OSes the `vagrant` run manifest gives it, and every entry names the providers and clouds each target really has.
 
 use std::collections::BTreeSet;
 
@@ -24,7 +23,7 @@ fn exists_on(entries: &[tiers::TierEntry], id: &str) -> Outcome<BTreeSet<String>
 }
 
 #[test]
-fn a_vagrant_provider_exists_where_the_run_manifest_says_and_so_does_docker_vm_on_it() -> Outcome {
+fn a_vagrant_provider_exists_where_the_run_manifest_says() -> Outcome {
     let entries = tiers::tiers()?;
     let files = generate(&example("hello-stack")?, Target::Vagrant)?;
     let manifest: Value = serde_json::from_str(file(&files, "vagrant/run.json")?)?;
@@ -39,22 +38,6 @@ fn a_vagrant_provider_exists_where_the_run_manifest_says_and_so_does_docker_vm_o
             .filter_map(|h| h.as_str().map(str::to_owned))
             .collect();
         assert_eq!(exists_on(&entries, &format!("vagrant/{id}"))?, hosts, "vagrant/{id}");
-        if tiers::variants(Target::DockerVm).contains(&id) {
-            assert_eq!(exists_on(&entries, &format!("docker-vm/{id}"))?, hosts, "docker-vm/{id}");
-        }
     }
-    Ok(())
-}
-
-#[test]
-fn docker_vm_has_an_entry_for_each_provider_its_vagrantfile_has_a_block_for() -> Outcome {
-    let files = generate(&example("hello-stack")?, Target::DockerVm)?;
-    let vagrantfile = file(&files, "docker-vm/Vagrantfile")?;
-    let blocks: Vec<&str> = tiers::variants(Target::DockerVm).into_iter().filter(|p| *p != "proxmox").collect();
-    for p in &blocks {
-        assert!(vagrantfile.contains(&format!("config.vm.provider \"{p}\"")), "no `{p}` block");
-    }
-    assert!(!vagrantfile.contains("config.vm.provider \"hyperv\""));
-    assert!(files.iter().any(|f| f.path.ends_with("docker-vm/proxmox/main.tf")));
     Ok(())
 }

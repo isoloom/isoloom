@@ -1005,7 +1005,6 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1016,7 +1015,6 @@ volumes:
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "vagrant",
       "proxmox",
@@ -1027,7 +1025,6 @@ volumes:
       "kubernetes": "machine `aliases` (dotted DNS names) aren't Kubernetes Service names"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
       "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },

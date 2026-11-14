@@ -1156,21 +1156,18 @@ volumes:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes"
     ],
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker"
     ],
     "refused": {
       "kubernetes": "machine `vios` is a network appliance (`app.appliance`), which runs on the Docker targets"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "vagrant": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
       "proxmox": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
       "esxi": "machines.vios.app.appliance: an appliance's packaging exists only as a container",

@@ -13,8 +13,6 @@ is the prose around it.
 | `hosted` | The same Compose file, for a hosting service |
 | `kubernetes` | Manifests for your cluster, with NetworkPolicies for `reach`; the same as a Kustomize overlay and as a Helm chart |
 | `vagrant` | One local VM per machine, through a Vagrant provider |
-| `docker-vm` | The containers on one VM (Vagrant, or Proxmox) |
-| `hybrid` | Containers and VMs together on the same networks |
 | `proxmox` | A Terraform module for Proxmox VE: one VM (or LXC) per machine, with SDN, router and firewall |
 | `esxi` | A Terraform module for a standalone ESXi host |
 | `cloud-vm` | A Terraform module: one cloud VM per machine |
@@ -40,14 +38,14 @@ Two targets fan out:
 - **`vagrant`** generates one Vagrantfile that every local provider reads: VirtualBox, VMware,
   Parallels, libvirt, Hyper-V and QEMU, plus the remote `vmware_esxi` provider. A provider
   exists only on the hosts that have it (Hyper-V on Windows, libvirt on Linux, Parallels on
-  macOS, QEMU on Linux and macOS); the others run on all three. UTM (macOS) runs `docker-vm`'s
-  one VM only: `vagrant_utm` gives a VM no private network, and every machine is on one.
+  macOS, QEMU on Linux and macOS); the others run on all three. UTM (macOS) has no `vagrant`
+  provider: `vagrant_utm` gives a VM no private network, and every machine is on one.
 - **`cloud-vm`, `cloud-docker` and `cloud-services`** target six clouds: AWS, Azure, Google
   Cloud, DigitalOcean, Linode and Oracle Cloud.
 
 A Vagrant run manifest is one file for every provider, chosen when the runner brings it up; the
 cloud targets write one per cloud (`.isoloom/cloud-vm/<cloud>/run.json`). `kubernetes`,
-`hybrid`, `external` and `hosted` write no run manifest, and `cloud-services` none
+`external` and `hosted` write no run manifest, and `cloud-services` none
 without `cloud:`: [the run manifest](run-manifest.md) lists which target has one, and where.
 
 ## Tiers: how far a target is proven
@@ -74,9 +72,8 @@ still pending.
 | `vagrant` on libvirt | Linux |
 
 Every other target, provider and cloud is Tier 2: its files pass their official validators, and
-some have real runs from one host OS (`proxmox`, `vagrant` on VirtualBox and remote ESXi,
-`docker-vm` on VirtualBox, and `cloud-vm`, `cloud-docker` and `cloud-services` on AWS, from
-macOS). No target is Tier 3. `isoloom targets` shows the tiers of a spec's targets, and
+some have real runs from one host OS (`proxmox`, `vagrant` on VirtualBox and remote ESXi, and
+`cloud-vm`, `cloud-docker` and `cloud-services` on AWS, from macOS). No target is Tier 3. `isoloom targets` shows the tiers of a spec's targets, and
 `isoloom matrix` all of them, with their evidence.
 
 ### What is proven

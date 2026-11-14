@@ -1,6 +1,5 @@
 //! The `cloud-docker` run manifest (`.isoloom/cloud-docker/<cloud>/run.json`): Terraform makes
-//! one VM, and the runner runs the environment's containers inside it, as `docker-vm`
-//! does on a server. The containers and the commands that start, check and read them are the
+//! one VM, and the runner runs the environment's containers inside it. The containers and the commands that start, check and read them are the
 //! shared Compose-in-a-VM pieces (`isoloom_render::run_manifest::guest`); this module adds the
 //! Terraform lifecycle, the cloud's credentials and the VM.
 //!
@@ -52,7 +51,7 @@ pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &super::Driver, 
         identity: crate::module::manifest::runner_identity(Vec::new())?,
         params,
         secrets,
-        // The lab's networks as Compose names them in the VM, as docker-vm lists them: what the
+        // The environment's networks as Compose names them in the VM: what the
         // runner reads and draws.
         networks: guest.networks.clone(),
         machines,
@@ -84,7 +83,7 @@ fn up_steps(login: &Login, guest: &GuestCompose) -> Result<Vec<Step>, ManifestEr
     let mut into = into_vm(login, &RelPath::parse("setup.sh")?, "../../..")?;
     boot_wait(&mut into)?;
     up.extend(into);
-    // The VM is readied bare over SSH (no cloud-init `AcceptEnv`, unlike docker-vm on Proxmox), so
+    // The VM is readied bare over SSH (no cloud-init `AcceptEnv`), so
     // its sshd must be told to accept the launch's values the runner forwards (`SendEnv`) before
     // the start steps run; otherwise the containers' env vars arrive unset.
     if let Some(accept) = accept_env(guest, login.as_root())? {

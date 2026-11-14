@@ -18,8 +18,6 @@ pub(crate) enum ComposeTarget {
     Docker,
     /// `hosted`: a hosting service runs the same Compose file.
     Hosted,
-    /// `hybrid`: the containers' file, run on the Docker host VM beside the environment's VMs.
-    Hybrid,
 }
 
 impl ComposeTarget {
@@ -28,7 +26,6 @@ impl ComposeTarget {
         match self {
             ComposeTarget::Docker => Target::Docker,
             ComposeTarget::Hosted => Target::Hosted,
-            ComposeTarget::Hybrid => Target::Hybrid,
         }
     }
 }
@@ -68,7 +65,7 @@ impl Backend for ComposeBackend {
     }
 }
 
-/// What runs inside a Docker host VM (`docker-vm`, `cloud-docker`) for `env` (planned for the
+/// What runs inside a Docker host VM (`cloud-docker`) for `env` (planned for the
 /// `docker` target): the `docker` target's Compose file, its containers, and the commands that
 /// start, check and read them there, as root as the way in gets it (`as_root`: the backend that
 /// makes the VM runs them through its own way in).
@@ -92,7 +89,7 @@ pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> 
 /// (`external`). Data disks are named volumes, a tmpfs takes a mode, and a volume can be kept
 /// past `down` or exist already; no raw disk (a container gets no block device). Only on the
 /// `docker` target, folders of the computer that runs the environment: its containers run there (a
-/// hosting service's and the hybrid VM's don't).
+/// hosting service's don't).
 pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
     let caps = Capabilities::of([
         Feature::NetworkAppliances,
@@ -124,7 +121,7 @@ pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
     }
 }
 
-/// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
+/// What a Compose file run on a VM can render (`cloud-docker`): Compose's, but
 /// existing networks, which a fresh Docker host VM has none of, and the host's GPUs and
 /// devices, which a VM Isoloom creates doesn't have, and volumes kept past `down` or existing
 /// already (the storage goes with the VM). Secrets reach the VM over its own
@@ -158,7 +155,7 @@ mod tests {
 
     #[test]
     fn only_the_docker_targets_containers_run_on_the_computer_whose_folders_they_mount() {
-        let with: Vec<ComposeTarget> = [ComposeTarget::Docker, ComposeTarget::Hosted, ComposeTarget::Hybrid]
+        let with: Vec<ComposeTarget> = [ComposeTarget::Docker, ComposeTarget::Hosted]
             .into_iter()
             .filter(|t| capabilities(*t).has(Feature::HostFolders))
             .collect();

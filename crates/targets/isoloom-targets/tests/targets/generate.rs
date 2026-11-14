@@ -3,7 +3,6 @@
 
 mod controller;
 mod docker;
-mod hybrid;
 mod images;
 mod kubernetes;
 mod own_names;

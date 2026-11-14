@@ -46,86 +46,6 @@
       "runs": []
     },
     {
-      "entry": "docker-vm/virtualbox",
-      "goal": 1,
-      "exists_on": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "runs": [
-        {
-          "host": "macos-arm64",
-          "date": "2026-10-16",
-          "result": "pass",
-          "note": "hello-stack up, 12 checks, down through the runner on VirtualBox 7.2 (bento/debian-12, Docker inside); no VM or container left behind"
-        }
-      ]
-    },
-    {
-      "entry": "docker-vm/vmware_desktop",
-      "goal": 1,
-      "exists_on": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "docker-vm/parallels",
-      "goal": 1,
-      "exists_on": [
-        "macos"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "docker-vm/utm",
-      "goal": 1,
-      "exists_on": [
-        "macos"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "docker-vm/qemu",
-      "goal": 1,
-      "exists_on": [
-        "linux",
-        "macos"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "docker-vm/libvirt",
-      "goal": 1,
-      "exists_on": [
-        "linux"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "docker-vm/vmware_esxi",
-      "goal": 2,
-      "exists_on": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "docker-vm/proxmox",
-      "goal": 2,
-      "exists_on": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "runs": []
-    },
-    {
       "entry": "cloud-docker/aws",
       "goal": 1,
       "exists_on": [
@@ -194,16 +114,6 @@
     },
     {
       "entry": "kubernetes",
-      "goal": 2,
-      "exists_on": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "runs": []
-    },
-    {
-      "entry": "hybrid",
       "goal": 2,
       "exists_on": [
         "linux",

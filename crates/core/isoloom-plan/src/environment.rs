@@ -699,12 +699,10 @@ overrides:
     #[test]
     fn each_target_produces_a_machine_in_the_form_it_runs() {
         use super::MachineShape::{Container, External, Supplied, Vm};
-        for t in [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Kubernetes] {
+        for t in [Target::Docker, Target::Hosted, Target::CloudDocker, Target::Kubernetes] {
             assert_eq!(shape_of(t, "both"), Some(Container), "{t:?}");
             assert_eq!(shape_of(t, "user"), Some(Supplied), "{t:?}");
         }
-        assert_eq!(shape_of(Target::Hybrid, "both"), Some(Container), "a container where it has one");
-        assert_eq!(shape_of(Target::Hybrid, "vm"), Some(Vm));
         assert_eq!(shape_of(Target::Proxmox, "ct"), Some(Container), "an LXC container");
         assert_eq!(shape_of(Target::Proxmox, "both"), Some(Vm));
         assert_eq!(
@@ -718,7 +716,7 @@ overrides:
 
     #[test]
     fn every_vm_comes_with_its_os_and_nothing_else_is_one() {
-        for t in [Target::Hybrid, Target::Proxmox, Target::Vagrant, Target::Docker] {
+        for t in [Target::Proxmox, Target::Vagrant, Target::Docker] {
             let env = testing::environment(SHAPES, t);
             let vms: Vec<(&str, &str)> = env.vms().map(|vm| (vm.name, vm.os)).collect();
             let shaped = env.machines.values().filter(|m| m.shape == super::MachineShape::Vm).count();
@@ -732,10 +730,9 @@ overrides:
 
     #[test]
     fn a_vm_has_set_up_steps_and_a_container_none() {
-        let env = testing::environment(SHAPES, Target::Hybrid);
-        let steps = |m: &str| env.machines.get(m).map_or(0, |p| p.lifecycle.len());
-        assert!(steps("vm") > 0);
-        assert_eq!(steps("both"), 0);
+        let steps = |t: Target, m: &str| testing::environment(SHAPES, t).machines.get(m).map_or(0, |p| p.lifecycle.len());
+        assert!(steps(Target::Vagrant, "vm") > 0);
+        assert_eq!(steps(Target::Docker, "both"), 0);
     }
 
     #[test]
@@ -787,7 +784,7 @@ overrides:
         assert_eq!(win.winrm, Some(isoloom_spec::model::Winrm::Ssl));
         let vm = env.machines.get("vm").expect("planned");
         assert!(!vm.is_windows() && vm.winrm.is_none());
-        assert!(super::on_docker(Target::Docker) && super::on_docker(Target::Hosted) && !super::on_docker(Target::DockerVm));
+        assert!(super::on_docker(Target::Docker) && super::on_docker(Target::Hosted) && !super::on_docker(Target::CloudDocker));
     }
 
     #[test]

@@ -108,7 +108,11 @@ impl Sources {
 
 /// The Dockerfile's path in its repository.
 fn path_in_repo(o: &Origin) -> String {
-    if o.directory.is_empty() || o.directory == "." { o.file.clone() } else { format!("{}/{}", o.directory.trim_end_matches('/'), o.file) }
+    if o.directory.is_empty() || o.directory == "." {
+        o.file.clone()
+    } else {
+        format!("{}/{}", o.directory.trim_end_matches('/'), o.file)
+    }
 }
 
 /// The images `dockerfile` starts `FROM` that neither the matrix nor `sources` gives (stage
@@ -146,7 +150,11 @@ pub fn publisher(image: &str) -> Option<Origin> {
         // release tags carry the version, its bake file the Java release (`jdk21` in the tag).
         "jenkins/jenkins" => {
             let java = tag.split('-').find_map(|w| w.strip_prefix("jdk")).unwrap_or("21").to_owned();
-            let version = if tag.starts_with("lts") || tag == "latest" { JENKINS_LTS.to_owned() } else { tag.split('-').next().unwrap_or(&tag).to_owned() };
+            let version = if tag.starts_with("lts") || tag == "latest" {
+                JENKINS_LTS.to_owned()
+            } else {
+                tag.split('-').next().unwrap_or(&tag).to_owned()
+            };
             let slim = tag.contains("slim");
             Some(Origin {
                 repo: "https://github.com/jenkinsci/docker".to_owned(),
@@ -223,7 +231,10 @@ mod tests {
     #[test]
     fn an_official_tag_resolves_to_its_entry() {
         let o = official(MANIFEST, "8-jdk-noble").unwrap();
-        assert_eq!((o.repo.as_str(), o.commit.as_str(), o.directory.as_str(), o.file.as_str()), ("https://github.com/adoptium/containers", "df1e9fc3", "8/jdk/ubuntu/noble", "Dockerfile"));
+        assert_eq!(
+            (o.repo.as_str(), o.commit.as_str(), o.directory.as_str(), o.file.as_str()),
+            ("https://github.com/adoptium/containers", "df1e9fc3", "8/jdk/ubuntu/noble", "Dockerfile")
+        );
         assert_eq!(official(MANIFEST, "17").unwrap().file, "Dockerfile.releases");
         assert_eq!(official(MANIFEST, "11"), None);
     }

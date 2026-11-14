@@ -11,7 +11,7 @@ fn built() -> Matrix {
     matrix().unwrap()
 }
 
-/// The environments a row is decided on, by target: its plain one, `hybrid`'s and `external`'s.
+/// The environments a row is decided on, by target: its plain one and `external`'s.
 fn labs_of(p: &Probe) -> Vec<(Target, Lab)> {
     let probes = probe::probes().unwrap();
     Target::ALL
@@ -19,7 +19,6 @@ fn labs_of(p: &Probe) -> Vec<(Target, Lab)> {
         .filter(|t| *t != Target::CloudServices && (p.only.is_empty() || p.only.contains(t)))
         .filter_map(|t| {
             let lab = match t {
-                Target::Hybrid => lab(&probes.hybrid, &p.patch, false),
                 Target::External => lab(&probes.base, &p.patch, p.hosts),
                 _ => lab(&probes.base, &p.patch, false),
             };
@@ -107,7 +106,7 @@ fn a_column_carries_its_entries_tiers() {
     let m = built();
     let column = |id: &str| m.columns.iter().find(|c| c.id() == id).copied().unwrap();
     assert_eq!(m.column_tiers(&column("vagrant/libvirt")), [Tier::One]);
-    assert_eq!(m.column_tiers(&column("docker-vm")), [Tier::Two]);
+    assert_eq!(m.column_tiers(&column("cloud-docker")), [Tier::Two]);
 }
 
 #[test]
@@ -167,11 +166,8 @@ enum Sealed {
 fn sealed_by(target: Target) -> Option<Sealed> {
     Some(match target {
         Target::Proxmox | Target::Esxi | Target::CloudVm => Sealed::ByTheRun,
-        Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker => {
-            Sealed::AsMade("an internal Compose network: the containers have no route out")
-        }
+        Target::Docker | Target::Hosted | Target::CloudDocker => Sealed::AsMade("an internal Compose network: the containers have no route out"),
         Target::Kubernetes => Sealed::AsMade("an egress network policy on the offline pods"),
-        Target::Hybrid => Sealed::AsMade("an internal Compose network, and each VM's own egress step"),
         Target::Vagrant | Target::External => Sealed::AsMade("each machine's own egress step, at the end of its set-up"),
         Target::CloudServices => return None,
     })
@@ -254,7 +250,7 @@ fn every_column_generates_some_row() {
 fn every_step_row_is_decided_on_the_step_itself() {
     let m = built();
     let probes = probe::probes().unwrap();
-    let containers = [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Kubernetes];
+    let containers = [Target::Docker, Target::Hosted, Target::CloudDocker, Target::Kubernetes];
     for p in probes.rows.iter().filter(|p| p.field.starts_with("machines.*.app.steps[]")) {
         let row = m.rows.iter().find(|r| r.field == p.field && r.value == p.value && r.about == p.about).unwrap();
         for (target, lab) in labs_of(p) {

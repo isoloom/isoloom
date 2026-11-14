@@ -148,8 +148,7 @@ fn refused(entry: &str, why: String) -> CliError {
 }
 
 /// The folder a generation covers: every file under `.isoloom/` when it generated every
-/// target, else the one target's own folder (`.isoloom/<target>/`; a folder several targets
-/// write, `docker/` for `docker-vm`, belongs to the target it is named after).
+/// target, else the one target's own folder (`.isoloom/<target>/`).
 pub(crate) fn scope(target: Option<&str>) -> String {
     target.map_or_else(|| format!("{OUTPUT_DIR}/"), |t| format!("{OUTPUT_DIR}/{t}/"))
 }

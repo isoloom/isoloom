@@ -312,7 +312,7 @@ fn aliases_on_clones() {
 #[test]
 fn machines_no_target_takes_together_leave_no_target() {
     // A VM-only machine beside a container-only access machine: no container target takes the
-    // VM, no VM target the container, and `hybrid` wants a container among the machines proper.
+    // VM, and no VM target the container.
     let yaml = with_machines(&[
         "a: { networks: { lab: 5 }, os: windows-server@2022, app: { steps: [{ run: a.ps1 }] } }",
         "b: { networks: { lab: 6 }, access: true, app: { image: nginx } }",

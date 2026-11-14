@@ -21,9 +21,7 @@
 //!   listen port per VM), each VM on one network; the QEMU provider's refusal ([`provider`])
 //!   says when a spec doesn't fit. A disk size grows the box's disk, never below the box's own.
 //! - UTM (`vagrant_utm`) gives a VM no private network, and every machine is on one, so the
-//!   `vagrant` target has no UTM block ([`provider::Provider::runs_vms`]); `docker-vm`'s one VM
-//!   runs on it, its default route through UTM's shared network rather than the plugin's slow
-//!   emulated one ([`utm`]).
+//!   `vagrant` target has no UTM block ([`provider::Provider::runs_vms`]).
 //! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
 //!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
 //!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
@@ -42,7 +40,6 @@ pub(crate) mod provider;
 pub(crate) mod providers;
 pub(crate) mod qemu;
 mod transport;
-pub(crate) mod utm;
 pub(crate) mod values;
 mod windows;
 
@@ -61,7 +58,7 @@ use isoloom_plan::checks::{Position, Resolved};
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header, router, steps};
-use isoloom_spec::model::{Spec, Target};
+use isoloom_spec::model::Target;
 
 use crate::backend::capabilities;
 use crate::boxes::ARM_HOST;
@@ -102,8 +99,7 @@ pub(crate) fn copy_rules(outputs: &[&str]) -> Value {
     Value::str(&isoloom_manifest::ignore::copy_rules(outputs))
 }
 
-/// Where a Vagrantfile goes and what it carries besides the environment's VMs: `hybrid` writes
-/// its VMs to `.isoloom/hybrid/`, with its Docker host as one more `config.vm.define` block.
+/// Where a Vagrantfile goes and what it carries besides the environment's VMs.
 #[derive(Clone, Copy)]
 pub(crate) struct Layout<'a> {
     /// The folder under `.isoloom/`.
@@ -136,15 +132,6 @@ pub(crate) fn boot(env: &Environment) -> Result<BootStatements> {
 
 /// The `vagrant` target's layout: its folder, nothing after the VMs.
 const VAGRANT: Layout<'static> = Layout { dir: DIR, extra: &|_| {} };
-
-/// The VMs of `spec` (the `vagrant` target's plan of it) into `layout`: the `hybrid` target's.
-pub(crate) fn render_spec_in(spec: &Spec, layout: &Layout) -> Result<Files> {
-    let env = Environment::build(spec, Target::Vagrant, None).map_err(|source| Error::Unplanned {
-        target: Target::Vagrant,
-        source,
-    })?;
-    Ok(render_in(&env, layout)?.0)
-}
 
 /// [`render`], into `layout`, with what its Vagrantfile applies at boot.
 fn render_in(env: &Environment, layout: &Layout) -> Result<(Files, BootStatements)> {

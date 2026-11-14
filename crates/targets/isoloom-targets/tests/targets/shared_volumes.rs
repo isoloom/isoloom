@@ -1,9 +1,8 @@
 //! `volumes:` shared between machines: one Docker volume, one Kubernetes claim (its users on
 //! the owner's node), and on VMs the owner's directory served over NFS to the others.
 
-use isoloom_spec::syntax::Tpm;
 use isoloom_spec::{Spec, Target, parse};
-use isoloom_targets::{Lab, generate, refusal};
+use isoloom_targets::{Lab, generate};
 
 use crate::testing::{Outcome, source};
 
@@ -95,13 +94,4 @@ machines:
     assert!(has("volumes.lonely", "no machine mounts it"), "{problems:#?}");
     assert!(has("volumes.data.owner", "`ghost` doesn't mount it"), "{problems:#?}");
     assert!(has("machines.two.volumes.apart", "shares no network with `one`"), "{problems:#?}");
-}
-
-#[test]
-fn hybrid_refuses_a_volume_shared_by_a_container_and_a_vm() -> Outcome {
-    // A TPM rules out the reader's container form: it is a VM, the writer a container.
-    let mut spec = shared_source()?;
-    spec.machines["reader"].hardware.tpm = Tpm::Required;
-    assert!(refusal(&Lab::new(spec), Target::Hybrid).unwrap().contains("shared by containers and VMs"));
-    Ok(())
 }

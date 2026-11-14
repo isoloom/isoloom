@@ -148,7 +148,8 @@ pub fn translate(build: &Build<'_>, sources: &Sources) -> Result<Translation, Un
     let steps: Vec<Step> = serde_json::from_value(Value::Array(written.clone()))
         .map_err(|e| Untranslatable::at(build.path, 0, "", format!("the VM form isn't a valid one: {e}"), "report this to Isoloom"))?;
     let form = json!({ "os": image.os, "app": { "steps": written } });
-    let yaml = serde_yaml_ng::to_string(&form).map_err(|e| Untranslatable::at(build.path, 0, "", format!("the VM form doesn't write: {e}"), "report this to Isoloom"))?;
+    let yaml = serde_yaml_ng::to_string(&form)
+        .map_err(|e| Untranslatable::at(build.path, 0, "", format!("the VM form doesn't write: {e}"), "report this to Isoloom"))?;
     Ok(Translation { os, steps, yaml })
 }
 

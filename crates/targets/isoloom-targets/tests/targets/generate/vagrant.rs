@@ -26,8 +26,6 @@ fn libvirt_domains_are_named_after_the_environment() -> Outcome {
     assert!(vf.contains("v.default_prefix = \"hello-stack_\""), "{vf}");
     let second = file(&generate_instance(&spec, Target::Vagrant, 2)?, ".isoloom-2/vagrant/Vagrantfile")?.to_owned();
     assert!(second.contains("v.default_prefix = \"hello-stack-2_\""));
-    let dvm = generated(&spec, Target::DockerVm, ".isoloom/docker-vm/Vagrantfile")?;
-    assert!(dvm.contains("v.default_prefix = \"hello-stack_\""));
     Ok(())
 }
 

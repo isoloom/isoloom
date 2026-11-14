@@ -89,10 +89,6 @@ fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service
         Shape::Vm => vm.err().map(|no| no.refusal(name)),
         Shape::VmOrLxc if overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)) => container.err().map(|no| no.refusal(name)),
         Shape::VmOrLxc => vm.err().map(|no| no.refusal(name)),
-        Shape::Either => match (container, vm) {
-            (Err(_), Err(no)) => Some(no.refusal(name)),
-            _ => None,
-        },
         Shape::External => (overrides::external(source, name).is_none() && !(m.access && m.os.is_none())).then(|| {
             Problem::new(
                 Code::Refused,
@@ -113,7 +109,6 @@ fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: S
     match target.needs() {
         Shape::Vm | Shape::External => vm,
         Shape::VmOrLxc => vm && !overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Either => vm && forms::container(m, service).is_err(),
         Shape::Docker | Shape::Cloud => false,
     }
 }
@@ -127,7 +122,7 @@ fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Servic
         _ => return None,
     };
     let container = match target.needs() {
-        Shape::Docker | Shape::Either => true,
+        Shape::Docker => true,
         Shape::VmOrLxc => overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
         Shape::Vm | Shape::External | Shape::Cloud => false,
     };
@@ -208,20 +203,6 @@ overrides:
         );
         assert_eq!(on(&l, Target::Proxmox), []);
         assert_eq!(on(&l, Target::Vagrant), [], "a VM renders its copy step");
-    }
-
-    #[test]
-    fn hybrid_refuses_only_a_machine_with_neither_form_and_runs_a_vm_only_where_it_must() {
-        let l = testing::lab(
-            "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: no-such-service }\n",
-        );
-        let found: Vec<String> = on(&l, Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
-        assert_eq!(found, ["machines.svc.service"], "a service with no catalogue entry is refused at its `service`");
-        assert_eq!(
-            refused_on(Target::Hybrid),
-            Vec::<String>::new(),
-            "both has a container form: no VM steps to refuse"
-        );
     }
 
     #[test]

@@ -1241,7 +1241,6 @@ secrets:
     "possible": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1252,7 +1251,6 @@ secrets:
     "generated": [
       "docker",
       "hosted",
-      "docker-vm",
       "cloud-docker",
       "kubernetes",
       "vagrant",
@@ -1263,7 +1261,6 @@ secrets:
       "esxi": "machine `database` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target"
     },
     "not_possible": {
-      "hybrid": "only when some machines are containers and others are VMs",
       "external": "overrides.external.machines.database: the external target reaches machines that exist already, and `database` names no host",
       "cloud-services": "needs `cloud:` (cloud services instead of machines)"
     },

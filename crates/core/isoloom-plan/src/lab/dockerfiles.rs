@@ -1,4 +1,4 @@
-//! The VM forms a lab's Dockerfiles give: on a target that runs VMs, a machine written as
+//! The VM forms an environment's Dockerfiles give: on a target that runs VMs, a machine written as
 //! `app.build` with no `app.steps` of its own takes the explicit VM form its Dockerfile
 //! translates to ([`crate::dockerfile`]), so the target runs it as a true VM; one whose
 //! Dockerfile doesn't translate is refused at its `app.build`, naming the line and the
@@ -29,11 +29,14 @@ fn dockerfile(m: &syntax::Machine) -> Option<(&syntax::Build, String)> {
     if !app.steps.is_empty() {
         return None;
     }
-    let path = b.dockerfile.clone().unwrap_or_else(|| format!("{}/Dockerfile", b.context.trim_end_matches('/')));
+    let path = b
+        .dockerfile
+        .clone()
+        .unwrap_or_else(|| format!("{}/Dockerfile", b.context.trim_end_matches('/')));
     Some((b, path.trim_start_matches("./").to_owned()))
 }
 
-/// The Dockerfiles the lab's VM forms are translated from, each once.
+/// The Dockerfiles the environment's VM forms are translated from, each once.
 pub(super) fn paths(source: &syntax::Spec) -> Vec<ProjectPath> {
     let mut out: Vec<ProjectPath> = Vec::new();
     for m in source.machines.values() {
@@ -58,7 +61,9 @@ pub(super) fn translate(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, Str
     let mut refused = BTreeMap::new();
     for (name, m) in &mut out.machines {
         let Some((build, path)) = dockerfile(m) else { continue };
-        let Some(text) = path.parse::<ProjectPath>().ok().and_then(|p| texts.get(&p)) else { continue };
+        let Some(text) = path.parse::<ProjectPath>().ok().and_then(|p| texts.get(&p)) else {
+            continue;
+        };
         let args: Vec<(String, String)> = build.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         let os = m.os.map(|o| o.to_string());
         let b = Build {
@@ -77,7 +82,10 @@ pub(super) fn translate(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, Str
             }
             Err(u) => {
                 let at = FieldPath::new("machines").key(name).key("app").key("build");
-                refused.insert(name.clone(), Problem::new(Code::Refused, at, format!("its Dockerfile has no VM form: {u}")).fix(u.fix));
+                refused.insert(
+                    name.clone(),
+                    Problem::new(Code::Refused, at, format!("its Dockerfile has no VM form: {u}")).fix(u.fix),
+                );
             }
         }
     }
@@ -132,7 +140,10 @@ mod tests {
     #[test]
     fn a_dockerfile_that_doesnt_translate_is_refused_at_its_line() {
         let lab = Lab::parse(LAB).unwrap().with_dockerfiles(texts(&[
-            ("build/web/Dockerfile", "FROM php:8.2-apache\nCOPY --from=composer:2 /usr/bin/composer /usr/bin/\n"),
+            (
+                "build/web/Dockerfile",
+                "FROM php:8.2-apache\nCOPY --from=composer:2 /usr/bin/composer /usr/bin/\n",
+            ),
             ("build/db/Dockerfile.lab", "FROM mariadb:10.11\n"),
         ]));
         let refusal = lab.refusal(Target::Vagrant).unwrap();

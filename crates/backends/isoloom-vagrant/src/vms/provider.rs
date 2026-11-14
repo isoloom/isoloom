@@ -153,7 +153,7 @@ impl<'a> Provider<'a> {
     /// Whether the `vagrant` target has a block for it: every provider but UTM. `vagrant_utm`
     /// (0.1.6) gives a VM no private network, only forwarded ports on its shared network, and
     /// every machine of a spec is on a network (validation asks it), so UTM could run no
-    /// environment's VMs; it runs `docker-vm`'s one VM, which needs no private network.
+    /// environment's VMs.
     pub(crate) fn runs_vms(self) -> bool {
         self != Provider::Utm
     }
@@ -173,7 +173,7 @@ pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
     let provider = Provider::from(provider);
     if !provider.runs_vms() {
         return Some(format!(
-            "the `vagrant` target has no `{}` provider: vagrant_utm gives a VM no private network (it only forwards ports), and every machine is on one; UTM runs `docker-vm`",
+            "the `vagrant` target has no `{}` provider: vagrant_utm gives a VM no private network (it only forwards ports), and every machine is on one",
             provider.id()
         ));
     }

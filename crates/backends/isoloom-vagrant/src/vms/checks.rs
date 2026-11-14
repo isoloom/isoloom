@@ -55,7 +55,7 @@ fn runs_on_vm(env: &Environment, pos: &Position) -> bool {
 }
 
 /// The derived checks the controller runs from the networks when the spec's machines could run
-/// them but none is a Linux VM here (a hybrid environment's containers next to Windows VMs, or
+/// them but none is a Linux VM here (Windows VMs only, or
 /// a supplied access machine): nothing else would check the services. Empty when a Linux VM
 /// runs them, or when they already stand on the networks.
 pub(crate) fn in_their_place(env: &Environment) -> Vec<Resolved> {

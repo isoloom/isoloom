@@ -70,9 +70,9 @@ mod tests {
     use super::HostSize;
     use crate::testing;
 
-    /// The containers' host for `yaml`, on `docker-vm`.
+    /// The containers' host for `yaml`, on `cloud-docker`.
     fn host_size(yaml: &str) -> HostSize {
-        HostSize::of(&testing::env(yaml, Target::DockerVm))
+        HostSize::of(&testing::env(yaml, Target::CloudDocker))
     }
 
     #[test]

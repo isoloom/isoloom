@@ -147,8 +147,8 @@ fn access_box(plan: &isoloom_plan::MachinePlan, svc: &mut Service) {
 }
 
 /// A published port: on the host's loopback, on an ephemeral host port by default (no
-/// collisions); `ISOLOOM_PUBLISH_FIXED` pins it to `publish` inside the docker-vm/cloud VMs that
-/// forward it. `<port>/udp` for a UDP service (Compose's default is TCP).
+/// collisions); `ISOLOOM_PUBLISH_FIXED` pins it to `publish` inside the cloud VMs that forward
+/// it. `<port>/udp` for a UDP service (Compose's default is TCP).
 fn port(p: &PublishedPort) -> String {
     let proto = if p.protocol.is_tcp() { "" } else { "/udp" };
     let (publish, port) = (p.publish, p.port);

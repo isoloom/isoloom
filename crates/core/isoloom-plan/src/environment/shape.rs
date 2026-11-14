@@ -35,8 +35,7 @@ pub(super) fn shape(target: Target, m: &Machine) -> MachineShape {
         return MachineShape::External;
     }
     let container = match target {
-        Target::Docker | Target::Hosted | Target::DockerVm | Target::CloudDocker | Target::Kubernetes => true,
-        Target::Hybrid => m.docker.is_some(),
+        Target::Docker | Target::Hosted | Target::CloudDocker | Target::Kubernetes => true,
         // Proxmox runs a machine with no `vm:` as an LXC container when it opts in.
         Target::Proxmox => m.vm.is_none() && m.docker.as_ref().is_some_and(|d| d.lxc),
         _ => false,

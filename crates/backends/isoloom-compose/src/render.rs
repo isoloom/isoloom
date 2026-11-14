@@ -82,8 +82,8 @@ pub(crate) struct Rendered {
 }
 
 /// The typed Compose file of `env` and the files it mounts, for a target that adapts it before
-/// writing it (`hybrid` plugs it into its Docker host's networks). Refused as `target` when
-/// `env` needs what Compose can't do.
+/// writing it (a Docker host's own run). Refused as `target` when `env` needs what Compose can't
+/// do.
 pub(crate) fn compose_file(target: ComposeTarget, env: &Environment) -> Result<Rendered> {
     if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &crate::backend::capabilities(target)) {
         return Err(Error::Refused {

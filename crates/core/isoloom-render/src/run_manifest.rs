@@ -2,7 +2,7 @@
 //! driver action, with their policies), tools, the environment's networks, a machine's addresses and
 //! ports, the outputs of its published ports, and the checks a runner reports with the time
 //! its step may take. Pure functions over the plan, shared so each target says them once.
-//! Compose inside a VM is [`guest`]: what both backends of `docker-vm` share.
+//! Compose inside a VM is [`guest`]: what `cloud-docker`'s clouds share.
 
 mod body;
 pub mod guest;

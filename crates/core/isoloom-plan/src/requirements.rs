@@ -356,7 +356,7 @@ impl fmt::Display for Requirement {
                 "volume `{volume}` is shared by containers and VMs: one storage can't be both a Docker volume and an NFS export"
             ),
             Requirement::VmDependsOnContainer { vm, container } => {
-                write!(f, "VM `{vm}` depends on container `{container}`: VMs start first in a hybrid environment")
+                write!(f, "VM `{vm}` depends on container `{container}`: VMs start before the containers beside them")
             }
             // Only Kubernetes lacks these today: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
