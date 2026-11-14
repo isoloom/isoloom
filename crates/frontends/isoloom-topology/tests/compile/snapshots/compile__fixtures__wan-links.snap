@@ -1,6 +1,6 @@
 ---
 source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
-expression: "compiled(\"wan-links\", &[\"docker\"])"
+expression: yaml(&compiled)
 ---
 version: 1
 name: wan-links
@@ -31,11 +31,7 @@ machines:
       hq: 2
       branch: 2
   hq-pc:
-    app:
-      image: alpine:3.20
-    command:
-    - sleep
-    - infinity
+    os: alpine@3.24
     networks:
       hq: 10
     access: true

@@ -2,9 +2,11 @@
 //! around them, and the cables between their ports) becomes an Isoloom spec, in the format Isoloom
 //! reads (`isoloom.yml`, version 1).
 //!
-//! - **Machines.** A container node is a custom app from its image (`app.image`), kept running
-//!   idle with its own `command` when the image runs nothing of its own; a Cisco node is an
-//!   appliance (`app.appliance`). A VM node is its OS (`os`), set up by its provisioning steps
+//! - **Machines.** A container node takes every form Isoloom has of its image: a distro image is
+//!   its OS (`os`), a service image the catalogue has is that service (`os` + `service:`), both a
+//!   container and a VM; any other image is a custom app from it (`app.image`, a container only,
+//!   which a VM target refuses), kept running idle with its own `command` when the image runs
+//!   nothing of its own. A Cisco node is an appliance (`app.appliance`). A VM node is its OS (`os`), set up by its provisioning steps
 //!   (`app.steps`), or the OS alone: each target decides how to deliver it.
 //! - **Ports** are named (`ssh`, `http`, `port-8000`, `dns-udp`), each with its `protocol`.
 //! - **Networks.** A LAN (an area drawn around machines, a VLAN in practice) is an Isoloom network
@@ -26,11 +28,11 @@
 //! appliances' configurations, and a starter for each provisioning step to edit, so a downloaded
 //! project runs as is.
 //!
-//! The modules follow [`compile`]: the drawing as read (`topology`); its `machines` and their
-//! `ports`; the playbooks Isoloom's `controller` runs; the `lans` and their addresses, the
-//! `cables`, the `routers` and the switches' `vlans`; the spec as it is built (`draft`) and
-//! written (`document`). `project` and `starters` are the project's own files; `error` is what a
-//! drawing can get wrong.
+//! The modules follow [`compile`]: the drawing as read (`topology`); its `machines`, the
+//! `forms` of their containers and their `ports`; the playbooks Isoloom's `controller` runs; the
+//! `lans` and their addresses, the `cables`, the `routers` and the switches' `vlans`; the spec as
+//! it is built (`draft`) and written (`document`). `project` and `starters` are the project's own
+//! files; `error` is what a drawing can get wrong.
 //!
 //! ```
 //! let topology: isoloom_topology::Topology = serde_json::from_str(
@@ -58,6 +60,7 @@ mod controller;
 mod document;
 mod draft;
 mod error;
+mod forms;
 mod lans;
 mod machines;
 mod ports;

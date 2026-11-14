@@ -305,3 +305,37 @@ fn a_windows_machines_playbook_runs_from_the_controller_and_the_vm_targets_take_
     assert!(playbook.contains("- hosts: dc01"), "{playbook}");
     Ok(())
 }
+
+/// A drawn container whose image the catalogue has is that service, so the drawing runs on the
+/// VM targets as well as the container ones.
+#[test]
+fn a_catalogue_image_gives_the_drawing_the_vm_targets_too() -> Outcome {
+    let t = r#"{"name":"site","networks":{"lan":{"cidr":"10.60.1.0/24"}},"nodes":{
+        "web":{"kind":{"container":{"image":"nginx:1.30"}},"services":[{"port":80,"protocol":"http"}],"networks":{"lan":10}},
+        "user":{"kind":{"vm":{"os":"debian@12"}},"access":true,"networks":{"lan":50}}}}"#;
+    let (plan, yml) = clean_plan(t)?;
+    assert!(yml.contains("web:\n    os: debian@12\n    service: nginx@1.30\n"), "{yml}");
+    for target in ["docker", "vagrant"] {
+        let dir = format!(".isoloom/{target}/");
+        assert!(plan.files.iter().any(|f| f.path.starts_with(&dir)), "{target}: {:?}", plan.skipped);
+    }
+    Ok(())
+}
+
+/// A drawing no one target runs whole (an image with no VM form beside a Windows VM, which has
+/// no container form) is refused in the plan, naming each machine and why, and nothing is
+/// generated: never a part of the drawing.
+#[test]
+fn a_drawing_no_target_runs_is_refused_in_the_plan_naming_its_machines() {
+    let t = r#"{"name":"mixed","networks":{"corp":{"cidr":"10.50.1.0/24"}},"nodes":{
+        "router":{"kind":{"container":{"image":"frrouting/frr:v8.5.2"}},"networks":{"corp":5}},
+        "dc01":{"kind":{"vm":{"os":"windows-server@2022"}},"networks":{"corp":10}}}}"#;
+    let refused = plan(t);
+    assert!(refused.ok, "{refused:?}");
+    let why = refused.problems.join("\n");
+    assert!(why.contains("no target is possible"), "{why}");
+    assert!(why.contains("machines.router.app.image") && why.contains("machines.dc01.os"), "{why}");
+    assert_eq!(refused.files, []);
+    let download = bundle_bytes(t).unwrap_err().to_string();
+    assert!(download.starts_with("fix the spec first: ") && download.contains("router"), "{download}");
+}

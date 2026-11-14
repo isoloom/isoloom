@@ -44,6 +44,8 @@ fn an_idle_container_is_kept_running_by_its_own_command() -> Outcome {
 #[test]
 fn a_vm_without_steps_is_its_os_alone_and_a_playbook_is_a_playbook_step() -> Outcome {
     let mut topo = three_node()?;
+    // The router's image has no VM form: a VM router, so the drawing renders on the VM targets.
+    topo.nodes["router"].kind = vm("debian@12", &[])?;
     topo.nodes["client"].kind = vm("debian@12", &[])?;
     topo.nodes["server"].kind = vm("ubuntu@24.04", &["provision/web.sh", "provision/site.yml"])?;
     let c = accepted(&topo)?;
@@ -59,6 +61,8 @@ fn a_vm_without_steps_is_its_os_alone_and_a_playbook_is_a_playbook_step() -> Out
 #[test]
 fn ports_are_named_with_their_protocol() -> Outcome {
     let mut topo = three_node()?;
+    // The router's image has no VM form: a VM router, so the drawing renders on the VM targets.
+    topo.nodes["router"].kind = vm("debian@12", &[])?;
     topo.nodes["server"].services = serde_json::from_str(r#"[{ "port": 22 }, { "port": 443, "protocol": "https" }, { "port": 53, "protocol": "udp" }]"#)?;
     let c = accepted(&topo)?;
     assert!(
@@ -74,6 +78,8 @@ fn ports_are_named_with_their_protocol() -> Outcome {
 #[test]
 fn a_windows_vm_runs_its_powershell_steps_and_the_controller_its_playbooks() -> Outcome {
     let mut topo = three_node()?;
+    // The router's image has no VM form: a VM router, so the drawing renders on the VM targets.
+    topo.nodes["router"].kind = vm("debian@12", &[])?;
     topo.nodes["server"].kind = vm("windows-server@2022", &["provision/iis.ps1", "provision/domain.yml"])?;
     let c = accepted(&topo)?;
     assert!(
@@ -93,6 +99,8 @@ fn a_windows_vm_runs_its_powershell_steps_and_the_controller_its_playbooks() -> 
 #[test]
 fn a_windows_vm_with_only_playbooks_is_its_os_alone() -> Outcome {
     let mut topo = three_node()?;
+    // The router's image has no VM form: a VM router, so the drawing renders on the VM targets.
+    topo.nodes["router"].kind = vm("debian@12", &[])?;
     topo.nodes["server"].kind = vm("windows@11", &["provision/a.yml", "provision/b.yaml"])?;
     let c = accepted(&topo)?;
     assert!(spec(&c).machines["server"].app().is_none(), "{}", yaml(&c));
@@ -126,5 +134,30 @@ fn a_step_outside_the_project_is_refused_naming_it() -> Outcome {
     }
     let seed = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../fuzz/seeds/drawing/step-outside.json"))?;
     assert!(matches!(compile(&serde_json::from_str(&seed)?), Err(Error::StepPath { .. })));
+    Ok(())
+}
+
+#[test]
+fn a_container_takes_the_forms_isoloom_has_of_its_image() -> Outcome {
+    let mut topo = three_node()?;
+    topo.nodes["router"].kind = container("alpine:3.24", true);
+    topo.nodes["server"].kind = container("nginx:1.30", false);
+    topo.nodes["server"].services = serde_json::from_str(r#"[{ "port": 80, "protocol": "http" }]"#)?;
+    let c = accepted(&topo)?;
+    let s = spec(&c);
+    assert_eq!(s.machines["router"].os.map(|os| os.to_string()).as_deref(), Some("alpine@3.24"));
+    assert!(s.machines["router"].app().is_none() && s.machines["router"].command.is_none(), "{}", yaml(&c));
+    assert!(yaml(&c).contains("server:\n    os: debian@12\n    service: nginx@1.30\n"), "{}", yaml(&c));
+    Ok(())
+}
+
+#[test]
+fn a_drawing_no_target_runs_whole_is_refused_naming_each_machine_and_why() -> Outcome {
+    let mut topo = three_node()?;
+    topo.nodes["server"].kind = vm("windows-server@2022", &["provision/iis.ps1"])?;
+    let refused = accepted(&topo).err().ok_or("a drawing no one target runs")?.to_string();
+    assert!(refused.contains("no target is possible"), "{refused}");
+    assert!(refused.contains("machines.router.app.image"), "the image with no VM form: {refused}");
+    assert!(refused.contains("machines.server.os"), "the Windows VM with no container form: {refused}");
     Ok(())
 }
