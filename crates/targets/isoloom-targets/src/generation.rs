@@ -138,6 +138,14 @@ fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Resu
 /// refuse the environment, so it can't be part of what a backend renders): the plan for the target,
 /// rendered by its backend.
 fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
+    let problems = lab.problems();
+    if !problems.is_empty() {
+        // The generators assume a checked spec: a spec that parses but is wrong stops here,
+        // whoever calls, as the CLI stops it.
+        return Err(GenerateError::Invalid {
+            problems: problems.iter().map(isoloom_spec::syntax::Problem::line).collect(),
+        });
+    }
     if let Some(refused) = lab.refusal(target) {
         return Err(GenerateError::Unsupported { target, what: refused.line() });
     }
