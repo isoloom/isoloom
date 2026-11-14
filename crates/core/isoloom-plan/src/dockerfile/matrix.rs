@@ -30,9 +30,6 @@ pub struct Base {
     /// The catalogue entry the image is, which the translation resolves (its OS then the
     /// release's): `None` for a distro or an install written here.
     pub entry: Option<EntryCall>,
-    /// kCTF's challenge base: it takes the VM's OS (its chroot stage's), and the VM is the
-    /// jail, so copying a stage's whole filesystem into it is nothing to do.
-    pub jail: bool,
 }
 
 /// A catalogue entry a base image is: the entry, the version its tag asks for (`None`: the
@@ -84,7 +81,6 @@ impl Base {
             entrypoint: None,
             cmd: None,
             entry: None,
-            jail: false,
         }
     }
 
@@ -174,12 +170,6 @@ pub fn of(image: &str) -> Result<Base, NoEntry> {
             workdir: Some("/go".to_owned()),
             ..Base::entry("golang", &tag, &[], &[])
         }),
-        // kCTF's challenge base: its OS is the VM's (an empty `os` takes it), its jail the VM.
-        "gcr.io/kctf-docker/challenge" => Ok(Base {
-            prelude: vec![KCTF.to_owned()],
-            jail: true,
-            ..Base::os("")
-        }),
         "scratch" => Err(NoEntry::Refused {
             reason: "`FROM scratch` has no OS to install onto".to_owned(),
             fix: "give the machine `os` and `app.steps`: its VM form".to_owned(),
@@ -237,8 +227,6 @@ fn version_and_variants(tag: &str) -> (String, Vec<String>) {
     let version = words.next().unwrap_or_default().to_owned();
     (version, words.map(str::to_owned).collect())
 }
-
-const KCTF: &str = include_str!("matrix/kctf.sh");
 
 /// `jenkins/jenkins:<tag>`: the catalogue's jenkins, as the image's user with its environment
 /// and folder, when the catalogue has the tag's release on the tag's Java (21); any other tag is
