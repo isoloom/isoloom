@@ -1,10 +1,13 @@
 # yaml-language-server: $schema=../entry.schema.json
 #
-# The postgres entry: PostgreSQL, from its official image. The image initialises the cluster at
-# first start from the settings below (its own entrypoint, `image.start: image`): the superuser
-# and its password, and an application database. There is no VM form in this unit; a VM form that
-# installs PGDG's packages and matches the image is a follow-up. lock.yml beside it is written
-# only by `cargo xtask catalogue refresh postgres`, which pins the image's digest.
+# The postgres entry: PostgreSQL, from its official image (16 on Debian 12), or the PostgreSQL
+# project's own packages of an exact release (apt.postgresql.org, its archive for the releases it
+# no longer carries) installed the same way in every form: a VM, or a container built from the
+# OS's image. The image initialises the cluster at first start from the settings below (its own
+# entrypoint); the packages' form does the same through the entry's entrypoint, which keeps the
+# image's contract (POSTGRES_*, /docker-entrypoint-initdb.d). lock.yml beside it is written only by
+# `cargo xtask catalogue refresh postgres`, which pins the image's digest, the repository's key and
+# each release's package versions.
 name: postgres
 description: >-
   PostgreSQL, from its official image: it serves an application database, with a superuser whose
@@ -14,27 +17,63 @@ licence:
   software: PostgreSQL
   notes: The official image bundles its Debian base's packages under those packages' own licences.
 
-# PostgreSQL's major series; the image tag is `<version>-bookworm` (a Debian 12 base).
+# PostgreSQL's major series as the official image (its tag `<version>-bookworm`, a Debian 12
+# base).
 releases:
   - version: "16"
     source: distro
     os: [debian@12]
+# The exact releases labs pin, from the PostgreSQL project's repository on the OS it built them
+# for: its archive for a minor release it no longer carries (`vars.host`, `vars.archive`), the
+# current one for a series' newest.
+  - version: "10.5"
+    source: vendor
+    os: [ubuntu@18.04]
+    vars: { major: "10", host: apt-archive.postgresql.org, archive: "-archive" }
+  - version: "10.7"
+    source: vendor
+    os: [ubuntu@18.04]
+    vars: { major: "10", host: apt-archive.postgresql.org, archive: "-archive" }
+  - version: "11.5"
+    source: vendor
+    os: [ubuntu@18.04]
+    vars: { major: "11", host: apt-archive.postgresql.org, archive: "-archive" }
+  - version: "12.22"
+    source: vendor
+    os: [ubuntu@24.04]
+    vars: { major: "12", host: apt.postgresql.org, archive: "" }
+  - version: "13.23"
+    source: vendor
+    os: [ubuntu@24.04]
+    vars: { major: "13", host: apt.postgresql.org, archive: "" }
+  - version: "14.25"
+    source: vendor
+    os: [ubuntu@24.04]
+    vars: { major: "14", host: apt.postgresql.org, archive: "" }
+  - version: "15.4"
+    source: vendor
+    os: [ubuntu@22.04]
+    vars: { major: "15", host: apt-archive.postgresql.org, archive: "-archive" }
+  - version: "16.16"
+    source: vendor
+    os: [ubuntu@24.04]
+    vars: { major: "16", host: apt.postgresql.org, archive: "" }
 default: "16"
 
 images:
   debian@12: docker.io/library/postgres:{{ version }}-bookworm
 
 settings:
-  database:
-    type: string
-    default: app
-    pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
-    description: The application database the image creates at first start.
   user:
     type: string
     default: app
     pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
     description: The superuser the image creates at first start.
+  database:
+    type: string
+    default: app
+    pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+    description: The application database the image creates at first start.
   password:
     type: password
     required: true
@@ -54,4 +93,49 @@ ports:
 data:
   data: /var/lib/postgresql/data
 
-recipe: {}
+# The packages' form (every vendor release): never the official image, whose own entrypoint is
+# its first start.
+recipe:
+  install:
+    - packages: [ca-certificates, procps]
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    # The packages make no cluster of their own (Debian's postgresql-common would start one).
+    - file: { path: /etc/postgresql-common, state: directory, mode: "0755" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    - template: { from: files/createcluster.conf, to: /etc/postgresql-common/createcluster.conf, mode: "0644" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    - repository:
+        name: pgdg
+        url: "https://{{ vars.host }}/pub/repos/apt"
+        suite: "{{ os.codename }}-pgdg{{ vars.archive }}"
+        # The PostgreSQL project's key (www.postgresql.org/download/linux/debian lists it): the
+        # refresh checks its fingerprint and writes the file's SHA-256 into lock.yml.
+        key: { url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc", fingerprint: B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8 }
+        priority: 900
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    # lock.yml gives the exact package string per OS (10.5-2.pgdg100+1, …).
+    - packages:
+        - { name: "postgresql-{{ vars.major }}", version: "{{ version }}" }
+        - { name: "postgresql-client-{{ vars.major }}", version: "{{ version }}" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    - command: "sh -c 'for b in /usr/lib/postgresql/{{ vars.major }}/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
+      creates: /usr/local/bin/postgres
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+
+  configure:
+    - file: { path: /var/lib/postgresql/data, state: directory, owner: postgres, group: postgres, mode: "0700" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    - file: { path: /var/run/postgresql, state: directory, owner: postgres, group: postgres, mode: "0775" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    - file: { path: /docker-entrypoint-initdb.d, state: directory, mode: "0755" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    # The settings, read by the entrypoint at first start (the image reads them from its environment).
+    - template: { from: files/isoloom.env, to: /etc/postgresql/isoloom.env, mode: "0600" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    - template: { from: files/docker-entrypoint.sh, to: /usr/local/bin/docker-entrypoint.sh, mode: "0755" }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    - service: { name: postgres, run: [/usr/local/bin/docker-entrypoint.sh, postgres] }
+      when: { os: [ubuntu@18.04, ubuntu@22.04, ubuntu@24.04] }
+
+  start: []

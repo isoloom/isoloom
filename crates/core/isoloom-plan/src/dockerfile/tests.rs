@@ -129,12 +129,33 @@ fn a_build_argument_given_wins_over_the_default() {
 fn the_machines_own_os_picks_where_a_service_installs() {
     let build = Build {
         path: "Dockerfile",
-        text: "FROM postgres:16\n",
+        text: "FROM python:3.12\n",
         context: ".",
         args: &[],
         os: Some("rocky@9"),
     };
     assert_eq!(translate(&build, &Sources::default()).unwrap().os.to_string(), "rocky@9");
+}
+
+#[test]
+fn a_postgres_image_installs_the_exact_release_with_the_images_defaults() {
+    let build = Build {
+        path: "build/db/Dockerfile",
+        text: "FROM postgres:10.5\nENV POSTGRES_PASSWORD=s3cret\nCOPY init.sql /docker-entrypoint-initdb.d/\n",
+        context: "build/db",
+        args: &[],
+        os: None,
+    };
+    let t = translate(&build, &Sources::default()).unwrap();
+    assert_eq!(t.os.to_string(), "ubuntu@18.04");
+    assert!(t.yaml.contains("catalogue: postgres@10.5 on ubuntu@18.04"), "{}", t.yaml);
+    assert!(t.files.values().any(|v| v == "s3cret"), "{:?}", t.files.keys());
+    // Without a password the image refuses to start: so does the translation.
+    let bare = Build {
+        text: "FROM postgres:16\n",
+        ..build
+    };
+    assert!(translate(&bare, &Sources::default()).unwrap_err().to_string().contains("POSTGRES_PASSWORD"));
 }
 
 #[test]

@@ -83,10 +83,12 @@ fn settings(def: &Definition, env: &[(String, String)], op: &EntryOp) -> Result<
     }
     for (name, setting) in &def.settings {
         let name = name.as_str();
-        if !setting.required || with.contains_key(name) {
+        let fallback = op.call.unset.iter().find(|(n, _)| *n == name).map(|(_, f)| *f);
+        // A setting the image's environment leaves out takes the image's own default (its
+        // fallback), else the entry's when it has one.
+        if with.contains_key(name) || (!setting.required && fallback.is_none()) {
             continue;
         }
-        let fallback = op.call.unset.iter().find(|(n, _)| *n == name).map(|(_, f)| *f);
         let value = match fallback {
             Some(Fallback::Value(v)) => Some(Value::String(v.to_owned())),
             Some(Fallback::Setting(other)) => with.get(other).cloned(),
@@ -165,5 +167,26 @@ mod tests {
         assert_eq!(setting_of("{{ with.database }}"), Some(("database".to_owned(), false)));
         assert_eq!(setting_of("{{ with.password.path }}"), Some(("password".to_owned(), true)));
         assert_eq!(setting_of("{{ version }}"), None);
+    }
+
+    #[test]
+    fn a_setting_the_image_leaves_out_takes_the_images_default() {
+        let catalogue = Catalogue::embedded().unwrap();
+        let def = catalogue.entry("postgres").unwrap().definition();
+        let Some(call) = super::super::matrix::of("postgres:10.5").unwrap().entry else {
+            panic!("an entry")
+        };
+        let op = EntryOp {
+            call,
+            release: "10.5".to_owned(),
+            os: "ubuntu@18.04".to_owned(),
+        };
+        let env = [("POSTGRES_PASSWORD".to_owned(), "s3cret".to_owned())];
+        let with = settings(def, &env, &op).unwrap();
+        // The image's superuser `postgres`, and a database named after it.
+        assert_eq!(with.get("user"), Some(&Value::String("postgres".to_owned())));
+        assert_eq!(with.get("database"), Some(&Value::String("postgres".to_owned())));
+        let named = [env[0].clone(), ("POSTGRES_USER".to_owned(), "shop".to_owned())];
+        assert_eq!(settings(def, &named, &op).unwrap().get("database"), Some(&Value::String("shop".to_owned())));
     }
 }

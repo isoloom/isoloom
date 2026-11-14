@@ -128,7 +128,7 @@ pub fn wanted(dockerfile: &str, sources: &Sources) -> Vec<String> {
             Instruction::Arg { name, default } if stages.is_empty() => args.push((name.clone(), default.clone().unwrap_or_default())),
             Instruction::From { image, stage } => {
                 let image = super::translate::substitute(image, &args).replace(['"', '\''], "");
-                let unknown = matches!(matrix::of(&image, None), Err(NoEntry::Unknown(_)));
+                let unknown = matches!(matrix::of(&image), Err(NoEntry::Unknown(_)));
                 if !stages.contains(&image.to_ascii_lowercase()) && unknown && sources.get(&image).is_none() && !out.contains(&image) {
                     out.push(image);
                 }

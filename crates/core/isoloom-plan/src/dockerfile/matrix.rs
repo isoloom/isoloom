@@ -3,12 +3,11 @@
 //! official service image is a catalogue entry ([`EntryCall`]: `mysql:5.7` is the catalogue's
 //! `mysql`, its newest 5.7 release), resolved by the translation with the settings the image's
 //! environment gives (`MYSQL_ROOT_PASSWORD` and the like); the images whose entries have no VM
-//! recipe yet (php, postgres) are still the install written here, with their image's
-//! conventions (its helper commands, its entrypoint's first start). Either wins over a fetched
-//! Dockerfile.
+//! recipe yet (php) are still the install written here, with their image's conventions (its
+//! helper commands). Either wins over a fetched Dockerfile.
 //!
-//! An install written here goes on the Debian family by default, on the machine's own `os` when
-//! the spec names one it supports (`os: rocky@9` beside `app.build` puts MariaDB on Rocky Linux).
+//! An entry's release goes on the machine's own `os` when the release runs there, else on the
+//! first OS it lists.
 
 use super::instruction::Command;
 
@@ -66,6 +65,10 @@ pub enum Fallback {
 /// entrypoint reads the user `root` the same way, so the image's behaviour is kept.
 const MYSQL_UNSET: &[(&str, Fallback)] = &[("user", Fallback::Value("root")), ("user_password", Fallback::Setting("password"))];
 
+/// PostgreSQL's image makes its superuser `postgres` when `POSTGRES_USER` is unset, and names the
+/// database after the user when `POSTGRES_DB` is.
+const POSTGRES_UNSET: &[(&str, Fallback)] = &[("user", Fallback::Value("postgres")), ("database", Fallback::Setting("user"))];
+
 impl Base {
     /// A bare OS: no prelude, root in `/`, a shell for a command.
     fn os(os: &str) -> Base {
@@ -113,16 +116,6 @@ pub enum NoEntry {
     },
 }
 
-/// `wanted` (the machine's own `os`) when an install written here for apt and dnf runs there,
-/// else `default`.
-fn debian_or_rhel(wanted: Option<&str>, default: &str) -> String {
-    let family = |os: &str| os.split('@').next().unwrap_or(os).to_owned();
-    match wanted {
-        Some(os) if matches!(family(os).as_str(), "debian" | "ubuntu" | "rocky" | "almalinux" | "fedora" | "centos") => os.to_owned(),
-        _ => default.to_owned(),
-    }
-}
-
 /// An image reference split into its name (without `docker.io/library/`) and tag (`latest` when
 /// it names none); a digest is dropped (the VM installs by version).
 #[must_use]
@@ -142,13 +135,12 @@ pub fn split(image: &str) -> (String, String) {
     }
 }
 
-/// The base image `image` as a VM, on `wanted` (the machine's own `os`) when the entry installs
-/// there.
+/// The base image `image` as a VM.
 ///
 /// # Errors
 ///
 /// [`NoEntry`]: no entry (`Unknown`), or one that can't be a VM at all (`Refused`).
-pub fn of(image: &str, wanted: Option<&str>) -> Result<Base, NoEntry> {
+pub fn of(image: &str) -> Result<Base, NoEntry> {
     let (name, tag) = split(image);
     match name.as_str() {
         "debian" | "ubuntu" | "alpine" | "rockylinux" | "rockylinux/rockylinux" | "almalinux" | "fedora" | "centos" | "kalilinux/kali-rolling" => {
@@ -157,7 +149,7 @@ pub fn of(image: &str, wanted: Option<&str>) -> Result<Base, NoEntry> {
         "php" => Ok(php(&tag)),
         "mariadb" => Ok(Base::entry("mariadb", &tag, MYSQL_UNSET, &[("MARIADB_", "MYSQL_")])),
         "mysql" | "mysql/mysql-server" => Ok(Base::entry("mysql", &tag, MYSQL_UNSET, &[])),
-        "postgres" => Ok(postgres(&tag, wanted)),
+        "postgres" => Ok(Base::entry("postgres", &tag, POSTGRES_UNSET, &[])),
         "python" => Ok(Base::entry("python", &tag, &[], &[])),
         "node" => Ok(Base::entry("node", &tag, &[], &[])),
         // The image's `USER` and the folders its entrypoints read: a lab's own entrypoint runs.
@@ -249,7 +241,6 @@ fn minor(version: &str) -> String {
 const PHP: &str = include_str!("matrix/php.sh");
 const KCTF: &str = include_str!("matrix/kctf.sh");
 const PHP_SHIMS: &str = include_str!("matrix/php-shims.sh");
-const POSTGRES: &str = include_str!("matrix/postgres.sh");
 
 /// `php:<version>[-apache|-fpm|-cli]`: PHP of that version from the Debian PHP archive
 /// (`packages.sury.org`), Apache with `mod_php` for `-apache`, FPM on port 9000 for `-fpm`, and the
@@ -294,35 +285,6 @@ fn php(tag: &str) -> Base {
     }
 }
 
-/// `postgres:<version>`: the PostgreSQL project's build of that major (apt.postgresql.org, or
-/// its dnf repository), with the image's entrypoint (`POSTGRES_PASSWORD`, `POSTGRES_USER`,
-/// `POSTGRES_DB`, `/docker-entrypoint-initdb.d`).
-fn postgres(tag: &str, wanted: Option<&str>) -> Base {
-    let (version, _) = version_and_variants(tag);
-    let major = if version == "latest" {
-        "18".to_owned()
-    } else {
-        // 9.6 names its major with the minor; 10 and later by the first number.
-        let parts: Vec<&str> = version.split('.').collect();
-        match parts.as_slice() {
-            ["9", minor, ..] => format!("9.{minor}"),
-            [major, ..] => (*major).to_owned(),
-            [] => version.clone(),
-        }
-    };
-    Base {
-        os: debian_or_rhel(wanted, "debian@12"),
-        prelude: vec![POSTGRES.replace("{VERSION}", &major)],
-        env: vec![("PGDATA".into(), "/var/lib/postgresql/data".into())],
-        workdir: None,
-        user: None,
-        entrypoint: Some(exec(&["docker-entrypoint.sh"])),
-        cmd: Some(exec(&["postgres"])),
-        entry: None,
-        jail: false,
-    }
-}
-
 /// The exec form of `argv`.
 fn exec(argv: &[&str]) -> Command {
     Command::Exec(argv.iter().map(|a| (*a).to_owned()).collect())
@@ -348,23 +310,22 @@ mod tests {
             ("alpine:3.19.1", "alpine@3.19"),
             ("kalilinux/kali-rolling", "kali@rolling"),
         ] {
-            assert_eq!(of(image, None).unwrap().os, os, "{image}");
+            assert_eq!(of(image).unwrap().os, os, "{image}");
         }
-        assert_eq!(of("alpine:3.7", None).unwrap().os, "alpine@3.7");
-        assert!(matches!(of("alpine:3.6", None), Err(NoEntry::Refused { reason, .. }) if reason.contains("`alpine:3.6`")));
+        assert_eq!(of("alpine:3.7").unwrap().os, "alpine@3.7");
+        assert!(matches!(of("alpine:3.6"), Err(NoEntry::Refused { reason, .. }) if reason.contains("`alpine:3.6`")));
     }
 
     #[test]
     fn service_images_pin_their_version() {
-        let php = of("php:7.4-apache", None).unwrap();
+        let php = of("php:7.4-apache").unwrap();
         assert!(php.prelude[0].contains("php7.4-cli") && php.prelude[0].contains("libapache2-mod-php7.4"));
         assert_eq!(php.cmd, Some(exec(&["apache2-foreground"])));
-        assert!(of("postgres:10.5", None).unwrap().prelude[0].contains("postgresql-10 "));
     }
 
     #[test]
     fn catalogue_images_name_their_entry_and_the_version_their_tag_asks_for() {
-        let call = |image: &str| of(image, None).unwrap().entry.map(|c| (c.entry, c.version));
+        let call = |image: &str| of(image).unwrap().entry.map(|c| (c.entry, c.version));
         assert_eq!(call("mysql:5.7"), Some(("mysql", Some("5.7".to_owned()))));
         assert_eq!(call("docker.io/library/mysql:5.7.44"), Some(("mysql", Some("5.7.44".to_owned()))));
         assert_eq!(call("mysql/mysql-server:8.0.21"), Some(("mysql", Some("8.0.21".to_owned()))));
@@ -373,20 +334,14 @@ mod tests {
         assert_eq!(call("docker.io/library/mariadb:10.6.3"), Some(("mariadb", Some("10.6.3".to_owned()))));
         assert_eq!(call("golang:1.23-alpine"), Some(("golang", Some("1.23".to_owned()))));
         assert_eq!(call("gitea/gitea:1.22@sha256:538658de"), Some(("gitea", Some("1.22".to_owned()))));
-        assert_eq!(of("golang:1.22-bookworm", None).unwrap().workdir.as_deref(), Some("/go"));
+        assert_eq!(of("golang:1.22-bookworm").unwrap().workdir.as_deref(), Some("/go"));
+        assert_eq!(call("postgres:15.4-alpine"), Some(("postgres", Some("15.4".to_owned()))));
         assert_eq!(call("debian:12"), None);
     }
 
     #[test]
-    fn an_entry_installs_on_the_machines_own_os_when_it_can() {
-        assert_eq!(of("postgres:16", Some("ubuntu@24.04")).unwrap().os, "ubuntu@24.04");
-        // PHP's archive is Debian's: its default instead.
-        assert_eq!(of("php:8.2-apache", Some("rocky@9")).unwrap().os, "debian@12");
-    }
-
-    #[test]
     fn an_image_without_an_entry_is_unknown_and_scratch_is_refused() {
-        assert_eq!(of("vulhub/tomcat:8.5", None), Err(NoEntry::Unknown("vulhub/tomcat".into())));
-        assert!(matches!(of("scratch", None), Err(NoEntry::Refused { .. })));
+        assert_eq!(of("vulhub/tomcat:8.5"), Err(NoEntry::Unknown("vulhub/tomcat".into())));
+        assert!(matches!(of("scratch"), Err(NoEntry::Refused { .. })));
     }
 }

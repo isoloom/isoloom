@@ -87,7 +87,15 @@ fn read_index(family: Family, url: &str) -> Res<String> {
             }
             Err(format!("{url}: no APKINDEX in the archive").into())
         }
-        _ => gunzip(&fetch::get(url, &[])?),
+        // An archive suite (apt-archive.postgresql.org's) may publish its index uncompressed
+        // only, beside a bzip2 one: read the plain file then.
+        _ => match fetch::get(url, &[]) {
+            Ok(bytes) => gunzip(&bytes),
+            Err(gz) => {
+                let plain = url.strip_suffix(".gz").unwrap_or(url);
+                String::from_utf8(fetch::get(plain, &[]).map_err(|_| gz)?).map_err(|_| format!("{plain} isn't text").into())
+            }
+        },
     }
 }
 
