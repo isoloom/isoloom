@@ -334,22 +334,12 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
     ),
     (
         "machines.*.app.image",
-        "docker-vm",
-        "the base's container form already runs the image; the patch only removes steps it doesn't use",
-    ),
-    (
-        "machines.*.app.image",
         "cloud-docker",
         "the base's container form already runs the image; the patch only removes steps it doesn't use",
     ),
     (
         "machines.*.app.image",
         "kubernetes",
-        "the base's container form already runs the image; the patch only removes steps it doesn't use",
-    ),
-    (
-        "machines.*.app.image",
-        "hybrid",
         "the base's container form already runs the image; the patch only removes steps it doesn't use",
     ),
     (
@@ -385,11 +375,6 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
         "networks.*.ipv6.addresses = auto",
         "kubernetes",
         "the base has no port, so no Service whose IP families the IPv6 side sets",
-    ),
-    (
-        "overrides.vagrant.machines.*.box",
-        "hybrid",
-        "`m` is a container on hybrid (it has an image), so no VM takes the box",
     ),
 ];
 
@@ -438,11 +423,10 @@ fn a_row_generated_on_a_target_changes_that_targets_files() {
             None => p.field.clone(),
         };
         for (target, patched) in labs_of(p) {
-            if target == Target::External || decide(&patched, target, None) != Decision::Generated {
+            if target == Target::External || decide(&patched, target, None).ok() != Some(Decision::Generated) {
                 continue;
             }
-            let start = if target == Target::Hybrid { &probes.hybrid } else { &probes.base };
-            let Ok(base) = lab(start, &nothing, false) else { continue };
+            let Ok(base) = lab(&probes.base, &nothing, false) else { continue };
             let (Some(before), Some(after)) = (files_of(&base, target), files_of(&patched, target)) else {
                 continue;
             };

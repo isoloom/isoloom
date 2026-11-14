@@ -261,8 +261,8 @@ mod tests {
         let vms = lab(&format!(
             "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lan: 10 }}, app: {{ steps: [{{ run: a.sh }}] }} }}\n{tools}"
         ));
-        assert_eq!(decide(&containers, Target::Docker, None), Decision::Generated);
-        assert_eq!(decide(&vms, Target::Vagrant, Some("virtualbox")), Decision::Generated);
+        assert_eq!(decide(&containers, Target::Docker, None).unwrap(), Decision::Generated);
+        assert_eq!(decide(&vms, Target::Vagrant, Some("virtualbox")).unwrap(), Decision::Generated);
         for (lab, column) in [
             (&containers, on(Target::Kubernetes, None)),
             (&vms, on(Target::Proxmox, None)),
