@@ -7,7 +7,7 @@
   "nodes": {
     "user": { "kind": { "vm": { "os": "debian@12" } }, "access": true, "networks": { "office": null } },
     "router": { "kind": { "router": {} }, "networks": { "office": null, "servers": null } },
-    "web": { "kind": { "container": { "image": "nginx:1.27-alpine" } }, "services": [{ "port": 80, "protocol": "http" }], "networks": { "servers": null } },
+    "web": { "kind": { "container": { "image": "nginx:1.30-alpine" } }, "services": [{ "port": 80, "protocol": "http" }], "networks": { "servers": null } },
     "db": { "kind": { "vm": { "os": "debian@12", "provision": ["provision/db.sh"] } }, "services": [{ "port": 5432 }], "networks": { "servers": 20 } }
   }
 }

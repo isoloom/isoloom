@@ -32,6 +32,7 @@ named! {
     VolumesAcrossShapes => "volumes-across-shapes",
     VmAfterContainer => "vm-after-container",
     MachineAliases => "machine-aliases",
+    Tools => "tools",
     Ulimits => "ulimits",
     TrafficControl => "traffic-control",
     Ipv6 => "ipv6",

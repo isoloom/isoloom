@@ -1,6 +1,6 @@
 ---
 source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
-expression: "compiled(\"office\", &[\"hybrid\"])"
+expression: "compiled(\"office\", &[\"vagrant\"])?"
 ---
 version: 1
 name: office
@@ -21,14 +21,10 @@ machines:
       office: 10
     access: true
   web:
-    app:
-      image: nginx:1.27-alpine
+    os: alpine@3.24
+    service: nginx@1.30
     networks:
       servers: 10
-    ports:
-      http:
-        port: 80
-        protocol: http
   db:
     os: debian@12
     app:

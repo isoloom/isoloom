@@ -88,7 +88,7 @@ fn qemu_emulates_another_cpu_and_links_the_vms_through_a_hub() -> Outcome {
     let spec = lab(
         "version: 1\nname: mini\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app: { steps: [{ run: p.ps1 }] }\nprovision:\n  - ansible: ansible/main.yml\n",
     )?;
-    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
+    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap(), None);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
     assert!(vf.contains("HOST_ARCH = RbConfig::CONFIG[\"host_cpu\"]"));
     // QEMU boots machines in parallel unless told not to: the controller would run its play
@@ -239,14 +239,16 @@ fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() ->
         v.contains("# No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`."),
         "{v}"
     );
-    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
-    let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv")).expect("refused on Hyper-V");
+    assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
+    let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv"))
+        .unwrap()
+        .expect("refused on Hyper-V");
     assert!(why.contains("machine `box`") && why.contains("boxes.hyperv"), "{why}");
     // The spec's own box: its latest version with a Hyper-V build.
     let own = lab(&format!(
         "{yaml}overrides: {{ vagrant: {{ machines: {{ box: {{ boxes: {{ hyperv: my/debian13 }} }} }} }} }}\n"
     ))?;
-    assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")), None);
+    assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")).unwrap(), None);
     let given = generated(&own, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(given.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{given}");
     Ok(())

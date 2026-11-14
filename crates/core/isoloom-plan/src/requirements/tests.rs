@@ -20,6 +20,7 @@ fn environment_wide() -> Vec<(Requirement, &'static str)> {
         (Requirement::PlaybookChecks, "Ansible checks (.yml)"),
         (Requirement::ExecWithoutContainer { check: "c1".into() }, "`exec` check \"c1\" needs `from:`"),
         (Requirement::MachineAliases, "machine `aliases`"),
+        (Requirement::Tools { tool: "shell".into() }, "tool `shell` (`tools:`)"),
         (Requirement::TrafficControl, "(`tc`)"),
         (Requirement::PrivateDns { domain: "lab.internal".into() }, "(`dns.private`, `lab.internal`)"),
         (

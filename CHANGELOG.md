@@ -12,6 +12,14 @@ stable spec format.
 
 ### Added
 
+- **A machine built from a Dockerfile has a true VM form (#295).** On a target that runs VMs, a
+  machine written as `app.build` with no `app.steps` of its own takes the VM form its Dockerfile
+  translates to: the base image's OS, its `RUN`, `COPY`, `ENV`, `USER` and `WORKDIR` as steps, and
+  its command as the machine's service. A service image the Dockerfile starts `FROM` (MySQL,
+  MariaDB, PostgreSQL, PHP, Python, Node, Go, Gitea, MongoDB...) installs its catalogue entry's VM
+  recipe, pinned to the image's exact release, and keeps the image's first-start contract; a line
+  with no VM form is refused at that line. `isoloom bases fetch` vendors the base images the
+  catalogue doesn't have.
 - **A port declares the fixed login its service ships with (#296).** `login: { user, password }`
   on a port written in full is kept on the spec's port (`isoloom_spec::model::Login`,
   `model::Port::login`), so an embedder reading the spec through the library shows the sign-in
@@ -55,9 +63,41 @@ stable spec format.
 - **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
   (`Kept`, `Stripped`) instead of a `strip: bool`** (breaking, for 3.0): a call says what it does
   with the archive's top folder instead of passing a bare `true` or `false`.
+- **A lab that doesn't plan for a target is a failure, never a target shown as generated
+  (#381).** **Breaking, for library users:** `isoloom_targets::refusal`, `refusal_on` and
+  `cloud_refusals` return a `Result` (`GenerateError::Internal` when the lab doesn't plan, as
+  `generate` fails there), not an `Option` that read such a lab as generated; `isoloom targets`
+  and the capability matrix fail with it, and the resolved snapshot's `targets` lists it under
+  `failed`, a key it has only then.
+- **Errors split by what can return them (#381).** **Breaking, for library users:**
+  `isoloom_spec::instance::apply` fails with its own `InstanceError` (`Number`, `Name`, `Port`,
+  `Docker`, `Ipv6`), no longer five variants of the crate-wide `isoloom_spec::Error`. A lab
+  whose built-in catalogue doesn't load fails to plan with the new `PlanError::Catalogue`, never
+  plans with an empty catalogue.
+
+### Removed
+
+- **The `docker-vm` and `hybrid` targets.** Every machine now runs in its true form: a container on
+  the container targets, a VM on the VM targets (a container machine taking the VM form its
+  Dockerfile or its OS gives it). A lab that used `docker-vm` runs on `docker` (its containers) or
+  on `vagrant` (their VM forms); one that used `hybrid` runs on `vagrant`, its containers in their
+  VM forms.
 
 ### Fixed
 
+- **Proxmox refuses `nested_virtualization` on an arm64 VM (#324),** whose CPU QEMU emulates, so it
+  can't nest.
+- **A Linux VM mounts its `tmpfs` entries (#322),** in fstab and at once (or remounts a path that
+  is one already), where the VM targets wrote nothing for them; a Windows machine's `tmpfs` is
+  refused at validation.
+- **A secret's source and a device of the wrong kind say what they take (#320),** where they were
+  refused with "data did not match any variant of untagged enum": a source is one store
+  (`{ env }`, `{ file }`, `{ vault }` or `{ sops }`), a device a path, `host:guest[:permissions]`
+  or `{ host, guest, permissions }`, and a misspelt key is named as such.
+- **An external machine's run and playbook steps get its inputs (#316),** through the task's
+  `environment` read from where Ansible runs (`lookup('ansible.builtin.env')`).
+- **An external machine's `files[].secret` and `files[].input` are refused (#317),** as on Proxmox
+  and ESXi: nothing delivered them there, though the backend said a runner would.
 - **Two `isoloom generate` runs in one project at once no longer fail each other (#297):** each
   writes its fresh copy of a file under a name of its own before renaming it into place, where they
   shared one and could remove or rename the other's half-written copy.

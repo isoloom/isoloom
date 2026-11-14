@@ -63,7 +63,12 @@ fn every_vm_target_runs_the_same_settings_before_the_steps() -> Outcome {
 
 #[test]
 fn kubernetes_refuses_ulimits_and_sets_the_rest() -> Outcome {
-    assert!(refusal(&Lab::new(tuned_container()?), Target::Kubernetes).unwrap().contains("process limits"));
+    assert!(
+        refusal(&Lab::new(tuned_container()?), Target::Kubernetes)
+            .unwrap()
+            .unwrap()
+            .contains("process limits")
+    );
     let mut spec = tuned_container()?;
     spec.machines["web"].ulimits.clear();
     let all: String = generate(&Lab::new(spec), Target::Kubernetes).unwrap().into_iter().map(|f| f.contents).collect();

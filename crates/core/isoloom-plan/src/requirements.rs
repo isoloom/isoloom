@@ -31,6 +31,8 @@ pub enum Feature {
     VmAfterContainer,
     /// Extra names for a machine (`aliases`), dotted ones included.
     MachineAliases,
+    /// The tools beside the environment (`tools:`), each a machine of its own on every network.
+    Tools,
     /// Per-container process limits (`ulimits`).
     Ulimits,
     /// Link impairment (`tc`), applied on the path into a network.
@@ -143,6 +145,11 @@ pub enum Requirement {
     },
     /// A machine has `aliases`.
     MachineAliases,
+    /// The environment has tools beside it (`tools:`).
+    Tools {
+        /// The first tool, by name.
+        tool: String,
+    },
     /// A machine sets `ulimits`.
     Ulimits {
         /// The first machine that does.
@@ -307,6 +314,7 @@ impl Requirement {
             Requirement::VolumeAcrossShapes { .. } => Feature::VolumesAcrossShapes,
             Requirement::VmDependsOnContainer { .. } => Feature::VmAfterContainer,
             Requirement::MachineAliases => Feature::MachineAliases,
+            Requirement::Tools { .. } => Feature::Tools,
             Requirement::Ulimits { .. } => Feature::Ulimits,
             Requirement::TrafficControl => Feature::TrafficControl,
             Requirement::Ipv6 { .. } => Feature::Ipv6,
@@ -371,6 +379,10 @@ impl fmt::Display for Requirement {
             }
             // Only Kubernetes lacks these today: the messages say so in its terms.
             Requirement::MachineAliases => f.write_str("machine `aliases` (dotted DNS names) aren't Kubernetes Service names"),
+            Requirement::Tools { tool } => write!(
+                f,
+                "tool `{tool}` (`tools:`) is added beside the environment on the Docker and Vagrant targets only"
+            ),
             Requirement::Ulimits { machine } => write!(f, "machine `{machine}` sets `ulimits`: Kubernetes has no per-container process limits"),
             Requirement::TrafficControl => f.write_str("link impairment (`tc`) needs a router in the path; Kubernetes has none"),
             Requirement::Ipv6 { network } => write!(f, "network `{network}` is IPv6 (`ipv6`), which this target's networks don't carry"),
@@ -490,6 +502,10 @@ pub(crate) fn of(spec: &Spec) -> Vec<Requirement> {
     out.extend(crate::links::requirements(spec));
     out.extend(crate::private_dns::requirements(spec));
     out.extend(crate::storage::requirements(spec));
+    // Last: a target that refuses the environment for another reason too says that one first.
+    if let Some(tool) = spec.tools.keys().next() {
+        out.push(Requirement::Tools { tool: tool.clone() });
+    }
     out
 }
 

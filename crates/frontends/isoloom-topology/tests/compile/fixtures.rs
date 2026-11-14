@@ -1,5 +1,6 @@
 //! The fixture drawings, compiled: each spec as written (a snapshot), Isoloom's validation finds
-//! nothing wrong with it, and Isoloom generates the files of the targets the drawing is for.
+//! nothing wrong with it, and Isoloom generates the files of the targets the drawing is for; or,
+//! for a drawing no one target runs whole, Isoloom refuses it naming why.
 
 use std::path::Path;
 
@@ -47,9 +48,19 @@ fn the_cisco_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
     Ok(())
 }
 
+/// The WAN drawing mixes an image Isoloom has no VM form of (FRR's) with a VM whose steps install
+/// services no container command runs: no one target runs it whole, and Isoloom's validation says
+/// so, naming each machine and why, rather than generating a part of it.
 #[test]
-fn the_wan_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
-    insta::assert_snapshot!("wan-links", compiled("wan-links", &["vagrant"])?);
+fn the_wan_drawing_is_refused_naming_the_machines_no_target_takes() -> Outcome {
+    let compiled = compile(&fixture("wan-links")?)?;
+    let project = isoloom_targets::Lab::parse(&yaml(&compiled)).map_err(|p| format!("{p:?}"))?;
+    let problems: Vec<String> = project.problems().iter().map(ToString::to_string).collect();
+    let why = problems.join("\n");
+    assert!(why.contains("no target is possible"), "{why}");
+    assert!(why.contains("machines.edge.app.image"), "the image with no VM form: {why}");
+    assert!(why.contains("machines.files.command"), "the VM with no container form: {why}");
+    insta::assert_snapshot!("wan-links", yaml(&compiled));
     Ok(())
 }
 

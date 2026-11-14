@@ -86,9 +86,9 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.files[].mode` | a project file with its own owner or mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
 | `machines.*.volumes` | data kept until the environment is destroyed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `volumes` | a volume two machines share | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `volumes` | a volume a container and a VM share (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | ✗ | – | – | – | – | – | – | – | – | – |
@@ -119,7 +119,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `checks[].exec` | a command run inside an access machine the runner's image table supplies | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
 | `checks[] = *.yml` | a check that is an Ansible playbook | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
 | `checks[] = *.sh` | a check that is a project script | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `tools` | a toolbox beside the environment, on every network | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `tools` | a toolbox beside the environment, on every network | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
 | `constraints.proxy` | an HTTP proxy every machine goes through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `constraints.registries` | a registry mirror every image is pulled through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
 | `overrides.external.machines.*` | a machine with no existing host to reach, on `external` | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | ✗ | – |
@@ -372,15 +372,15 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 
 ### `machines.*.files[].input`
 
-- `proxmox`, `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
+- `proxmox`, `esxi`, `external`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `machines.*.files[].secret`
 
-- `proxmox`, `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
+- `proxmox`, `esxi`, `external`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `machines.*.files[].uid`
 
-- `proxmox`, `esxi`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
+- `proxmox`, `esxi`, `external`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `volumes`
 
@@ -532,6 +532,10 @@ Graphical consoles: what each VM target gives a VM's screen, from the run manife
 ### `checks[] = *.sh`
 
 - `external`: capability `existing-host-script-checks`: check "check.sh" runs a project script, and an existing host has no copy of the project (Isoloom copies nothing there): probe it with `http`, `tcp` or `exec` instead
+
+### `tools`
+
+- `kubernetes`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `tools`: tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only
 
 ### `overrides.external.machines.*`
 

@@ -35,7 +35,7 @@ fn connects_to(block: &str) -> Outcome<String> {
 #[test]
 fn qemu_links_three_vms_through_a_hub() -> Outcome {
     let spec = lab(THREE)?;
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap(), None);
     let vf = vagrantfile(THREE)?;
     // Every VM connects to its own port of the network's hub, picked for the copy of the project.
     let ports: Vec<String> = ["a", "b", "c"]
@@ -77,11 +77,11 @@ fn qemu_links_two_vms_through_a_hub_too_and_refuses_a_vm_on_two_networks() -> Ou
 
     let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10, dmz: 10 }\n    app: { steps: [{ run: p.sh }] }\n";
     let spec = lab(routed)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("qemu")).expect("a VM on two networks");
+    let why = refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap().expect("a VM on two networks");
     assert!(why.contains("`a` is on 2 networks, and QEMU gives a VM one"), "{why}");
     // Only QEMU: Vagrant on another provider, or whatever the provider, runs it.
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
-    assert_eq!(refusal(&spec, Target::Vagrant), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
+    assert_eq!(refusal(&spec, Target::Vagrant).unwrap(), None);
     // Still generated (for every other provider); the QEMU block says why it has no network.
     let routed_vf = vagrantfile(routed)?;
     assert!(provider_block(&routed_vf, "a", "qemu")?.contains("# No private network on QEMU: `a` is on 2 networks"));
@@ -105,12 +105,12 @@ fn the_vagrant_target_has_no_utm_provider() -> Outcome {
     // could run no environment's VMs, so the Vagrantfile has no block for it, the run manifest
     // doesn't offer it, and asking for it says so; the other providers run the environment.
     let spec = lab(THREE)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("utm")).ok_or("UTM taken")?;
+    let why = refusal_on(&spec, Target::Vagrant, Some("utm")).unwrap().ok_or("UTM taken")?;
     assert!(
         why.starts_with("the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network"),
         "{why}"
     );
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
     let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
     assert!(!vf.contains("\"utm\"") && !vf.contains("ISOLOOM_NAT_ROUTE"), "{vf}");
     let manifest = isoloom_manifest::parse(&generated(&spec, Target::Vagrant, "vagrant/run.json")?)?;
@@ -136,11 +136,13 @@ fn vmware_runs_a_machine_with_nested_virtualization() -> Outcome {
 fn esxi_refuses_an_arm64_machine() -> Outcome {
     let arm = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    os: ubuntu@24.04\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n";
     let spec = lab(arm)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("vmware_esxi")).ok_or("ESXi takes an arm64 machine")?;
+    let why = refusal_on(&spec, Target::Vagrant, Some("vmware_esxi"))
+        .unwrap()
+        .ok_or("ESXi takes an arm64 machine")?;
     assert_eq!(why, "machine `box` is arm64 (`hardware.arch`), and ESXi runs x86-64 VMs only");
     for p in ["virtualbox", "vmware_desktop", "parallels", "libvirt", "qemu"] {
-        assert_eq!(refusal_on(&spec, Target::Vagrant, Some(p)), None, "{p}");
+        assert_eq!(refusal_on(&spec, Target::Vagrant, Some(p)).unwrap(), None, "{p}");
     }
-    assert_eq!(refusal_on(&lab(THREE)?, Target::Vagrant, Some("vmware_esxi")), None);
+    assert_eq!(refusal_on(&lab(THREE)?, Target::Vagrant, Some("vmware_esxi")).unwrap(), None);
     Ok(())
 }

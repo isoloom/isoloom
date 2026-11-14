@@ -61,7 +61,7 @@ fn the_lab_every_row_changes_is_generated_everywhere_but_where_a_network_is_refu
             .unwrap()
             .clone()
     };
-    let row = row(&probes, &base, &columns());
+    let row = row(&probes, &base, &columns()).unwrap();
     for (column, cell) in columns().iter().zip(&row.cells) {
         let expected = match column.id().as_str() {
             "cloud-services" => Cell::NotApplicable,
@@ -265,7 +265,7 @@ fn every_step_row_is_decided_on_the_step_itself() {
                 .find(|(c, _)| c.target == target)
                 .map(|(_, cell)| cell)
                 .unwrap();
-            match (crate::refusal(&lab, target), cell) {
+            match (crate::refusal(&lab, target).unwrap(), cell) {
                 (None, Cell::Supported) => {}
                 (Some(why), Cell::Refused(r)) => assert!(why.ends_with(&r.reason), "{} on {}: {why} / {}", row.name(), target.id(), r.reason),
                 (theirs, cell) => panic!("{} on {}: the generator says {theirs:?}, the matrix {cell:?}", row.name(), target.id()),
@@ -317,4 +317,137 @@ fn every_column_the_matrix_says_takes_a_check_writes_it() {
         }
     }
     assert!(looked > m.columns.len(), "{looked} columns looked at");
+}
+
+/// Rows a target marks generated without its files changing, each with why that is right:
+/// `(row, target, why)`.
+const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
+    (
+        "machines.*.app.image",
+        "docker",
+        "the base's container form already runs the image; the patch only removes steps it doesn't use",
+    ),
+    (
+        "machines.*.app.image",
+        "hosted",
+        "the base's container form already runs the image; the patch only removes steps it doesn't use",
+    ),
+    (
+        "machines.*.app.image",
+        "cloud-docker",
+        "the base's container form already runs the image; the patch only removes steps it doesn't use",
+    ),
+    (
+        "machines.*.app.image",
+        "kubernetes",
+        "the base's container form already runs the image; the patch only removes steps it doesn't use",
+    ),
+    (
+        "machines.*.app.steps",
+        "vagrant",
+        "the base's VM form already runs the steps; the patch only removes an image it doesn't use",
+    ),
+    (
+        "machines.*.app.steps",
+        "proxmox",
+        "the base's VM form already runs the steps; the patch only removes an image it doesn't use",
+    ),
+    (
+        "machines.*.app.steps",
+        "esxi",
+        "the base's VM form already runs the steps; the patch only removes an image it doesn't use",
+    ),
+    (
+        "machines.*.app.steps",
+        "cloud-vm",
+        "the base's VM form already runs the steps; the patch only removes an image it doesn't use",
+    ),
+    ("machines.*.privileged", "vagrant", "a VM has kernel-level access already"),
+    ("machines.*.privileged", "proxmox", "a VM has kernel-level access already"),
+    ("machines.*.privileged", "esxi", "a VM has kernel-level access already"),
+    ("machines.*.privileged", "cloud-vm", "a VM has kernel-level access already"),
+    (
+        "networks.*.ipv6",
+        "kubernetes",
+        "the base has no port, so no Service whose IP families the IPv6 side sets",
+    ),
+    (
+        "networks.*.ipv6.addresses = auto",
+        "kubernetes",
+        "the base has no port, so no Service whose IP families the IPv6 side sets",
+    ),
+    (
+        "machines.*.hardware.nested_virtualization",
+        "proxmox",
+        "an amd64 VM always takes the server's CPU (cpu.type = host), which nests; an arm64 one is refused",
+    ),
+];
+
+/// Rows a target marks generated without its files changing, and no reason found yet: each one
+/// is either a field the backend drops (to refuse or render) or a reason to move above. Listed so
+/// the test holds every other row; none may be added without one of those two outcomes.
+const SUSPECTED_DROPS: &[(&str, &str, &str)] = &[
+    ("machines.*.dns", "vagrant", "unverified: Proxmox and ESXi write the resolver, these don't"),
+    ("machines.*.dns", "cloud-vm", "unverified: Proxmox and ESXi write the resolver, these don't"),
+];
+
+/// The target's own files `lab` generates on `target`, or None when it doesn't generate: the
+/// resolved snapshot and `.gitignore` that go with every target are left out, since the
+/// snapshot names every field whatever the target does with it.
+fn files_of(lab: &Lab, target: Target) -> Option<Vec<(String, String)>> {
+    let shared = [crate::resolved::file(lab).path, crate::gitignore::file().path];
+    let files = crate::generate(lab, target).ok()?;
+    Some(files.into_iter().filter(|f| !shared.contains(&f.path)).map(|f| (f.path, f.contents)).collect())
+}
+
+#[test]
+fn a_row_generated_on_a_target_changes_that_targets_files() {
+    // A ✓ that leaves the files as they were is a field the backend dropped: `tools:` read as
+    // generated on Kubernetes, Proxmox, ESXi and cloud-vm while their files had no toolbox.
+    let probes = probe::probes().unwrap();
+    let nothing = Value::Mapping(serde_yaml_ng::Mapping::new());
+    let mut dropped = Vec::new();
+    let mut compared = 0;
+    let mut excused_seen = BTreeSet::new();
+    for p in probes.rows.iter().filter(|p| !p.cloud) {
+        let name = match &p.value {
+            Some(v) => format!("{} = {v}", p.field),
+            None => p.field.clone(),
+        };
+        for (target, patched) in labs_of(p) {
+            if target == Target::External || decide(&patched, target, None).ok() != Some(Decision::Generated) {
+                continue;
+            }
+            let Ok(base) = lab(&probes.base, &nothing, false) else { continue };
+            let (Some(before), Some(after)) = (files_of(&base, target), files_of(&patched, target)) else {
+                continue;
+            };
+            compared += 1;
+            let excused = NO_FILE_CHANGE
+                .iter()
+                .chain(SUSPECTED_DROPS)
+                .any(|(row, t, _)| *row == name && *t == target.id());
+            if before == after {
+                if excused {
+                    excused_seen.insert(format!("{name} on {}", target.id()));
+                } else {
+                    dropped.push(format!("{name} on {}", target.id()));
+                }
+            }
+        }
+    }
+    assert!(dropped.is_empty(), "generated, files unchanged:\n{}", dropped.join("\n"));
+    let stale: Vec<String> = NO_FILE_CHANGE
+        .iter()
+        .chain(SUSPECTED_DROPS)
+        .map(|(row, t, _)| format!("{row} on {t}"))
+        .filter(|e| !excused_seen.contains(e))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "listed as unchanged, but its files change now (take it off the list):\n{}",
+        stale.join("\n")
+    );
+    // Most rows are generated on most targets: a handful compared means the loop skipped them.
+    assert!(compared > 300, "only {compared} rows compared");
 }

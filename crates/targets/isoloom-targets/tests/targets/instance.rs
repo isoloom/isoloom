@@ -157,7 +157,7 @@ fn two_instances_never_share_a_vm_network_or_prefix_name() -> Outcome {
     for name in ["solo-web", "segmented", "corp-ad-basics", "hello-stack", "configured-windows", "mixed-office"] {
         let lab = example(name)?;
         for target in [Target::Vagrant] {
-            if !lab.possible().contains(&target) || isoloom_targets::refusal(&lab, target).is_some() {
+            if !lab.possible().contains(&target) || isoloom_targets::refusal(&lab, target).unwrap().is_some() {
                 continue;
             }
             let plain = host_names(&lab, target, None)?;

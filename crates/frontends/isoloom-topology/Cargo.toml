@@ -17,6 +17,9 @@ publish = true
 [dependencies]
 # A starter's path: inside the project (`RelPath`) and outside Isoloom's outputs (`ignore`).
 isoloom-manifest.workspace = true
+# A drawn container's VM form: Isoloom's table of images (`dockerfile::matrix`) and its catalogue.
+isoloom-catalogue.workspace = true
+isoloom-plan.workspace = true
 isoloom-spec.workspace = true
 indexmap.workspace = true
 serde.workspace = true

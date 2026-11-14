@@ -95,11 +95,14 @@ pub(crate) struct ReachDoc {
     pub(crate) to: String,
 }
 
-/// A machine: what it is (`os`, `app`), its own command, where it sits and what it answers on.
+/// A machine: what it is (`os`, a catalogue `service` or an `app`), its own command, where it
+/// sits and what it answers on.
 #[derive(Debug, Clone, PartialEq, Default, Serialize)]
 pub(crate) struct MachineDoc {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) os: Option<OsRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) service: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) app: Option<AppDoc>,
     #[serde(skip_serializing_if = "Option::is_none")]

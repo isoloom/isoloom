@@ -116,11 +116,13 @@ impl Row {
 /// # Errors
 ///
 /// [`crate::Error::Probe`] when a row of `probes.yml` names what doesn't exist, [`crate::Error::Tiers`] or
-/// [`crate::Error::TiersJson`] when the tier list can't be read (tests keep both readable).
+/// [`crate::Error::TiersJson`] when the tier list can't be read (tests keep both readable),
+/// [`crate::Error::Generate`] when a row's lab doesn't plan for a column's target (a failure of
+/// lowering, never a cell shown as supported).
 pub fn matrix() -> Result<Matrix> {
     let probes = probe::probes()?;
     let columns = columns();
-    let rows = probes.rows.iter().map(|p| row(&probes, p, &columns)).collect();
+    let rows = probes.rows.iter().map(|p| row(&probes, p, &columns)).collect::<Result<_>>()?;
     Ok(Matrix {
         consoles: consoles::rows(&columns),
         columns,
@@ -156,46 +158,46 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
 const RUNNER_IMAGES: &str = "access: { docker: registry.example.com/workstation:1, vm: debian@12 }\n";
 
 /// A row: its environments, then each column's decision about the one it reads.
-fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Row {
+fn row(probes: &Probes, p: &Probe, columns: &[Column]) -> Result<Row> {
     let labs = Labs {
         plain: lab(&probes.base, &p.patch, false),
         external: lab(&probes.base, &p.patch, p.hosts),
         cloud: lab(&probes.cloud, &p.patch, false),
     };
-    Row {
+    Ok(Row {
         field: p.field.clone(),
         value: p.value.clone(),
         about: p.about.clone(),
         features: p.features.clone(),
-        cells: columns.iter().map(|c| cell(p, &labs, c)).collect(),
+        cells: columns.iter().map(|c| cell(p, &labs, c)).collect::<std::result::Result<_, _>>()?,
         uses: p.uses.clone(),
-    }
+    })
 }
 
 /// What `column` decides about the row's environment, or not applicable when the row is about another
 /// target or another kind of lab.
-fn cell(p: &Probe, labs: &Labs, column: &Column) -> Cell {
+fn cell(p: &Probe, labs: &Labs, column: &Column) -> std::result::Result<Cell, crate::GenerateError> {
     let target = column.target;
     if (!p.only.is_empty() && !p.only.contains(&target)) || p.cloud != (target == Target::CloudServices) {
-        return Cell::NotApplicable;
+        return Ok(Cell::NotApplicable);
     }
     let lab = match target {
         Target::External => &labs.external,
         Target::CloudServices => &labs.cloud,
         _ => &labs.plain,
     };
-    match lab {
+    Ok(match lab {
         Err(why) => Cell::Refused(Refused {
             code: Code::Invalid,
             field: None,
             reason: why.clone(),
         }),
-        Ok(lab) => match decide(lab, column.target, column.variant) {
+        Ok(lab) => match decide(lab, column.target, column.variant)? {
             Decision::Generated => Cell::Supported,
             Decision::Refused(r) => Cell::Refused(r),
             Decision::NotApplicable => Cell::NotApplicable,
         },
-    }
+    })
 }
 
 impl Matrix {

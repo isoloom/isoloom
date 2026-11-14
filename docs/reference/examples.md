@@ -33,7 +33,7 @@ may still refuse some clouds).
 | `dual-stack` | Two dual-stack networks and a router, IPv4 and IPv6 alike | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `vlan-office` | One LAN split into two VLANs, each with its own reach | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 | `several-addresses` | Several addresses for one machine on one network | vagrant, proxmox, esxi, cloud-vm |
-| `slow-link` | Two sites over a link with delay, jitter, loss and a rate limit | docker, hosted, cloud-docker, vagrant, proxmox, esxi |
+| `slow-link` | Two sites over a link with delay, jitter, loss and a rate limit | docker, hosted, cloud-docker, vagrant |
 | `private-names` | Every machine's name in a private DNS zone (`corp.internal`) | docker, hosted, cloud-docker, vagrant, proxmox, esxi, cloud-vm |
 | `udp-dns` | A DNS server answering over UDP and TCP, reachable on port 53 only | docker, hosted, cloud-docker, kubernetes, vagrant, proxmox, esxi, cloud-vm |
 
