@@ -74,11 +74,11 @@ fn boxed(name: &str, version: Option<&str>, libvirt: Option<&str>) -> VagrantBox
     }
 }
 
-/// Debian 12 for UTM: vagrant_utm's own box (arm64, built from Debian's cloud image). Isoloom's
+/// Debian 12 for UTM: `vagrant_utm`'s own box (arm64, built from Debian's cloud image). Isoloom's
 /// own Debian VMs (router, controller, tool shell) use it there too.
 pub(crate) const UTM_DEBIAN_12: &str = "utm/bookworm";
 
-/// `b` with its UTM box: the UTM boxes are vagrant_utm's own (`utm/*`), for a few OSes only.
+/// `b` with its UTM box: the UTM boxes are `vagrant_utm`'s own (`utm/*`), for a few OSes only.
 fn with_utm(mut b: VagrantBox, utm: &str) -> VagrantBox {
     b.utm = Some(utm.into());
     b

@@ -1,4 +1,4 @@
-//! Vagrant's UTM provider (`vagrant up --provider utm`, vagrant_utm 0.2.0 or later). The plugin
+//! Vagrant's UTM provider (`vagrant up --provider utm`, `vagrant_utm` 0.2.0 or later). The plugin
 //! makes no adapter for a private network and sets no address in the guest (it has no network
 //! step: `private_network` lines are ignored), and boots only UTM-format boxes, so each VM gets,
 //! besides its provider block (its UTM box, name, size), triggers that hang on the plugin's own

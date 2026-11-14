@@ -127,8 +127,8 @@ fn utm_refuses_what_it_cant_give_saying_what_would() -> Outcome {
     let disks = lab(
         "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 }, disks: { data: { size_gb: 2, mount: /data } }, app: { steps: [{ run: p.sh }] } }\n",
     )?;
-    let why = refusal_on(&disks, Target::Vagrant, Some("utm")).unwrap().ok_or("data disks taken")?;
-    assert!(why.contains("data disks"), "{why}");
+    let disks_why = refusal_on(&disks, Target::Vagrant, Some("utm")).unwrap().ok_or("data disks taken")?;
+    assert!(disks_why.contains("data disks"), "{disks_why}");
     Ok(())
 }
 

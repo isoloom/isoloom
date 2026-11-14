@@ -37,10 +37,11 @@ pub struct VmStart {
 /// [`crate::Error::Refused`] when `env` needs what Compose can't do.
 pub fn vm_start(env: &Environment) -> Result<VmStart> {
     let file = render::compose_file(ComposeTarget::Docker, env)?.file;
-    let folders: String = host_folders::of_containers(env)
+    let folders = host_folders::of_containers(env)
         .iter()
         .map(|f| format!("{}={} ", f.variable, f.in_vm))
-        .collect();
+        .collect::<Vec<_>>()
+        .concat();
     let compose = format!(
         "cd {PROJECT_DIR} && {}env {PUBLISH_ADDRESS}=0.0.0.0 {PUBLISH_FIXED}=1 {folders}docker compose --project-name {} --file {OUTPUT_DIR}/{DIR}/compose.yml",
         host_environment(env),

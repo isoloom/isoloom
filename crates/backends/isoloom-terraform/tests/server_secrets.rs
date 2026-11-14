@@ -26,17 +26,17 @@ machines:
 ";
 
 /// The variable block of `name` in `tf`.
-fn variable<'a>(tf: &'a str, name: &str) -> &'a str {
+fn variable<'a>(tf: &'a str, name: &str) -> Outcome<&'a str> {
     let (_, rest) = tf
         .split_once(&format!("variable \"{name}\" {{"))
-        .unwrap_or_else(|| panic!("no variable {name}: {tf}"));
-    rest.split_once("\n}\n").map_or(rest, |(v, _)| v)
+        .ok_or_else(|| format!("no variable {name}: {tf}"))?;
+    Ok(rest.split_once("\n}\n").map_or(rest, |(v, _)| v))
 }
 
 #[test]
 fn proxmox_writes_the_token_from_a_sensitive_variable_into_the_vms_cloud_init() -> Outcome {
     let tf = testing::proxmox(SPEC)?;
-    assert!(variable(&tf, "LAUNCH_TOKEN").contains("sensitive   = true"), "{tf}");
+    assert!(variable(&tf, "LAUNCH_TOKEN")?.contains("sensitive   = true"), "{tf}");
     assert!(tf.contains("/var/lib/isoloom/secrets.env") && tf.contains("var.LAUNCH_TOKEN"), "{tf}");
     assert!(
         tf.contains(". /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env"),
@@ -49,7 +49,7 @@ fn proxmox_writes_the_token_from_a_sensitive_variable_into_the_vms_cloud_init() 
 fn esxi_writes_the_token_from_a_sensitive_variable_into_the_vms_guestinfo_user_data() -> Outcome {
     let files = EsxiBackend.render(&plan(SPEC, Target::Esxi)?)?;
     let tf = file(&files, "esxi/main.tf")?;
-    assert!(variable(tf, "LAUNCH_TOKEN").contains("sensitive   = true"), "{tf}");
+    assert!(variable(tf, "LAUNCH_TOKEN")?.contains("sensitive   = true"), "{tf}");
     assert!(tf.contains("/var/lib/isoloom/secrets.env") && tf.contains("var.LAUNCH_TOKEN"), "{tf}");
     Ok(())
 }

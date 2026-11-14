@@ -146,15 +146,15 @@ enum Sealed {
     AsMade(&'static str),
 }
 
-/// How `target` seals an `internet: false` network; `None` where the row means nothing (no
-/// machines of its own). A target added to the spec must say, so a ✓ can't go unexplained.
-fn sealed_by(target: Target) -> Option<Sealed> {
-    Some(match target {
+/// How `target` seals an `internet: false` network. A target added to the spec must say, so a ✓
+/// can't go unexplained.
+fn sealed_by(target: Target) -> Sealed {
+    match target {
         Target::Proxmox | Target::Esxi | Target::CloudVm => Sealed::ByTheModule,
         Target::Docker | Target::Hosted | Target::CloudDocker => Sealed::AsMade("an internal Compose network: the containers have no route out"),
         Target::Kubernetes => Sealed::AsMade("an egress network policy on the offline pods"),
         Target::Vagrant | Target::External => Sealed::AsMade("each machine's own egress step, at the end of its set-up"),
-    })
+    }
 }
 
 /// The matrix's ✓ for `networks.*.internet = false` is what the generators write: every column
@@ -176,7 +176,7 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
         if *cell != Cell::Supported {
             continue;
         }
-        let how = sealed_by(column.target).unwrap_or_else(|| panic!("{}: takes the row, but says nothing of a seal", column.id()));
+        let how = sealed_by(column.target);
         let lab = &labs.iter().find(|(t, _)| *t == column.target).unwrap().1;
         let files = crate::generate(lab, column.target).unwrap();
         // The column's own modules: a cloud's in its folder, every other target's in its own.
