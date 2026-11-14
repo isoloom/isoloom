@@ -12,6 +12,14 @@ stable spec format.
 
 ### Added
 
+- **A machine built from a Dockerfile has a true VM form (#295).** On a target that runs VMs, a
+  machine written as `app.build` with no `app.steps` of its own takes the VM form its Dockerfile
+  translates to: the base image's OS, its `RUN`, `COPY`, `ENV`, `USER` and `WORKDIR` as steps, and
+  its command as the machine's service. A service image the Dockerfile starts `FROM` (MySQL,
+  MariaDB, PostgreSQL, PHP, Python, Node, Go, Gitea, MongoDB...) installs its catalogue entry's VM
+  recipe, pinned to the image's exact release, and keeps the image's first-start contract; a line
+  with no VM form is refused at that line. `isoloom bases fetch` vendors the base images the
+  catalogue doesn't have.
 - **A port declares the fixed login its service ships with (#296).** `login: { user, password }`
   on a port written in full is kept on the spec's port (`isoloom_spec::model::Login`,
   `model::Port::login`), so an embedder reading the spec through the library shows the sign-in
@@ -55,8 +63,6 @@ stable spec format.
 - **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
   (`Kept`, `Stripped`) instead of a `strip: bool`** (breaking, for 3.0): a call says what it does
   with the archive's top folder instead of passing a bare `true` or `false`.
-### Changed
-
 - **A lab that doesn't plan for a target is a failure, never a target shown as generated
   (#381).** **Breaking, for library users:** `isoloom_targets::refusal`, `refusal_on` and
   `cloud_refusals` return a `Result` (`GenerateError::Internal` when the lab doesn't plan, as
@@ -68,6 +74,14 @@ stable spec format.
   `Docker`, `Ipv6`), no longer five variants of the crate-wide `isoloom_spec::Error`. A lab
   whose built-in catalogue doesn't load fails to plan with the new `PlanError::Catalogue`, never
   plans with an empty catalogue.
+
+### Removed
+
+- **The `docker-vm` and `hybrid` targets.** Every machine now runs in its true form: a container on
+  the container targets, a VM on the VM targets (a container machine taking the VM form its
+  Dockerfile or its OS gives it). A lab that used `docker-vm` runs on `docker` (its containers) or
+  on `vagrant` (their VM forms); one that used `hybrid` runs on `vagrant`, its containers in their
+  VM forms.
 
 ### Fixed
 
