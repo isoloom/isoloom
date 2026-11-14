@@ -154,6 +154,17 @@ mod tests {
         }
     }
 
+    /// Why the generator keeps a Windows machine away from container-only forms: a lab that one
+    /// form alone can run (a Windows VM beside a machine built from a Dockerfile Isoloom hasn't
+    /// read) is refused as a whole, not split across targets.
+    #[test]
+    fn a_windows_vm_beside_a_container_only_machine_is_refused_not_split() {
+        let yaml = "version: 1\nname: mix\nnetworks:\n  n0: { cidr: 10.46.0.0/24 }\nmachines:\n  m0:\n    os: alpine@3.19\n    networks: { n0: 10 }\n    app: { build: build/m0 }\n  m1:\n    os: windows-server@2019\n    networks: { n0: 11 }\n";
+        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).expect("the spec parses"));
+        let problems: Vec<String> = lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
+        assert!(problems.iter().any(|p| p.contains("no target is possible")), "{problems:?}");
+    }
+
     /// The generator is deterministic: a seed always yields the same spec, so a failing seed
     /// reproduces.
     #[test]
