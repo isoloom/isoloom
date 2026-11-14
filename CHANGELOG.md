@@ -23,7 +23,7 @@ stable spec format.
   `utm/ubuntu-24.04`; another OS takes `overrides.vagrant.machines.<m>.boxes.utm` (the spec
   schema's `boxes.utm`), else UTM refuses the spec saying so. UTM refuses data disks, bridged
   networks, a TPM and a machine's own boot, stops `vagrant up` on nested virtualization, and
-  offers no console (SPICE). The run manifest offers `utm` again, `vagrant/utm` is a matrix
+  offers no console (SPICE). `vagrant/utm` is a matrix
   column again (tier 2, goal 1 on macOS). Breaking for the Rust API: `ProviderBoxes` and
   `VmImage` have a new public field, `utm`.
 

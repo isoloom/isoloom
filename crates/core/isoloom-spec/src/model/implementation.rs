@@ -238,7 +238,7 @@ pub struct VmImage {
     #[serde(default)]
     pub hyperv: Option<String>,
     /// The box Vagrant's UTM provider (`vagrant_utm`) boots instead: a UTM-format box (the
-    /// built-in ones are `utm/*`, for Debian 11 and 12 and Ubuntu 24.04).
+    /// built-in ones are `utm/*`, for Debian 12 and Ubuntu 24.04).
     #[serde(default)]
     pub utm: Option<String>,
     /// How this Windows box answers WinRM, when it isn't the usual plain-HTTP box.

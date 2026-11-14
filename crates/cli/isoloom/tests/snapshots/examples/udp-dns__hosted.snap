@@ -12,14 +12,7 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
 
-## .isoloom/.generated
-# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.
-.isoloom/.gitignore
-.isoloom/docker/build/client/Dockerfile
-.isoloom/docker/checks/client.sh
-.isoloom/docker/checks/dns.sh
-.isoloom/docker/compose.yml
-.isoloom/resolved.json
+## .isoloom/.generated: identical in the `docker` snapshot
 
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 

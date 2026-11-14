@@ -25,6 +25,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 | `vagrant/parallels` | 2 | macos | validated only; tier 1 pending: macos |
 | `vagrant/libvirt` | 1 | linux | real runs: linux (2026-10-17) |
 | `vagrant/qemu` | 2 | linux, macos | validated only; tier 1 pending: linux, macos |
+| `vagrant/utm` | 2 | macos | validated only; tier 1 pending: macos |
 | `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (2026-10-16); tier 1 pending: linux, windows |
 | `proxmox` | 2 | linux, macos, windows | real runs: macos (2026-10-17); tier 1 pending: linux, windows |
 | `esxi` | 2 | linux, macos, windows | real runs: partial macos (2026-10-17) |
@@ -41,118 +42,118 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ## Fields
 
-| Field | What | `docker` (1) | `hosted` (2) | `cloud-docker` (2) | `kubernetes` (2) | `vagrant/virtualbox` (2) | `vagrant/vmware_desktop` (2) | `vagrant/hyperv` (1) | `vagrant/parallels` (2) | `vagrant/libvirt` (1) | `vagrant/qemu` (2) | `vagrant/vmware_esxi` (2) | `proxmox` (2) | `esxi` (2) | `cloud-vm/aws` (2) | `cloud-vm/azure` (2) | `cloud-vm/gcp` (2) | `cloud-vm/digitalocean` (2) | `cloud-vm/linode` (2) | `cloud-vm/oci` (2) | `external` (2) | `cloud-services` (2) |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `machines.*.app.image` | a published image, the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.app.build` | the project's own Dockerfile, the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.app.appliance` | a network appliance (a router or switch OS in a container) | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `machines.*.app.steps` | portable steps, the machine's only recipe (a Dockerfile from the OS's image, or a VM's set-up) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.command` | steps that install a service, with no `command` to keep it in the foreground | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.app.steps[].copy` | a step copying a project file into the machine, among the steps that are the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.app.steps[].packages` | a step installing packages with the OS's installer, among the steps that are the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.app.steps[].playbook` | a step running an Ansible playbook in the machine, the machine's only recipe | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.app.steps[] = reboot` | a step restarting the machine, among the steps that are the machine's only recipe | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.command` | its own command | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.healthcheck` | when it counts as healthy, beyond its ports answering | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.setup` | project scripts run once the machine is up | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.environment` | environment variables | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.environment.*.input` | an environment variable from a non-sensitive input | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.depends_on` | a machine waiting for another | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `machines.*.depends_on` | a VM waiting for a container (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
-| `machines.*.resources` | CPUs and memory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.privileged` | kernel-level access | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.dns` | its own resolver settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines` | several machines | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `machines.*.count` | clones of one machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `machines.*.ports.*.publish = true` | clones each publishing a port on a free host port | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `machines.*.access` | the machine the user lands on, supplied by the runner's image table (no OS) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `machines.*.networks` | a machine on several networks | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
-| `machines.*.networks.*` | several addresses on one network | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | – |
-| `machines.*.networks.*` | several addresses on one network, for a machine only a VM runs | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | – |
-| `machines.*.aliases` | more DNS names a machine answers to | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.ports.*.publish` | a port reachable from the user's machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.ports.*.protocol = udp` | a UDP port | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.rate_limit` | a bandwidth cap on a machine's links | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `machines.*.hardware.arch = arm64` | a 64-bit ARM machine | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.hardware.tpm = required` | a virtual TPM 2.0 it can't run without | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
-| `machines.*.hardware.tpm = required` | a virtual TPM 2.0 a Windows machine can't run without | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.hardware.gpus` | GPUs, by count | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | – |
-| `machines.*.hardware.gpus.ids` | GPUs, by the host's ids | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.hardware.devices` | the host's devices | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.hardware.nested_virtualization` | VMs inside the machine | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
-| `machines.*.hardware.boot` | its own kernel, firmware, boot order or network boot | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.hardware.boot.firmware = uefi` | a VM booting through UEFI | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].mode` | a project file with its own owner or mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.volumes` | data kept until the environment is destroyed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `volumes` | a volume two machines share | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `volumes` | a volume a container and a VM share (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | ✗ | – | – | – | – | – | – | – | – | – |
-| `volumes.*.persistent = true` | a volume kept past `down` | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `overrides.*.volumes.*.external` | a volume that exists already, mounted by name | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.disks` | a data disk beside the machine's own | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.disks.*.fs = raw` | a data disk left unformatted | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.tmpfs` | a memory-backed mount | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.tmpfs[].mode` | a memory-backed mount with its own mode | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `machines.*.host_folders` | a folder of the computer that runs the environment, mounted both ways | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `machines.*.host_folders[].read_only = true` | a folder of the computer that runs the environment, mounted read-only | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `networks.*.internet = false` | a network with no way out | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
-| `reach` | traffic allowed between two networks, the rest blocked | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `networks.*.gateway` | a network routed by one of the machines | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
-| `networks.*.vlans` | a LAN split into VLANs | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `networks.*.tc` | link impairment (delay, loss, rate) on the way into a network | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `networks.*.mtu` | a network's own MTU | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | – |
-| `networks.*.ipv6` | an IPv6 block beside the IPv4 one (dual stack) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | – |
-| `networks.*.ipv6.only = true` | an IPv6-only network | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `networks.*.ipv6.addresses = auto` | IPv6 addresses the target hands out | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | – |
-| `networks.*.bridged` | a network bridged to an interface of the host | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `overrides.*.networks.*.external` | a network that exists already, joined by name | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
-| `dns.private = true` | the machines' names served under a private DNS zone | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `provision` | the environment's own Ansible, run from a controller | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | – |
-| `checks[].http` | an HTTP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `checks[].tcp` | a TCP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `checks[].exec` | a command run inside a machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `checks[].exec` | a command run inside an access machine the runner's image table supplies | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
-| `checks[] = *.yml` | a check that is an Ansible playbook | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `checks[] = *.sh` | a check that is a project script | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
-| `tools` | a toolbox beside the environment, on every network | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
-| `constraints.proxy` | an HTTP proxy every machine goes through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `constraints.registries` | a registry mirror every image is pulled through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `overrides.external.machines.*` | a machine with no existing host to reach, on `external` | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | ✗ | – |
-| `overrides.proxmox.machines.*.lxc` | a container image as an LXC container on Proxmox | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
-| `overrides.proxmox.volumes.*.virtiofs` | a volume as a folder of the Proxmox server | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
-| `overrides.vagrant.machines.*.box` | a Vagrant box of one's own | – | – | – | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | – | – | – | – | – | – | – | – | – |
-| `cloud` | cloud services instead of machines (the spec's Terraform module, applied as is) | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | ✓ |
-| `machines.*.os = debian@11` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = debian@12` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.os = debian@13` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.os = ubuntu@14.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = ubuntu@16.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = ubuntu@18.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = ubuntu@20.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = ubuntu@22.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.os = ubuntu@24.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `machines.*.os = rocky@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = alma@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = alpine@3.7` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = alpine@3.19` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = alpine@3.24` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = kali@rolling` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = fedora@42` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = centos@7` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows@10` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows@11` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows-server@2008r2` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows-server@2012r2` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows-server@2016` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows-server@2019` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows-server@2022` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
-| `machines.*.os = windows-server@2025` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| Field | What | `docker` (1) | `hosted` (2) | `cloud-docker` (2) | `kubernetes` (2) | `vagrant/virtualbox` (2) | `vagrant/vmware_desktop` (2) | `vagrant/hyperv` (1) | `vagrant/parallels` (2) | `vagrant/libvirt` (1) | `vagrant/qemu` (2) | `vagrant/utm` (2) | `vagrant/vmware_esxi` (2) | `proxmox` (2) | `esxi` (2) | `cloud-vm/aws` (2) | `cloud-vm/azure` (2) | `cloud-vm/gcp` (2) | `cloud-vm/digitalocean` (2) | `cloud-vm/linode` (2) | `cloud-vm/oci` (2) | `external` (2) | `cloud-services` (2) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `machines.*.app.image` | a published image, the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.app.build` | the project's own Dockerfile, the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.app.appliance` | a network appliance (a router or switch OS in a container) | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.app.steps` | portable steps, the machine's only recipe (a Dockerfile from the OS's image, or a VM's set-up) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.command` | steps that install a service, with no `command` to keep it in the foreground | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.app.steps[].copy` | a step copying a project file into the machine, among the steps that are the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.app.steps[].packages` | a step installing packages with the OS's installer, among the steps that are the machine's only recipe | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.app.steps[].playbook` | a step running an Ansible playbook in the machine, the machine's only recipe | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.app.steps[] = reboot` | a step restarting the machine, among the steps that are the machine's only recipe | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.command` | its own command | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.healthcheck` | when it counts as healthy, beyond its ports answering | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.setup` | project scripts run once the machine is up | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.environment` | environment variables | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.environment.*.input` | an environment variable from a non-sensitive input | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.depends_on` | a machine waiting for another | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `machines.*.depends_on` | a VM waiting for a container (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
+| `machines.*.resources` | CPUs and memory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.privileged` | kernel-level access | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.dns` | its own resolver settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines` | several machines | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `machines.*.count` | clones of one machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `machines.*.ports.*.publish = true` | clones each publishing a port on a free host port | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.access` | the machine the user lands on, supplied by the runner's image table (no OS) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `machines.*.networks` | a machine on several networks | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
+| `machines.*.networks.*` | several addresses on one network | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | – |
+| `machines.*.networks.*` | several addresses on one network, for a machine only a VM runs | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | – |
+| `machines.*.aliases` | more DNS names a machine answers to | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.ports.*.publish` | a port reachable from the user's machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.ports.*.protocol = udp` | a UDP port | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.rate_limit` | a bandwidth cap on a machine's links | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.hardware.arch = arm64` | a 64-bit ARM machine | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.hardware.tpm = required` | a virtual TPM 2.0 it can't run without | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
+| `machines.*.hardware.tpm = required` | a virtual TPM 2.0 a Windows machine can't run without | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.hardware.gpus` | GPUs, by count | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | – |
+| `machines.*.hardware.gpus.ids` | GPUs, by the host's ids | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.hardware.devices` | the host's devices | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.hardware.nested_virtualization` | VMs inside the machine | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
+| `machines.*.hardware.boot` | its own kernel, firmware, boot order or network boot | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.hardware.boot.firmware = uefi` | a VM booting through UEFI | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].mode` | a project file with its own owner or mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.volumes` | data kept until the environment is destroyed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `volumes` | a volume two machines share | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `volumes` | a volume a container and a VM share (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | – | ✗ | – | – | – | – | – | – | – | – | – |
+| `volumes.*.persistent = true` | a volume kept past `down` | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `overrides.*.volumes.*.external` | a volume that exists already, mounted by name | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.disks` | a data disk beside the machine's own | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.disks.*.fs = raw` | a data disk left unformatted | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.tmpfs` | a memory-backed mount | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.tmpfs[].mode` | a memory-backed mount with its own mode | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `machines.*.host_folders` | a folder of the computer that runs the environment, mounted both ways | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `machines.*.host_folders[].read_only = true` | a folder of the computer that runs the environment, mounted read-only | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `networks.*.internet = false` | a network with no way out | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
+| `reach` | traffic allowed between two networks, the rest blocked | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `networks.*.gateway` | a network routed by one of the machines | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
+| `networks.*.vlans` | a LAN split into VLANs | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `networks.*.tc` | link impairment (delay, loss, rate) on the way into a network | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `networks.*.mtu` | a network's own MTU | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | – |
+| `networks.*.ipv6` | an IPv6 block beside the IPv4 one (dual stack) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | – |
+| `networks.*.ipv6.only = true` | an IPv6-only network | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `networks.*.ipv6.addresses = auto` | IPv6 addresses the target hands out | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | – |
+| `networks.*.bridged` | a network bridged to an interface of the host | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `overrides.*.networks.*.external` | a network that exists already, joined by name | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | – |
+| `dns.private = true` | the machines' names served under a private DNS zone | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `provision` | the environment's own Ansible, run from a controller | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | – |
+| `checks[].http` | an HTTP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `checks[].tcp` | a TCP check | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `checks[].exec` | a command run inside a machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `checks[].exec` | a command run inside an access machine the runner's image table supplies | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | – |
+| `checks[] = *.yml` | a check that is an Ansible playbook | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `checks[] = *.sh` | a check that is a project script | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | – |
+| `tools` | a toolbox beside the environment, on every network | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | – |
+| `constraints.proxy` | an HTTP proxy every machine goes through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `constraints.registries` | a registry mirror every image is pulled through | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `overrides.external.machines.*` | a machine with no existing host to reach, on `external` | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | ✗ | – |
+| `overrides.proxmox.machines.*.lxc` | a container image as an LXC container on Proxmox | – | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
+| `overrides.proxmox.volumes.*.virtiofs` | a volume as a folder of the Proxmox server | – | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – | – |
+| `overrides.vagrant.machines.*.box` | a Vagrant box of one's own | – | – | – | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | – | – | – | – | – | – | – | – | – | – |
+| `cloud` | cloud services instead of machines (the spec's Terraform module, applied as is) | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – | ✓ |
+| `machines.*.os = debian@11` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = debian@12` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.os = debian@13` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.os = ubuntu@14.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = ubuntu@16.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = ubuntu@18.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = ubuntu@20.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = ubuntu@22.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.os = ubuntu@24.04` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `machines.*.os = rocky@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = alma@9` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = alpine@3.7` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = alpine@3.19` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = alpine@3.24` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = kali@rolling` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = fedora@42` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = centos@7` | the OS alone, nothing installed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows@10` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows@11` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows-server@2008r2` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows-server@2012r2` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows-server@2016` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows-server@2019` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows-server@2022` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
+| `machines.*.os = windows-server@2025` | the OS alone, nothing installed | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | – |
 
 ## Why a target refuses
 
@@ -196,6 +197,10 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.depends_on`
 
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
+
+### `machines.*.privileged`
+
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a container runs privileged, with power over this computer's kernel): refused unless whoever runs it allows `privileged` (`--allow-host privileged`)
 
 ### `machines.*.sysctls`
 
@@ -266,6 +271,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/utm`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's utm provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/digitalocean`: cloud: machine `m` asks for a virtual TPM (`hardware.tpm: required`): DigitalOcean gives none
@@ -277,6 +283,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/vmware_desktop`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_desktop provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `vagrant/parallels`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's parallels provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `vagrant/qemu`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's qemu provider gives none (VirtualBox, Hyper-V and libvirt do)
+- `vagrant/utm`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's utm provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `vagrant/vmware_esxi`: provider: machine `m` asks for a virtual TPM (`hardware.tpm: required`): Vagrant's vmware_esxi provider gives none (VirtualBox, Hyper-V and libvirt do)
 - `esxi`: capability `tpm`: machine `m` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)
 - `cloud-vm/aws`: cloud: machine `m`: a TPM on a Windows VM on AWS needs Amazon's NitroTPM images (TPM-Windows_Server-*), which Isoloom doesn't use
@@ -306,8 +313,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.hardware.devices`
 
-- `cloud-docker`, `kubernetes`: capability `container-devices`: machine `m` is given host devices (`devices`): only a container on your own Docker host reaches them (the `docker` target), not one in a VM Isoloom creates or a Kubernetes pod
-- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`: lowering: the host's devices go to a container on the host's own Docker; a VM has its own
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a machine is given devices of this computer): refused unless whoever runs it allows `devices` (`--allow-host devices`)
 
 ### `machines.*.hardware.nested_virtualization`
 
@@ -319,16 +325,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.hardware.boot`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: only a VM gives it: a container has no kernel or firmware of its own
-- `vagrant/virtualbox`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's virtualbox provider boots the box as it is; the libvirt provider boots it
-- `vagrant/vmware_desktop`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's vmware_desktop provider boots the box as it is; the libvirt provider boots it
-- `vagrant/hyperv`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's hyperv provider boots the box as it is; the libvirt provider boots it
-- `vagrant/parallels`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's parallels provider boots the box as it is; the libvirt provider boots it
-- `vagrant/qemu`: provider: machine `m` sets `hardware.boot.kernel`, `hardware.boot.initrd`, `hardware.boot.cmdline`: Vagrant's QEMU provider boots the box's disk through its own firmware (only `firmware_format` applies); the libvirt provider boots it
-- `vagrant/vmware_esxi`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's vmware_esxi provider boots the box as it is; the libvirt provider boots it
-- `proxmox`: target: machine `m` sets `hardware.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
-- `esxi`: target: machine `m` sets `hardware.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
-- `cloud-vm/*`: capability `own-boot`: machine `m` boots its own way (`hardware.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a VM boots from, or serves, files of the hypervisor's computer): refused unless whoever runs it allows `boot-files` (`--allow-host boot-files`)
 
 ### `machines.*.hardware.boot.firmware = uefi`
 
@@ -338,6 +335,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `vagrant/hyperv`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's hyperv provider boots the box as it is; the libvirt provider boots it
 - `vagrant/parallels`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's parallels provider boots the box as it is; the libvirt provider boots it
 - `vagrant/libvirt`: provider: machine `m` sets `hardware.boot.firmware: uefi`: libvirt boots UEFI from the firmware file in `hardware.boot.loader`; give it
+- `vagrant/utm`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's utm provider boots the box as it is; the libvirt provider boots it
 - `vagrant/vmware_esxi`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's vmware_esxi provider boots the box as it is; the libvirt provider boots it
 - `cloud-vm/*`: capability `own-boot`: machine `m` boots its own way (`hardware.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 
@@ -385,6 +383,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `vagrant/parallels`: provider: machine `m` has data disks (`disks`), which the `parallels` provider doesn't attach
 - `vagrant/qemu`: provider: machine `m` has data disks (`disks`), which the `qemu` provider doesn't attach
+- `vagrant/utm`: provider: machine `m` has data disks (`disks`), which the `utm` provider doesn't attach
 - `external`: capability `data-disks`: machine `m` has data disks (`disks`), which this target can't attach
 
 ### `machines.*.disks.*.fs = raw`
@@ -392,6 +391,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `docker`, `hosted`, `cloud-docker`: capability `raw-disks`: machine `m` has a raw disk (`fs: raw`): a block device, which this target's containers don't get
 - `vagrant/parallels`: provider: machine `m` has data disks (`disks`), which the `parallels` provider doesn't attach
 - `vagrant/qemu`: provider: machine `m` has data disks (`disks`), which the `qemu` provider doesn't attach
+- `vagrant/utm`: provider: machine `m` has data disks (`disks`), which the `utm` provider doesn't attach
 - `external`: capability `data-disks`: machine `m` has data disks (`disks`), which this target can't attach
 
 ### `machines.*.tmpfs[].mode`
@@ -400,16 +400,11 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.host_folders`
 
-- `hosted`, `cloud-docker`, `kubernetes`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them
-- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
-- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a folder of this computer outside the project is shared with a machine): refused unless whoever runs it allows `host-folders` (`--allow-host host-folders`)
 
 ### `machines.*.host_folders[].read_only = true`
 
-- `hosted`, `cloud-docker`, `kubernetes`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them
-- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
-- `vagrant/qemu`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): one is read-only (`read_only`), and the `qemu` provider (vagrant-qemu) mounts its VirtioFS shares read-write
-- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a folder of this computer outside the project is shared with a machine): refused unless whoever runs it allows `host-folders` (`--allow-host host-folders`)
 
 ### `networks.*.internet = false`
 
@@ -473,10 +468,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `networks.*.bridged`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `cloud-vm/*`: capability `bridged-networks`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
-- `vagrant/hyperv`: provider: network `home`: Isoloom bridges no network under Vagrant's Hyper-V provider
-- `vagrant/libvirt`: provider: network `home`: Isoloom bridges no network under Vagrant's libvirt provider
-- `vagrant/qemu`: provider: network `home`: Isoloom bridges no network under Vagrant's QEMU provider
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: the environment reaches the computer that runs it (machines join this computer's own network): refused unless whoever runs it allows `host-network` (`--allow-host host-network`)
 
 ### `overrides.*.networks.*.external`
 
@@ -529,8 +521,13 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 - `external`: lowering: the external target reaches machines that exist already, and `m` names no host
 
+### `overrides.vagrant.machines.*.box`
+
+- `vagrant/utm`: provider: machine `m`: `debian-12` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
+
 ### `machines.*.os = debian@11`
 
+- `vagrant/utm`: provider: machine `m`: `debian-11` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `debian-11` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `debian-11` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no Google Cloud image for `debian-11` (Debian 12/13, Ubuntu 22.04/24.04)
@@ -541,10 +538,12 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = debian@13`
 
 - `vagrant/hyperv`: provider: machine `m`: `debian-13` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.m.boxes.hyperv`
+- `vagrant/utm`: provider: machine `m`: `debian-13` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 
 ### `machines.*.os = ubuntu@14.04`
 
 - `vagrant/hyperv`: provider: machine `m`: `ubuntu-14.04` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.m.boxes.hyperv`
+- `vagrant/utm`: provider: machine `m`: `ubuntu-14.04` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `proxmox`: target: machine `m`: no Proxmox image for `ubuntu-14.04` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `ubuntu-14.04` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-14.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
@@ -556,6 +555,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = ubuntu@16.04`
 
+- `vagrant/utm`: provider: machine `m`: `ubuntu-16.04` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `esxi`: target: machine `m`: no ESXi image for `ubuntu-16.04` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-16.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-16.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -566,6 +566,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = ubuntu@18.04`
 
+- `vagrant/utm`: provider: machine `m`: `ubuntu-18.04` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `esxi`: target: machine `m`: no ESXi image for `ubuntu-18.04` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-18.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-18.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -576,6 +577,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = ubuntu@20.04`
 
+- `vagrant/utm`: provider: machine `m`: `ubuntu-20.04` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `ubuntu-20.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `ubuntu-20.04` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no Google Cloud image for `ubuntu-20.04` (Debian 12/13, Ubuntu 22.04/24.04)
@@ -583,8 +585,13 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 - `cloud-vm/linode`: cloud: machine `m`: no Linode image for `ubuntu-20.04` (Debian 12/13, Ubuntu 22.04/24.04)
 - `cloud-vm/oci`: cloud: machine `m`: no Oracle Cloud image for `ubuntu-20.04` (Ubuntu 22.04/24.04, Debian 12/13 on Ubuntu 24.04)
 
+### `machines.*.os = ubuntu@22.04`
+
+- `vagrant/utm`: provider: machine `m`: `ubuntu-22.04` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
+
 ### `machines.*.os = rocky@9`
 
+- `vagrant/utm`: provider: machine `m`: `rocky-9` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `rocky-9` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `rocky-9` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no Google Cloud image for `rocky-9` (Debian 12/13, Ubuntu 22.04/24.04)
@@ -594,6 +601,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = alma@9`
 
+- `vagrant/utm`: provider: machine `m`: `almalinux-9` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `almalinux-9` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `almalinux-9` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: no Google Cloud image for `almalinux-9` (Debian 12/13, Ubuntu 22.04/24.04)
@@ -603,6 +611,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = alpine@3.7`
 
+- `vagrant/utm`: provider: machine `m`: `alpine-3.7` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `proxmox`: target: machine `m`: no Proxmox image for `alpine-3.7` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `alpine-3.7` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.7` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
@@ -614,6 +623,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = alpine@3.19`
 
+- `vagrant/utm`: provider: machine `m`: `alpine-3.19` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `proxmox`: target: machine `m`: no Proxmox image for `alpine-3.19` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `alpine-3.19` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.19` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
@@ -626,6 +636,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = alpine@3.24`
 
 - `vagrant/hyperv`: provider: machine `m`: `alpine-3.24` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.m.boxes.hyperv`
+- `vagrant/utm`: provider: machine `m`: `alpine-3.24` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `proxmox`: target: machine `m`: no Proxmox image for `alpine-3.24` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `alpine-3.24` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `alpine-3.24` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
@@ -637,6 +648,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = kali@rolling`
 
+- `vagrant/utm`: provider: machine `m`: `kali` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `proxmox`: target: machine `m`: no Proxmox image for `kali` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `kali` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `kali` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -648,6 +660,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = fedora@42`
 
 - `vagrant/hyperv`: provider: machine `m`: `fedora-42` has no known Hyper-V build of its box; give one with `overrides.vagrant.machines.m.boxes.hyperv`
+- `vagrant/utm`: provider: machine `m`: `fedora-42` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `proxmox`: target: machine `m`: no Proxmox image for `fedora-42` (Debian, Ubuntu, Rocky, AlmaLinux, CentOS 7, Windows from a template)
 - `esxi`: target: machine `m`: no ESXi image for `fedora-42` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `fedora-42` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
@@ -659,6 +672,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 ### `machines.*.os = centos@7`
 
+- `vagrant/utm`: provider: machine `m`: `centos-7` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `esxi`: target: machine `m`: no ESXi image for `centos-7` (Debian, Ubuntu, Rocky, AlmaLinux: an OVA with cloud-init and open-vm-tools; Windows: an OVA with cloudbase-init)
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `centos-7` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `centos-7` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
@@ -670,6 +684,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows@10`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-10` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-10` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-10` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
@@ -680,6 +695,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows@11`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-11` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-11` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-11` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
@@ -690,6 +706,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows-server@2008r2`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-server-2008r2` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2008r2` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2008r2` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
@@ -700,6 +717,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows-server@2012r2`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-server-2012r2` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/aws`: cloud: machine `m`: no AWS image for `windows-server-2012r2` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025, Kali)
 - `cloud-vm/azure`: cloud: machine `m`: no Azure image for `windows-server-2012r2` (Debian 12/13, Ubuntu 22.04/24.04, Windows Server 2016/2019/2022/2025)
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
@@ -710,6 +728,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows-server@2016`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-server-2016` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only
@@ -718,6 +737,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows-server@2019`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-server-2019` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only
@@ -726,6 +746,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows-server@2022`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-server-2022` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only
@@ -734,6 +755,7 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 ### `machines.*.os = windows-server@2025`
 
 - `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: Windows has no container form
+- `vagrant/utm`: provider: machine `m`: `windows-server-2025` has no known UTM box (vagrant_utm boots UTM-format boxes only, `utm/*` for Debian 12 and Ubuntu 24.04); give one with `overrides.vagrant.machines.m.boxes.utm`
 - `cloud-vm/gcp`: cloud: machine `m`: Isoloom generates no Windows VM on Google Cloud
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm is Linux only
 - `cloud-vm/linode`: cloud: Linode cloud-vm is Linux only
