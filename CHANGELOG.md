@@ -53,6 +53,10 @@ stable spec format.
 
 ### Fixed
 
+- **A Linux VM keeps every environment variable when one value has several lines (#302).** Such
+  a value broke systemd's `DefaultEnvironment`, and every service lost every variable. systemd
+  now reads the line breaks escaped (`\n`), and a value of several lines reaches logins through
+  `/etc/profile.d/90-isoloom-environment.sh` instead of `/etc/environment`, which can't hold it.
 - **`isoloom import vagrant` and `isoloom import terraform` read a box or a cloud image's OS with
   its version and family (#303):** `ubuntu/jammy64` drafts Ubuntu 22.04, `windows-10` Windows 10,
   and Rocky, CentOS, Alpine and Fedora boxes their family; a shell provisioner's `args`, `env`,
