@@ -80,6 +80,12 @@ impl Template {
         }
     }
 
+    /// Whether it ends with a line break (its last part text that does).
+    #[must_use]
+    pub(crate) fn ends_with_newline(&self) -> bool {
+        matches!(self.parts.last(), Some(Part::Text(t)) if t.ends_with('\n'))
+    }
+
     /// Its text and expressions, in order (for a caller that writes the template another way).
     pub(crate) fn pieces(&self) -> impl Iterator<Item = Piece<'_>> {
         self.parts.iter().map(|p| match p {
