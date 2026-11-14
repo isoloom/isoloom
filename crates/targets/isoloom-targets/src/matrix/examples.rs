@@ -38,7 +38,7 @@ fn example(dir: &Path) -> Outcome<Example> {
     let text = std::fs::read_to_string(dir.join("isoloom.yml"))?;
     Ok(Example {
         name: dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
-        lab: Lab::new(isoloom_spec::load(dir)?),
+        lab: Lab::new(isoloom_spec::load(dir)?).with_host_access(super::every_access()),
         written: Authored::parse(&text).ok_or("not YAML")?,
     })
 }

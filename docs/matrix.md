@@ -41,7 +41,7 @@ Each target's files are checked by the official validators of their formats (`ca
 | `machines.*.depends_on` | a machine waiting for another | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
 | `machines.*.depends_on` | a VM waiting for a container (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | – | ✓ | – | – | – | – | – | – | – | – |
 | `machines.*.resources` | CPUs and memory | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `machines.*.privileged` | kernel-level access | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `machines.*.privileged` | kernel-level access | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `machines.*.sysctls` | kernel parameters | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `machines.*.ulimits` | process limits | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `machines.*.dns` | its own resolver settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -61,9 +61,9 @@ Each target's files are checked by the official validators of their formats (`ca
 | `machines.*.hardware.tpm = required` | a virtual TPM 2.0 a Windows machine can't run without | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | `machines.*.hardware.gpus` | GPUs, by count | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ |
 | `machines.*.hardware.gpus.ids` | GPUs, by the host's ids | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| `machines.*.hardware.devices` | the host's devices | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `machines.*.hardware.devices` | the host's devices | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | `machines.*.hardware.nested_virtualization` | VMs inside the machine | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ |
-| `machines.*.hardware.boot` | its own kernel, firmware, boot order or network boot | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `machines.*.hardware.boot` | its own kernel, firmware, boot order or network boot | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | `machines.*.hardware.boot.firmware = uefi` | a VM booting through UEFI | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
@@ -80,8 +80,8 @@ Each target's files are checked by the official validators of their formats (`ca
 | `machines.*.disks.*.fs = raw` | a data disk left unformatted | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `machines.*.tmpfs` | a memory-backed mount | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `machines.*.tmpfs[].mode` | a memory-backed mount with its own mode | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| `machines.*.host_folders` | a folder of the computer that runs the environment, mounted both ways | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| `machines.*.host_folders[].read_only = true` | a folder of the computer that runs the environment, mounted read-only | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `machines.*.host_folders` | a folder of the computer that runs the environment, mounted both ways | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `machines.*.host_folders[].read_only = true` | a folder of the computer that runs the environment, mounted read-only | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `networks.*.internet = false` | a network with no way out | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
 | `reach` | traffic allowed between two networks, the rest blocked | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
 | `networks.*.gateway` | a network routed by one of the machines | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
@@ -91,7 +91,7 @@ Each target's files are checked by the official validators of their formats (`ca
 | `networks.*.ipv6` | an IPv6 block beside the IPv4 one (dual stack) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ |
 | `networks.*.ipv6.only = true` | an IPv6-only network | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | `networks.*.ipv6.addresses = auto` | IPv6 addresses the target hands out | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ |
-| `networks.*.bridged` | a network bridged to an interface of the host | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `networks.*.bridged` | a network bridged to an interface of the host | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | `overrides.*.networks.*.external` | a network that exists already, joined by name | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
 | `dns.private = true` | the machines' names served under a private DNS zone | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `provision` | the environment's own Ansible, run from a controller | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ |
@@ -176,10 +176,6 @@ Each target's files are checked by the official validators of their formats (`ca
 ### `machines.*.depends_on`
 
 - `cloud-vm/digitalocean`: cloud: DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address
-
-### `machines.*.privileged`
-
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a container runs privileged, with power over this computer's kernel): refused unless whoever runs it allows `privileged` (`--allow-host privileged`)
 
 ### `machines.*.sysctls`
 
@@ -292,7 +288,8 @@ Each target's files are checked by the official validators of their formats (`ca
 
 ### `machines.*.hardware.devices`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a machine is given devices of this computer): refused unless whoever runs it allows `devices` (`--allow-host devices`)
+- `cloud-docker`, `kubernetes`: capability `container-devices`: machine `m` is given host devices (`devices`): only a container on your own Docker host reaches them (the `docker` target), not one in a VM Isoloom creates or a Kubernetes pod
+- `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`: lowering: the host's devices go to a container on the host's own Docker; a VM has its own
 
 ### `machines.*.hardware.nested_virtualization`
 
@@ -304,7 +301,17 @@ Each target's files are checked by the official validators of their formats (`ca
 
 ### `machines.*.hardware.boot`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a VM boots from, or serves, files of the hypervisor's computer): refused unless whoever runs it allows `boot-files` (`--allow-host boot-files`)
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`: lowering: only a VM gives it: a container has no kernel or firmware of its own
+- `vagrant/virtualbox`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's virtualbox provider boots the box as it is; the libvirt provider boots it
+- `vagrant/vmware_desktop`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's vmware_desktop provider boots the box as it is; the libvirt provider boots it
+- `vagrant/hyperv`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's hyperv provider boots the box as it is; the libvirt provider boots it
+- `vagrant/parallels`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's parallels provider boots the box as it is; the libvirt provider boots it
+- `vagrant/qemu`: provider: machine `m` sets `hardware.boot.kernel`, `hardware.boot.initrd`, `hardware.boot.cmdline`: Vagrant's QEMU provider boots the box's disk through its own firmware (only `firmware_format` applies); the libvirt provider boots it
+- `vagrant/utm`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's utm provider boots the box as it is; the libvirt provider boots it
+- `vagrant/vmware_esxi`: provider: machine `m` boots its own way (`hardware.boot`): Vagrant's vmware_esxi provider boots the box as it is; the libvirt provider boots it
+- `proxmox`: target: machine `m` sets `hardware.boot.kernel`: Proxmox boots the VM's disk through its own firmware (`firmware`, `order` and `firmware_format` apply); Vagrant's libvirt provider boots it
+- `esxi`: target: machine `m` sets `hardware.boot.kernel`: ESXi boots the VM's disk through its own firmware (`firmware` applies, as `boot_firmware`); Vagrant's libvirt provider boots it
+- `cloud-vm/*`: capability `own-boot`: machine `m` boots its own way (`hardware.boot`): this target boots a VM from its image's own kernel and firmware; Vagrant's libvirt provider boots it
 
 ### `machines.*.hardware.boot.firmware = uefi`
 
@@ -379,11 +386,16 @@ Each target's files are checked by the official validators of their formats (`ca
 
 ### `machines.*.host_folders`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a folder of this computer outside the project is shared with a machine): refused unless whoever runs it allows `host-folders` (`--allow-host host-folders`)
+- `hosted`, `cloud-docker`, `kubernetes`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them
+- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
+- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
 
 ### `machines.*.host_folders[].read_only = true`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: machine `m` reaches the computer that runs it (a folder of this computer outside the project is shared with a machine): refused unless whoever runs it allows `host-folders` (`--allow-host host-folders`)
+- `hosted`, `cloud-docker`, `kubernetes`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: capability `host-folders`: machine `m` mounts a folder of the computer that runs the environment (`host_folders`), which only the docker and vagrant targets mount: this one's machines run elsewhere, or it doesn't share them
+- `vagrant/hyperv`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB, which asks for a Windows account's password at every `vagrant up`
+- `vagrant/qemu`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): one is read-only (`read_only`), and the `qemu` provider (vagrant-qemu) mounts its VirtioFS shares read-write
+- `vagrant/vmware_esxi`: provider: machine `m` mounts a folder of the computer that runs the environment (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host, not on this computer
 
 ### `networks.*.internet = false`
 
@@ -447,7 +459,11 @@ Each target's files are checked by the official validators of their formats (`ca
 
 ### `networks.*.bridged`
 
-- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `vagrant/*`, `proxmox`, `esxi`, `cloud-vm/*`, `external`: invalid: the environment reaches the computer that runs it (machines join this computer's own network): refused unless whoever runs it allows `host-network` (`--allow-host host-network`)
+- `docker`, `hosted`, `cloud-docker`, `kubernetes`, `cloud-vm/*`: capability `bridged-networks`: network `home` is bridged to a host interface (`bridged`), which this target has no way to do (`vagrant` and `proxmox` bridge one)
+- `vagrant/hyperv`: provider: network `home`: Isoloom bridges no network under Vagrant's Hyper-V provider
+- `vagrant/libvirt`: provider: network `home`: Isoloom bridges no network under Vagrant's libvirt provider
+- `vagrant/qemu`: provider: network `home`: Isoloom bridges no network under Vagrant's QEMU provider
+- `vagrant/utm`: provider: network `home`: Isoloom bridges no network under Vagrant's UTM provider
 
 ### `overrides.*.networks.*.external`
 

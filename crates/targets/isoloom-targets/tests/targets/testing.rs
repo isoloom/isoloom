@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use isoloom_plan::Environment;
 use isoloom_spec::Spec;
+use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 use isoloom_targets::{GeneratedFile, Lab, generate};
 
@@ -33,7 +34,23 @@ pub(crate) fn lab(yaml: &str) -> Outcome<Lab> {
 
 /// A spec written in a test, as an environment with no problem.
 pub(crate) fn valid(yaml: &str) -> Outcome<Lab> {
-    let lab = lab(yaml)?;
+    no_problem(lab(yaml)?)
+}
+
+/// `lab` with every access to the computer that runs it allowed, as `--allow-host` allows each:
+/// the tests of what a target does with a field that reaches that computer.
+pub(crate) fn allowed(lab: Lab) -> Lab {
+    lab.with_host_access(Grants::of(HostAccess::ALL))
+}
+
+/// A spec written in a test that reaches the computer that runs it, as an environment allowed
+/// to, with no problem.
+pub(crate) fn valid_allowed(yaml: &str) -> Outcome<Lab> {
+    no_problem(allowed(lab(yaml)?))
+}
+
+/// `lab`, once it has no problem.
+fn no_problem(lab: Lab) -> Outcome<Lab> {
     match problems(&lab) {
         found if found.is_empty() => Ok(lab),
         found => Err(format!("the spec isn't valid: {found:?}").into()),

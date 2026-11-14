@@ -287,7 +287,7 @@ rows:
   - field: machines.*.host_folders
     about: a folder of the computer that runs the environment, mounted both ways
     features: [host-folders]
-    patch: { machines: { m: { host_folders: [{ from: /srv/shared, path: /srv/shared }] } } }
+    patch: { machines: { m: { host_folders: [{ from: /srv/shared, path: /srv/shared, read_only: false }] } } }
   - field: machines.*.host_folders[].read_only
     value: true
     about: a folder of the computer that runs the environment, mounted read-only

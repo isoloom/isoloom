@@ -5,12 +5,12 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Lab, refusal, refusal_on};
 
-use crate::testing::{Outcome, generated as file, valid};
+use crate::testing::{Outcome, generated as file, valid_allowed};
 
 /// Machine `web` with `fields` beside its network, `others` (more machines, as YAML lines) and
 /// the spec's `overrides` (YAML lines).
 fn build(fields: &str, others: &str, overrides: &str) -> Outcome<Lab> {
-    valid(&format!(
+    valid_allowed(&format!(
         "version: 1\nname: own\nnetworks: {{ lan: {{ cidr: 10.30.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, {fields} }}\n{others}{overrides}"
     ))
 }

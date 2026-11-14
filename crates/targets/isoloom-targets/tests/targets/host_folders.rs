@@ -6,10 +6,11 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Lab, generate, refusal, refusal_on};
 
-use crate::testing::{Outcome, file, valid};
+use crate::testing::{Outcome, file, valid_allowed};
 
 /// A desk with both forms (the OS's image idle, a fresh VM) mounting three folders of the
-/// computer: one of the project, one of the home folder (read-only), one absolute.
+/// computer: one of the project, one of the home folder (read-only), one absolute; the two
+/// read-write ones say so (a host folder is read-only unless `read_only: false`).
 const DESK: &str = "version: 1
 name: shared-desk
 networks: { lan: { cidr: 10.30.0.0/24 } }
@@ -18,13 +19,13 @@ machines:
     os: debian@12
     networks: { lan: 10 }
     host_folders:
-      - { from: shared, path: /srv/shared }
+      - { from: shared, path: /srv/shared, read_only: false }
       - { from: '~/notes', path: /home/notes, read_only: true }
-      - { from: /srv/drop, path: /srv/drop }
+      - { from: /srv/drop, path: /srv/drop, read_only: false }
 ";
 
 fn desk() -> Outcome<Lab> {
-    valid(DESK)
+    valid_allowed(DESK)
 }
 
 #[test]
@@ -63,19 +64,19 @@ fn vagrant_refuses_it_on_the_providers_with_no_two_way_shared_folder() -> Outcom
     assert!(esxi.contains("run on the ESXi host"), "{esxi}");
     let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).unwrap().ok_or("QEMU takes a read-only one")?;
     assert!(qemu.contains("read-only (`read_only`)"), "{qemu}");
-    let read_write = valid(&DESK.replace(", read_only: true", ""))?;
+    let read_write = valid_allowed(&DESK.replace("read_only: true", "read_only: false"))?;
     assert_eq!(refusal_on(&read_write, Target::Vagrant, Some("qemu")).unwrap(), None);
     Ok(())
 }
 
 #[test]
 fn vagrant_refuses_qemu_for_any_vm_with_a_read_only_folder_not_only_the_first() -> Outcome {
-    let lab = valid(
+    let lab = valid_allowed(
         "version: 1
 name: two-desks
 networks: { lan: { cidr: 10.30.0.0/24 } }
 machines:
-  a: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }] }
+  a: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared, read_only: false }] }
   b: { os: debian@12, networks: { lan: 11 }, host_folders: [{ from: notes, path: /notes, read_only: true }] }
 ",
     )?;

@@ -7,6 +7,7 @@ use isoloom_compose::ComposeBackend;
 use isoloom_plan::Lab;
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
+use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failed step is its report.
@@ -14,7 +15,12 @@ type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
 /// The files the Compose backend renders for `spec` (the authored format), which must be valid.
 fn render(spec: isoloom_spec::Spec) -> Outcome<Vec<GeneratedFile>> {
-    let lab = Lab::new(spec);
+    render_allowing(spec, Grants::none())
+}
+
+/// The files the Compose backend renders for `spec`, with whoever runs it allowing `grants`.
+fn render_allowing(spec: isoloom_spec::Spec, grants: Grants) -> Outcome<Vec<GeneratedFile>> {
+    let lab = Lab::new(spec).with_host_access(grants);
     let problems = lab.problems();
     if !problems.is_empty() {
         return Err(format!("the spec isn't valid: {problems:?}").into());
@@ -62,7 +68,8 @@ fn a_build_with_a_published_image_emits_both_image_and_build() -> Outcome {
 #[test]
 fn a_machine_binds_folders_of_the_computer_that_runs_the_lab() -> Outcome {
     let fixture = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/host-folders.yml"))?;
-    insta::assert_snapshot!(compose(render(isoloom_spec::parse(&fixture)?)?)?);
+    let allowed = Grants::of([HostAccess::HostFolders, HostAccess::WritableHostFolders]);
+    insta::assert_snapshot!(compose(render_allowing(isoloom_spec::parse(&fixture)?, allowed)?)?);
     Ok(())
 }
 
