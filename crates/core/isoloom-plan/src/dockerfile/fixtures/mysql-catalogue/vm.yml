@@ -47,7 +47,74 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - catalogue: mysql@5.7.44 on debian@11
+  - template:
+      from: catalogue/mysql/values/0
+      to: /run/isoloom/with/password
+      mode: '0600'
+  - template:
+      from: catalogue/mysql/values/1
+      to: /run/isoloom/with/user_password
+      mode: '0600'
+  - packages:
+    - ca-certificates
+    - libaio1
+    - libnuma1
+    - procps
+    - xz-utils
+  - packages:
+    - libncurses5
+  - file:
+      path: /var/cache/isoloom/mysql.tar
+      url: https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz
+      sha256: 798ff0a14cdc1ab259f8a3b6a7f683403e9bbaa85957d82e5370f82b27ba6805
+  - command: sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf "$b" /usr/local/bin/; done'
+    creates: /usr/local/mysql/bin/mysqld
+  - group:
+      name: mysql
+      system: true
+  - user:
+      name: mysql
+      group: mysql
+      system: true
+      home: /var/lib/mysql
+      shell: /bin/false
+  - file:
+      path: /var/lib/mysql
+      state: directory
+      owner: mysql
+      group: mysql
+      mode: '0750'
+  - file:
+      path: /var/lib/mysql-files
+      state: directory
+      owner: mysql
+      group: mysql
+      mode: '0750'
+  - file:
+      path: /docker-entrypoint-initdb.d
+      state: directory
+      mode: '0755'
+  - file:
+      path: /etc/mysql/conf.d
+      state: directory
+      mode: '0755'
+  - template:
+      from: catalogue/mysql/.isoloom/catalogue/mysql/files/my.cnf
+      to: /etc/my.cnf
+      mode: '0644'
+  - template:
+      from: catalogue/mysql/.isoloom/catalogue/mysql/files/isoloom.env
+      to: /etc/mysql/isoloom.env
+      mode: '0600'
+  - template:
+      from: catalogue/mysql/.isoloom/catalogue/mysql/files/docker-entrypoint.sh
+      to: /usr/local/bin/docker-entrypoint.sh
+      mode: '0755'
+  - service:
+      name: mysql
+      run:
+      - /usr/local/bin/docker-entrypoint.sh
+      - mysqld
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

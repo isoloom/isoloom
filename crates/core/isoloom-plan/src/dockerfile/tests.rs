@@ -90,6 +90,13 @@ fn a_refusal_names_the_file_the_line_and_the_instruction() {
     assert!(unknown.contains("isoloom bases fetch"), "{unknown}");
 }
 
+/// The translation's YAML writes the catalogue entry's recipe for `release` out as steps (no
+/// `catalogue:` line a spec can't hold).
+fn written_out(t: &Translation, release: &str) {
+    assert!(!t.yaml.contains("catalogue:"), "{}", t.yaml);
+    assert!(t.yaml.contains(release), "release {release}: {}", t.yaml);
+}
+
 #[test]
 fn the_translation_is_an_explicit_vm_form_a_spec_can_hold() {
     let text = std::fs::read_to_string(fixtures().join("php-apache/Dockerfile")).unwrap();
@@ -102,19 +109,22 @@ fn the_translation_is_an_explicit_vm_form_a_spec_can_hold() {
     };
     let t = translate(&build, &Sources::default()).unwrap();
     assert_eq!(t.os.to_string(), "debian@12");
-    // The YAML's `app.steps` are the spec's own steps: they parse as an authored spec's, but
-    // for the catalogue entry's recipe, which shows as one `catalogue:` line where its steps go.
+    // The YAML's `app.steps` are the spec's own steps, the catalogue entry's recipe written out:
+    // each parses as an authored spec's, and they are the translation's steps, in order.
     let reparsed: serde_yaml_ng::Value = serde_yaml_ng::from_str(&t.yaml).unwrap();
-    let written = reparsed["app"]["steps"].as_sequence().unwrap();
-    assert_eq!(written.iter().filter(|s| s.get("catalogue").is_some()).count(), 1, "{}", t.yaml);
-    let own: Vec<Step> = written
+    let written: Vec<Step> = reparsed["app"]["steps"]
+        .as_sequence()
+        .unwrap()
         .iter()
-        .filter(|s| s.get("catalogue").is_none())
-        .map(|s| serde_yaml_ng::from_value(s.clone()).unwrap())
+        .map(|s| serde_yaml_ng::from_value(s.clone()).unwrap_or_else(|e| panic!("{e}: {s:?}\n{}", t.yaml)))
         .collect();
-    // Each in order among the translation's steps, the recipe's around them.
-    let mut rest = t.steps.iter();
-    assert!(own.iter().all(|s| rest.any(|made| made == s)), "{}", t.yaml);
+    assert_eq!(written, t.steps, "{}", t.yaml);
+    // As a machine's explicit VM form, it is a valid spec.
+    let spec = format!(
+        "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web:\n    networks: {{ lan: 10 }}\n{}",
+        t.yaml.lines().map(|l| format!("    {l}\n")).collect::<String>()
+    );
+    assert!(isoloom_spec::parse(&spec).is_ok(), "{spec}");
     // The image's command is the VM's service, as the image's user and in its folder.
     assert!(matches!(t.steps.last(), Some(Step::Service(_))));
 }
@@ -157,7 +167,7 @@ fn a_postgres_image_installs_the_exact_release_with_the_images_defaults() {
     };
     let t = translate(&build, &Sources::default()).unwrap();
     assert_eq!(t.os.to_string(), "ubuntu@18.04");
-    assert!(t.yaml.contains("catalogue: postgres@10.5 on ubuntu@18.04"), "{}", t.yaml);
+    written_out(&t, "10.5");
     assert!(t.files.values().any(|v| v == "s3cret"), "{:?}", t.files.keys());
     // Without a password the image refuses to start: so does the translation.
     let bare = Build {
@@ -179,7 +189,7 @@ fn a_catalogue_image_brings_its_entry_recipe_with_the_images_settings() {
     };
     let t = translate(&build, &Sources::default()).unwrap();
     assert_eq!(t.os.to_string(), "debian@11");
-    assert!(t.yaml.contains("catalogue: mysql@5.7.44 on debian@11"), "{}", t.yaml);
+    written_out(&t, "5.7.44");
     let files: Vec<&str> = t.files.keys().map(ProjectPath::as_str).collect();
     assert!(
         files
@@ -204,7 +214,7 @@ fn a_php_image_installs_its_series_release_and_its_variants_server() {
     };
     let fpm = translate(&build("FROM php:7.4-fpm\nRUN docker-php-ext-install pdo_mysql\n"), &Sources::default()).unwrap();
     assert_eq!(fpm.os.to_string(), "debian@12");
-    assert!(fpm.yaml.contains("catalogue: php@7.4.33 on debian@12"), "{}", fpm.yaml);
+    written_out(&fpm, "7.4.33");
     let files: Vec<&str> = fpm.files.keys().map(ProjectPath::as_str).collect();
     assert!(files.iter().any(|f| f.ends_with("files/php-fpm")), "{files:?}");
     // A patch release the archive no longer carries: refused, naming the releases it has.
@@ -223,7 +233,7 @@ fn a_mongo_image_installs_the_exact_build_and_its_service_reads_the_images_envir
     };
     let t = translate(&build, &Sources::default()).unwrap();
     assert_eq!(t.os.to_string(), "ubuntu@18.04");
-    assert!(t.yaml.contains("catalogue: mongodb@4.0.4 on ubuntu@18.04"), "{}", t.yaml);
+    written_out(&t, "4.0.4");
     // The entry's own service runs, and reads the environment the Dockerfile set.
     assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
     assert!(t.yaml.contains(IMAGE_ENV), "{}", t.yaml);
@@ -232,7 +242,7 @@ fn a_mongo_image_installs_the_exact_build_and_its_service_reads_the_images_envir
         ..build
     };
     let newest = translate(&latest, &Sources::default()).unwrap();
-    assert!(newest.yaml.contains("catalogue: mongodb@7.0.28 on ubuntu@20.04"), "{}", newest.yaml);
+    written_out(&newest, "7.0.28");
 }
 
 #[test]
@@ -247,7 +257,7 @@ fn a_jenkins_image_installs_the_lts_release_and_runs_the_dockerfiles_steps_as_je
     };
     let t = translate(&build, &Sources::default()).unwrap();
     assert_eq!(t.os.to_string(), "debian@13");
-    assert!(t.yaml.contains("catalogue: jenkins@2.580.2 on debian@13"), "{}", t.yaml);
+    written_out(&t, "2.580.2");
     // `jenkins-plugin-cli` runs as the image's user, with its environment.
     assert!(t.yaml.contains("export JENKINS_HOME=/var/jenkins_home"), "{}", t.yaml);
     // The entry's service runs Jenkins: the Dockerfile keeps the image's command.
@@ -266,6 +276,5 @@ fn a_file_copied_out_of_composers_image_is_its_catalogue_entrys() {
     };
     let t = translate(&build, &Sources::default()).unwrap();
     // The series' newest release, on the VM's own OS (the php image's).
-    assert!(t.yaml.contains("catalogue: composer@2.8.12 on debian@12"), "{}", t.yaml);
-    assert!(t.yaml.contains("catalogue: php@8.2"), "{}", t.yaml);
+    written_out(&t, "2.8.12");
 }

@@ -47,7 +47,78 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - catalogue: jenkins@2.580.2 on debian@13
+  - packages:
+    - ca-certificates
+    - curl
+    - fontconfig
+    - git
+    - gnupg
+    - less
+    - openssh-client
+    - procps
+    - tzdata
+    - unzip
+  - file:
+      path: /var/cache/isoloom/jdk.tar.gz
+      url: https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13%2B9/OpenJDK21U-jdk_x64_linux_hotspot_21.0.13_9.tar.gz
+      sha256: d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c
+  - command: sh -c 'mkdir -p /opt/java/openjdk && tar -xzf /var/cache/isoloom/jdk.tar.gz --strip-components=1 -C /opt/java/openjdk && ln -sf /opt/java/openjdk/bin/java /usr/local/bin/java'
+    creates: /opt/java/openjdk/bin/java
+  - file:
+      path: /usr/share/jenkins
+      state: directory
+      mode: '0755'
+  - file:
+      path: /usr/share/jenkins/jenkins.war
+      url: https://get.jenkins.io/war-stable/2.580.2/jenkins.war
+      sha256: d98032d2401c540a35613a82ed358921fcf3166d5e6eaaaf60a7941845be3251
+  - file:
+      path: /opt/jenkins-plugin-manager.jar
+      url: https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.15.0/jenkins-plugin-manager-2.15.0.jar
+      sha256: a86853ec2e2933f37a4b471ba65099b61e03c87a80c2ef8fe2315eb135672d43
+  - group:
+      name: jenkins
+  - user:
+      name: jenkins
+      group: jenkins
+      home: /var/jenkins_home
+      shell: /bin/bash
+  - file:
+      path: /var/jenkins_home
+      state: directory
+      owner: jenkins
+      group: jenkins
+      mode: '0755'
+  - file:
+      path: /usr/share/jenkins/ref/init.groovy.d
+      state: directory
+      owner: jenkins
+      group: jenkins
+      mode: '0755'
+  - file:
+      path: /etc/jenkins
+      state: directory
+      mode: '0755'
+  - template:
+      from: catalogue/jenkins/.isoloom/catalogue/jenkins/files/jenkins.env
+      to: /etc/jenkins/jenkins.env
+      mode: '0644'
+  - template:
+      from: catalogue/jenkins/.isoloom/catalogue/jenkins/files/jenkins.sh
+      to: /usr/local/bin/jenkins.sh
+      mode: '0755'
+  - template:
+      from: catalogue/jenkins/.isoloom/catalogue/jenkins/files/jenkins-plugin-cli
+      to: /bin/jenkins-plugin-cli
+      mode: '0755'
+  - template:
+      from: catalogue/jenkins/.isoloom/catalogue/jenkins/files/jenkins-foreground
+      to: /usr/local/bin/jenkins-foreground
+      mode: '0755'
+  - service:
+      name: jenkins
+      run:
+      - /usr/local/bin/jenkins-foreground
   - command: |
       set -e
       export JENKINS_HOME=/var/jenkins_home

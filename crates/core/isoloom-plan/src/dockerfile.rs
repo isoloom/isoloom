@@ -50,8 +50,8 @@ pub struct Translation {
     /// The steps that make the VM what the image is.
     pub steps: Vec<Step>,
     /// `os` and `app` as YAML, the way a spec writes them: what the translation is, to read
-    /// or to paste as the machine's explicit VM form. A catalogue entry's recipe shows as
-    /// `{ catalogue: <entry>@<release> }` where its steps go.
+    /// or to paste as the machine's explicit VM form, a catalogue entry's recipe written out as
+    /// its own steps.
     pub yaml: String,
     /// The texts of the templates the steps place that aren't the project's (a catalogue
     /// entry's files, its value files), by the path a step's `from` names.
@@ -139,7 +139,7 @@ pub fn translate(build: &Build<'_>, sources: &Sources) -> Result<Translation, Un
             Op::Entry(e) => {
                 let last = image.entry == Some(i);
                 let recipe = catalogue::resolve(e, last.then_some(image.env.as_slice()), build.path)?;
-                out.written.push(json!({ "catalogue": format!("{}@{} on {}", e.call.entry, e.release, e.os) }));
+                out.written.extend(recipe.written);
                 out.steps.extend(recipe.steps);
                 out.files.extend(recipe.files);
                 if last {

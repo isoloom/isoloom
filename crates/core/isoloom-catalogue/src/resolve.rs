@@ -48,6 +48,9 @@ pub struct Resolved {
     pub configure: Vec<Step>,
     /// The `start` phase, run before the services at each start.
     pub start: Vec<Step>,
+    /// The three phases' steps in order (`install`, `configure`, `start`), each as a spec writes
+    /// it: what a machine's explicit `app.steps` would hold to do the same.
+    pub written: Vec<serde_json::Value>,
     /// The texts of the templates the steps place, by the path a step's `from` names.
     pub files: BTreeMap<ProjectPath, String>,
     /// The machine's ports, by name.
@@ -185,6 +188,9 @@ impl Entry {
         let surface = surface::Surface::of(&context)
             .map_err(|reason| vec![Problem::new(Code::InvalidValue, request.field.clone(), format!("{}: {reason}", self.name()))])?;
         start.splice(0..0, surface.owners);
+        let written = install.iter().chain(&configure).chain(&start).map(|(_, w)| w.clone()).collect();
+        let steps = |phase: Vec<(Step, serde_json::Value)>| phase.into_iter().map(|(s, _)| s).collect::<Vec<_>>();
+        let (install, configure, start) = (steps(install), steps(configure), steps(start));
         Ok(Resolved {
             entry: self.name().clone(),
             release: release.version.clone(),
@@ -194,6 +200,7 @@ impl Entry {
             install,
             configure,
             start,
+            written,
             files,
             ports: surface.ports,
             data: self.definition().data.clone(),

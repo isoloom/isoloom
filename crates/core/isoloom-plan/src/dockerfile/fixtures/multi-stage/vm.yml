@@ -47,7 +47,15 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - catalogue: python@3.12.16 on debian@12
+  - packages:
+    - ca-certificates
+    - build-essential
+  - file:
+      path: /var/cache/isoloom/python.tar.gz
+      url: https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only.tar.gz
+      sha256: c2f87d4b4e8db3abddb0f116c6ccfc503d0cbdbb9ee8faacddad1b679ec12e99
+  - command: sh -c 'tar -xzf /var/cache/isoloom/python.tar.gz --strip-components=1 -C /usr/local && ln -sf python3 /usr/local/bin/python && ln -sf pip3 /usr/local/bin/pip'
+    creates: /usr/local/bin/python
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -77,7 +85,15 @@ app:
       pip wheel --wheel-dir /wheels -r requirements.txt
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
     creates: /var/lib/isoloom/dockerfile/005
-  - catalogue: python@3.12.16 on debian@12
+  - packages:
+    - ca-certificates
+    - build-essential
+  - file:
+      path: /var/cache/isoloom/python.tar.gz
+      url: https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.12.16%2B20261110-x86_64-unknown-linux-gnu-install_only.tar.gz
+      sha256: c2f87d4b4e8db3abddb0f116c6ccfc503d0cbdbb9ee8faacddad1b679ec12e99
+  - command: sh -c 'tar -xzf /var/cache/isoloom/python.tar.gz --strip-components=1 -C /usr/local && ln -sf python3 /usr/local/bin/python && ln -sf pip3 /usr/local/bin/pip'
+    creates: /usr/local/bin/python
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
