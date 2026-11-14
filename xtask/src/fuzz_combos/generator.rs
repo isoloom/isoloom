@@ -8,7 +8,7 @@
 //! isn't is a generator bug the fast test catches.
 //!
 //! It varies the machines, their OS, the `app` form (an image, a build,
-//! the configuration model, or a plain OS), the ports map, files reading inputs and secrets,
+//! the configuration model, or a plain OS, all of one spec's machines in one form family), the ports map, files reading inputs and secrets,
 //! per-target overrides, the networks and the `setup` scripts. A `user` step carries a recognis-
 //! able sentinel password ([`SENTINEL_PREFIX`]), which is hashed before it reaches any file: the
 //! harness proves the plaintext never leaks.
@@ -108,6 +108,8 @@ struct Builder {
     host_port: u32,
     secret_values: Vec<String>,
     sentinel: u32,
+    /// The spec's machines all take VM forms (true), or all take container forms (false).
+    vm_family: bool,
 }
 
 /// The spec named by `seed`: valid by construction, varied in its machines, OS, forms, ports,
@@ -124,6 +126,7 @@ pub(crate) fn spec(seed: u64) -> GeneratedSpec {
         host_port: 20000,
         secret_values: Vec::new(),
         sentinel: 0,
+        vm_family: false,
     };
     let yaml = b.build(seed);
     GeneratedSpec {
@@ -184,8 +187,13 @@ impl Builder {
         }
     }
 
-    /// The `machines` block: one to four, each on a subset of the networks.
+    /// The `machines` block: one to four, each on a subset of the networks. The spec draws its
+    /// form family first: every machine takes a form a VM target runs (Windows, the configuration
+    /// model, the plain OS), or every one takes a form a container target runs (an image, a build,
+    /// the plain OS). A lab whose machines only different targets can run is refused as a whole,
+    /// not split across targets, so a mix would be an invalid spec.
     fn machines_block(&mut self, out: &mut String) {
+        self.vm_family = self.rng.chance(50);
         let count = self.rng.range(1, 4);
         out.push_str("machines:\n");
         for i in 0..count {
@@ -201,7 +209,7 @@ impl Builder {
     /// setup. Machine `m0` is always Linux and places every declared input and secret, so each
     /// declaration is used (the format requires it).
     fn machine(&mut self, out: &mut String, name: &str, index: usize) {
-        let windows = index != 0 && self.rng.chance(15);
+        let windows = self.vm_family && index != 0 && self.rng.chance(25);
         let os = if windows { self.rng.pick(&WINDOWS_OS) } else { self.rng.pick(&LINUX_OS) };
         writeln!(out, "  {name}:\n    os: {os}").ok();
         self.attach(out);
@@ -247,8 +255,10 @@ impl Builder {
         }
     }
 
-    /// The machine's `app`. Windows (no container form) gets a PowerShell `run` step or the plain
-    /// OS; Linux gets an image, a build context, the configuration model, or nothing.
+    /// The machine's `app`, in the spec's form family. Windows (no container form) gets a
+    /// PowerShell `run` step or the plain OS. In the VM family, Linux gets the configuration model
+    /// or the plain OS; in the container family, an image, a build context (no Dockerfile text is
+    /// read here, so no VM form), or the plain OS.
     fn app(&mut self, out: &mut String, name: &str, windows: bool) {
         if windows {
             if self.rng.chance(70) {
@@ -256,12 +266,17 @@ impl Builder {
             }
             return;
         }
-        match self.rng.range(1, 4) {
+        if self.vm_family {
+            if self.rng.chance(70) {
+                self.config_app(out);
+            }
+            return;
+        }
+        match self.rng.range(1, 3) {
             1 => {
                 writeln!(out, "    app: {{ image: \"nginx:1.27-alpine\", steps: [{{ run: provision/{name}.sh }}] }}").ok();
             }
-            2 => self.config_app(out),
-            3 => {
+            2 => {
                 writeln!(out, "    app: {{ build: build/{name} }}").ok();
             }
             _ => {}
