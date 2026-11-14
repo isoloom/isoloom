@@ -46,10 +46,20 @@ pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, p: &mut Pro
         filesystem(d, os, &at, p);
         if let Some(m) = &d.mount {
             mount(m, os, &at, p);
-            if volume_paths.contains(m.trim_end_matches('/')) || !mounts.insert(m.trim_end_matches('/').to_ascii_uppercase()) {
+            if volume_paths.contains(m.trim_end_matches('/')) || !mounts.insert(mount_key(m, os)) {
                 p.add(format!("{at}.mount"), format!("`{m}` is already a volume or a disk of this machine"));
             }
         }
+    }
+}
+
+/// The mount point `m` as `os` compares two: Windows' drive letters regardless of case, Linux's
+/// paths as written (`/data` and `/DATA` are two), a trailing `/` ignored on both.
+fn mount_key(m: &str, os: Kind) -> String {
+    let m = m.trim_end_matches('/');
+    match os {
+        Kind::Windows => m.to_ascii_uppercase(),
+        Kind::Linux => m.to_owned(),
     }
 }
 
@@ -255,6 +265,8 @@ mod tests {
         let taken = |what: &str| [format!("machines.web.disks.b.mount: `{what}` is already a volume or a disk of this machine")];
         assert_eq!(linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /data/ } }"), taken("/data/"));
         assert_eq!(windows("{ a: { size_gb: 1, mount: 'E:' }, b: { size_gb: 1, mount: 'e:' } }"), taken("e:"));
+        // Regression: Linux paths are case-sensitive, so two disks may mount at `/data` and `/DATA`.
+        assert!(linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /DATA } }").is_empty());
         assert_eq!(
             named(
                 "web",
