@@ -1,9 +1,10 @@
 //! The router of a server's environment (Proxmox, ESXi): a VM on the server's own network
 //! (DHCP) and on every network at its router address. It forwards between networks with the
-//! `reach` rules and gives them the internet ([`ruleset_content`], [`forwarding`]), until the run
-//! manifest's seal closes it to the `internet: false` networks ([`sealed_reload`]); and everything
+//! `reach` rules and gives them the internet ([`ruleset_content`], [`forwarding`]), until the
+//! seal closes it to the `internet: false` networks ([`sealed_reload`]); and everything
 //! is reached through it from outside ([`outputs`]): each published service at its uplink address,
-//! each machine over SSH by it. Each platform makes the VM itself.
+//! each machine over SSH by it, each Windows machine's Remote Desktop through an SSH tunnel by it
+//! (`crate::consoles`). Each platform makes the VM itself.
 
 use crate::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
 use isoloom_plan::checks::Position;
@@ -238,6 +239,14 @@ pub(crate) fn outputs(env: &Environment, target: Target, module: &mut Module) {
         output("machines", object(machines)),
     );
     module.block(output("ssh_user", string(crate::machine::USER)));
+    // Each Windows VM's Remote Desktop, through the router, which is on every network.
+    crate::consoles::outputs(env, module, &|vm| {
+        Some(crate::consoles::Tunnel {
+            via: reference("local.router_address"),
+            user: crate::machine::USER.to_owned(),
+            host: vm.plan.addresses.values().next()?.to_string(),
+        })
+    });
     if let Some(checks) = output_block(env, dir, Invocation::Script, &|p| runner(env, p)) {
         module.commented(
             "The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).",

@@ -39,6 +39,7 @@
 
 mod checks;
 mod cloud;
+mod consoles;
 mod docker_host;
 mod error;
 mod hcl_builder;
@@ -53,10 +54,7 @@ mod target;
 mod testing;
 
 pub use cloud::Cloud;
-pub use cloud::docker::{
-    Host as CloudDockerHost, modules as cloud_docker_modules, refusal as cloud_docker_refusal,
-    refusals as cloud_docker_refusals,
-};
+pub use cloud::docker::{Host as CloudDockerHost, modules as cloud_docker_modules, refusal as cloud_docker_refusal, refusals as cloud_docker_refusals};
 pub use cloud::services::CloudServicesBackend;
 pub use cloud::vm::{CloudVmBackend, CloudVmModule};
 pub use error::{Error, Result};

@@ -66,10 +66,14 @@ VNC server and VirtualBox's remote display all bind `127.0.0.1`. VMware's takes 
 runner makes for each run and keeps until `down` (VMware writes it in the VM's `.vmx`, as it does
 every setting); libvirt's, QEMU's and VirtualBox's take none, so any program of a user of that
 computer can reach them while the VM runs, as it can reach the forwarded ports. Proxmox's console
-goes through its API, with the connection's own credentials and a ticket per session. A cloud
-Windows VM's Remote Desktop is reached only through an SSH tunnel the runner opens from the
-loopback, through a Linux machine of the run: Isoloom opens no port for it at the VM's public
-address.
+goes through its API, with the connection's own credentials and a ticket per session. A Windows
+VM's Remote Desktop (when its spec opens 3389/tcp) is reached only through an SSH tunnel from the
+loopback: on a cloud through a Linux machine of the lab on a network the Windows one is on, on
+Proxmox and ESXi through the router. Isoloom opens no port for it at a public address. The module
+says where in its `consoles` output (per machine: `protocol`, `port`, `host`, `via`, `user`), with
+the administrator in `windows_user` and its password in the sensitive `windows_password`; a cloud
+Windows VM no Linux machine shares a network with has no entry, and with no entry at all the
+`consoles` output is left out.
 
 ## Kubernetes
 
