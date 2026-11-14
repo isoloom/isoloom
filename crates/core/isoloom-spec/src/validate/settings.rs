@@ -15,7 +15,8 @@ pub(crate) const CONTAINER_SYSCTLS: &[&str] = &[
     "fs.mqueue.",
 ];
 
-/// The machine's settings, each checked in turn; a Windows machine has neither sysctls nor ulimits.
+/// The machine's settings, each checked in turn; a Windows machine has neither sysctls, ulimits
+/// nor memory-backed mounts.
 pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
     let at = |field: &str, key: &str| format!("machines.{name}.{field}.{key}");
     for k in m.environment.keys() {
@@ -33,7 +34,11 @@ pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
         }
     }
     if m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)) {
-        for (field, set) in [("sysctls", !m.sysctls.is_empty()), ("ulimits", !m.ulimits.is_empty())] {
+        for (field, set) in [
+            ("sysctls", !m.sysctls.is_empty()),
+            ("ulimits", !m.ulimits.is_empty()),
+            ("tmpfs", !m.tmpfs.is_empty()),
+        ] {
             if set {
                 p.add(format!("machines.{name}.{field}"), "Linux only: a Windows machine has none");
             }
@@ -82,6 +87,17 @@ mod tests {
         let container = "environment: { _A1: x }, sysctls: { net.ipv4.tcp_syncookies: '1', net.ipv4.conf.br-lan.forwarding: '1', kernel.shmmax: '1' }, ulimits: { nofile: { soft: 1024, hard: 1024 }, nproc: 64 }";
         assert_eq!(of(CONTAINER, container), Vec::<String>::new());
         assert_eq!(of("vm: { os: debian@12 }", "sysctls: { vm.swappiness: '10' }"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_windows_machine_has_no_linux_settings() {
+        assert_eq!(
+            of("vm: { os: windows-server@2022 }", "sysctls: { vm.swappiness: '10' }, tmpfs: [/cache]"),
+            [
+                "machines.a.sysctls: Linux only: a Windows machine has none",
+                "machines.a.tmpfs: Linux only: a Windows machine has none"
+            ]
+        );
     }
 
     #[test]
