@@ -21,6 +21,7 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::ByMemory(|s| s.pick(["e2-medium", "e2-standard-2", "e2-standard-4"])),
     }),
     resources,
+    instance: "google_compute_instance",
 };
 
 /// The cloud's resources, after the module's head, `setup` as the instance's startup script;
@@ -73,7 +74,7 @@ fn network(env: &Environment) -> Vec<Block> {
 }
 
 /// The Docker host's OS from Google Cloud's image table in the region's first zone, its user
-/// (the image's, as on `cloud-vm`) with the runner's key, set up by its startup script (Google's Debian images have no cloud-init; the script runs at every boot).
+/// (the image's, as on `cloud-vm`) with the operator's key, set up by its startup script (Google's Debian images have no cloud-init; the script runs at every boot).
 /// The script is an entry of `metadata`, which the provider updates in place (unlike
 /// `metadata_startup_script`, which forces a new VM): a later apply with another expiry neither
 /// replaces nor restarts the VM, and the next boot schedules the new expiry, so no lifecycle

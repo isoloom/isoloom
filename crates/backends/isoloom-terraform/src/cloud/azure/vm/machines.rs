@@ -85,7 +85,7 @@ fn controller_nics(id: &str, who: &str, (addresses, addresses6, more): Addresses
 }
 
 /// A Linux VM (its size, its disk in GB, and whether it has a virtual TPM), as `isoloom` with
-/// the runner's key, on `nics`, set up by `setup` (its custom data, which cloud-init runs).
+/// the operator's key, on `nics`, set up by `setup` (its custom data, which cloud-init runs).
 fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk, tpm): (&str, u32, bool), (nics, setup): (Expression, Expression)) -> Block {
     let custom_data = call("base64encode", [setup]);
     let vm = trusted_launch(placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}"))), tpm)
@@ -149,7 +149,7 @@ pub(in crate::cloud::azure) fn source_image(os: &str, tpm: bool) -> Block {
 /// ports from `allowed_cidr`.
 fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
     let allowed = || reference("var.allowed_cidr");
-    let mut g = Nsg::new(&ident(name), name).sealed(crate::seal::sealed(env, mp));
+    let mut g = Nsg::new(&ident(name), name);
     let Some(m) = env.spec().machines.get(name) else { return g.build() };
     for (n, p) in reach::own(env, m) {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));

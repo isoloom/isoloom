@@ -73,12 +73,12 @@ pub(crate) fn forwarding(env: &Environment) -> String {
 /// published ports forwarded from the uplink address, and the internet for every network). It
 /// never depends on the seal, so a later apply leaves the router's cloud-init snippet untouched
 /// (a changed snippet forces the VM to be recreated). The seal is applied live instead, from
-/// [`SEALED_NFT`], by the runner's seal-reload step ([`sealed_reload`]).
+/// [`SEALED_NFT`], by the module's own seal resource ([`seal`]).
 pub(crate) fn ruleset_content(env: &Environment) -> Expression {
     string(rules(env, Ruleset::Open))
 }
 
-/// Where the router keeps the sealed ruleset as a second, inert file. The runner's seal step
+/// Where the router keeps the sealed ruleset as a second, inert file. The module's seal resource
 /// applies it live to the already-booted (unsealed) router: updating the host-side cloud-init
 /// snippet alone never reaches a running guest, unlike the clouds' control-plane seal.
 pub(crate) const SEALED_NFT: &str = "/etc/nftables.sealed.nft";
@@ -90,7 +90,7 @@ fn sealed_file(env: &Environment) -> Option<Expression> {
     seal::any(env).then(|| file(SEALED_NFT, None, string(rules(env, Ruleset::Sealed))))
 }
 
-/// The command the seal step runs on the router over SSH: apply the sealed ruleset (fail-closed —
+/// The command the seal runs on the router over SSH: apply the sealed ruleset (fail-closed —
 /// an invalid ruleset isn't kept), then keep it as `/etc/nftables.conf` so a reboot stays sealed.
 #[must_use]
 pub(crate) fn sealed_reload() -> String {
@@ -104,6 +104,35 @@ enum Ruleset {
     Open,
     /// The `internet: false` networks are closed.
     Sealed,
+
+/// The seal, when the run has an `internet: false` network: `terraform_data.isoloom_seal`
+/// signs in to the router at its uplink address as `isoloom` and applies the sealed ruleset
+/// ([`sealed_reload`]) once every resource of `after` is done (the machines' set-up, or the
+/// waits for it), so the one `terraform apply` closes those networks once their machines are set
+/// up. Made again with the router (`router`, its id), whose first boot is unsealed.
+pub(crate) fn seal(env: &Environment, router: Expression, after: Vec<Expression>) -> Option<Block> {
+    use crate::machine::provisioner::{Connection, connection};
+    seal::any(env).then(|| {
+        let at = Connection::Ssh {
+            host: reference("local.router_address"),
+            user: crate::machine::USER.to_owned(),
+        };
+        let mut b = Block::builder("resource")
+            .add_label("terraform_data")
+            .add_label("isoloom_seal")
+            .add_attribute(("triggers_replace", crate::hcl_builder::list([router])))
+            .add_block(connection(&at))
+            .add_block(
+                Block::builder("provisioner")
+                    .add_label("remote-exec")
+                    .add_attribute(("inline", crate::hcl_builder::list([string(sealed_reload())])))
+                    .build(),
+            );
+        if !after.is_empty() {
+            b = b.add_attribute(("depends_on", crate::hcl_builder::list(after)));
+        }
+        b.build()
+    })
 }
 
 /// The networks the router forwards and masquerades to the internet: every one, or, once

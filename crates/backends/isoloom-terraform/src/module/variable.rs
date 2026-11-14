@@ -1,7 +1,6 @@
 //! A module's `variable` blocks, built up.
 
 use crate::hcl_builder::{Block, Expression, boolean, reference, string};
-use isoloom_render::run_manifest::RUNNER;
 
 /// A `variable` block, built up.
 #[derive(Debug, Clone)]
@@ -127,29 +126,22 @@ impl Variable {
     }
 }
 
-/// Who signs in to a module's machines with the private key of its `ssh_public_key`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SignsIn {
-    /// The runner (a target with a run manifest).
-    Runner,
-    /// Terraform itself, to set the machines up.
-    Terraform,
+/// `ssh_public_key`, with the one description every module gives it. Required: a cloud's
+/// machines are reachable only with a key (its key pair or instance metadata takes one), and
+/// Terraform signs in with its private half ([`ssh_private_key_file`]) to set the machines up
+/// (ESXi) or to wait for their set-up (`crate::ready`).
+pub(crate) fn ssh_public_key() -> Variable {
+    Variable::new("ssh_public_key", "string").describe(
+        "The SSH public key the machines let in: Terraform signs in with its private half (`ssh_private_key_file`) to set them up or wait for their set-up, and so can you, to run the checks",
+    )
 }
 
-/// `ssh_public_key`, with the one description every module gives it, which says who `signs_in`
-/// with its private key. Required as built: a cloud's machines are reachable only with a key (its key pair or
-/// instance metadata takes one), and ESXi's Terraform signs in with its private key
-/// (`ssh_private_key_file`) to set the machines up. A Proxmox module defaults it to empty
-/// instead: its machines are set up from cloud-init snippets, nobody needs to sign in for them to
-/// be made, and an empty key installs none.
-pub(crate) fn ssh_public_key(signs_in: SignsIn) -> Variable {
-    let who = match signs_in {
-        SignsIn::Runner => format!("as {RUNNER} does to deliver the project and run the checks"),
-        SignsIn::Terraform => "as Terraform does to set them up (`ssh_private_key_file`), and the checks by hand".to_owned(),
-    };
-    Variable::new("ssh_public_key", "string").describe(&format!(
-        "The SSH public key the machines let in: whoever holds its private key signs in, {who}"
-    ))
+/// `ssh_private_key_file`: the private half of `ssh_public_key`, which Terraform signs in to the
+/// machines with to wait for their set-up (`crate::ready`). A path, `~` allowed.
+pub(crate) fn ssh_private_key_file() -> Variable {
+    Variable::new("ssh_private_key_file", "string").describe(
+        "The private key of ssh_public_key (a path, ~ allowed): Terraform signs in to the machines with it to bring the project in and wait for their set-up",
+    )
 }
 
 #[cfg(test)]

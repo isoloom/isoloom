@@ -5,9 +5,15 @@ pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
+use isoloom_render::backend::Files;
 use isoloom_spec::model::Target;
-use isoloom_terraform::{CloudServicesBackend, cloud_docker_modules as modules};
-use testing::{Outcome, example, file};
+use isoloom_terraform::{CloudServicesBackend, cloud_docker_modules};
+use testing::{Outcome, docker_host, example, file};
+
+/// The cloud-docker modules of `e`, its host starting the Compose file.
+fn modules(e: &Environment) -> isoloom_terraform::Result<Files> {
+    cloud_docker_modules(e, &docker_host(&[]))
+}
 
 /// Example `name`'s plan for `target`.
 fn env(name: &str, target: Target) -> Outcome<Environment> {

@@ -5,7 +5,7 @@
 //! network sends every other network through its own gateway, so traffic crosses the gateway
 //! both ways.
 //!
-//! The machines keep their own public addresses (the runner reaches them there over SSH, Terraform
+//! The machines keep their own public addresses (Terraform and the operator reach them there over SSH, Terraform
 //! a Windows one over WinRM), so a routed network still goes out to the internet directly rather
 //! than through its gateway.
 

@@ -38,12 +38,6 @@ fn oci_solo_web() -> Outcome {
 }
 
 #[test]
-fn linode_hello_stack() -> Outcome {
-    insta::assert_snapshot!(module(Cloud::Linode, "hello-stack")?);
-    Ok(())
-}
-
-#[test]
 fn oci_hello_stack() -> Outcome {
     insta::assert_snapshot!(module(Cloud::Oci, "hello-stack")?);
     Ok(())
@@ -86,10 +80,15 @@ fn refusals_keep_their_messages() -> Outcome {
     let one_vm = s(
         "DigitalOcean cloud-vm takes one machine on one network: an instance joins one VPC, at a private address DigitalOcean picks, so other machines couldn't reach it at its spec address",
     );
-    for name in ["hello-stack", "segmented"] {
+    // Both have a network without internet, which Linode's firewalls couldn't close once the
+    // machines are set up.
+    for (name, net) in [("hello-stack", "app"), ("segmented", "back")] {
+        let sealed = s(&format!(
+            "network `{net}` has no internet: Linode's firewalls only allow, and each machine's is made with it, so the apply couldn't close its way out once its machines are set up"
+        ));
         assert_eq!(
             refusals(name)?,
-            [(Cloud::DigitalOcean, one_vm.clone()), (Cloud::Linode, None), (Cloud::Oci, None)],
+            [(Cloud::DigitalOcean, one_vm.clone()), (Cloud::Linode, sealed), (Cloud::Oci, None)],
             "{name}"
         );
     }
@@ -107,7 +106,7 @@ fn a_refusal_matches_rendering_and_drops_only_that_cloud() -> Outcome {
     assert!(err.to_string().ends_with(&why), "{err}");
     let files = CloudVmBackend.render(&e)?;
     let has = |sub: &str| files.iter().any(|f| f.path.ends_with(&format!("cloud-vm/{sub}/main.tf")));
-    assert!(!has("digitalocean") && has("linode") && has("oci") && has("aws"));
+    assert!(!has("digitalocean") && !has("linode") && has("oci") && has("aws"));
     Ok(())
 }
 

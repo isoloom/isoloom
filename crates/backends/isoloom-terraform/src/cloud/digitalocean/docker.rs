@@ -20,6 +20,7 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::Table(super::vm::DROPLETS),
     }),
     resources,
+    instance: "digitalocean_droplet",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the droplet; the Docker
@@ -37,7 +38,7 @@ fn resource(kind: &str) -> BlockBuilder {
     crate::module::resource(kind, "env").add_attribute(("name", reference("local.name")))
 }
 
-/// The Docker host's OS from DigitalOcean's image table, with the runner's key, its expiry in its user data, run once ([`instance::set_up_once`]).
+/// The Docker host's OS from DigitalOcean's image table, with the operator's key, its set-up in its user data, run once ([`instance::set_up_once`]).
 fn droplet(env: &Environment, user_data: Expression) -> Block {
     resource("digitalocean_droplet")
         .add_attribute(("region", reference("var.region")))

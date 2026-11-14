@@ -1,4 +1,4 @@
-use isoloom_manifest::{Action, Condition, Delivery, HostOs, Identity, OutputSource, Run, SetBy, SlotKind, StateOwner, TfVarShape, Version};
+use isoloom_manifest::{Action, Condition, Delivery, HostOs, Identity, OutputSource, Run, SetBy, SlotKind, StateOwner, Version};
 use isoloom_plan::{Environment, Lab};
 use isoloom_spec::model::Target;
 
@@ -116,7 +116,7 @@ fn the_variables_are_params_and_the_secrets_slots() {
     let secret = slot("DEMO_SECRET");
     assert_eq!(secret.kind, SlotKind::Input);
     assert!(!secret.sensitive, "the spec's word on it");
-    assert!(matches!(secret.deliver.as_slice(), [Delivery::TfVar { var, shape: TfVarShape::MapEntry }] if var.as_str() == "inputs"));
+    assert!(matches!(secret.deliver.as_slice(), [Delivery::Env { var, .. }] if var.as_str() == "TF_VAR_DEMO_SECRET"));
 }
 
 #[test]

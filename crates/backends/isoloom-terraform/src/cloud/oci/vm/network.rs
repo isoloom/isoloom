@@ -75,8 +75,9 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .add_attribute(("display_name", display(net)))
             .add_attribute(("route_table_id", reference("oci_core_route_table.env.id")))
             .add_attribute(("security_list_ids", list([reference(&format!("oci_core_security_list.{}.id", ident(net)))])));
-        if !routed(env).is_empty() {
-            // Its own table replaces the internet one once the gateway exists.
+        if !routed(env).is_empty() || closed(env, net) {
+            // Its own table, or the sealed one, replaces the internet one once the gateway exists
+            // or once the machines are set up.
             subnet = subnet.add_block(
                 Block::builder("lifecycle")
                     .add_attribute(("ignore_changes", list([reference("route_table_id")])))
@@ -84,7 +85,44 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             );
         }
         m.block(subnet.build());
+        // A routed network's seal comes with its own table (`gateway_routes`).
+        if closed(env, net) && routed(env).is_empty() {
+            sealed(env, net, Vec::new(), m);
+        }
     }
+}
+
+/// Whether network `net` is closed once its machines are set up (`crate::seal`).
+fn closed(env: &Environment, net: &str) -> bool {
+    crate::seal::any(env) && crate::seal::closed(env, net)
+}
+
+/// The seal of network `net` (`crate::seal`): a route table with no way to the internet, only to
+/// `allowed_cidr` (the replies to SSH and the published ports) and through its gateway (`hops`,
+/// a routed network's), attached to its subnet once every machine is set up
+/// (`seal::after_set_up`). Until then the subnet has the internet table (the VCN routes between
+/// its subnets itself), and its security list lets the machines out.
+fn sealed(env: &Environment, net: &str, hops: Vec<Block>, m: &mut Module) {
+    let id = format!("sealed_{}", ident(net));
+    m.commented(
+        &format!("The seal of `{net}`: once every machine is set up, its subnet goes out to allowed_cidr alone."),
+        in_vcn(resource("oci_core_route_table", &id), name_with(&format!("-{net}-sealed")))
+            .add_block(
+                Block::builder("route_rules")
+                    .add_attribute(("destination", reference("var.allowed_cidr")))
+                    .add_attribute(("network_entity_id", reference("oci_core_internet_gateway.env.id")))
+                    .build(),
+            )
+            .add_blocks(hops)
+            .build(),
+    );
+    m.block(
+        resource("oci_core_route_table_attachment", &id)
+            .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(net)))))
+            .add_attribute(("route_table_id", reference(&format!("oci_core_route_table.{id}.id"))))
+            .add_attribute(("depends_on", seal::after_set_up(env)))
+            .build(),
+    );
 }
 
 /// With dual-stack networks: IPv6 on, their blocks as the VCN's private prefixes, and no
@@ -174,12 +212,8 @@ fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
         .add_block(fragmentation(inbound, false))
         .add_block(rule(outbound, "its own network", string(cidr), "all", None))
         .add_blocks(reach_rules(outbound, &reach::out_of(env, net), "to"));
-    if crate::seal::any(env) && crate::seal::closed(env, net) {
-        b = b.add_block(internet_until_sealed());
-    } else {
-        for block in reach::public_blocks() {
-            b = b.add_block(rule(outbound, "the internet", string(block), "all", None));
-        }
+    for block in reach::public_blocks() {
+        b = b.add_block(rule(outbound, "the internet", string(block), "all", None));
     }
     b = b.add_block(fragmentation(outbound, false));
     if let Some(v6) = p.ipv6.as_ref().map(|v| v.cidr.to_string()) {
@@ -192,23 +226,6 @@ fn security_list(env: &Environment, (net, p): (&str, &NetworkPlan)) -> Block {
             .add_block(fragmentation(outbound, true));
     }
     b.build()
-}
-
-/// The rules out to the internet of a network that has none: until the run is sealed (the
-/// machines set themselves up), then none.
-fn internet_until_sealed() -> Block {
-    let blocks = list(reach::public_blocks().into_iter().map(string));
-    Block::builder("dynamic")
-        .add_label("egress_security_rules")
-        .add_attribute(("for_each", seal::when_sealed(list([]), blocks)))
-        .add_block(
-            Block::builder("content")
-                .add_attribute(("description", string("the internet, until the run is sealed")))
-                .add_attribute(("destination", reference("egress_security_rules.value")))
-                .add_attribute(("protocol", string("all")))
-                .build(),
-        )
-        .build()
 }
 
 /// The `reach` rules whose other network is dual-stack too, on its IPv6 block.
@@ -252,7 +269,7 @@ pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
     }
     let mut lookups: Vec<String> = Vec::new();
     for net in env.networks.keys() {
-        let mut table = in_vcn(resource("oci_core_route_table", &ident(net)), display(net)).add_block(route_out());
+        let mut hops = Vec::new();
         for hop in through(env, net) {
             let Some((id, data)) = gateway_ip(&hop, net) else { continue };
             if !lookups.contains(&id) {
@@ -260,13 +277,22 @@ pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
                 lookups.push(id.clone());
             }
             let ip = attr(index(reference(&format!("data.oci_core_private_ips.{id}.private_ips")), 0), "id");
-            table = table.add_block(
+            hops.push(
                 Block::builder("route_rules")
                     .add_attribute(("destination", string(hop.plan.cidr.to_string())))
                     .add_attribute(("network_entity_id", ip))
                     .build(),
             );
         }
+        if closed(env, net) {
+            // Through its gateway once sealed; until then the internet table, the VCN routing
+            // between its subnets itself.
+            sealed(env, net, hops, m);
+            continue;
+        }
+        let table = in_vcn(resource("oci_core_route_table", &ident(net)), display(net))
+            .add_block(route_out())
+            .add_blocks(hops);
         m.block(table.build());
         m.block(
             resource("oci_core_route_table_attachment", &ident(net))

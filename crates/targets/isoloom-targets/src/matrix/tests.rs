@@ -152,9 +152,9 @@ fn a_refused_cell_says_which_step_refused_and_why() {
 /// Where a target that takes an `internet: false` network closes the internet to it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Sealed {
-    /// By the run, once the machines are set up: its run manifest's `lifecycle.seal`, out of a
-    /// guest's reach (a cloud's firewalls, a server's router).
-    ByTheRun,
+    /// By the module, within its apply, once the machines are set up: resources that wait for
+    /// every readiness wait, out of a guest's reach (a cloud's firewalls, a server's router).
+    ByTheModule,
     /// By what the target makes, from the start (`why` says how): its run manifest, if it has
     /// one, has no seal of its own.
     AsMade(&'static str),
@@ -164,7 +164,7 @@ enum Sealed {
 /// machines of its own). A target added to the spec must say, so a ✓ can't go unexplained.
 fn sealed_by(target: Target) -> Option<Sealed> {
     Some(match target {
-        Target::Proxmox | Target::Esxi | Target::CloudVm => Sealed::ByTheRun,
+        Target::Proxmox | Target::Esxi | Target::CloudVm => Sealed::ByTheModule,
         Target::Docker | Target::Hosted | Target::CloudDocker => Sealed::AsMade("an internal Compose network: the containers have no route out"),
         Target::Kubernetes => Sealed::AsMade("an egress network policy on the offline pods"),
         Target::Vagrant | Target::External => Sealed::AsMade("each machine's own egress step, at the end of its set-up"),
@@ -186,7 +186,7 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
         .unwrap();
     let row = m.rows.iter().find(|r| r.name() == "networks.*.internet = false").unwrap();
     let labs = labs_of(p);
-    let mut by_the_run = BTreeSet::new();
+    let mut by_the_module = BTreeSet::new();
     for (column, cell) in m.columns.iter().zip(&row.cells) {
         if *cell != Cell::Supported {
             continue;
@@ -205,14 +205,24 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
             .map(|f| isoloom_manifest::parse(&f.contents).unwrap())
             .collect();
         match how {
-            Sealed::ByTheRun => {
-                assert!(!manifests.is_empty(), "{}: sealed by the run, but it writes no run manifest", column.id());
-                for man in &manifests {
-                    let seal = man.lifecycle.seal.as_ref();
-                    assert!(seal.is_some(), "{}: ✓ in the matrix, but its run manifest has no seal", column.id());
-                    assert_eq!(seal.map(|s| s.param.as_str()), Some("isoloom_sealed"), "{}", column.id());
+            Sealed::ByTheModule => {
+                let modules: Vec<&str> = files
+                    .iter()
+                    .filter(|f| f.path.starts_with(&folder) && f.path.ends_with("/main.tf"))
+                    .map(|f| f.contents.as_str())
+                    .collect();
+                assert!(!modules.is_empty(), "{}: sealed by its module, but it writes none", column.id());
+                for module in modules {
+                    // The closing resource waits for the set-up: a server's seal, or a cloud's
+                    // resources named `sealed` made after the readiness waits.
+                    let seals = module.contains("resource \"terraform_data\" \"isoloom_seal\"")
+                        || (module.contains("sealed") && module.contains("terraform_data.isoloom_ready_"));
+                    assert!(seals, "{}: ✓ in the matrix, but its module doesn't seal", column.id());
                 }
-                by_the_run.insert(column.target);
+                for man in &manifests {
+                    assert!(man.lifecycle.seal.is_none(), "{}: the module seals, not the run", column.id());
+                }
+                by_the_module.insert(column.target);
             }
             Sealed::AsMade(why) => {
                 for man in &manifests {
@@ -221,7 +231,7 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
             }
         }
     }
-    assert_eq!(by_the_run, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
+    assert_eq!(by_the_module, BTreeSet::from([Target::Proxmox, Target::Esxi, Target::CloudVm]));
 }
 
 /// A column that generates nothing has no place in the matrix nor a tier: a provider or cloud

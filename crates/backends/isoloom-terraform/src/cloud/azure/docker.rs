@@ -22,6 +22,7 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::ByMemory(|s| s.pick(["Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"])),
     }),
     resources,
+    instance: "azurerm_linux_virtual_machine",
 };
 
 /// The cloud's resources, after the module's head, `custom_data` in the VM (read by
@@ -118,7 +119,7 @@ fn interface() -> Vec<Block> {
     ]
 }
 
-/// The Docker host's OS from Azure's image table, the cloud's user with the runner's key, its
+/// The Docker host's OS from Azure's image table, the cloud's user with the operator's key, its
 /// disk as a `cloud-vm` machine's, its expiry in its custom data, run once ([`set_up_once`]).
 fn host(size: HostSize, custom_data: Expression) -> Block {
     placed("azurerm_linux_virtual_machine")

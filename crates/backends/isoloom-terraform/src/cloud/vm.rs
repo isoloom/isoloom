@@ -45,7 +45,7 @@ use isoloom_spec::model::Target;
 
 use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
 use crate::machine::{self, controller};
-use crate::module::providers::{self, Provider, TLS};
+use crate::module::providers::{self, LOCAL, Provider, TLS};
 use crate::module::variable::Variable;
 use crate::module::{self, ProjectCopy};
 use crate::{Result, checks, target};
@@ -67,28 +67,26 @@ pub(crate) struct Driver {
     pub(crate) write: fn(&Environment, &mut Module) -> Result<()>,
 }
 
-/// The providers a cloud's module requires: `base` (the cloud's own), TLS for the controller's
-/// key, and `windows` for the Windows machines (their password, the project's file list).
+/// The providers a cloud's module requires: `base` (the cloud's own), `local` for the project's
+/// archive (its exclusion list, `crate::ready`), TLS for the controller's key, and `windows`
+/// for the Windows machines (their password).
 fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<Provider> {
     let mut p = base.to_vec();
+    p.push(LOCAL);
     if controller::needed(env) {
         p.push(TLS);
     }
     if machine::windows::any(env) {
-        p.extend_from_slice(windows);
+        p.extend(windows.iter().filter(|w| **w != LOCAL).copied());
     }
     p
 }
 
-/// A cloud's own variables for `env`: the driver's, then the seal's switch when a machine has
-/// anything to seal.
+/// A cloud's own variables for `env`: the driver's, then the launch-time inputs.
 pub(crate) fn own_variables(env: &Environment, driver: &Driver) -> Vec<Variable> {
     let mut v = driver.base.variables(env);
-    v.extend(seal::variable(env));
-    // cloud-vm reads the launch-time inputs in its machines' user data (the plain ones); the
-    // cloud-docker host never does (its containers get them over SSH), so only cloud-vm declares
-    // the `inputs` variable.
-    v.extend(crate::module::inputs::variable_of(env));
+    // The values given at launch, each its own variable, read in the machines' user data.
+    v.extend(crate::module::inputs::variables_of(env));
     v
 }
 
@@ -111,6 +109,8 @@ pub(crate) struct Machines {
     pub(crate) windows: Option<WriteWindows>,
     /// The controller's resources and set-up.
     pub(crate) controller: fn(&Environment, &mut Module) -> Result<()>,
+    /// The kind of a Linux VM's instance (`aws_instance`): its id makes its readiness wait again.
+    pub(crate) instance: &'static str,
 }
 
 impl Machines {
@@ -148,7 +148,7 @@ impl Machines {
     ) -> Result<()> {
         crate::machine::credentials(env, m);
         self.write(env, m)?;
-        outputs::write_named(env, user, public_ip, m);
+        outputs::write_named(env, user, public_ip, self.instance, m);
         Ok(())
     }
 }
@@ -243,14 +243,10 @@ impl CloudVmModule {
         let mut m = module::start(&(driver.base.usage)(&folder));
         let (base, windows) = driver.requires;
         m.block(providers::terraform(&required(env, base, windows)));
-        // Only Terraform's WinRM set-up of a Windows machine still uploads the project (an
-        // archive it reads from `local.root`); otherwise the runner delivers it and no local is
-        // read.
-        let copy = if machine::windows::any(env) {
-            ProjectCopy::Archive
-        } else {
-            ProjectCopy::Runner
-        };
+        // Terraform brings the project in: over SSH to each Linux machine before it waits for its
+        // set-up (`crate::ready`), over WinRM to a Windows machine it sets up itself; an archive
+        // made from `local.root` either way.
+        let copy = ProjectCopy::Archive;
         super::head(env, &mut m, own_variables(env, &driver), driver.base.provider, copy);
         (driver.write)(env, &mut m)?;
         module::file(Target::CloudVm, &folder, m, copy)

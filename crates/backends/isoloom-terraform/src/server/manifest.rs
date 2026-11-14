@@ -8,9 +8,9 @@
 //!   cloud-init, on ESXi Terraform sets it up over SSH during the apply. The runner reads each
 //!   ready file and runs the checks over SSH, through the router (`ssh.run`), so the same steps run
 //!   from macOS, Windows and Linux.
-//! - **The seal** (`lifecycle.seal`), when the run has an `internet: false` network: once the
-//!   machines are ready, one `ssh.run` applies the router's sealed ruleset live
-//!   (`crate::server::router`).
+//! - **The seal**, when the run has an `internet: false` network, is the module's own: once the
+//!   machines are set up, `terraform_data.isoloom_seal` applies the router's sealed ruleset live
+//!   (`crate::server::router::seal`), within the one apply.
 //! - **Params are the module's variables**, the connection's secrets are slots, the inputs one map
 //!   (`inputs`). The run's own values come from the runner, in the steps' environment
 //!   (`steps::runner_set`): its slot on the server (`${run.slot}`), its key (`${run.ssh_public_key}`,
@@ -68,16 +68,15 @@ fn build(env: &Environment, server: &Server) -> Result<Manifest, ManifestError> 
     let mut machines = machines::machines(env)?;
     let mut outputs = machines::outputs(&machines)?;
     (server.consoles)(env, &mut machines, &mut outputs)?;
-    let sealed = crate::seal::any(env);
     isoloom_render::run_manifest::Body {
         tools: (server.tools)()?,
         identity: crate::module::manifest::runner_identity((server.gone)()?)?,
-        params: slots::params(&server.variables, server.private_key, &runners, sealed)?,
+        params: slots::params(&server.variables, server.private_key, &runners)?,
         secrets: slots::secrets(env, &server.variables)?,
         networks: run_manifest::networks(env, server.native)?,
         outputs,
         machines,
-        lifecycle: steps::lifecycle(server.private_key, sealed)?,
+        lifecycle: steps::lifecycle(server.private_key)?,
         ready: steps::ready(env, server.applied, server.setup_log)?,
         checks: crate::module::manifest::checks(runners),
         recovery: None,

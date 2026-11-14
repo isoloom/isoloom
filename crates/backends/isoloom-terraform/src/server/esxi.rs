@@ -25,11 +25,12 @@
 //!   the host: it names the vSwitches and the VMs, and makes the MACs) are variables.
 //! - Machines are reached through the router (`ssh -J isoloom@<address>`): the `machines`
 //!   output gives their addresses, and the check runners in
-//!   `.isoloom/esxi/checks/<position>.sh` are piped to them by the runner (the module's usage
-//!   says how by hand).
-//! - The run manifest (`.isoloom/esxi/run.json`, see `manifest`) is the servers' own: Terraform
-//!   makes the environment and sets it up, the runner waits for every set-up, seals, and runs the
-//!   checks over SSH through the router.
+//!   `.isoloom/esxi/checks/<position>.sh` are piped to them over SSH through the router (the
+//!   `checks` output says which runs where).
+//! - Terraform makes the environment, sets every machine up over SSH and, once they are, seals
+//!   the `internet: false` networks at the router (`crate::server::router::seal`): the apply ends
+//!   with the environment ready. The run manifest (`.isoloom/esxi/run.json`, see `manifest`) is
+//!   the servers' own.
 //! - Secrets and inputs as files are refused: a machine would wait for a runner to deliver them
 //!   over SSH at its own address, and an ESXi machine is reached only through the router, which a
 //!   run manifest's guest delivery doesn't go through.
@@ -166,9 +167,9 @@ impl Backend for EsxiBackend {
         PARTS.refusal(&self.capabilities(), env)
     }
 
-    /// The run manifest (`.isoloom/esxi/run.json`): Terraform makes the environment and sets its
-    /// machines up, the runner reads each machine's ready file, seals the `internet: false`
-    /// networks at the router and runs the checks, over SSH through the router.
+    /// The run manifest (`.isoloom/esxi/run.json`): Terraform makes the environment, sets its
+    /// machines up and seals the `internet: false` networks at the router; the runner runs the
+    /// checks over SSH through the router.
     fn run_manifest(&self, env: &Environment) -> std::result::Result<Option<isoloom_manifest::Manifest>, RenderError> {
         Ok(Some(manifest::manifest(env)?))
     }

@@ -172,9 +172,10 @@ fn a_cloud_docker_host_schedules_its_expiry_again_at_every_boot() -> Outcome {
         lab("version: 1\nname: d\nnetworks: { lab: { cidr: 10.72.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: \"nginx:1.27\" } }\n")?;
     for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
         let tf = generated(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?;
-        // Cloud-init runs the user data once: a boot unit reschedules the expiry after a restart.
-        assert!(tf.contains("systemctl enable isoloom-expiry.service"), "{cloud}");
-        assert!(tf.contains("ExecStart=-/etc/isoloom/expiry.sh"), "{cloud}");
+        // Cloud-init runs the user data once: the set-up's unit, enabled for every boot, schedules
+        // the expiry again before anything else.
+        assert!(tf.contains("systemctl enable isoloom-setup.service"), "{cloud}");
+        assert!(tf.contains("shutdown -h"), "{cloud}");
     }
     Ok(())
 }

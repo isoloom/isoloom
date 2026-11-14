@@ -7,7 +7,7 @@
 //!   other targets: a machine's networks reach it, `reach` rules open one network to another
 //!   (on their ports), the rest is closed.
 //! - Each machine is a VM at its address with a static public IP that sets itself up from its
-//!   user data (`crate::cloud::vm::hooks::user_data`), once the runner delivered the
+//!   user data (`crate::cloud::vm::hooks::user_data`), once Terraform brought in the
 //!   project over SSH as `isoloom` (Azure creates the administrator; it reserves `admin`). A
 //!   machine on several networks gets an interface on each (forwarding on, so replies leave from
 //!   the right one), brought up by MAC at every boot.
@@ -78,6 +78,7 @@ const MACHINES: vm::Machines = vm::Machines {
     linux: machines::linux,
     windows: Some(machines::windows),
     controller: machines::controller,
+    instance: "azurerm_linux_virtual_machine",
 };
 
 /// The Azure Marketplace image of each OS: (publisher, offer, sku).

@@ -4,45 +4,42 @@
 //! machine over SSH through the router.
 
 use isoloom_manifest::{
-    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, RelPath, RunVar, Seal, SnakeName,
-    Step, Template,
+    Action, CheckRunner, Condition, EnvName, Error as ManifestError, Lifecycle, NonEmpty, Part, PathTemplate, Placeholder, RelPath, RunVar, SnakeName, Step,
+    Template,
 };
 use isoloom_plan::{Environment, Vm};
 use isoloom_render::run_manifest::timeout_s;
 
 use crate::machine::controller;
-use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, UNREACHABLE_S, id, output, secs, terraform, words};
+use crate::module::manifest::{self, PLAYBOOKS_S, SETUP_S, id, secs, terraform, words};
 use crate::server::router::check_host;
 use crate::ssh::Login;
 
 use crate::machine::USER;
 
-/// The seal, over SSH: the runner applies the router's sealed ruleset (its `SEALED_NFT` file,
-/// written at boot) live and keeps it as `/etc/nftables.conf`, so later boots stay sealed
-/// (`crate::server::router::sealed_reload`). The module itself never changes for the seal, so no
-/// apply is needed. Reached directly at the router's uplink address (`${outputs.ip}`), the
-/// environment's way in, as `isoloom`: where the runner reaches every machine through, and, on
-/// ESXi, where Terraform does too.
-fn seal_reload() -> Result<Step, ManifestError> {
-    let login = Login::new(output("ip")?, USER);
-    let mut step = login.step("seal-reload", &Template::text(&crate::server::router::sealed_reload()), &[])?;
-    step.timeout_s = secs(UNREACHABLE_S);
-    Ok(step)
-}
-
 /// The module's variables the runner sets itself, each from one of its own values: its slot on
-/// the server, its key's public half (the VMs let it in), and its private half's file
-/// (`private_key`, the module's name for that variable). Never params an embedder gives.
-pub(crate) fn runner_set(private_key: &str) -> [(&str, RunVar); 3] {
-    [("slot", RunVar::Slot), ("ssh_public_key", RunVar::SshPublicKey), (private_key, RunVar::SshKey)]
+/// the server, its key's public half (the VMs let it in), and its private half's file, under the
+/// name Terraform signs in to the machines with (`ssh_private_key_file`) and under `private_key`
+/// (the module's name for the file it reaches the server with, when that is another). Never
+/// params an embedder gives.
+pub(crate) fn runner_set(private_key: &str) -> Vec<(&str, RunVar)> {
+    let mut out = vec![
+        ("slot", RunVar::Slot),
+        ("ssh_public_key", RunVar::SshPublicKey),
+        ("ssh_private_key_file", RunVar::SshKey),
+    ];
+    if private_key != "ssh_private_key_file" {
+        out.push((private_key, RunVar::SshKey));
+    }
+    out
 }
 
-/// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`); when the run
-/// has an `internet: false` network to seal (`sealed`), the seal: one `ssh.run` applying the
-/// sealed ruleset to the running router once the machines are ready, and keeping it for later
-/// boots ([`seal_reload`]). Each Terraform step has the runner's own values in its environment
-/// ([`runner_set`], `private_key` the module's variable for its key's file).
-pub(crate) fn lifecycle(private_key: &str, sealed: bool) -> Result<Lifecycle, ManifestError> {
+/// A stale lock of a crashed run cleared, then `init`, then `apply` (or `destroy`). The apply
+/// ends once the machines are set up and the networks without internet are sealed (the module's
+/// own waits and seal, `crate::ready`, `crate::server::router::seal`). Each Terraform step has
+/// the runner's own values in its environment ([`runner_set`], `private_key` the module's
+/// variable for its key's file).
+pub(crate) fn lifecycle(private_key: &str) -> Result<Lifecycle, ManifestError> {
     let named: Vec<(String, RunVar)> = runner_set(private_key).iter().map(|(v, run)| (format!("TF_VAR_{v}"), *run)).collect();
     let vars: Vec<(&str, RunVar)> = named.iter().map(|(v, run)| (v.as_str(), *run)).collect();
     let vars = vars.as_slice();
@@ -57,14 +54,6 @@ pub(crate) fn lifecycle(private_key: &str, sealed: bool) -> Result<Lifecycle, Ma
         "Removing the environment from the server…",
         vars,
     )?;
-    let seal = sealed
-        .then(|| {
-            Ok::<Seal, ManifestError>(Seal {
-                param: EnvName::parse(crate::seal::SEALED)?,
-                steps: NonEmpty::one(seal_reload()?),
-            })
-        })
-        .transpose()?;
     Ok(Lifecycle {
         up: NonEmpty::new(
             vec![lock()?, init()?, apply("apply", "Creating the environment's VMs on the server…")?],
@@ -74,7 +63,7 @@ pub(crate) fn lifecycle(private_key: &str, sealed: bool) -> Result<Lifecycle, Ma
         park: None,
         resume: Vec::new(),
         provision: None,
-        seal,
+        seal: None,
         status: Step::action(id("state")?, Action::TerraformReadState),
     })
 }

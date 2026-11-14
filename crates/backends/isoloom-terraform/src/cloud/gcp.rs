@@ -16,7 +16,7 @@ use crate::module::{Usage, resource};
 /// machines, the project and region, the provider and project, and its images' users.
 pub(crate) const BASE: Base = Base {
     cloud: crate::cloud::Cloud::Gcp,
-    usage: |folder| Usage::with_runner_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
+    usage: |folder| Usage::with_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
     variables: |region| variables(region).into(),
     provider: |env, m| {
         let mut locals = provider_and_project(env, m);

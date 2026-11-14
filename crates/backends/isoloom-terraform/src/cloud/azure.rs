@@ -17,7 +17,7 @@ use crate::module::variable::Variable;
 /// the region, the provider with the tags, and the one user every VM is given.
 pub(crate) const BASE: Base = Base {
     cloud: crate::cloud::Cloud::Azure,
-    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
     variables: |region| variables(region).into(),
     provider,
     user: |_| vm::USER,

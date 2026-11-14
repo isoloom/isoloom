@@ -59,6 +59,16 @@ pub(super) fn guests(env: &Environment, m: &mut Module) {
     if controller::needed(env) {
         controller(env, m);
     }
+    // Terraform sets each Linux machine and the controller up itself: the seal comes after.
+    let mut set_up: Vec<Expression> = env
+        .vms()
+        .filter(|vm| !vm.plan.is_windows())
+        .map(|vm| reference(&format!("terraform_data.{}", ident(vm.name))))
+        .collect();
+    if controller::needed(env) {
+        set_up.push(reference("terraform_data.isoloom_controller"));
+    }
+    m.blocks(crate::server::router::seal(env, reference("esxi_guest.isoloom_router.id"), set_up));
 }
 
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.

@@ -116,7 +116,7 @@ pub(crate) struct Base {
     pub(crate) variables: fn(&str) -> Vec<Variable>,
     /// Its provider's configuration.
     pub(crate) provider: ProviderConfig,
-    /// The user the runner's key logs in as on a machine of this OS, from the cloud's image
+    /// The user the operator's key logs in as on a machine of this OS, from the cloud's image
     /// table (it has `sudo`, or is root).
     pub(crate) user: fn(&str) -> &'static str,
 }

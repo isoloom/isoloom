@@ -7,15 +7,14 @@
 
 use std::collections::BTreeSet;
 
-use isoloom_manifest::{CheckRunner, Delivery, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SlotKind, SnakeName, TfVarShape};
+use isoloom_manifest::{
+    CheckRunner, Delivery, EnvName, Error as ManifestError, Identifier, Name, NonEmpty, Param, SecretSlot, SlotKind, SnakeName, StepSelection, TfVarShape,
+};
 use isoloom_plan::Environment;
 
 use isoloom_render::run_manifest::derived_switch;
 
 use crate::module::variable::Variable;
-
-/// The module's variable the inputs go in, one entry each.
-const INPUTS: &str = "inputs";
 
 /// The Terraform variable `name`.
 fn tf_var(name: &str, shape: TfVarShape) -> Result<NonEmpty<Delivery>, ManifestError> {
@@ -26,23 +25,16 @@ fn tf_var(name: &str, shape: TfVarShape) -> Result<NonEmpty<Delivery>, ManifestE
 }
 
 /// The module's variables an embedder sets (of `variables`, those the runner sets itself aside,
-/// `private_key` among them: `super::steps::runner_set`), the checks' switch when the environment has
-/// checks, and the seal switch when the run has an `internet: false` network to seal (`sealed`).
-pub(crate) fn params(variables: &[Variable], private_key: &str, runners: &[CheckRunner], sealed: bool) -> Result<Vec<Param>, ManifestError> {
+/// `private_key` among them: `super::steps::runner_set`), and the checks' switch when the
+/// environment has checks.
+pub(crate) fn params(variables: &[Variable], private_key: &str, runners: &[CheckRunner]) -> Result<Vec<Param>, ManifestError> {
     let runner_set = super::steps::runner_set(private_key);
     let mut out: Vec<Param> = variables
         .iter()
-        .filter(|v| !v.is_sensitive() && v.name() != INPUTS && !runner_set.iter().any(|(r, _)| *r == v.name()))
+        .filter(|v| !v.is_sensitive() && !runner_set.iter().any(|(r, _)| *r == v.name()))
         .map(param)
         .collect::<Result<_, _>>()?;
     out.extend(derived_switch(runners.iter().map(|r| r.step.id.clone()).collect())?);
-    if sealed {
-        // The runner records it and replays it on every later op. The module has no such
-        // variable (the router's cloud-init never changes, or the router would be made again), so
-        // Terraform ignores it; the seal takes effect live through the seal-reload step on the
-        // router (`crate::server::router`).
-        out.push(crate::module::manifest::seal_param(crate::seal::SEALED, "router")?);
-    }
     Ok(out)
 }
 
@@ -56,7 +48,7 @@ fn param(v: &Variable) -> Result<Param, ManifestError> {
 pub(crate) fn connection(variables: &[Variable]) -> Result<Vec<SecretSlot>, ManifestError> {
     variables
         .iter()
-        .filter(|v| v.is_sensitive() && v.name() != INPUTS)
+        .filter(|v| v.is_sensitive())
         .map(|v| slot(v.name(), SlotKind::Connection, true, Vec::new(), tf_var(v.name(), TfVarShape::String)?))
         .collect()
 }
@@ -69,7 +61,12 @@ pub(super) fn secrets(env: &Environment, variables: &[Variable]) -> Result<Vec<S
         if readers.is_empty() {
             continue;
         }
-        let mut s = slot(&input.name, SlotKind::Input, input.sensitive, readers, tf_var(INPUTS, TfVarShape::MapEntry)?)?;
+        let var = EnvName::parse(&format!("TF_VAR_{}", input.name))?;
+        let deliver = NonEmpty::one(Delivery::Env {
+            var,
+            steps: StepSelection::Every,
+        });
+        let mut s = slot(&input.name, SlotKind::Input, input.sensitive, readers, deliver)?;
         // Left out, an input is an empty value in the map: the machines read it empty.
         s.default = Some(String::new());
         out.push(s);

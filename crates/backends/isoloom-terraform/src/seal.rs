@@ -3,16 +3,12 @@
 //! guest can't undo it. The machines had what they needed to set themselves up (packages,
 //! images); from then on only the environment's own networks are reachable from them.
 //!
-//! What is sealed, and the switch's name, are the same everywhere; how differs. A cloud switches
-//! its own rules with a module variable (`crate::cloud::vm::seal`); a server's router (Proxmox's,
-//! ESXi's) applies a sealed ruleset it keeps from its first boot (`crate::server::router`), over
-//! SSH (`crate::server::manifest`).
+//! What is sealed is the same everywhere; how differs, but always within the one `terraform
+//! apply`, by resources made after every machine's set-up (`crate::ready`): a cloud's own rules
+//! (`crate::cloud::vm::seal`), or a server's router (Proxmox's, ESXi's) applying, over SSH, a
+//! sealed ruleset it keeps from its first boot (`crate::server::router::seal`).
 
 use isoloom_plan::{Environment, MachinePlan, Vm};
-
-/// The run's seal switch: the cloud modules' Terraform variable, and on a server the runner's
-/// recorded flag.
-pub(crate) const SEALED: &str = "isoloom_sealed";
 
 /// Whether network `net` has no internet (`internet: false`).
 pub(crate) fn closed(env: &Environment, net: &str) -> bool {

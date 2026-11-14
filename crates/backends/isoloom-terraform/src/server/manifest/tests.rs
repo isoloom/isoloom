@@ -1,6 +1,7 @@
-//! The servers' run manifests side by side: the seal is one and the same on Proxmox and ESXi.
+//! The servers' run manifests and modules side by side: the seal is one and the same on Proxmox
+//! and ESXi, the module's own.
 
-use isoloom_manifest::{Action, Condition, Manifest, Run, SetBy};
+use isoloom_manifest::{Condition, Manifest};
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
@@ -43,71 +44,52 @@ fn manifest(yaml: &str, target: Target) -> Manifest {
     m
 }
 
+/// The module of `yaml` on server `target`.
+fn module(yaml: &str, target: Target) -> String {
+    let env = crate::testing::environment(yaml, target);
+    let files = match target {
+        Target::Esxi => EsxiBackend.render(&env),
+        _ => ProxmoxBackend.render(&env),
+    };
+    files.unwrap().into_iter().find(|f| f.path.ends_with("main.tf")).expect("a module").contents
+}
+
 #[test]
-fn an_unsealed_run_has_no_seal_step_and_no_sealed_param() {
+fn an_unsealed_run_has_no_seal_step_and_no_seal() {
     for target in SERVERS {
         let m = manifest(OPEN, target);
         assert!(m.lifecycle.seal.is_none(), "{target:?}: nothing to seal");
-        assert!(m.params.iter().all(|p| p.name.as_str() != "isoloom_sealed"), "{target:?}");
+        assert!(!module(OPEN, target).contains("isoloom_seal"), "{target:?}");
     }
 }
 
+/// The seal is the module's own, within the one apply: once the machines are set up (Proxmox:
+/// each readiness wait; ESXi: each machine's set-up over SSH), `terraform_data.isoloom_seal`
+/// signs in to the router at its uplink address and applies the sealed ruleset live, keeping it
+/// for later boots. The run manifest has no seal of its own.
 #[test]
-fn the_seal_applies_the_sealed_ruleset_live_on_the_router() {
-    for target in SERVERS {
-        let m = manifest(SEALED, target);
-        // The runner sets the seal param once the machines are ready and records it.
-        let seal = m.lifecycle.seal.as_ref().expect("a run with an internet:false network seals");
-        assert_eq!(seal.param.as_str(), "isoloom_sealed", "{target:?}");
+fn the_module_seals_on_the_router_once_the_machines_are_set_up() {
+    for (target, after) in [
+        (
+            Target::Proxmox,
+            "depends_on = [terraform_data.isoloom_ready_web, terraform_data.isoloom_ready_cache]",
+        ),
+        (Target::Esxi, "depends_on = [terraform_data.web, terraform_data.cache]"),
+    ] {
+        assert!(manifest(SEALED, target).lifecycle.seal.is_none(), "{target:?}");
+        let tf = module(SEALED, target);
+        let (_, seal) = tf.split_once("resource \"terraform_data\" \"isoloom_seal\"").expect("a seal");
+        let (seal, _) = seal.split_once("\n}\n").unwrap();
         assert!(
-            m.params.iter().any(|p| p.name.as_str() == "isoloom_sealed" && p.set_by == SetBy::Runner),
-            "{target:?}"
+            seal.contains("host        = local.router_address") && seal.contains("user        = \"isoloom\""),
+            "{target:?}: {seal}"
         );
-        // One step, no second apply (the module never changes for the seal): an ssh.run that
-        // applies the sealed ruleset live to the already-booted router and keeps it for later boots.
-        let ids: Vec<&str> = seal.steps.iter().map(|s| s.id.as_str()).collect();
-        assert_eq!(ids, ["seal-reload"], "{target:?}");
-        let reload = &seal.steps.as_slice()[0];
-        let Run::Action { action: Action::SshRun, with } = &reload.run else {
-            panic!("{target:?}: {:?}", reload.run)
-        };
-        let arg = |k: &str| with.iter().find(|(n, _)| n.as_str() == k).map(|(_, v)| v.to_string());
-        assert_eq!(
-            arg("host").as_deref(),
-            Some("${outputs.ip}"),
-            "{target:?}: reached at the router's uplink, the environment's way in"
-        );
-        assert_eq!(arg("user").as_deref(), Some("isoloom"), "{target:?}");
-        assert!(arg("via").is_none(), "{target:?}: the router is reached directly, not through itself");
-        let command = arg("command").unwrap();
-        assert!(command.contains("nft -f /etc/nftables.sealed.nft"), "{target:?}: {command}");
         assert!(
-            command.contains("cp /etc/nftables.sealed.nft /etc/nftables.conf"),
-            "{target:?}: kept for later boots: {command}"
+            seal.contains("nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf"),
+            "{target:?}: {seal}"
         );
-        // The way in it names is an output of the run, the router's uplink address.
-        assert!(m.outputs.iter().any(|o| o.name.as_str() == "ip"), "{target:?}");
+        assert!(seal.contains(after), "{target:?}: {seal}");
     }
-}
-
-/// ESXi seals as Proxmox does: the same seal, step for step, and the same param.
-#[test]
-fn esxi_seals_as_proxmox_does() {
-    let (pve, esxi) = (manifest(SEALED, Target::Proxmox), manifest(SEALED, Target::Esxi));
-    assert_eq!(esxi.lifecycle.seal, pve.lifecycle.seal);
-    let sealed = |m: &Manifest| m.params.iter().find(|p| p.name.as_str() == "isoloom_sealed").cloned();
-    assert_eq!(sealed(&esxi), sealed(&pve));
-    // The same ready files, but for the log each server's set-up writes.
-    let unlogged = |m: &Manifest| -> Vec<Condition> {
-        let mut ready = m.ready[1..].to_vec();
-        for c in &mut ready {
-            if let Condition::ReadyFile { log, .. } = c {
-                *log = None;
-            }
-        }
-        ready
-    };
-    assert_eq!(unlogged(&esxi), unlogged(&pve), "the seal comes once the same set-ups are done");
 }
 
 /// Each ready file names the log the server's set-up writes: cloud-init's on Proxmox, where

@@ -1,6 +1,6 @@
 //! What a cloud run is given at run time beyond the environment's own values: the module's
 //! variables as params (the region, the account, the sizes, who may reach the machines), the
-//! provider's profile, the seal's switch, and the provider's credentials as connection slots.
+//! provider's profile, and the provider's credentials as connection slots.
 //!
 //! The credentials reach Terraform's own steps only, as the provider's environment: never a
 //! command line, never a file, never the SSH sessions to the machines. Each slot also names the
@@ -12,50 +12,27 @@
 use std::collections::BTreeSet;
 
 use isoloom_manifest::{
-    Delivery, EnvName, Error as ManifestError, Identifier, NonEmpty, Param, SecretSlot, SecretSource, SetBy, SlotKind, SnakeName, StepId, StepSelection, Store,
-    TfVarShape,
+    Delivery, EnvName, Error as ManifestError, Identifier, NonEmpty, Param, SecretSlot, SecretSource, SetBy, SlotKind, StepId, StepSelection, Store,
 };
 
 use crate::cloud::Cloud;
 use crate::module::variable::Variable;
 
 /// The module's variables the runner sets itself: never params the embedder gives.
-pub(crate) const RUNNER_SET: [&str; 3] = ["ssh_public_key", "expires_at", SEALED];
+pub(crate) const RUNNER_SET: [&str; 3] = ["ssh_public_key", "ssh_private_key_file", "expires_at"];
 
-/// The variable that seals the run (`crate::cloud::vm::seal`), set by the runner once the
-/// machines are set up.
-pub(crate) const SEALED: &str = crate::seal::SEALED;
-
-/// The module's variable the launch's values go in, one entry each.
-pub(crate) const INPUTS: &str = "inputs";
-
-/// The Terraform steps, which alone get the provider's credentials and profile: the seal is one
-/// only when the run has an `internet: false` network to seal.
-pub(crate) fn terraform_steps(sealed: bool) -> &'static [&'static str] {
-    if sealed {
-        &["init", "apply", "destroy", "seal"]
-    } else {
-        &["init", "apply", "destroy"]
-    }
-}
+/// The Terraform steps, which alone get the provider's credentials and profile.
+pub(crate) const TERRAFORM_STEPS: &[&str] = &["init", "apply", "destroy"];
 
 /// The params: each of the module's variables an embedder gives (required when it has no
-/// default, or when it is the account a destroy must find again), the cloud's profile, and the
-/// seal's switch.
+/// default, or when it is the account a destroy must find again), and the cloud's profile.
 pub(crate) fn params(variables: &[Variable], cloud: Cloud) -> Result<Vec<Param>, ManifestError> {
-    let sealed = variables.iter().any(|v| v.name() == SEALED);
     let mut out: Vec<Param> = variables
         .iter()
-        .filter(|v| !v.is_sensitive() && v.name() != INPUTS && !RUNNER_SET.contains(&v.name()))
+        .filter(|v| !v.is_sensitive() && !RUNNER_SET.contains(&v.name()))
         .map(|v| variable(v, account_of(cloud) == Some(v.name())))
         .collect::<Result<_, _>>()?;
-    out.extend(profile(cloud, terraform_steps(sealed))?);
-    if !sealed {
-        return Ok(out);
-    }
-    // The runner sets it once the machines are ready; on a cloud the internet is closed at the
-    // network (its security groups and routes).
-    out.push(crate::module::manifest::seal_param(SEALED, "network")?);
+    out.extend(profile(cloud, TERRAFORM_STEPS)?);
     Ok(out)
 }
 
@@ -80,7 +57,7 @@ fn tf_var(name: &str) -> Result<NonEmpty<Delivery>, ManifestError> {
 }
 
 /// The provider's environment variable `var`, on the Terraform `steps` only.
-fn on_terraform(var: &str, steps: &[&str]) -> Result<NonEmpty<Delivery>, ManifestError> {
+pub(crate) fn on_terraform(var: &str, steps: &[&str]) -> Result<NonEmpty<Delivery>, ManifestError> {
     let steps: Vec<StepId> = steps.iter().map(|s| StepId::parse(s)).collect::<Result<_, _>>()?;
     Ok(NonEmpty::one(Delivery::Env {
         var: EnvName::parse(var)?,
@@ -174,47 +151,31 @@ pub(crate) fn slots(cloud: Cloud, steps: &[&str]) -> Result<Vec<SecretSlot>, Man
         .collect()
 }
 
-/// The launch's value `name`, an input: an entry of the module's `inputs` for the machines that
-/// read it in their environment (`env_readers`), delivered over SSH to those that read it as a
-/// file (`file_readers`, kept under its own name: `/var/lib/isoloom/secrets/<name>`); empty when
-/// not given. `None` when no machine reads it.
-pub(crate) fn input(
-    name: &str,
-    sensitive: bool,
-    env_readers: &[isoloom_manifest::Name],
-    file_readers: &[isoloom_manifest::Name],
-) -> Result<Option<SecretSlot>, ManifestError> {
-    let mut deliver = Vec::new();
-    if !env_readers.is_empty() {
-        deliver.push(Delivery::TfVar {
-            var: SnakeName::parse(INPUTS)?,
-            shape: TfVarShape::MapEntry,
-        });
-    }
-    deliver.extend(file_readers.iter().map(guest));
-    if deliver.is_empty() {
+/// The launch's value `name`, an input, for the machines that read it (`readers`): the module's
+/// variable of the same name (`TF_VAR_<name>` on the Terraform steps), read in their user data;
+/// empty when not given. `None` when no machine reads it.
+pub(crate) fn input(name: &str, sensitive: bool, readers: &[isoloom_manifest::Name]) -> Result<Option<SecretSlot>, ManifestError> {
+    if readers.is_empty() {
         return Ok(None);
     }
-    let mut machines = env_readers.to_vec();
-    machines.extend(file_readers.iter().filter(|m| !env_readers.contains(m)).cloned());
     Ok(Some(SecretSlot {
         name: Identifier::parse(name)?,
         kind: SlotKind::Input,
         required: false,
         sensitive,
-        machines,
+        machines: readers.to_vec(),
         providers: BTreeSet::new(),
         source: None,
         default: Some(String::new()),
-        deliver: NonEmpty::new(deliver, "the machines reading the input")?,
+        deliver: on_terraform(&format!("TF_VAR_{name}"), TERRAFORM_STEPS)?,
     }))
 }
 
-/// A machine secret delivered over SSH, the fallback every cloud shares (the stores on AWS, Azure
-/// and GCP are a hardening): the runner reads it from its `source` (as on every target) and
-/// writes it into `/var/lib/isoloom/secrets/<name>`, and the machine's set-up waits for it. The
-/// value reaches no generated file and no state.
-pub(crate) fn guest_secret(name: &str, source: SecretSource, machines: &[isoloom_manifest::Name]) -> Result<SecretSlot, ManifestError> {
+/// A machine secret, read from its `source` (as on every target): the module's variable
+/// `ISOLOOM_SECRET_<NAME>` (`TF_VAR_` on the Terraform steps), which the machines' user data
+/// writes into `/var/lib/isoloom/secrets/<name>`.
+pub(crate) fn machine_secret(name: &str, source: SecretSource, machines: &[isoloom_manifest::Name]) -> Result<SecretSlot, ManifestError> {
+    let var = isoloom_manifest::contract::secret_variable(name);
     Ok(SecretSlot {
         name: Identifier::parse(name)?,
         kind: SlotKind::Secret,
@@ -224,17 +185,8 @@ pub(crate) fn guest_secret(name: &str, source: SecretSource, machines: &[isoloom
         providers: BTreeSet::new(),
         source: Some(source),
         default: None,
-        deliver: NonEmpty::new(machines.iter().map(guest).collect(), "the machines receiving the secret")?,
+        deliver: on_terraform(&format!("TF_VAR_{var}"), TERRAFORM_STEPS)?,
     })
-}
-
-/// Guest delivery to `machine` over SSH, once `up`'s steps are done.
-fn guest(machine: &isoloom_manifest::Name) -> Delivery {
-    Delivery::Guest {
-        machine: machine.clone(),
-        transport: isoloom_manifest::Transport::Ssh,
-        during_step: None,
-    }
 }
 
 #[cfg(test)]
@@ -243,7 +195,7 @@ mod tests {
 
     #[test]
     fn credentials_reach_the_terraform_steps_only_from_the_runners_environment() {
-        let aws = slots(Cloud::Aws, terraform_steps(true)).unwrap();
+        let aws = slots(Cloud::Aws, TERRAFORM_STEPS).unwrap();
         let names: Vec<&str> = aws.iter().map(|s| s.name.as_str()).collect();
         assert_eq!(names, ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]);
         for s in &aws {
@@ -257,35 +209,31 @@ mod tests {
                 panic!()
             };
             let ids: Vec<&str> = steps.iter().map(StepId::as_str).collect();
-            assert_eq!(ids, ["init", "apply", "destroy", "seal"]);
+            assert_eq!(ids, ["init", "apply", "destroy"]);
         }
+        assert!(slots(Cloud::DigitalOcean, TERRAFORM_STEPS).unwrap()[0].required, "a token is the only way in");
         assert!(
-            slots(Cloud::DigitalOcean, terraform_steps(true)).unwrap()[0].required,
-            "a token is the only way in"
-        );
-        assert!(
-            slots(Cloud::Oci, terraform_steps(false)).unwrap().is_empty(),
+            slots(Cloud::Oci, TERRAFORM_STEPS).unwrap().is_empty(),
             "the OCI provider reads its CLI configuration"
         );
     }
 
     #[test]
-    fn the_runner_sets_the_key_the_expiry_and_the_seal_and_the_account_is_required() {
+    fn the_runner_sets_the_key_and_the_expiry_and_the_account_is_required() {
         let vars = [
             Variable::new("region", "string").default(crate::hcl_builder::string("x")),
             Variable::new("subscription_id", "string").default(crate::hcl_builder::null()),
             Variable::new("allowed_cidr", "string"),
             Variable::new("ssh_public_key", "string"),
+            Variable::new("ssh_private_key_file", "string"),
             Variable::new("expires_at", "string").default(crate::hcl_builder::string("")),
-            Variable::new(SEALED, "bool").default(crate::hcl_builder::boolean(false)),
         ];
         let p = params(&vars, Cloud::Azure).unwrap();
         let named = |n: &str| p.iter().find(|x| x.name.as_str() == n);
-        assert!(named("ssh_public_key").is_none() && named("expires_at").is_none());
+        assert!(named("ssh_public_key").is_none() && named("ssh_private_key_file").is_none() && named("expires_at").is_none());
         assert!(named("allowed_cidr").is_some_and(|x| x.required && x.set_by == SetBy::Embedder));
         assert!(named("subscription_id").is_some_and(|x| x.required), "a destroy must find the same account");
         assert!(named("region").is_some_and(|x| !x.required && x.default.as_deref() == Some("x")));
-        assert!(named(SEALED).is_some_and(|x| x.set_by == SetBy::Runner && x.default.as_deref() == Some("false")));
         assert!(params(&vars[..1], Cloud::Aws).unwrap().iter().any(|x| x.name.as_str() == "AWS_PROFILE"));
     }
 }

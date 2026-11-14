@@ -1,10 +1,10 @@
 //! The VPC, its subnets, and each machine's security group.
 
-use crate::hcl_builder::{Block, BlockBuilder, Module, boolean, list, object, reference, string};
+use crate::hcl_builder::{Block, BlockBuilder, Module, boolean, list, number, object, reference, string};
 use isoloom_plan::{Environment, MachinePlan};
 
 use super::routing;
-use crate::cloud::aws::{egress, egress_to, first_zone, ingress, key_pair, route_out, sealed_route_out};
+use crate::cloud::aws::{egress, first_zone, ingress, key_pair, route_out};
 use crate::cloud::instance::name_with;
 use crate::cloud::vm::{reach, seal};
 use crate::module::{ident, resource};
@@ -41,7 +41,6 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .build(),
     );
     let own_tables = routing::blocks(env, m);
-    let closed = |net: &str| crate::seal::any(env) && crate::seal::closed(env, net);
     if !own_tables {
         m.block(
             resource("aws_route_table", "env")
@@ -49,25 +48,57 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                 .add_block(route_out())
                 .build(),
         );
-        if nets.iter().any(|(n, _)| closed(n)) {
-            m.commented(
-                "The networks without internet: theirs until the run is sealed, then allowed_cidr's replies only.",
-                resource("aws_route_table", "sealed")
-                    .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
-                    .add_block(sealed_route_out())
-                    .build(),
-            );
-        }
     }
     for (i, (net, cidr)) in nets.iter().enumerate() {
-        let table = match (own_tables, closed(net)) {
-            (true, _) => ident(net),
-            (false, true) => "sealed".to_owned(),
-            (false, false) => "env".to_owned(),
-        };
+        let table = if own_tables { ident(net) } else { "env".to_owned() };
         m.blocks(subnet(net, cidr, i > 0 && whole.is_none(), &table));
     }
+    if let Some(acl) = sealed_acl(env) {
+        m.commented(
+            "The seal: once every machine is set up, the networks without internet go out to the environment's networks and allowed_cidr alone (replies to SSH and the published ports), at the network.",
+            acl,
+        );
+    }
     m.block(key_pair());
+}
+
+/// The seal (`crate::seal`), when a network has no internet: a network ACL on those networks'
+/// subnets, made once every machine is set up (`seal::after_set_up`), letting traffic in from and
+/// out to the environment's networks and `allowed_cidr` alone (an ACL is stateless: SSH and the
+/// published ports come from there, and their replies go back there; each machine's security
+/// group still decides what comes in). Until it is made, the subnets have the VPC's default ACL,
+/// open both ways, and their route table's way to the internet. The VPC's resolver isn't
+/// filtered by an ACL.
+fn sealed_acl(env: &Environment) -> Option<Block> {
+    let closed: Vec<&String> = env.networks.keys().filter(|n| crate::seal::any(env) && crate::seal::closed(env, n)).collect();
+    if closed.is_empty() {
+        return None;
+    }
+    let rule = |way: &str, n: u64, cidr: crate::hcl_builder::Expression| {
+        Block::builder(way)
+            .add_attribute(("rule_no", number(n)))
+            .add_attribute(("protocol", string("-1")))
+            .add_attribute(("action", string("allow")))
+            .add_attribute(("cidr_block", cidr))
+            .add_attribute(("from_port", number(0)))
+            .add_attribute(("to_port", number(0)))
+            .build()
+    };
+    let mut peers: Vec<crate::hcl_builder::Expression> = env.networks.values().map(|p| string(p.cidr.to_string())).collect();
+    peers.push(reference("var.allowed_cidr"));
+    let subnets = list(closed.iter().map(|n| reference(&format!("aws_subnet.{}.id", ident(n)))));
+    let mut b = resource("aws_network_acl", "sealed")
+        .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
+        .add_attribute(("subnet_ids", subnets));
+    for way in ["ingress", "egress"] {
+        for (n, peer) in (100..).step_by(10).zip(&peers) {
+            b = b.add_block(rule(way, n, peer.clone()));
+        }
+    }
+    b = b
+        .add_attribute(("tags", object([("Name", name_with("-sealed"))])))
+        .add_attribute(("depends_on", seal::after_set_up(env)));
+    Some(b.build())
 }
 
 /// With a private zone (`dns.private`), the VPC's DNS support and host names on: a private
@@ -134,7 +165,7 @@ pub(super) fn security_group(env: &Environment, (name, mp): (&str, &MachinePlan)
     for p in &mp.ports {
         b = b.add_block(ingress("published", (p.publish, p.publish), p.protocol.id(), allowed()));
     }
-    b.add_block(egress_to(seal::destinations(env, mp))).build()
+    b.add_block(egress()).build()
 }
 
 /// The controller's: every network may reach it, and SSH from `allowed_cidr`.

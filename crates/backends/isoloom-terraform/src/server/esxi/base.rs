@@ -53,7 +53,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
             "unique per environment on this host: it names the vSwitches and the VMs, and makes the MACs",
         ),
         images(env),
-        variable::ssh_public_key(variable::SignsIn::Terraform),
+        variable::ssh_public_key(),
         s("ssh_private_key_file").describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router"),
     ];
     if super::outside::on_host_vswitch(env) {

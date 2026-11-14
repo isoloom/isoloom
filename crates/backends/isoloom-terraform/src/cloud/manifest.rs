@@ -5,11 +5,10 @@
 //!   (`identity.terraform.state: runner`), the provider's credentials given as connection slots
 //!   on its steps only ([`connection`]), the region, the account and the profile as params the
 //!   runner records at `up` and replays at `down`, never the profile current then.
-//! - **The runner** archives the project and pipes it into each machine over SSH (`ssh.run`,
-//!   retried while the machine boots); each machine sets itself up from its user data and says
-//!   how far it got in its ready file, which the runner reads ([`steps`]).
-//! - **The seal:** once the machines are set up, a second apply with `isoloom_sealed` closes the
-//!   internet to the `internet: false` networks at the network ([`isoloom_manifest::Seal`]).
+//! - **The apply** brings the project into each machine over SSH, waits for each machine's
+//!   set-up from its user data (its ready file), then closes the internet to the
+//!   `internet: false` networks at the network: the module's own resources (`crate::ready`,
+//!   `crate::cloud::vm::seal`), so the run is one apply ([`steps`]).
 //! - **The expiry:** the runner computes the run's end (`expires_at`, Unix seconds), a tag on
 //!   every resource for its reaper and the machines' own shutdown time.
 
@@ -51,10 +50,9 @@ pub(crate) struct Frame {
 
 /// The run manifest of `frame`, for `env`; its message is left to the caller.
 pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, ManifestError> {
-    let sealed = frame.variables.iter().any(|v| v.name() == connection::SEALED);
     let mut params = connection::params(&frame.variables, frame.cloud)?;
     params.extend(steps::derived(&frame.runners)?);
-    let mut secrets = connection::slots(frame.cloud, connection::terraform_steps(sealed))?;
+    let mut secrets = connection::slots(frame.cloud, connection::TERRAFORM_STEPS)?;
     secrets.extend(frame.slots);
     isoloom_render::run_manifest::Body {
         tools: tools()?, // Terraform and ssh.
@@ -64,7 +62,7 @@ pub(crate) fn build(env: &Environment, frame: Frame) -> Result<Manifest, Manifes
         networks: networks(env, isoloom_manifest::Template::text)?,
         machines: frame.machines,
         outputs: frame.outputs,
-        lifecycle: steps::lifecycle(&frame.guests, sealed)?,
+        lifecycle: steps::lifecycle()?,
         ready: steps::ready(&frame.guests)?,
         checks: crate::module::manifest::checks(frame.runners),
         recovery: recovery()?,

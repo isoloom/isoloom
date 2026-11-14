@@ -67,7 +67,7 @@ const SUDO: &str = "command -v sudo >/dev/null || (apt-get update -qq && apt-get
 
 /// Why Linode can't run this environment, if it can't.
 fn refusal(env: &Environment) -> Option<String> {
-    RULES.linux_refusal(env)
+    RULES.linux_refusal(env).or_else(|| crate::cloud::vm::seal::refusal(env, "Linode"))
 }
 
 /// The Linode image of each OS.
@@ -113,7 +113,7 @@ fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
     for (vm, at) in vm::at_first_address(env) {
         machine(env, vm, at, m)?;
     }
-    outputs::write_as(env, super::BASE.user, &public_ip, m);
+    outputs::write_as(env, super::BASE.user, &public_ip, "linode_instance", m);
     Ok(())
 }
 

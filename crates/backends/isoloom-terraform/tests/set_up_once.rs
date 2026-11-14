@@ -126,7 +126,7 @@ fn every_cloud_vm_keeps_its_user_data() -> Outcome {
 
 #[test]
 fn every_cloud_docker_host_keeps_its_expiry() -> Outcome {
-    let files = cloud_docker_modules(&planned(&example("hello-stack")?, Target::CloudDocker)?)?;
+    let files = cloud_docker_modules(&planned(&example("hello-stack")?, Target::CloudDocker)?, &testing::docker_host(&[]))?;
     for cloud in Cloud::ALL {
         let module = file(&files, &format!("cloud-docker/{}/main.tf", cloud.id()))?;
         assert!(module.contains("var.expires_at"), "{}: the host's user data schedules its expiry", cloud.id());

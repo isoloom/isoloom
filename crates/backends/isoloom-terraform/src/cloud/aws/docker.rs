@@ -23,6 +23,7 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::ByMemory(|s| host_instance_type(s.memory_mb)),
     }),
     resources,
+    instance: "aws_instance",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance; the Docker
