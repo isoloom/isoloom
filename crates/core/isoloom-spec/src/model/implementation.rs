@@ -339,6 +339,7 @@ pub const KNOWN_OS: &[&str] = &[
     "ubuntu-24.04",
     "rocky-9",
     "almalinux-9",
+    "alpine-3.7",
     "alpine-3.19",
     "alpine-3.24",
     "kali",

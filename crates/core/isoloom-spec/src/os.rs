@@ -79,7 +79,7 @@ pub const DISTROS: &[Distro] = &[
     },
     Distro {
         name: "alpine",
-        versions: &[("3.19", "alpine-3.19"), ("3.24", "alpine-3.24")],
+        versions: &[("3.7", "alpine-3.7"), ("3.19", "alpine-3.19"), ("3.24", "alpine-3.24")],
         default: "3.19",
         installer: Installer::Apk,
     },

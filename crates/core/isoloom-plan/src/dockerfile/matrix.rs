@@ -1,13 +1,14 @@
-//! The service matrix: the base images a translated Dockerfile may start `FROM` without fetching
-//! anything, and what each is on a fresh VM. A distro image is its OS (`debian:bookworm-slim` is a
-//! `debian@12` VM). A classic service's official image (php, mariadb, mysql, postgres, python,
-//! node) is the install that gives the same service at the same version, the conventions its
-//! Dockerfile sets up (its helper commands, its entrypoint's first start driven by
-//! `MYSQL_ROOT_PASSWORD` and the like), and its environment, folder and command. The matrix wins
-//! over a fetched Dockerfile: it is shorter and kept here.
+//! The base images a translated Dockerfile may start `FROM` without fetching anything, and what
+//! each is on a fresh VM. A distro image is its OS (`debian:bookworm-slim` is a `debian@12` VM). An
+//! official service image is a catalogue entry ([`EntryCall`]: `mysql:5.7` is the catalogue's
+//! `mysql`, its newest 5.7 release), resolved by the translation with the settings the image's
+//! environment gives (`MYSQL_ROOT_PASSWORD` and the like); the images whose entries have no VM
+//! recipe yet (php, postgres) are still the install written here, with their image's
+//! conventions (its helper commands, its entrypoint's first start). Either wins over a fetched
+//! Dockerfile.
 //!
-//! An entry installs on the Debian family by default, on the machine's own `os` when the spec
-//! names one the entry supports (`os: rocky@9` beside `app.build` puts MariaDB on Rocky Linux).
+//! An install written here goes on the Debian family by default, on the machine's own `os` when
+//! the spec names one it supports (`os: rocky@9` beside `app.build` puts MariaDB on Rocky Linux).
 
 use super::instruction::Command;
 
@@ -28,7 +29,42 @@ pub struct Base {
     pub entrypoint: Option<Command>,
     /// The image's command.
     pub cmd: Option<Command>,
+    /// The catalogue entry the image is, which the translation resolves (its OS then the
+    /// release's): `None` for a distro or an install written here.
+    pub entry: Option<EntryCall>,
+    /// kCTF's challenge base: it takes the VM's OS (its chroot stage's), and the VM is the
+    /// jail, so copying a stage's whole filesystem into it is nothing to do.
+    pub jail: bool,
 }
+
+/// A catalogue entry a base image is: the entry, the version its tag asks for (`None`: the
+/// newest), and what a required setting the image's environment leaves out takes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryCall {
+    /// The entry (`mysql`).
+    pub entry: &'static str,
+    /// The version the tag names (`5.7`), or none for the newest release with a VM form.
+    pub version: Option<String>,
+    /// A setting the image's environment leaves out, and the setting whose value it takes or the
+    /// value itself.
+    pub unset: &'static [(&'static str, Fallback)],
+    /// Prefixes the image reads its environment under besides the entry's own: `MARIADB_` and
+    /// `MYSQL_` (a mariadb image reads `MYSQL_ROOT_PASSWORD` too).
+    pub aliases: &'static [(&'static str, &'static str)],
+}
+
+/// What a setting the image's environment leaves out takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fallback {
+    /// This value.
+    Value(&'static str),
+    /// The value of this other setting.
+    Setting(&'static str),
+}
+
+/// MySQL's image creates no application user when `MYSQL_USER` is unset; the entry's
+/// entrypoint reads the user `root` the same way, so the image's behaviour is kept.
+const MYSQL_UNSET: &[(&str, Fallback)] = &[("user", Fallback::Value("root")), ("user_password", Fallback::Setting("password"))];
 
 impl Base {
     /// A bare OS: no prelude, root in `/`, a shell for a command.
@@ -41,6 +77,24 @@ impl Base {
             user: None,
             entrypoint: None,
             cmd: None,
+            entry: None,
+            jail: false,
+        }
+    }
+
+    /// The catalogue's `entry`, at the version `tag` names, with what a setting the image's
+    /// environment leaves out takes and the prefixes it reads that environment under too.
+    fn entry(entry: &'static str, tag: &str, unset: &'static [(&'static str, Fallback)], aliases: &'static [(&'static str, &'static str)]) -> Base {
+        let (version, _) = version_and_variants(tag);
+        let version = (!["latest", "lts", "current", "slim", "alpine"].contains(&version.as_str())).then_some(version);
+        Base {
+            entry: Some(EntryCall {
+                entry,
+                version,
+                unset,
+                aliases,
+            }),
+            ..Base::os("")
         }
     }
 }
@@ -59,31 +113,13 @@ pub enum NoEntry {
     },
 }
 
-/// The OS families an entry installs on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Families {
-    /// apt only.
-    Debian,
-    /// apt or dnf.
-    DebianOrRhel,
-    /// Any Linux with glibc (a vendor's build unpacked).
-    AnyGlibc,
-}
-
-impl Families {
-    /// `wanted` when the entry installs there, else its default (`default`).
-    fn pick(self, wanted: Option<&str>, default: &str) -> String {
-        let family = |os: &str| os.split('@').next().unwrap_or(os).to_owned();
-        let ok = match wanted.map(family).as_deref() {
-            Some("debian" | "ubuntu") => true,
-            Some("rocky" | "almalinux" | "fedora" | "centos") => self != Families::Debian,
-            Some("kali") => self != Families::DebianOrRhel,
-            _ => false,
-        };
-        match wanted {
-            Some(os) if ok => os.to_owned(),
-            _ => default.to_owned(),
-        }
+/// `wanted` (the machine's own `os`) when an install written here for apt and dnf runs there,
+/// else `default`.
+fn debian_or_rhel(wanted: Option<&str>, default: &str) -> String {
+    let family = |os: &str| os.split('@').next().unwrap_or(os).to_owned();
+    match wanted {
+        Some(os) if matches!(family(os).as_str(), "debian" | "ubuntu" | "rocky" | "almalinux" | "fedora" | "centos") => os.to_owned(),
+        _ => default.to_owned(),
     }
 }
 
@@ -119,11 +155,34 @@ pub fn of(image: &str, wanted: Option<&str>) -> Result<Base, NoEntry> {
             distro(&name, &tag).map(|os| Base::os(&os))
         }
         "php" => Ok(php(&tag)),
-        "mariadb" => Ok(mariadb(&tag, wanted)),
-        "mysql" => mysql(&tag, wanted),
+        "mariadb" => Ok(Base::entry("mariadb", &tag, MYSQL_UNSET, &[("MARIADB_", "MYSQL_")])),
+        "mysql" | "mysql/mysql-server" => Ok(Base::entry("mysql", &tag, MYSQL_UNSET, &[])),
         "postgres" => Ok(postgres(&tag, wanted)),
-        "python" => Ok(python(&tag, wanted)),
-        "node" => Ok(node(&tag, wanted)),
+        "python" => Ok(Base::entry("python", &tag, &[], &[])),
+        "node" => Ok(Base::entry("node", &tag, &[], &[])),
+        // The image's `USER` and the folders its entrypoints read: a lab's own entrypoint runs.
+        "gitea/gitea" => Ok(Base {
+            env: vec![("USER".to_owned(), "git".to_owned()), ("GITEA_CUSTOM".to_owned(), "/data/gitea".to_owned())],
+            ..Base::entry("gitea", &tag, &[], &[])
+        }),
+        // The image's GOPATH, its PATH and its folder: what a Dockerfile's `go build` reads.
+        "golang" => Ok(Base {
+            env: vec![
+                ("GOPATH".to_owned(), "/go".to_owned()),
+                (
+                    "PATH".to_owned(),
+                    "/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_owned(),
+                ),
+            ],
+            workdir: Some("/go".to_owned()),
+            ..Base::entry("golang", &tag, &[], &[])
+        }),
+        // kCTF's challenge base: its OS is the VM's (an empty `os` takes it), its jail the VM.
+        "gcr.io/kctf-docker/challenge" => Ok(Base {
+            prelude: vec![KCTF.to_owned()],
+            jail: true,
+            ..Base::os("")
+        }),
         "scratch" => Err(NoEntry::Refused {
             reason: "`FROM scratch` has no OS to install onto".to_owned(),
             fix: "give the machine `os` and `app.steps`: its VM form".to_owned(),
@@ -144,6 +203,7 @@ const DISTROS: &[(&str, &[&str], &str)] = &[
     ("ubuntu", &["20.04", "focal"], "ubuntu@20.04"),
     ("ubuntu", &["22.04", "jammy"], "ubuntu@22.04"),
     ("ubuntu", &["24.04", "noble", "latest"], "ubuntu@24.04"),
+    ("alpine", &["3.7"], "alpine@3.7"),
     ("alpine", &["3.19"], "alpine@3.19"),
     ("alpine", &["3.24", "latest"], "alpine@3.24"),
     ("rockylinux", &["9"], "rocky@9"),
@@ -187,13 +247,9 @@ fn minor(version: &str) -> String {
 }
 
 const PHP: &str = include_str!("matrix/php.sh");
+const KCTF: &str = include_str!("matrix/kctf.sh");
 const PHP_SHIMS: &str = include_str!("matrix/php-shims.sh");
-const MARIADB: &str = include_str!("matrix/mariadb.sh");
-const MYSQL: &str = include_str!("matrix/mysql.sh");
-const DB_ENTRYPOINT: &str = include_str!("matrix/db-entrypoint.sh");
 const POSTGRES: &str = include_str!("matrix/postgres.sh");
-const PYTHON: &str = include_str!("matrix/python.sh");
-const NODE: &str = include_str!("matrix/node.sh");
 
 /// `php:<version>[-apache|-fpm|-cli]`: PHP of that version from the Debian PHP archive
 /// (`packages.sury.org`), Apache with `mod_php` for `-apache`, FPM on port 9000 for `-fpm`, and the
@@ -233,62 +289,8 @@ fn php(tag: &str) -> Base {
         user: None,
         entrypoint: None,
         cmd,
-    }
-}
-
-/// `mariadb:<version>`: MariaDB of that version (Debian 12's own 10.11, else MariaDB's
-/// repository), on every address, with the image's entrypoint.
-fn mariadb(tag: &str, wanted: Option<&str>) -> Base {
-    let (version, _) = version_and_variants(tag);
-    let version = if version == "latest" { "11.8".to_owned() } else { minor(&version) };
-    database(Families::DebianOrRhel.pick(wanted, "debian@12"), MARIADB.replace("{VERSION}", &version), "mariadbd")
-}
-
-/// The full release `mysql:<version>` names, and Oracle's archive of it. A tag names a minor
-/// (`5.7`) or a release (`5.7.44`); a minor is its last release.
-fn mysql_release(version: &str) -> Option<(String, String)> {
-    let full = match version {
-        _ if version.matches('.').count() == 2 => version,
-        "5" | "5.7" => "5.7.44",
-        "5.5" => "5.5.62",
-        "5.6" => "5.6.51",
-        "8" | "8.0" => "8.0.44",
-        "8.4" | "latest" => "8.4.7",
-        _ => return None,
-    }
-    .to_owned();
-    let series = minor(&full);
-    let url = match series.as_str() {
-        "5.5" | "5.6" | "5.7" => format!("https://cdn.mysql.com/archives/mysql-{series}/mysql-{full}-linux-glibc2.12-x86_64.tar.gz"),
-        _ => format!("https://cdn.mysql.com/archives/mysql-{series}/mysql-{full}-linux-glibc2.17-x86_64.tar.xz"),
-    };
-    Some((full, url))
-}
-
-/// `mysql:<version>`: Oracle's generic Linux build of that release, with the image's entrypoint.
-/// 5.x runs on Debian 11 (the last with the ncurses 5 its tools link).
-fn mysql(tag: &str, wanted: Option<&str>) -> Result<Base, NoEntry> {
-    let (version, _) = version_and_variants(tag);
-    let Some((full, url)) = mysql_release(&version) else {
-        return Err(NoEntry::Unknown(format!("mysql:{tag}")));
-    };
-    let old = full.starts_with('5');
-    let os = Families::AnyGlibc.pick(wanted, if old { "debian@11" } else { "debian@12" });
-    let ncurses = if old { "libncurses5" } else { "libncurses6" };
-    let install = MYSQL.replace("{FULL}", &full).replace("{VERSION}", &version).replace("{URL}", &url).replace("{NCURSES}", ncurses);
-    Ok(database(os, install, "mysqld"))
-}
-
-/// A MySQL-family server: its install, then the shared entrypoint, run as `server`.
-fn database(os: String, install: String, server: &str) -> Base {
-    Base {
-        os,
-        prelude: vec![install, DB_ENTRYPOINT.to_owned()],
-        env: Vec::new(),
-        workdir: None,
-        user: None,
-        entrypoint: Some(exec(&["docker-entrypoint.sh"])),
-        cmd: Some(exec(&[server])),
+        entry: None,
+        jail: false,
     }
 }
 
@@ -309,51 +311,15 @@ fn postgres(tag: &str, wanted: Option<&str>) -> Base {
         }
     };
     Base {
-        os: Families::DebianOrRhel.pick(wanted, "debian@12"),
+        os: debian_or_rhel(wanted, "debian@12"),
         prelude: vec![POSTGRES.replace("{VERSION}", &major)],
         env: vec![("PGDATA".into(), "/var/lib/postgresql/data".into())],
         workdir: None,
         user: None,
         entrypoint: Some(exec(&["docker-entrypoint.sh"])),
         cmd: Some(exec(&["postgres"])),
-    }
-}
-
-/// `python:<version>[-slim|-bookworm|...]`: that Python as `python`, `python3` and `pip` (uv's
-/// standalone builds, any 3.x); Python 2.7 is Debian 11's own.
-fn python(tag: &str, wanted: Option<&str>) -> Base {
-    let (version, _) = version_and_variants(tag);
-    let version = if version == "latest" || version == "3" { "3.13".to_owned() } else { minor(&version) };
-    let os = if version.starts_with('2') {
-        "debian@11".to_owned()
-    } else {
-        Families::AnyGlibc.pick(wanted, "debian@12")
-    };
-    Base {
-        os,
-        prelude: vec![PYTHON.replace("{VERSION}", &version)],
-        env: vec![("PIP_BREAK_SYSTEM_PACKAGES".into(), "1".into()), ("PYTHONUNBUFFERED".into(), "1".into())],
-        workdir: None,
-        user: None,
-        entrypoint: None,
-        // The image's command is Python's interactive shell: on a VM, nothing runs.
-        cmd: None,
-    }
-}
-
-/// `node:<version>`: Node.js of that version (nodejs.org's release, its checksum checked).
-fn node(tag: &str, wanted: Option<&str>) -> Base {
-    let (version, _) = version_and_variants(tag);
-    let version = if version == "latest" || version == "lts" { "22".to_owned() } else { version };
-    Base {
-        os: Families::AnyGlibc.pick(wanted, "debian@12"),
-        prelude: vec![NODE.replace("{VERSION}", &version)],
-        env: Vec::new(),
-        workdir: None,
-        user: None,
-        entrypoint: None,
-        // The image's command is Node's interactive shell: on a VM, nothing runs.
-        cmd: None,
+        entry: None,
+        jail: false,
     }
 }
 
@@ -384,7 +350,8 @@ mod tests {
         ] {
             assert_eq!(of(image, None).unwrap().os, os, "{image}");
         }
-        assert!(matches!(of("alpine:3.7", None), Err(NoEntry::Refused { reason, .. }) if reason.contains("`alpine:3.7`")));
+        assert_eq!(of("alpine:3.7", None).unwrap().os, "alpine@3.7");
+        assert!(matches!(of("alpine:3.6", None), Err(NoEntry::Refused { reason, .. }) if reason.contains("`alpine:3.6`")));
     }
 
     #[test]
@@ -392,25 +359,26 @@ mod tests {
         let php = of("php:7.4-apache", None).unwrap();
         assert!(php.prelude[0].contains("php7.4-cli") && php.prelude[0].contains("libapache2-mod-php7.4"));
         assert_eq!(php.cmd, Some(exec(&["apache2-foreground"])));
-        assert!(of("python:3.8-slim", None).unwrap().prelude[0].contains("uv python install 3.8"));
-        assert_eq!(of("python:2.7.18-slim", None).unwrap().os, "debian@11");
-        assert!(of("mariadb:10.6.3", None).unwrap().prelude[0].contains("mariadb-10.6"));
         assert!(of("postgres:10.5", None).unwrap().prelude[0].contains("postgresql-10 "));
     }
 
     #[test]
-    fn mysql_is_oracles_build_of_the_release_the_tag_names() {
-        let five = of("mysql:5.7", None).unwrap();
-        assert_eq!(five.os, "debian@11");
-        assert!(five.prelude[0].contains("mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz"));
-        assert!(of("mysql:5.7.44", None).unwrap().prelude[0].contains("mysql-5.7.44-"));
-        assert!(of("mysql:8.0.33", None).unwrap().prelude[0].contains("mysql-8.0.33-linux-glibc2.17"));
-        assert_eq!(of("mysql:8.4", None).unwrap().os, "debian@12");
+    fn catalogue_images_name_their_entry_and_the_version_their_tag_asks_for() {
+        let call = |image: &str| of(image, None).unwrap().entry.map(|c| (c.entry, c.version));
+        assert_eq!(call("mysql:5.7"), Some(("mysql", Some("5.7".to_owned()))));
+        assert_eq!(call("docker.io/library/mysql:5.7.44"), Some(("mysql", Some("5.7.44".to_owned()))));
+        assert_eq!(call("mysql/mysql-server:8.0.21"), Some(("mysql", Some("8.0.21".to_owned()))));
+        assert_eq!(call("python:3.8-slim-buster"), Some(("python", Some("3.8".to_owned()))));
+        assert_eq!(call("node:lts"), Some(("node", None)));
+        assert_eq!(call("docker.io/library/mariadb:10.6.3"), Some(("mariadb", Some("10.6.3".to_owned()))));
+        assert_eq!(call("golang:1.23-alpine"), Some(("golang", Some("1.23".to_owned()))));
+        assert_eq!(call("gitea/gitea:1.22@sha256:538658de"), Some(("gitea", Some("1.22".to_owned()))));
+        assert_eq!(of("golang:1.22-bookworm", None).unwrap().workdir.as_deref(), Some("/go"));
+        assert_eq!(call("debian:12"), None);
     }
 
     #[test]
     fn an_entry_installs_on_the_machines_own_os_when_it_can() {
-        assert_eq!(of("mariadb:10.11", Some("rocky@9")).unwrap().os, "rocky@9");
         assert_eq!(of("postgres:16", Some("ubuntu@24.04")).unwrap().os, "ubuntu@24.04");
         // PHP's archive is Debian's: its default instead.
         assert_eq!(of("php:8.2-apache", Some("rocky@9")).unwrap().os, "debian@12");

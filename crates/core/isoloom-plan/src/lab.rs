@@ -179,7 +179,9 @@ impl Lab {
 
     /// The spec with the VM forms its Dockerfiles give, worked out once.
     fn translated(&self) -> &dockerfiles::Translated {
-        self.memo.translated.get_or_init(|| dockerfiles::translate(&self.source, &self.dockerfiles, &self.bases))
+        self.memo
+            .translated
+            .get_or_init(|| dockerfiles::translate(&self.source, &self.dockerfiles, &self.bases))
     }
 
     /// `l` with each refusal of a Dockerfile that has no VM form saying why.
@@ -197,9 +199,17 @@ impl Lab {
         templates::paths(&self.source)
     }
 
-    /// `spec` with the image table and the templates' texts applied.
+    /// `spec` with the image table and the templates' texts applied: the project's, and those
+    /// the Dockerfiles' translations bring (catalogue entries' files), once translated.
     fn finish(&self, spec: &model::Spec) -> model::Spec {
-        templates::add(self.images.apply(spec), &self.templates)
+        match self.memo.translated.get().filter(|t| !t.files.is_empty()) {
+            Some(t) => {
+                let mut texts = self.templates.clone();
+                texts.extend(t.files.iter().map(|(k, v)| (k.clone(), v.clone())));
+                templates::add(self.images.apply(spec), &texts)
+            }
+            None => templates::add(self.images.apply(spec), &self.templates),
+        }
     }
 
     /// The spec as written.
@@ -271,7 +281,11 @@ impl Lab {
             return Some(NotPossible::NoMachines);
         }
         if let Some(missing) = crate::lower::missing_form(self.source_for(Scope::Target(target)), self.catalogue, target) {
-            let missing = if dockerfiles::wants_vm(target) { self.translated().explain(missing) } else { missing };
+            let missing = if dockerfiles::wants_vm(target) {
+                self.translated().explain(missing)
+            } else {
+                missing
+            };
             return Some(NotPossible::MissingForm(self.place(missing)));
         }
         if let Some(missing) = self.unsupplied(target) {

@@ -13,16 +13,38 @@ app:
     creates: /var/lib/isoloom/dockerfile/001
   - command: |
       set -e
-      export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
-      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
-      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
-      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/tmp/jdk_installers.txt
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/adoptium/jdk_installers.txt; do isoloom_copy_to "$s" "$dest"; done
+      d=/usr/local/lib/isoloom/shims
+      mkdir -p "$d"
+      cat > "$d/useradd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -u ] || [ "${prev:-}" = --uid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent passwd "$id" >/dev/null; then exec /usr/sbin/useradd -o "$@"; fi
+      exec /usr/sbin/useradd "$@"
+      SHIM
+      cat > "$d/groupadd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -g ] || [ "${prev:-}" = --gid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent group "$id" >/dev/null; then exec /usr/sbin/groupadd -o "$@"; fi
+      exec /usr/sbin/groupadd "$@"
+      SHIM
+      chmod 755 "$d/useradd" "$d/groupadd"
+      if command -v apk >/dev/null; then
+        for tool in adduser addgroup; do
+          cat > "$d/$tool" <<SHIM
+      #!/bin/sh
+      flag=-u; [ $tool = addgroup ] && flag=-g
+      db=passwd; [ $tool = addgroup ] && db=group
+      out=; skip=
+      for a; do
+        if [ -n "\$skip" ]; then skip=; getent "\$db" "\$a" >/dev/null || out="\$out \$flag \$a"; continue; fi
+        if [ "\$a" = "\$flag" ]; then skip=1; continue; fi
+        out="\$out \$a"
+      done
+      exec /bin/busybox $tool \$out
+      SHIM
+          chmod 755 "$d/$tool"
+        done
+      fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
   - command: |
@@ -30,6 +52,22 @@ app:
       export TARGETPLATFORM=linux/amd64
       export JAVA_RELEASE=21
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p / && cd /
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/tmp/jdk_installers.txt
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/adoptium/jdk_installers.txt; do isoloom_copy_to "$s" "$dest"; done
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
+    creates: /var/lib/isoloom/dockerfile/003
+  - command: |
+      set -e
+      export TARGETPLATFORM=linux/amd64
+      export JAVA_RELEASE=21
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
@@ -37,16 +75,6 @@ app:
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/local/share/adoptium.key
       for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/adoptium.key; do isoloom_copy_to "$s" "$dest"; done
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
-    creates: /var/lib/isoloom/dockerfile/003
-  - command: |
-      set -e
-      export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
-      export TEMP_JAVA_HOME=/opt/jdk
-      export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      mkdir -p / && cd /
-      /bin/bash -o pipefail -c 'apt-get update  && apt-get install --no-install-recommends -y  ca-certificates  curl  gnupg  tar  && rm -rf /var/lib/apt/lists/*  && java_zip_url="$(grep "jdk${JAVA_RELEASE}/${TARGETPLATFORM}/glibc" /tmp/jdk_installers.txt | cut -d'\'' '\'' -f2)"  && mkdir -p "${TEMP_JAVA_HOME}"  && jdk_archive="/opt/jdk.zip"  && curl --silent --show-error --fail --location --output "${jdk_archive}" "${java_zip_url}"  && curl --silent --show-error --fail --location --output "${jdk_archive}.sig" "${java_zip_url}.sig"  && GNUPGHOME=$(mktemp -d)  && gpg --batch --homedir "${GNUPGHOME}" --import /usr/local/share/adoptium.key  && gpg --batch --homedir "${GNUPGHOME}" --verify "${jdk_archive}.sig" "${jdk_archive}"  && tar xzf "${jdk_archive}" --strip-components=1 -C "${TEMP_JAVA_HOME}"  && java --version  && jlink --version'
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
     creates: /var/lib/isoloom/dockerfile/004
   - command: |
@@ -55,8 +83,9 @@ app:
       export JAVA_RELEASE=21
       export TEMP_JAVA_HOME=/opt/jdk
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      /bin/bash -o pipefail -c 'case "$(jlink --version 2>&1)" in  "21."*) jlink  --strip-java-debug-attributes  --compress=zip-6  --add-modules ALL-MODULE-PATH  --no-man-pages  --no-header-files  --output /javaruntime;;  "25"*)  cp -r "${TEMP_JAVA_HOME}" /javaruntime;;  *) echo "ERROR: unmanaged jlink version pattern" && exit 1 ;;  esac;'
+      /bin/bash -o pipefail -c 'apt-get update  && apt-get install --no-install-recommends -y  ca-certificates  curl  gnupg  tar  && rm -rf /var/lib/apt/lists/*  && java_zip_url="$(grep "jdk${JAVA_RELEASE}/${TARGETPLATFORM}/glibc" /tmp/jdk_installers.txt | cut -d'\'' '\'' -f2)"  && mkdir -p "${TEMP_JAVA_HOME}"  && jdk_archive="/opt/jdk.zip"  && curl --silent --show-error --fail --location --output "${jdk_archive}" "${java_zip_url}"  && curl --silent --show-error --fail --location --output "${jdk_archive}.sig" "${java_zip_url}.sig"  && GNUPGHOME=$(mktemp -d)  && gpg --batch --homedir "${GNUPGHOME}" --import /usr/local/share/adoptium.key  && gpg --batch --homedir "${GNUPGHOME}" --verify "${jdk_archive}.sig" "${jdk_archive}"  && tar xzf "${jdk_archive}" --strip-components=1 -C "${TEMP_JAVA_HOME}"  && java --version  && jlink --version'
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
     creates: /var/lib/isoloom/dockerfile/005
   - command: |
@@ -64,16 +93,10 @@ app:
       export TARGETPLATFORM=linux/amd64
       export JAVA_RELEASE=21
       export TEMP_JAVA_HOME=/opt/jdk
-      export JENKINS_VERSION=2.580.2
-      export WAR_URL=https://get.jenkins.io/war/2.580.2/jenkins.war
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
-      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
-      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/war/jenkins-key.pub
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins.io-2026.key; do isoloom_copy_to "$s" "$dest"; done
+      /bin/bash -o pipefail -c 'case "$(jlink --version 2>&1)" in  "21."*) jlink  --strip-java-debug-attributes  --compress=zip-6  --add-modules ALL-MODULE-PATH  --no-man-pages  --no-header-files  --output /javaruntime;;  "25"*)  cp -r "${TEMP_JAVA_HOME}" /javaruntime;;  *) echo "ERROR: unmanaged jlink version pattern" && exit 1 ;;  esac;'
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/006
     creates: /var/lib/isoloom/dockerfile/006
   - command: |
@@ -84,45 +107,44 @@ app:
       export JENKINS_VERSION=2.580.2
       export WAR_URL=https://get.jenkins.io/war/2.580.2/jenkins.war
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      /bin/bash -o pipefail -c 'curl -fsSL "${WAR_URL}" -o /war/jenkins.war  && curl -fsSL "${WAR_URL}.asc" -o /war/jenkins.war.asc  && gpg --import /war/jenkins-key.pub  && gpg --verify --trust-model direct /war/jenkins.war.asc /war/jenkins.war'
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/war/jenkins-key.pub
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins.io-2026.key; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/007
     creates: /var/lib/isoloom/dockerfile/007
   - command: |
       set -e
-      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export TARGETPLATFORM=linux/amd64
+      export JAVA_RELEASE=21
+      export TEMP_JAVA_HOME=/opt/jdk
+      export JENKINS_VERSION=2.580.2
+      export WAR_URL=https://get.jenkins.io/war/2.580.2/jenkins.war
+      export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      apt-get update  && apt-get install -y --no-install-recommends  ca-certificates  curl  git  libfontconfig1  libfreetype6  procps  ssh-client  tini  unzip  tzdata  && rm -rf /var/lib/apt/lists/*
+      /bin/bash -o pipefail -c 'curl -fsSL "${WAR_URL}" -o /war/jenkins.war  && curl -fsSL "${WAR_URL}.asc" -o /war/jenkins.war.asc  && gpg --import /war/jenkins-key.pub  && gpg --verify --trust-model direct /war/jenkins.war.asc /war/jenkins.war'
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/008
     creates: /var/lib/isoloom/dockerfile/008
   - command: |
       set -e
-      export GIT_LFS_VERSION=3.8.1
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      arch=$(uname -m | sed -e 's/x86_64/amd64/g' -e 's/aarch64/arm64/g')  && curl -L -s -o git-lfs.tgz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${arch}-v${GIT_LFS_VERSION}.tar.gz"  && tar xzf git-lfs.tgz  && bash git-lfs-*/install.sh  && git lfs install --skip-repo --system  && rm -rf git-lfs*
+      apt-get update  && apt-get install -y --no-install-recommends  ca-certificates  curl  git  libfontconfig1  libfreetype6  procps  ssh-client  tini  unzip  tzdata  && rm -rf /var/lib/apt/lists/*
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/009
     creates: /var/lib/isoloom/dockerfile/009
   - command: |
       set -e
       export GIT_LFS_VERSION=3.8.1
-      export TARGETARCH=amd64
-      export COMMIT_SHA=''
-      export user=jenkins
-      export group=jenkins
-      export uid=1000
-      export gid=1000
-      export http_port=8080
-      export agent_port=50000
-      export JENKINS_HOME=/var/jenkins_home
-      export REF=/usr/share/jenkins/ref
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      export LANG=C.UTF-8
-      export JENKINS_HOME=/var/jenkins_home
-      export JENKINS_SLAVE_AGENT_PORT=50000
-      export REF=/usr/share/jenkins/ref
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      mkdir -p $JENKINS_HOME  && chown ${uid}:${gid} $JENKINS_HOME  && groupadd -g ${gid} ${group}  && useradd -d "$JENKINS_HOME" -u ${uid} -g ${gid} -l -m -s /bin/bash ${user}
+      arch=$(uname -m | sed -e 's/x86_64/amd64/g' -e 's/aarch64/arm64/g')  && curl -L -s -o git-lfs.tgz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${arch}-v${GIT_LFS_VERSION}.tar.gz"  && tar xzf git-lfs.tgz  && bash git-lfs-*/install.sh  && git lfs install --skip-repo --system  && rm -rf git-lfs*
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/010
     creates: /var/lib/isoloom/dockerfile/010
   - command: |
@@ -143,8 +165,9 @@ app:
       export JENKINS_HOME=/var/jenkins_home
       export JENKINS_SLAVE_AGENT_PORT=50000
       export REF=/usr/share/jenkins/ref
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      mkdir -p /var/jenkins_home
+      mkdir -p $JENKINS_HOME  && chown ${uid}:${gid} $JENKINS_HOME  && groupadd -g ${gid} ${group}  && useradd -d "$JENKINS_HOME" -u ${uid} -g ${gid} -l -m -s /bin/bash ${user}
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/011
     creates: /var/lib/isoloom/dockerfile/011
   - command: |
@@ -165,8 +188,9 @@ app:
       export JENKINS_HOME=/var/jenkins_home
       export JENKINS_SLAVE_AGENT_PORT=50000
       export REF=/usr/share/jenkins/ref
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      mkdir -p ${REF}/init.groovy.d
+      mkdir -p /var/jenkins_home
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/012
     creates: /var/lib/isoloom/dockerfile/012
   - command: |
@@ -187,13 +211,37 @@ app:
       export JENKINS_HOME=/var/jenkins_home
       export JENKINS_SLAVE_AGENT_PORT=50000
       export REF=/usr/share/jenkins/ref
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p / && cd /
+      mkdir -p ${REF}/init.groovy.d
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/013
+    creates: /var/lib/isoloom/dockerfile/013
+  - command: |
+      set -e
+      export GIT_LFS_VERSION=3.8.1
+      export TARGETARCH=amd64
+      export COMMIT_SHA=''
+      export user=jenkins
+      export group=jenkins
+      export uid=1000
+      export gid=1000
+      export http_port=8080
+      export agent_port=50000
+      export JENKINS_HOME=/var/jenkins_home
+      export REF=/usr/share/jenkins/ref
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export LANG=C.UTF-8
+      export JENKINS_HOME=/var/jenkins_home
+      export JENKINS_SLAVE_AGENT_PORT=50000
+      export REF=/usr/share/jenkins/ref
       export JENKINS_UC=https://updates.jenkins.io
       export JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       chown -R ${user} "$JENKINS_HOME" "$REF"
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/013
-    creates: /var/lib/isoloom/dockerfile/013
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/014
+    creates: /var/lib/isoloom/dockerfile/014
   - command: |
       set -e
       export GIT_LFS_VERSION=3.8.1
@@ -217,42 +265,9 @@ app:
       export JENKINS_UC=https://updates.jenkins.io
       export JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       curl -fsSL ${PLUGIN_CLI_URL} -o /opt/jenkins-plugin-manager.jar  && echo "$(curl -fsSL "${PLUGIN_CLI_URL}.sha256")  /opt/jenkins-plugin-manager.jar" >/tmp/jpm_sha  && sha256sum -c --strict /tmp/jpm_sha  && rm -f /tmp/jpm_sha
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/014
-    creates: /var/lib/isoloom/dockerfile/014
-  - command: |
-      set -e
-      export GIT_LFS_VERSION=3.8.1
-      export TARGETARCH=amd64
-      export COMMIT_SHA=''
-      export user=jenkins
-      export group=jenkins
-      export uid=1000
-      export gid=1000
-      export http_port=8080
-      export agent_port=50000
-      export JENKINS_HOME=/var/jenkins_home
-      export REF=/usr/share/jenkins/ref
-      export PLUGIN_CLI_VERSION=2.15.0
-      export PLUGIN_CLI_URL=https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.15.0/jenkins-plugin-manager-2.15.0.jar
-      export PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      export LANG=C.UTF-8
-      export JENKINS_HOME=/var/jenkins_home
-      export JENKINS_SLAVE_AGENT_PORT=50000
-      export REF=/usr/share/jenkins/ref
-      export JENKINS_UC=https://updates.jenkins.io
-      export JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
-      export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
-      export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
-      export JAVA_HOME=/opt/java/openjdk
-      mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
-      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
-      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/opt/java/openjdk
-      for s in /javaruntime; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/015
     creates: /var/lib/isoloom/dockerfile/015
   - command: |
@@ -280,13 +295,14 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/usr/share/jenkins/jenkins.war
-      for s in /war/jenkins.war; do isoloom_copy_to "$s" "$dest"; done
+      dest=/opt/java/openjdk
+      for s in /javaruntime; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/016
     creates: /var/lib/isoloom/dockerfile/016
   - command: |
@@ -314,13 +330,14 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/usr/local/bin/jenkins-support
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins-support; do isoloom_copy_to "$s" "$dest"; done
+      dest=/usr/share/jenkins/jenkins.war
+      for s in /war/jenkins.war; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/017
     creates: /var/lib/isoloom/dockerfile/017
   - command: |
@@ -348,13 +365,14 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/usr/local/bin/jenkins.sh
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins.sh; do isoloom_copy_to "$s" "$dest"; done
+      dest=/usr/local/bin/jenkins-support
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins-support; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/018
     creates: /var/lib/isoloom/dockerfile/018
   - command: |
@@ -382,17 +400,31 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
-      dest=/bin/jenkins-plugin-cli
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins-plugin-cli.sh; do isoloom_copy_to "$s" "$dest"; done
+      dest=/usr/local/bin/jenkins.sh
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins.sh; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/019
     creates: /var/lib/isoloom/dockerfile/019
   - command: |
       set -e
+      export GIT_LFS_VERSION=3.8.1
+      export TARGETARCH=amd64
+      export COMMIT_SHA=''
+      export user=jenkins
+      export group=jenkins
+      export uid=1000
+      export gid=1000
+      export http_port=8080
+      export agent_port=50000
+      export JENKINS_HOME=/var/jenkins_home
+      export REF=/usr/share/jenkins/ref
+      export PLUGIN_CLI_VERSION=2.15.0
+      export PLUGIN_CLI_URL=https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.15.0/jenkins-plugin-manager-2.15.0.jar
       export PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export LANG=C.UTF-8
       export JENKINS_HOME=/var/jenkins_home
@@ -403,9 +435,14 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
-      export JENKINS_VERSION=2.580.2
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/bin/jenkins-plugin-cli
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins-plugin-cli.sh; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/020
     creates: /var/lib/isoloom/dockerfile/020
   - command: |
@@ -421,6 +458,25 @@ app:
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
       export JENKINS_VERSION=2.580.2
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p / && cd /
+      apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/021
+    creates: /var/lib/isoloom/dockerfile/021
+  - command: |
+      set -e
+      export PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export LANG=C.UTF-8
+      export JENKINS_HOME=/var/jenkins_home
+      export JENKINS_SLAVE_AGENT_PORT=50000
+      export REF=/usr/share/jenkins/ref
+      export JENKINS_UC=https://updates.jenkins.io
+      export JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
+      export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
+      export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
+      export JAVA_HOME=/opt/java/openjdk
+      export JENKINS_VERSION=2.580.2
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
@@ -428,8 +484,8 @@ app:
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/share/jenkins/ref/plugins.txt
       for s in /opt/isoloom/build/jenkins-fetched/plugins.txt; do isoloom_copy_to "$s" "$dest"; done
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/021
-    creates: /var/lib/isoloom/dockerfile/021
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/022
+    creates: /var/lib/isoloom/dockerfile/022
   - command: |
       set -e
       u=jenkins
@@ -445,11 +501,12 @@ app:
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
       export JENKINS_VERSION=2.580.2
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
       '
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/022
-    creates: /var/lib/isoloom/dockerfile/022
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/023
+    creates: /var/lib/isoloom/dockerfile/023
   - command: |
       set -e
       export PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -463,6 +520,7 @@ app:
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
       export JENKINS_VERSION=2.580.2
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
@@ -471,8 +529,8 @@ app:
       dest=/var/jenkins_home/casc.yaml
       for s in /opt/isoloom/build/jenkins-fetched/casc.yaml; do isoloom_copy_to "$s" "$dest"; done
       chown -R jenkins:jenkins "$dest"
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/023
-    creates: /var/lib/isoloom/dockerfile/023
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/024
+    creates: /var/lib/isoloom/dockerfile/024
   - command: |
       set -e
       keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom)'
@@ -488,15 +546,15 @@ app:
           rc-update del "$u" default || true
         done
       fi
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/024
-    creates: /var/lib/isoloom/dockerfile/024
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/025
+    creates: /var/lib/isoloom/dockerfile/025
   - command: |
       set -e
       mkdir -p /usr/local/lib/isoloom
       printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS9vcHQvamF2YS9vcGVuamRrL2JpbjovdXNyL2xvY2FsL3NiaW46L3Vzci9sb2NhbC9iaW46L3Vzci9zYmluOi91c3IvYmluOi9zYmluOi9iaW4KZXhwb3J0IExBTkc9Qy5VVEYtOApleHBvcnQgSkVOS0lOU19IT01FPS92YXIvamVua2luc19ob21lCmV4cG9ydCBKRU5LSU5TX1NMQVZFX0FHRU5UX1BPUlQ9NTAwMDAKZXhwb3J0IFJFRj0vdXNyL3NoYXJlL2plbmtpbnMvcmVmCmV4cG9ydCBKRU5LSU5TX1VDPWh0dHBzOi8vdXBkYXRlcy5qZW5raW5zLmlvCmV4cG9ydCBKRU5LSU5TX1VDX0VYUEVSSU1FTlRBTD1odHRwczovL3VwZGF0ZXMuamVua2lucy5pby9leHBlcmltZW50YWwKZXhwb3J0IEpFTktJTlNfSU5DUkVNRU5UQUxTX1JFUE9fTUlSUk9SPWh0dHBzOi8vcmVwby5qZW5raW5zLWNpLm9yZy9pbmNyZW1lbnRhbHMKZXhwb3J0IENPUFlfUkVGRVJFTkNFX0ZJTEVfTE9HPS92YXIvamVua2luc19ob21lL2NvcHlfcmVmZXJlbmNlX2ZpbGUubG9nCmV4cG9ydCBKQVZBX0hPTUU9L29wdC9qYXZhL29wZW5qZGsKZXhwb3J0IEpFTktJTlNfVkVSU0lPTj0yLjU4MC4yCmV4cG9ydCBDQVNDX0pFTktJTlNfQ09ORklHPS92YXIvamVua2luc19ob21lL2Nhc2MueWFtbApjZCAvCmV4ZWMgL3Vzci9iaW4vdGluaSAtLSAvdXNyL2xvY2FsL2Jpbi9qZW5raW5zLnNoCg== | base64 -d > /usr/local/lib/isoloom/app-start
       chmod 755 /usr/local/lib/isoloom/app-start
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/025
-    creates: /var/lib/isoloom/dockerfile/025
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/026
+    creates: /var/lib/isoloom/dockerfile/026
   - service:
       name: isoloom-app
       run:

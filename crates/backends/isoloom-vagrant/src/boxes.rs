@@ -129,6 +129,8 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         // End of life (2024): for labs about older systems.
         "centos-7" => h(b("bento/centos-7", None, Some("generic/centos7")), "generic/centos7", ROBOXES),
         "fedora-42" => no_hyperv(b("bento/fedora-42", None, None)),
+        // End of life (2019): for labs built on it (OWASP SKF's). Roboxes' box, every provider.
+        "alpine-3.7" => b("generic/alpine37", None, None),
         // The box Isoloom's own controller boots (roboxes, with libvirt and Hyper-V builds).
         "alpine-3.19" => b("generic/alpine319", None, None),
         // A supported Alpine: the official cloud image as a box (VirtualBox, libvirt and QEMU

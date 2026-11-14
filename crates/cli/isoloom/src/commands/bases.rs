@@ -59,7 +59,9 @@ pub(crate) fn run(b: Bases, profile: &spec::Profile, console: &mut Console) -> R
             None => official(&image, &scratch, &mut manifests),
         };
         let Some(origin) = origin else {
-            console.line(format_args!("✗ {image}: no published source Isoloom knows (give its machine `os` and `app.steps`)"))?;
+            console.line(format_args!(
+                "✗ {image}: no published source Isoloom knows (give its machine `os` and `app.steps`)"
+            ))?;
             failed += 1;
             continue;
         };
@@ -80,7 +82,10 @@ pub(crate) fn run(b: Bases, profile: &spec::Profile, console: &mut Console) -> R
         }
     }
     std::fs::remove_dir_all(&scratch).unwrap_or_default();
-    let text = serde_yaml_ng::to_string(&index).map_err(|e| CliError::Write { path: dir.join(INDEX), source: std::io::Error::other(e) })?;
+    let text = serde_yaml_ng::to_string(&index).map_err(|e| CliError::Write {
+        path: dir.join(INDEX),
+        source: std::io::Error::other(e),
+    })?;
     write(&dir.join(INDEX), &text)?;
     Ok(if failed == 0 { Verdict::Pass } else { Verdict::Fail })
 }
@@ -93,7 +98,18 @@ fn official(image: &str, scratch: &Path, manifests: &mut Option<PathBuf>) -> Opt
     }
     if manifests.is_none() {
         let to = scratch.join("official-images");
-        let ok = git(scratch, &["clone", "--quiet", "--depth", "1", "https://github.com/docker-library/official-images", to.to_str()?]).is_ok();
+        let ok = git(
+            scratch,
+            &[
+                "clone",
+                "--quiet",
+                "--depth",
+                "1",
+                "https://github.com/docker-library/official-images",
+                to.to_str()?,
+            ],
+        )
+        .is_ok();
         *manifests = ok.then_some(to);
     }
     let text = std::fs::read_to_string(manifests.as_ref()?.join("library").join(&name)).ok()?;
@@ -146,7 +162,10 @@ fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
 
 fn write(path: &Path, text: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| CliError::Write { path: parent.to_owned(), source })?;
+        std::fs::create_dir_all(parent).map_err(|source| CliError::Write {
+            path: parent.to_owned(),
+            source,
+        })?;
     }
     std::fs::write(path, text).map_err(|source| CliError::Write { path: path.to_owned(), source })
 }

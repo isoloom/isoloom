@@ -1,4 +1,4 @@
-os: debian@12
+os: ubuntu@22.04
 app:
   steps:
   - command: |
@@ -12,97 +12,42 @@ app:
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/001
     creates: /var/lib/isoloom/dockerfile/001
   - command: |
-      set -eu
-      # MariaDB 10.6, as the mariadb:10.6 image has it: Debian 12's own 10.11, else MariaDB's
-      # repository for that release (dnf on the RHEL family).
-      if command -v apt-get >/dev/null; then
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update
-        apt-get install -y --no-install-recommends ca-certificates curl
-        if [ "10.6" != 10.11 ]; then
-          curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup -o /tmp/mariadb_repo_setup
-          bash /tmp/mariadb_repo_setup --mariadb-server-version="mariadb-10.6" --skip-maxscale --skip-tools
-        fi
-        apt-get install -y --no-install-recommends mariadb-server mariadb-client
-        conf=/etc/mysql/mariadb.conf.d/99-isoloom.cnf
-      else
-        curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup -o /tmp/mariadb_repo_setup
-        bash /tmp/mariadb_repo_setup --mariadb-server-version="mariadb-10.6" --skip-maxscale --skip-tools
-        dnf install -y MariaDB-server MariaDB-client
-        conf=/etc/my.cnf.d/99-isoloom.cnf
+      set -e
+      d=/usr/local/lib/isoloom/shims
+      mkdir -p "$d"
+      cat > "$d/useradd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -u ] || [ "${prev:-}" = --uid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent passwd "$id" >/dev/null; then exec /usr/sbin/useradd -o "$@"; fi
+      exec /usr/sbin/useradd "$@"
+      SHIM
+      cat > "$d/groupadd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -g ] || [ "${prev:-}" = --gid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent group "$id" >/dev/null; then exec /usr/sbin/groupadd -o "$@"; fi
+      exec /usr/sbin/groupadd "$@"
+      SHIM
+      chmod 755 "$d/useradd" "$d/groupadd"
+      if command -v apk >/dev/null; then
+        for tool in adduser addgroup; do
+          cat > "$d/$tool" <<SHIM
+      #!/bin/sh
+      flag=-u; [ $tool = addgroup ] && flag=-g
+      db=passwd; [ $tool = addgroup ] && db=group
+      out=; skip=
+      for a; do
+        if [ -n "\$skip" ]; then skip=; getent "\$db" "\$a" >/dev/null || out="\$out \$flag \$a"; continue; fi
+        if [ "\$a" = "\$flag" ]; then skip=1; continue; fi
+        out="\$out \$a"
+      done
+      exec /bin/busybox $tool \$out
+      SHIM
+          chmod 755 "$d/$tool"
+        done
       fi
-      # The image listens on every address and keeps no host cache.
-      printf '[mysqld]\nbind-address = 0.0.0.0\nskip-name-resolve\n' > "$conf"
-      ln -sf "$(command -v mariadbd || command -v mysqld)" /usr/local/bin/mysqld 2>/dev/null || true
-      ln -sf /usr/local/bin/mysqld /usr/local/bin/mariadbd 2>/dev/null || true
-      mkdir -p /docker-entrypoint-initdb.d /run/mysqld
-      chown mysql:mysql /run/mysqld
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - command: |
-      set -eu
-      # The mysql and mariadb images' entrypoint: the first start creates the data folder, the root
-      # password, the database and the user the MARIADB_*/MYSQL_* environment names, and runs
-      # /docker-entrypoint-initdb.d (*.sh, *.sql, *.sql.gz) once; every start then runs the server.
-      cat > /usr/local/bin/docker-entrypoint.sh <<'SHIM'
-      #!/bin/bash
-      set -eo pipefail
-      v() { local m="MARIADB_$1" s="MYSQL_$1"; printf '%s' "${!m:-${!s:-}}"; }
-      server=${1:-mysqld}
-      case $server in -*) set -- mysqld "$@"; server=mysqld ;; esac
-      case $server in mysqld|mariadbd) ;; *) exec "$@" ;; esac
-      datadir=/var/lib/mysql
-      mkdir -p "$datadir" /run/mysqld
-      chown -R mysql:mysql "$datadir" /run/mysqld
-      if [ ! -d "$datadir/mysql" ]; then
-        if command -v mariadb-install-db >/dev/null; then
-          mariadb-install-db --user=mysql --datadir="$datadir" --skip-test-db --auth-root-authentication-method=normal >/dev/null
-        elif [ -x /usr/local/mysql/scripts/mysql_install_db ] && ! mysqld --help --verbose 2>/dev/null | grep -q -- '--initialize-insecure'; then
-          /usr/local/mysql/scripts/mysql_install_db --user=mysql --basedir=/usr/local/mysql --datadir="$datadir" >/dev/null
-        else
-          mysqld --initialize-insecure --user=mysql --datadir="$datadir"
-        fi
-        "$@" --user=mysql --skip-networking --socket=/run/mysqld/init.sock &
-        pid=$!
-        for _ in $(seq 60); do mysqladmin --socket=/run/mysqld/init.sock ping >/dev/null 2>&1 && break; sleep 1; done
-        sql() { mysql --protocol=socket --socket=/run/mysqld/init.sock -uroot "$@"; }
-        root=$(v ROOT_PASSWORD)
-        if [ -z "$root" ] && [ -n "$(v RANDOM_ROOT_PASSWORD)" ]; then root=$(head -c 24 /dev/urandom | base64); echo "GENERATED ROOT PASSWORD: $root"; fi
-        db=$(v DATABASE) user=$(v USER) pass=$(v PASSWORD)
-        host=$(v ROOT_HOST); host=${host:-%}
-        {
-          echo "SET @@SESSION.SQL_LOG_BIN=0;"
-          echo "DELETE FROM mysql.user WHERE user='' ;"
-          if [ -n "$root" ]; then
-            echo "CREATE USER IF NOT EXISTS 'root'@'$host' IDENTIFIED BY '$root'; GRANT ALL ON *.* TO 'root'@'$host' WITH GRANT OPTION;"
-            echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root';"
-          else
-            echo "CREATE USER IF NOT EXISTS 'root'@'$host'; GRANT ALL ON *.* TO 'root'@'$host' WITH GRANT OPTION;"
-          fi
-          [ -z "$db" ] || echo "CREATE DATABASE IF NOT EXISTS \`$db\`;"
-          if [ -n "$user" ]; then
-            echo "CREATE USER IF NOT EXISTS '$user'@'%' IDENTIFIED BY '$pass';"
-            [ -z "$db" ] || echo "GRANT ALL ON \`$db\`.* TO '$user'@'%';"
-          fi
-          echo "FLUSH PRIVILEGES;"
-        } | sql
-        auth=(); [ -z "$root" ] || auth=(-p"$root")
-        for f in /docker-entrypoint-initdb.d/*; do
-          case $f in
-            *.sh) . "$f" ;;
-            *.sql) sql "${auth[@]}" ${db:+"$db"} < "$f" ;;
-            *.sql.gz) gunzip -c "$f" | sql "${auth[@]}" ${db:+"$db"} ;;
-            *.sql.xz) xzcat "$f" | sql "${auth[@]}" ${db:+"$db"} ;;
-          esac
-        done
-        mysqladmin --socket=/run/mysqld/init.sock -uroot "${auth[@]}" shutdown
-        wait "$pid" || true
-      fi
-      exec "$@" --user=mysql
-      SHIM
-      chmod 755 /usr/local/bin/docker-entrypoint.sh
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
-    creates: /var/lib/isoloom/dockerfile/003
+  - catalogue: mariadb@10.6.3 on ubuntu@22.04
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -110,6 +55,7 @@ app:
       export MYSQL_DATABASE=a7db
       export MYSQL_USER=user
       export MYSQL_PASSWORD=pass
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
       isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
@@ -117,11 +63,11 @@ app:
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/docker-entrypoint-initdb.d
       for s in /opt/isoloom/build/mariadb-initdb/tables.sql; do isoloom_copy_into "$s" "$dest"; done
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
-    creates: /var/lib/isoloom/dockerfile/004
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
+    creates: /var/lib/isoloom/dockerfile/003
   - command: |
       set -e
-      keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom)'
+      keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom|mariadb)'
       if command -v systemctl >/dev/null; then
         systemctl list-unit-files --state=enabled --type=service --no-legend | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-after
         for u in $(comm -13 /var/lib/isoloom/dockerfile/units-before /var/lib/isoloom/dockerfile/units-after | grep -Ev "$keep" || true); do
@@ -134,17 +80,5 @@ app:
           rc-update del "$u" default || true
         done
       fi
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
-    creates: /var/lib/isoloom/dockerfile/005
-  - command: |
-      set -e
-      mkdir -p /usr/local/lib/isoloom
-      printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS91c3IvbG9jYWwvc2JpbjovdXNyL2xvY2FsL2JpbjovdXNyL3NiaW46L3Vzci9iaW46L3NiaW46L2JpbgpleHBvcnQgTVlTUUxfUk9PVF9QQVNTV09SRD1yb290CmV4cG9ydCBNWVNRTF9EQVRBQkFTRT1hN2RiCmV4cG9ydCBNWVNRTF9VU0VSPXVzZXIKZXhwb3J0IE1ZU1FMX1BBU1NXT1JEPXBhc3MKY2QgLwpleGVjIGRvY2tlci1lbnRyeXBvaW50LnNoIG1hcmlhZGJkCg== | base64 -d > /usr/local/lib/isoloom/app-start
-      chmod 755 /usr/local/lib/isoloom/app-start
-      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/006
-    creates: /var/lib/isoloom/dockerfile/006
-  - service:
-      name: isoloom-app
-      run:
-      - /usr/local/lib/isoloom/app-start
-      cwd: /
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
+    creates: /var/lib/isoloom/dockerfile/004

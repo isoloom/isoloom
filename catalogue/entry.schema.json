@@ -51,6 +51,9 @@
         "alpine@3.24": {
           "type": "string"
         },
+        "alpine@3.7": {
+          "type": "string"
+        },
         "centos": {
           "type": "string"
         },
@@ -333,6 +336,7 @@
         "alma",
         "alma@9",
         "alpine",
+        "alpine@3.7",
         "alpine@3.19",
         "alpine@3.24",
         "kali",
