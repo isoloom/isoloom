@@ -5,28 +5,30 @@
 use std::fmt;
 use std::str::FromStr;
 
+use crate::project_path::{NotPlain, plain};
+
 /// Why a path isn't a project-relative one.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum PathError {
-    /// An empty path.
-    #[error("a path can't be empty")]
-    Empty,
-    /// A NUL character in it.
-    #[error("a path holds no NUL character: {0}")]
-    Nul(String),
-    /// A backslash in it (paths are `/`-separated on every host).
-    #[error("`{0}` has a backslash: paths are `/`-separated")]
-    Backslash(String),
-    /// A `/` or a drive first.
-    #[error("`{0}` is absolute: a path is relative to the project's folder")]
-    Absolute(String),
-    /// A `..` segment.
-    #[error("`{0}` climbs out of its folder with `..`")]
-    Parent(String),
+    /// It isn't plain ([`crate::project_path::plain`], the one rule of a path in the project).
+    #[error("`{path}` isn't a path inside the project folder: {why}")]
+    NotPlain {
+        /// The path as written.
+        path: String,
+        /// The rule it breaks.
+        why: NotPlain,
+    },
+    /// A part of it is `.`.
+    #[error("`{0}` has a `.` part: name the file by its one spelling")]
+    CurrentDir(String),
 }
 
-/// A file or folder relative to the project's folder: `/`-separated, never absolute, never
-/// leaving its folder.
+/// A file or folder relative to the project's folder: a plain path
+/// ([`crate::project_path::plain`]: relative, `/`-separated, names only), and with no `.` part
+/// either. A `RelPath` names one entry (a file a drawing or a starter writes, a generated file's
+/// path) by one spelling, so `a` and `./a` can't be two names of one file; a path the spec gives
+/// to read from takes `.` (the project folder itself).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RelPath(String);
 
@@ -35,26 +37,17 @@ impl RelPath {
     ///
     /// # Errors
     ///
-    /// A [`PathError`] naming the rule it breaks.
+    /// [`PathError::NotPlain`] with the rule of [`plain`] it breaks, else
+    /// [`PathError::CurrentDir`] for a `.` part.
     pub fn parse(path: &str) -> Result<RelPath, PathError> {
-        let owned = || path.to_owned();
-        if path.is_empty() {
-            return Err(PathError::Empty);
+        plain(path).map_err(|why| PathError::NotPlain {
+            path: path.escape_default().to_string(),
+            why,
+        })?;
+        if path.split('/').any(|part| part == ".") {
+            return Err(PathError::CurrentDir(path.to_owned()));
         }
-        if path.contains('\0') {
-            return Err(PathError::Nul(path.escape_default().to_string()));
-        }
-        if path.contains('\\') {
-            return Err(PathError::Backslash(owned()));
-        }
-        let drive = matches!(path.as_bytes(), [letter, b':', ..] if letter.is_ascii_alphabetic());
-        if path.starts_with('/') || drive {
-            return Err(PathError::Absolute(owned()));
-        }
-        if path.split('/').any(|segment| segment == "..") {
-            return Err(PathError::Parent(owned()));
-        }
-        Ok(RelPath(owned()))
+        Ok(RelPath(path.to_owned()))
     }
 
     /// The path as written.
@@ -83,14 +76,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_project_path_is_relative_slash_separated_and_stays_in_its_folder() {
+    fn a_project_path_is_plain_and_names_its_entry_by_one_spelling() {
         assert_eq!(RelPath::parse("a/b.sh").map(|p| p.to_string()), Ok("a/b.sh".to_owned()));
-        assert_eq!(RelPath::parse(""), Err(PathError::Empty));
-        assert!(matches!(RelPath::parse("a\\b"), Err(PathError::Backslash(_))));
-        assert!(matches!(RelPath::parse("/etc"), Err(PathError::Absolute(_))));
-        assert!(matches!(RelPath::parse("C:x"), Err(PathError::Absolute(_))));
-        assert!(matches!(RelPath::parse("a/../../b"), Err(PathError::Parent(_))));
-        assert!(matches!(RelPath::parse("a\0"), Err(PathError::Nul(_))));
-        assert!(RelPath::parse("a..b/c").is_ok(), "only a whole `..` segment climbs");
+        let not_plain = |p: &str| match RelPath::parse(p) {
+            Err(PathError::NotPlain { why, .. }) => Some(why),
+            _ => None,
+        };
+        assert_eq!(not_plain(""), Some(NotPlain::Empty));
+        assert_eq!(not_plain("a\\b"), Some(NotPlain::Backslash));
+        assert_eq!(not_plain("/etc"), Some(NotPlain::Absolute));
+        assert_eq!(not_plain("C:x"), Some(NotPlain::Drive));
+        assert_eq!(not_plain("a/../../b"), Some(NotPlain::Parent));
+        assert_eq!(not_plain("a\0"), Some(NotPlain::Control));
+        assert!(matches!(RelPath::parse("./a"), Err(PathError::CurrentDir(_))));
+        assert!(matches!(RelPath::parse("a/./b"), Err(PathError::CurrentDir(_))));
+        assert!(RelPath::parse("a..b/c").is_ok(), "only a whole `..` part goes up");
     }
 }

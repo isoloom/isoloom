@@ -15,24 +15,25 @@ use crate::{Error, Result};
 /// The JSON Schema form of the rules a relative path follows (`[^\u0000]+` checks the rest).
 const RELATIVE: &str = "^(?![/\\\\])(?![A-Za-z]:)(?![\\s\\S]*\\\\)(?!(?:[\\s\\S]*/)?\\.\\.(?:/|$))";
 
-/// Checks the rules of a relative path on `text` (placeholders already stood in for): `shown` is
-/// what the error shows.
+/// Checks the rules of a relative path on `text` (placeholders already stood in for): the
+/// project's one rule of a plain path (`isoloom_spec::project_path::plain`); `shown` is what the
+/// error shows.
 fn check_relative(text: &str, shown: &str) -> Result<()> {
-    let refused = |make: fn(String) -> Error| Err(make(shown.to_owned()));
-    if text.is_empty() {
-        return Err(Error::EmptyPath);
+    use isoloom_spec::project_path::{NotPlain, plain};
+    let path = || shown.to_owned();
+    match plain(text) {
+        Ok(()) => Ok(()),
+        Err(NotPlain::Empty) => Err(Error::EmptyPath),
+        Err(NotPlain::Backslash) => Err(Error::Backslash { path: path() }),
+        Err(NotPlain::Parent) => Err(Error::ParentPath { path: path() }),
+        Err(NotPlain::Control) => Err(Error::Pattern {
+            what: "path",
+            value: shown.escape_default().to_string(),
+            rule: "a path holds no control character",
+        }),
+        // A root or a drive first (and any rule the shared one adds later reads as leaving).
+        Err(_) => Err(Error::AbsolutePath { path: path() }),
     }
-    if text.contains('\\') {
-        return refused(|path| Error::Backslash { path });
-    }
-    let drive = matches!(text.as_bytes(), [letter, b':', ..] if letter.is_ascii_alphabetic());
-    if text.starts_with('/') || drive {
-        return refused(|path| Error::AbsolutePath { path });
-    }
-    if text.split('/').any(|segment| segment == "..") {
-        return refused(|path| Error::ParentPath { path });
-    }
-    Ok(())
 }
 
 /// A file or folder relative to the manifest's folder (or, where a field says so, to the run's
@@ -45,17 +46,10 @@ impl RelPath {
     ///
     /// # Errors
     ///
-    /// [`Error::Pattern`] for a NUL character, [`Error::EmptyPath`],
+    /// [`Error::Pattern`] for a control character, [`Error::EmptyPath`],
     /// [`Error::Backslash`], [`Error::AbsolutePath`] (a `/` or a drive first) and
     /// [`Error::ParentPath`] (a `..` segment).
     pub fn parse(path: &str) -> Result<RelPath> {
-        if path.contains('\0') {
-            return Err(Error::Pattern {
-                what: "path",
-                value: path.escape_default().to_string(),
-                rule: "a path holds no NUL character",
-            });
-        }
         check_relative(path, path)?;
         Ok(RelPath(path.to_owned()))
     }
