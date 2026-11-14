@@ -224,7 +224,6 @@ name = "isoloom-catalogue"
 version = "3.0.0"
 dependencies = [
  "indexmap",
- "isoloom-manifest",
  "isoloom-spec",
  "regex",
  "schemars",
@@ -238,7 +237,6 @@ dependencies = [
 name = "isoloom-fuzz"
 version = "0.0.0"
 dependencies = [
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -250,24 +248,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "isoloom-manifest"
-version = "3.0.0"
-dependencies = [
- "isoloom-spec",
- "schemars",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "thiserror",
-]
-
-[[package]]
 name = "isoloom-plan"
 version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-catalogue",
- "isoloom-manifest",
  "isoloom-spec",
  "serde",
  "serde_json",
@@ -321,7 +306,6 @@ version = "3.0.0"
 dependencies = [
  "indexmap",
  "isoloom-catalogue",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-spec",
  "serde",

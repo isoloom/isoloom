@@ -168,8 +168,8 @@ jobs:
           fail: true
           jobSummary: true
 
-  # The supported library API (docs/reference/policies.md: isoloom-spec, isoloom-targets and
-  # isoloom-manifest), compared by cargo-semver-checks with each crate's latest version on
+  # The supported library API (docs/reference/policies.md: isoloom-spec and isoloom-targets),
+  # compared by cargo-semver-checks with each crate's latest version on
   # crates.io. The other published crates are building blocks whose API is not a promise. The release type comes from the workspace version: when it is still the
   # published one, the changes are checked as a patch, so a breaking change fails until the version
   # is raised on purpose. One exception, decided for the release after 1.x: while crates.io's
@@ -206,7 +206,7 @@ jobs:
         run: |
           set -euo pipefail
           packages=()
-          for crate in isoloom-spec isoloom-targets isoloom-manifest; do
+          for crate in isoloom-spec isoloom-targets; do
             packages+=(-p "$crate")
           done
           # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
@@ -323,9 +323,10 @@ jobs:
           for d in examples/*/.isoloom/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
             validate "$d"
           done
-          # cloud-services runs the lab's own module, which its run manifest copies (`from`).
+          # cloud-services applies the lab's own module (its spec's `cloud.terraform`).
           for d in examples/*/.isoloom/cloud-services; do
-            validate "$d/$(jq -r '.lifecycle.up[] | select(.action == "terraform.copy_module") | .with.from' "$d/run.json")"
+            lab="${d%/.isoloom/cloud-services}"
+            validate "$lab/$(sed -n 's/^  terraform: *//p' "$lab/isoloom.yml" | head -n 1)"
           done
 
   # The cloud and server modules' logic proven without a cloud (`cargo xtask tf-test`): every

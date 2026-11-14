@@ -677,7 +677,6 @@ dependencies = [
  "insta",
  "isoloom-catalogue",
  "isoloom-import",
- "isoloom-manifest",
  "isoloom-spec",
  "isoloom-targets",
  "isoloom-test-support",
@@ -694,7 +693,6 @@ version = "3.0.0"
 dependencies = [
  "insta",
  "isoloom-catalogue",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -710,7 +708,6 @@ version = "3.0.0"
 dependencies = [
  "indexmap",
  "insta",
- "isoloom-manifest",
  "isoloom-spec",
  "jsonschema",
  "proptest",
@@ -743,7 +740,6 @@ version = "3.0.0"
 dependencies = [
  "hcl-rs",
  "indexmap",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-spec",
  "proptest",
@@ -759,7 +755,6 @@ version = "3.0.0"
 dependencies = [
  "indexmap",
  "insta",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
@@ -771,27 +766,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "isoloom-manifest"
-version = "3.0.0"
-dependencies = [
- "isoloom-spec",
- "jsonschema",
- "proptest",
- "schemars",
- "serde",
- "serde_json",
- "serde_path_to_error",
- "thiserror",
-]
-
-[[package]]
 name = "isoloom-plan"
 version = "3.0.0"
 dependencies = [
  "indexmap",
  "insta",
  "isoloom-catalogue",
- "isoloom-manifest",
  "isoloom-spec",
  "proptest",
  "serde",
@@ -892,7 +872,6 @@ dependencies = [
  "indexmap",
  "insta",
  "isoloom-catalogue",
- "isoloom-manifest",
  "isoloom-plan",
  "isoloom-spec",
  "isoloom-targets",

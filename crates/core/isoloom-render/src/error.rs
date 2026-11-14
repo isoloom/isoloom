@@ -34,7 +34,7 @@ pub enum Error {
     Internal {
         /// The target being rendered.
         target: Target,
-        /// What failed (`the run manifest refused a value of this backend`).
+        /// What failed (`the module couldn't be written`).
         what: String,
         /// The error it failed with.
         #[source]

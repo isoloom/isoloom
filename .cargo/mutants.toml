@@ -7,10 +7,7 @@ exclude_re = [
     # A machine's address is its block's network part with the octet in the last byte, which the
     # mask leaves zero: `|` and `^` give the same address for every block and octet.
     'isoloom-plan/src/addressing\.rs:\d+:\d+: replace \| with \^ in address$',
-    # A non-empty list's schema is inlined (`inline_schema` is true), so its name is never written
-    # into the schema: any name gives the same schema.
-    'isoloom-manifest/src/list\.rs:\d+:\d+: replace <impl JsonSchema for NonEmpty<T>>::schema_name ',
-    # A file mode's and the spec version's schemas are inlined too: their names are never written.
+    # A file mode's and the spec version's schemas are inlined: their names are never written.
     'isoloom-spec/src/syntax/(files|names)\.rs:\d+:\d+: replace <impl JsonSchema for (Mode|Version)>::schema_name ',
     # The catalogue's names, versions and patterns are inlined the same way.
     'isoloom-catalogue/src/(names|version|entry/setting)\.rs:\d+:\d+: replace <impl JsonSchema for (Name<K>|Version|Pattern)>::schema_name ',

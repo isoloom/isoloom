@@ -108,7 +108,7 @@ mod tests {
         ));
         let failed = GenerateError::Internal {
             target: Target::Vagrant,
-            what: "the run manifest refused a value of this backend".to_owned(),
+            what: "the module couldn't be written".to_owned(),
             source: Arc::new(std::io::Error::other("bad name")),
         };
         let stopped = refusals(vec![refused, failed]);
@@ -125,7 +125,7 @@ mod tests {
         if let Err(e) = &stopped {
             let rendered = crate::diagnostic::render(e);
             assert!(
-                rendered.contains("error: vagrant: the run manifest refused a value of this backend\n  caused by: bad name"),
+                rendered.contains("error: vagrant: the module couldn't be written\n  caused by: bad name"),
                 "{rendered}"
             );
         }
@@ -135,7 +135,7 @@ mod tests {
     fn every_failed_backend_is_reported() {
         let failed = |target| GenerateError::Internal {
             target,
-            what: "the run manifest refused a value of this backend".to_owned(),
+            what: "the module couldn't be written".to_owned(),
             source: Arc::new(std::io::Error::other("bad name")),
         };
         let stopped = refusals(vec![failed(Target::Vagrant), failed(Target::CloudDocker)]);
@@ -144,7 +144,7 @@ mod tests {
         for target in ["vagrant", "cloud-docker"] {
             assert!(
                 rendered.contains(&format!(
-                    "error: {target}: the run manifest refused a value of this backend\n  caused by: bad name"
+                    "error: {target}: the module couldn't be written\n  caused by: bad name"
                 )),
                 "{rendered}"
             );

@@ -164,7 +164,7 @@ mod tests {
     fn target_folders_are_counted_once_each() {
         let files = [
             GeneratedFile::new(".isoloom/docker/compose.yaml", ""),
-            GeneratedFile::new(".isoloom/docker/run.json", ""),
+            GeneratedFile::new(".isoloom/docker/configure/run.sh", ""),
             GeneratedFile::new(".isoloom/vagrant/Vagrantfile", ""),
             GeneratedFile::new(".isoloom/resolved.json", ""),
         ];

@@ -173,7 +173,7 @@ mod tests {
     fn only_a_refusal_of_the_lab_is_a_refusal() {
         let failed = GenerateError::from(isoloom_render::Error::internal(
             Target::Vagrant,
-            "the run manifest refused a value of this backend",
+            "the module couldn't be written",
             std::io::Error::other("bad"),
         ));
         assert!(matches!(failed, GenerateError::Internal { target: Target::Vagrant, .. }));
