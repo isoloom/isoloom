@@ -80,3 +80,10 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
     creates: /var/lib/isoloom/dockerfile/004
+  - command: |
+      set -e
+      mkdir -p /etc/isoloom
+      printf %s UEFUSD0vdXNyL2xvY2FsL3NiaW46L3Vzci9sb2NhbC9iaW46L3Vzci9zYmluOi91c3IvYmluOi9zYmluOi9iaW4KTVlTUUxfUk9PVF9QQVNTV09SRD10cmFkaW5nX3BsYXRmb3JtCk1ZU1FMX0RBVEFCQVNFPWRhdGFiYXNlCg== | base64 -d > /etc/isoloom/image.env
+      chmod 644 /etc/isoloom/image.env
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
+    creates: /var/lib/isoloom/dockerfile/005

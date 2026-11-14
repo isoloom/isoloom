@@ -153,6 +153,7 @@ pub fn of(image: &str) -> Result<Base, NoEntry> {
         "mariadb" => Ok(Base::entry("mariadb", &tag, MYSQL_UNSET, &[("MARIADB_", "MYSQL_")])),
         "mysql" | "mysql/mysql-server" => Ok(Base::entry("mysql", &tag, MYSQL_UNSET, &[])),
         "postgres" => Ok(Base::entry("postgres", &tag, POSTGRES_UNSET, &[])),
+        "mongo" => Ok(Base::entry("mongodb", &tag, &[], &[])),
         "python" => Ok(Base::entry("python", &tag, &[], &[])),
         "node" => Ok(Base::entry("node", &tag, &[], &[])),
         // The image's `USER` and the folders its entrypoints read: a lab's own entrypoint runs.
@@ -306,6 +307,7 @@ mod tests {
         assert_eq!(call("gitea/gitea:1.22@sha256:538658de"), Some(("gitea", Some("1.22".to_owned()))));
         assert_eq!(of("golang:1.22-bookworm").unwrap().workdir.as_deref(), Some("/go"));
         assert_eq!(call("postgres:15.4-alpine"), Some(("postgres", Some("15.4".to_owned()))));
+        assert_eq!(call("mongo:4.0.4"), Some(("mongodb", Some("4.0.4".to_owned()))));
         assert_eq!(call("debian:12"), None);
     }
 
