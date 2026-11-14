@@ -82,6 +82,10 @@ pub(crate) enum OwnBoot {
 
 /// Everything Isoloom knows of one provider.
 #[derive(Debug, Clone, Copy)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "a provider's row of the table: each switch is a yes or no Isoloom knows of it, read on its own"
+)]
 pub(crate) struct Profile {
     /// The name Vagrant knows it by (`vagrant up --provider <id>`, `config.vm.provider`).
     pub(crate) id: &'static str,

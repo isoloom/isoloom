@@ -51,8 +51,7 @@ impl Turn {
     /// refused where a generated file would be ([`writable`]: through a symbolic link), and taken
     /// only when the generation writes files.
     pub(crate) fn take(dir: &Path) -> Result<Turn> {
-        let file = GeneratedFile::new(TURN, String::new());
-        writable(dir, [&file])?;
+        writable(dir, [&GeneratedFile::new(TURN, String::new())])?;
         let path = dir.join(TURN);
         let parent = path.parent().unwrap_or(dir);
         std::fs::create_dir_all(parent).map_err(CliError::writing(parent))?;

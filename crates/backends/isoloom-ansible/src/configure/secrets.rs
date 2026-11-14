@@ -70,9 +70,9 @@ fn lookup(env: &Environment, f: &SecretFile) -> (String, Value) {
         ValueSource::Secret(name) => env.spec().secrets.get(name).cloned().unwrap_or(SecretSource::Env { env: name.clone() }),
     };
     match source {
-        SecretSource::Env { env } | SecretSource::Input { input: env } => (
+        SecretSource::Env { env: var } | SecretSource::Input { input: var } => (
             "{{ lookup('ansible.builtin.env', isoloom_secret_env) }}".to_owned(),
-            json!({ "isoloom_secret_env": env }),
+            json!({ "isoloom_secret_env": var }),
         ),
         SecretSource::File { file } => file_lookup(&file),
         SecretSource::Vault { vault } => {
@@ -81,7 +81,7 @@ fn lookup(env: &Environment, f: &SecretFile) -> (String, Value) {
         }
         SecretSource::Sops { sops } => {
             let (file, key) = sops.split_once('#').unwrap_or((sops.as_str(), ""));
-            let extract: String = key.split('.').map(|k| format!("[\"{k}\"]")).collect();
+            let extract = key.split('.').map(|k| format!("[\"{k}\"]")).collect::<Vec<_>>().concat();
             // The file is the project's when relative, as the runner reads it.
             let file = if file.starts_with('/') {
                 quote(file)

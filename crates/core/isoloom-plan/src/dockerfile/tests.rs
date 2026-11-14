@@ -122,7 +122,7 @@ fn the_translation_is_an_explicit_vm_form_a_spec_can_hold() {
     // As a machine's explicit VM form, it is a valid spec.
     let spec = format!(
         "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web:\n    networks: {{ lan: 10 }}\n{}",
-        t.yaml.lines().map(|l| format!("    {l}\n")).collect::<String>()
+        t.yaml.lines().map(|l| format!("    {l}\n")).collect::<Vec<_>>().concat()
     );
     assert!(isoloom_spec::parse(&spec).is_ok(), "{spec}");
     // The image's command is the VM's service, as the image's user and in its folder.

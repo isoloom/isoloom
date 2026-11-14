@@ -48,7 +48,7 @@ pub(crate) fn project(env: &Environment, base: &str) -> crate::Result<Vec<Genera
         .into_iter()
         .filter_map(|h| Some((h.name.to_owned(), Configured::of(env, h.name)?)))
         .collect();
-    let project = task::jinja(&project_var(base));
+    let project = task::jinja(project_var(base));
     let delivered: Vec<Value> = hosts(env).into_iter().filter_map(|h| secrets::play(env, h.name, &project)).collect();
     if configured.is_empty() && delivered.is_empty() {
         return Ok(Vec::new());
