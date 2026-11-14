@@ -25,7 +25,7 @@ fn fail(name: &str, reason: &str) -> CheckLine {
 }
 
 /// A server on 127.0.0.1, read as its port. Dropping it stops its listener and joins every
-/// thread it started, so none outlives the test that started it (Clean Code ch.13).
+/// thread it started, so none outlives the test that started it.
 struct Server {
     port: u16,
     stop: Arc<AtomicBool>,
