@@ -56,7 +56,7 @@ fn the_ports_report_says_from_where_each_service_answers() -> Outcome {
 #[test]
 fn the_wiring_report_names_the_bridges_their_labels_and_gateways() -> Outcome {
     let wiring = report("wiring", &snapshot("segmented")?, false)?;
-    assert!(wiring.contains("isoloom-segmented-front"), "{wiring}");
+    assert!(wiring.contains("isoloom-segmented-<key>-front"), "{wiring}");
     assert!(wiring.contains("net.isoloom.com/front=member"), "{wiring}");
     assert!(wiring.contains("10.61.10.254"), "{wiring}");
     Ok(())

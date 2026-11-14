@@ -447,6 +447,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -769,7 +778,7 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "windows-hello_"
+    v.default_prefix = "windows-hello-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "web01" do |m|
@@ -784,17 +793,17 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "192.168.57.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-windows-hello-lab", libvirt__network_name: "isoloom-windows-hello-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "192.168.57.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-windows-hello-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-windows-hello-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web01/web", 8082), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
-      v.name = "windows-hello - web01"
+      v.name = "windows-hello-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "windows-hello - web01"
+      v.vmx["displayName"] = "windows-hello-#{ISOLOOM_KEY} - web01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "3072"
       if (console = IsoloomConsole.of("web01"))
@@ -805,7 +814,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "windows-hello - web01"
+      v.name = "windows-hello-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 3072
@@ -858,7 +867,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "windows-hello-web01"
+      v.guest_name = "windows-hello-#{ISOLOOM_KEY}-web01"
       v.guest_guestos = "windows2019srv-64"
       v.guest_numvcpus = 2
       v.guest_memsize = 3072
@@ -874,17 +883,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "StefanScherer/windows_2019"
       o.vm.box_version = ">= 0"
-      v.vmname = "windows-hello-web01"
+      v.vmname = "windows-hello-#{ISOLOOM_KEY}-web01"
       v.cpus = 2
       v.memory = 3072
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-windows-hello-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-windows-hello-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-windows-hello-lab", "0215E07FC5EF"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-windows-hello-#{ISOLOOM_KEY}-lab", "0215E07FC5EF"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -906,7 +915,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web01/web", 8082)]]); IsoloomHyperV.prune(["isoloom-windows-hello-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web01/web", 8082)]]); IsoloomHyperV.prune(["isoloom-windows-hello-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('192.168.57.10 web01')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
@@ -917,20 +926,20 @@ Vagrant.configure("2") do |config|
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "192.168.57.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-windows-hello-lab", libvirt__network_name: "isoloom-windows-hello-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "192.168.57.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-windows-hello-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-windows-hello-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "windows-hello - isoloom-controller"
+      v.name = "windows-hello-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "windows-hello - isoloom-controller"
+      v.vmx["displayName"] = "windows-hello-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "windows-hello - isoloom-controller"
+      v.name = "windows-hello-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -960,7 +969,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "windows-hello-isoloom-controller"
+      v.guest_name = "windows-hello-#{ISOLOOM_KEY}-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -972,7 +981,7 @@ Vagrant.configure("2") do |config|
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "windows-hello-isoloom-controller"
+      v.vmname = "windows-hello-#{ISOLOOM_KEY}-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -981,10 +990,10 @@ Vagrant.configure("2") do |config|
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-windows-hello-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-windows-hello-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-windows-hello-lab", "0215ACA47F21"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-windows-hello-#{ISOLOOM_KEY}-lab", "0215ACA47F21"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1042,7 +1051,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-windows-hello-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-windows-hello-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '192.168.57.10 web01' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"

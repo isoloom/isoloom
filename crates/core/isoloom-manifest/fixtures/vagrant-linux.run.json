@@ -403,8 +403,7 @@
     {
       "name": "lab",
       "cidr": "10.61.0.0/24",
-      "internet": true,
-      "native": "isoloom-web-vm-lab"
+      "internet": true
     }
   ],
   "machines": [
@@ -422,16 +421,8 @@
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "web-vm - web",
-          "vmware_desktop": "web-vm - web",
-          "hyperv": "web-vm-web",
-          "parallels": "web-vm - web",
-          "libvirt": "web-vm_web",
-          "utm": "web-vm - web",
-          "vmware_esxi": "web-vm-web"
-        },
-        "boot_digest": "sha256:dbb3d276503993ba8001af816624d7fafd5e2c83cbd060155282b90d17e4d205",
+        "vm_names": {},
+        "boot_digest": "sha256:6446cc285795e130ed4fb0b47b89dbffe0b270400ad807aac3d54c1a46721f40",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -553,16 +544,8 @@
       },
       "native": {
         "vagrant": "isoloom-controller",
-        "vm_names": {
-          "virtualbox": "web-vm - isoloom-controller",
-          "vmware_desktop": "web-vm - isoloom-controller",
-          "hyperv": "web-vm-isoloom-controller",
-          "parallels": "web-vm - isoloom-controller",
-          "libvirt": "web-vm_isoloom-controller",
-          "utm": "web-vm - isoloom-controller",
-          "vmware_esxi": "web-vm-isoloom-controller"
-        },
-        "boot_digest": "sha256:4cd6da6eed84f1c26b562bb05e16e43ef6020264b98e900db622f1ec57c00816",
+        "vm_names": {},
+        "boot_digest": "sha256:6ad22eb9b3187835b499ed8741ff7bf0a5a0b6f2d44c3d03a8ce46e08f75d1cb",
         "boxes": [
           {
             "provider": "virtualbox",

@@ -69,7 +69,7 @@ pub use environment::{
 pub use error::{Error, Result};
 pub use lab::{Lab, NotPossible};
 pub use lifecycle::{MachineLifecycle, Step};
-pub use names::Names;
+pub use names::{HostName, KEY_LEN, KEY_VAR, Names};
 pub use outside::{Join, OutsideAddress, OutsideNetwork};
 pub use private_dns::PrivateDns;
 pub use process::{Health, HealthTest, Process};

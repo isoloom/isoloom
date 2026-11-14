@@ -475,6 +475,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -794,28 +803,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "dmz-jump_"
+    v.default_prefix = "dmz-jump-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.30.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-dmz", libvirt__network_name: "isoloom-dmz-jump-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.30.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.30.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-access", libvirt__network_name: "isoloom-dmz-jump-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump - isoloom-router"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump - isoloom-router"
+      v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump - isoloom-router"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -835,7 +844,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "dmz-jump-isoloom-router"
+      v.guest_name = "dmz-jump-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -849,17 +858,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dmz-jump-isoloom-router"
+      v.vmname = "dmz-jump-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-dmz", "isoloom-dmz-jump-internal", "isoloom-dmz-jump-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", "isoloom-dmz-jump-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-dmz", "0215EBCAD3CC"], ["isoloom-dmz-jump-internal", "021503AD91FC"], ["isoloom-dmz-jump-access", "02159AFDF0C7"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", "0215EBCAD3CC"], ["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", "021503AD91FC"], ["isoloom-dmz-jump-#{ISOLOOM_KEY}-access", "02159AFDF0C7"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -919,7 +928,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-dmz", "isoloom-dmz-jump-internal", "isoloom-dmz-jump-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", "isoloom-dmz-jump-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -948,17 +957,17 @@ Vagrant.configure("2") do |config|
   config.vm.define "gateway" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "gateway"
-    m.vm.network "private_network", ip: "10.30.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-dmz", libvirt__network_name: "isoloom-dmz-jump-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.30.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump - gateway"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - gateway"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump - gateway"
+      v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - gateway"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("gateway"))
@@ -969,7 +978,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump - gateway"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - gateway"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -997,7 +1006,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "dmz-jump-gateway"
+      v.guest_name = "dmz-jump-#{ISOLOOM_KEY}-gateway"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1015,17 +1024,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dmz-jump-gateway"
+      v.vmname = "dmz-jump-#{ISOLOOM_KEY}-gateway"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-dmz", "isoloom-dmz-jump-internal"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-dmz", "021552CB6774"], ["isoloom-dmz-jump-internal", "0215F0B43574"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", "021552CB6774"], ["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", "0215F0B43574"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1084,7 +1093,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-dmz", "isoloom-dmz-jump-internal"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-#{ISOLOOM_KEY}-dmz", "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1158,16 +1167,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "app" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "app"
-    m.vm.network "private_network", ip: "10.30.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump - app"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump - app"
+      v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - app"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("app"))
@@ -1178,7 +1187,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump - app"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1215,7 +1224,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "dmz-jump-app"
+      v.guest_name = "dmz-jump-#{ISOLOOM_KEY}-app"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1233,17 +1242,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dmz-jump-app"
+      v.vmname = "dmz-jump-#{ISOLOOM_KEY}-app"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-internal"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-internal", "0215752E6C6F"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", "0215752E6C6F"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1301,7 +1310,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-internal"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1412,16 +1421,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "db" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "db"
-    m.vm.network "private_network", ip: "10.30.20.30", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-internal", libvirt__network_name: "isoloom-dmz-jump-internal", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.20.30", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump - db"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - db"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump - db"
+      v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - db"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("db"))
@@ -1432,7 +1441,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump - db"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - db"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1469,7 +1478,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "dmz-jump-db"
+      v.guest_name = "dmz-jump-#{ISOLOOM_KEY}-db"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1487,17 +1496,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dmz-jump-db"
+      v.vmname = "dmz-jump-#{ISOLOOM_KEY}-db"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-internal"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-internal", "0215166B9810"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal", "0215166B9810"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1555,7 +1564,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-internal"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-#{ISOLOOM_KEY}-internal"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1666,16 +1675,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.30.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-access", libvirt__network_name: "isoloom-dmz-jump-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.30.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dmz-jump-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-dmz-jump-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "dmz-jump - user"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dmz-jump - user"
+      v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("user"))
@@ -1686,7 +1695,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dmz-jump - user"
+      v.name = "dmz-jump-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1723,7 +1732,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([3])
-      v.guest_name = "dmz-jump-user"
+      v.guest_name = "dmz-jump-#{ISOLOOM_KEY}-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1741,17 +1750,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dmz-jump-user"
+      v.vmname = "dmz-jump-#{ISOLOOM_KEY}-user"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dmz-jump-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-access", "0215DC144EA0"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dmz-jump-#{ISOLOOM_KEY}-access", "0215DC144EA0"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1809,7 +1818,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dmz-jump-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -2637,20 +2646,17 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "dmz",
       "cidr": "10.30.10.0/24",
-      "internet": true,
-      "native": "isoloom-dmz-jump-dmz"
+      "internet": true
     },
     {
       "name": "internal",
       "cidr": "10.30.20.0/24",
-      "internet": false,
-      "native": "isoloom-dmz-jump-internal"
+      "internet": false
     },
     {
       "name": "access",
       "cidr": "10.30.99.0/24",
-      "internet": true,
-      "native": "isoloom-dmz-jump-access"
+      "internet": true
     }
   ],
   "machines": [
@@ -2668,16 +2674,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-router",
-        "vm_names": {
-          "virtualbox": "dmz-jump - isoloom-router",
-          "vmware_desktop": "dmz-jump - isoloom-router",
-          "hyperv": "dmz-jump-isoloom-router",
-          "parallels": "dmz-jump - isoloom-router",
-          "libvirt": "dmz-jump_isoloom-router",
-          "utm": "dmz-jump - isoloom-router",
-          "vmware_esxi": "dmz-jump-isoloom-router"
-        },
-        "boot_digest": "sha256:0b01a63225e0a5481f57c52609fe4d7ebe4a114b7f34f76383a2247ae0fc9d30",
+        "vm_names": {},
+        "boot_digest": "sha256:f74be9ddf3b290b861f040e99449649c8b1e0765eeb439acdf1f39a2925a9927",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2727,16 +2725,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "gateway",
-        "vm_names": {
-          "virtualbox": "dmz-jump - gateway",
-          "vmware_desktop": "dmz-jump - gateway",
-          "hyperv": "dmz-jump-gateway",
-          "parallels": "dmz-jump - gateway",
-          "libvirt": "dmz-jump_gateway",
-          "utm": "dmz-jump - gateway",
-          "vmware_esxi": "dmz-jump-gateway"
-        },
-        "boot_digest": "sha256:237d4d8f60412dda26010ec1567f16f0c93eedf5c3e67543a8daf66b5ba37070",
+        "vm_names": {},
+        "boot_digest": "sha256:e56866036c4544d9592a844e1cb097fa85218197571a14996f800a948fc05c27",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2861,16 +2851,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "app",
-        "vm_names": {
-          "virtualbox": "dmz-jump - app",
-          "vmware_desktop": "dmz-jump - app",
-          "hyperv": "dmz-jump-app",
-          "parallels": "dmz-jump - app",
-          "libvirt": "dmz-jump_app",
-          "utm": "dmz-jump - app",
-          "vmware_esxi": "dmz-jump-app"
-        },
-        "boot_digest": "sha256:a5826b6e01d150c2b5a54c4c2dbd81a5f38f58a2c35f94989ffa16ed95d3a515",
+        "vm_names": {},
+        "boot_digest": "sha256:7e891ccba497c3b8562759463f67d3862334802d4a97ebdea900e70f207f6cf5",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2989,16 +2971,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "db",
-        "vm_names": {
-          "virtualbox": "dmz-jump - db",
-          "vmware_desktop": "dmz-jump - db",
-          "hyperv": "dmz-jump-db",
-          "parallels": "dmz-jump - db",
-          "libvirt": "dmz-jump_db",
-          "utm": "dmz-jump - db",
-          "vmware_esxi": "dmz-jump-db"
-        },
-        "boot_digest": "sha256:f16382e1b7185b0100559363456369c3256bafae1b3dd925a1ed463fffde3405",
+        "vm_names": {},
+        "boot_digest": "sha256:7c2e4f0f66cf2427f4aa4d69daf6e1ed54da977080eee15d01e241f82d8ea91e",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3118,16 +3092,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "user",
-        "vm_names": {
-          "virtualbox": "dmz-jump - user",
-          "vmware_desktop": "dmz-jump - user",
-          "hyperv": "dmz-jump-user",
-          "parallels": "dmz-jump - user",
-          "libvirt": "dmz-jump_user",
-          "utm": "dmz-jump - user",
-          "vmware_esxi": "dmz-jump-user"
-        },
-        "boot_digest": "sha256:025a41607697a9aa49ccecd259beb2065860f37df938a759ceb67cdfd6c8b2a0",
+        "vm_names": {},
+        "boot_digest": "sha256:31d86b714926a7716c4b00a13a3098972bac24975d15d5558efa35400dae203b",
         "boxes": [
           {
             "provider": "virtualbox",

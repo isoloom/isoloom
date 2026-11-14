@@ -66,7 +66,10 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     let files = generate_instance(&spec, Target::Vagrant, 1).unwrap();
     let vf = &files.iter().find(|f| f.path == ".isoloom-1/vagrant/Vagrantfile").unwrap().contents;
     // VM labels and internal network names carry the instance; addresses don't move.
-    assert!(vf.contains("isoloom-hello-stack-1-app") && vf.contains("hello-stack-1 - web"), "{vf}");
+    assert!(
+        vf.contains("isoloom-hello-stack-1-#{ISOLOOM_KEY}-app") && vf.contains("hello-stack-1-#{ISOLOOM_KEY} - web"),
+        "{vf}"
+    );
     assert!(vf.contains("10.60.0.10"));
     // The runner picks each forward a free host port; the per-instance shift is the default it
     // falls back to, so two instances can both forward even without a runner choosing.
@@ -106,10 +109,10 @@ fn an_instance_that_cant_be_made_is_its_own_error_not_the_target_refusing_the_la
     Ok(())
 }
 
-/// The names a VM target's files give on the host for instance `n` of the environment `lab`
-/// (none: the environment as written): each VM's under every provider and each network's (the run manifest's
-/// `vm_names` and networks' `native`), and the libvirt prefix and internal networks the
-/// Vagrantfile sets. Each manifest name is checked to be the Vagrantfile's.
+/// The names a VM target's Vagrantfile gives on the host for instance `n` of the environment
+/// `lab` (none: the environment as written), as written in it, the copy's key still to read
+/// (`#{ISOLOOM_KEY}`): the libvirt prefix and the internal networks. The run manifest names none:
+/// each holds the copy's key, which only the Vagrantfile reads.
 fn host_names(lab: &isoloom_targets::Lab, target: Target, n: Option<u8>) -> Outcome<std::collections::BTreeSet<String>> {
     let files = match n {
         Some(n) => generate_instance(lab, target, n)?,
@@ -124,45 +127,32 @@ fn host_names(lab: &isoloom_targets::Lab, target: Target, n: Option<u8>) -> Outc
         .ok_or("the Vagrantfile sets a libvirt prefix")?;
     names.insert(format!("prefix {prefix}"));
     for name in vagrantfile.split("virtualbox__intnet: \"").skip(1).filter_map(|rest| rest.split('"').next()) {
+        assert!(name.contains("#{ISOLOOM_KEY}"), "{}: network {name} holds the copy's key", target.id());
         names.insert(format!("network {name}"));
     }
-    // The hybrid target writes no run manifest.
-    let Some(run) = files.iter().find(|f| f.path.ends_with("/run.json")) else {
-        return Ok(names);
-    };
-    let manifest: serde_json::Value = serde_json::from_str(&run.contents)?;
-    let list = |v: Option<&serde_json::Value>| v.and_then(serde_json::Value::as_array).cloned().unwrap_or_default();
-    for machine in list(manifest.get("machines")) {
-        let vm_names = machine
-            .get("native")
-            .and_then(|native| native.get("vm_names"))
-            .and_then(serde_json::Value::as_object);
-        for (provider, name) in vm_names.into_iter().flatten() {
-            let name = name.as_str().ok_or("a VM name is text")?;
-            if provider == "libvirt" {
-                assert!(name.starts_with(prefix), "{}: {name} has the prefix {prefix}", target.id());
-            } else {
-                assert!(vagrantfile.contains(&format!("\"{name}\"")), "{}: the Vagrantfile names {name}", target.id());
-            }
-            names.insert(format!("{provider} {name}"));
-        }
-    }
-    if target != Target::DockerVm {
-        // The docker-vm target's networks are Docker's, inside its one VM.
-        for net in list(manifest.get("networks")) {
-            let name = net.get("native").and_then(serde_json::Value::as_str).ok_or("a network's host name is text")?;
+    if let Some(run) = files.iter().find(|f| f.path.ends_with("/run.json")) {
+        let manifest: serde_json::Value = serde_json::from_str(&run.contents)?;
+        let list = |key: &str| manifest.get(key).and_then(serde_json::Value::as_array).cloned().unwrap_or_default();
+        for machine in list("machines") {
+            let vm_names = machine
+                .get("native")
+                .and_then(|native| native.get("vm_names"))
+                .and_then(serde_json::Value::as_object);
             assert!(
-                names.contains(&format!("network {name}")),
-                "{}: the Vagrantfile makes network {name}",
+                vm_names.is_none_or(serde_json::Map::is_empty),
+                "{}: the manifest names a VM: {machine}",
                 target.id()
             );
+        }
+        for net in list("networks").into_iter().filter(|_| target != Target::DockerVm) {
+            assert!(net.get("native").is_none(), "{}: the manifest names a network: {net}", target.id());
         }
     }
     Ok(names)
 }
 
 #[test]
-fn two_instances_never_share_a_vm_network_or_prefix_name_and_the_environment_as_written_keeps_its_own() -> Outcome {
+fn two_instances_never_share_a_vm_network_or_prefix_name() -> Outcome {
     let mut compared = 0;
     for name in ["solo-web", "segmented", "corp-ad-basics", "hello-stack", "configured-windows", "mixed-office"] {
         let lab = example(name)?;
@@ -180,10 +170,14 @@ fn two_instances_never_share_a_vm_network_or_prefix_name_and_the_environment_as_
                     a.intersection(b).collect::<Vec<_>>()
                 );
             }
-            // The environment as written keeps the names it always had.
+            // The environment's name, its instance's, then the copy's key.
             let env = &lab.spec().name;
-            assert!(plain.contains(&format!("prefix {env}_")), "{name} on {}: {plain:?}", target.id());
-            assert!(one.contains(&format!("prefix {env}-1_")), "{name} on {}: {one:?}", target.id());
+            assert!(
+                plain.contains(&format!("prefix {env}-#{{ISOLOOM_KEY}}_")),
+                "{name} on {}: {plain:?}",
+                target.id()
+            );
+            assert!(one.contains(&format!("prefix {env}-1-#{{ISOLOOM_KEY}}_")), "{name} on {}: {one:?}", target.id());
             compared += 1;
         }
     }

@@ -381,6 +381,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # QEMU (vagrant-qemu): what the provider block can't say on its own.
 # - Every network gets a hub: one QEMU process with no machine, a port per VM on one emulated
 #   hub, each VM connecting to its own (no root; multicast doesn't send on a Mac). The ports are
@@ -717,28 +726,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 600
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "slow-link_"
+    v.default_prefix = "slow-link-#{ISOLOOM_KEY}_"
   end
   config.vm.provider "virtualbox" do |v|
     v.customize ["modifyvm", :id, "--graphicscontroller", "vboxvga"] unless RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/
-    v.name = "slow-link - isoloom-docker-host"
+    v.name = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "vmware_desktop" do |v|
-    v.vmx["displayName"] = "slow-link - isoloom-docker-host"
+    v.vmx["displayName"] = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.vmx["numvcpus"] = "2"
     v.vmx["memsize"] = "2048"
   end
   config.vm.provider "parallels" do |v|
-    v.name = "slow-link - isoloom-docker-host"
+    v.name = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
   end
   config.vm.provider "utm" do |v, o|
     o.vm.box = "utm/bookworm"
     o.vm.box_version = ">= 0"
-    v.name = "slow-link - isoloom-docker-host"
+    v.name = "slow-link-#{ISOLOOM_KEY} - isoloom-docker-host"
     v.cpus = 2
     v.memory = 2048
     o.vm.provision "nat-route", type: "shell", run: "always", preserve_order: true, inline: ISOLOOM_NAT_ROUTE
@@ -768,7 +777,7 @@ Vagrant.configure("2") do |config|
     v.esxi_password = "env:ESXI_PASSWORD"
     v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
     v.esxi_virtual_network = [ENV.fetch("ESXI_VIRTUAL_NETWORK", "VM Network").split(",").first.strip]
-    v.guest_name = "slow-link-isoloom-docker-host"
+    v.guest_name = "slow-link-#{ISOLOOM_KEY}-isoloom-docker-host"
     v.guest_numvcpus = 2
     v.guest_memsize = 2048
   end
@@ -2125,15 +2134,8 @@ systemctl enable --now isoloom-published.service
       "addresses": {},
       "native": {
         "vagrant": "default",
-        "vm_names": {
-          "virtualbox": "slow-link - isoloom-docker-host",
-          "vmware_desktop": "slow-link - isoloom-docker-host",
-          "parallels": "slow-link - isoloom-docker-host",
-          "libvirt": "slow-link_default",
-          "utm": "slow-link - isoloom-docker-host",
-          "vmware_esxi": "slow-link-isoloom-docker-host"
-        },
-        "boot_digest": "sha256:94b43b1c399f3ab82e651f5ac6043b465dd046ddf8c5c8eccf8511bf94d7758c",
+        "vm_names": {},
+        "boot_digest": "sha256:de8d390da75ac3ec0ca44da98c28c58b0aeaba06a2bffe7b091a7f818b11bf78",
         "boxes": [
           {
             "provider": "virtualbox",

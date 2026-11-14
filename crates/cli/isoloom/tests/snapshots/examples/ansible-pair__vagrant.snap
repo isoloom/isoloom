@@ -712,6 +712,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -1031,22 +1040,22 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "ansible-pair_"
+    v.default_prefix = "ansible-pair-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair - web"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair - web"
+      v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -1057,7 +1066,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair - web"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1094,7 +1103,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-web"
+      v.guest_name = "ansible-pair-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1112,17 +1121,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "ansible-pair-web"
+      v.vmname = "ansible-pair-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215CFE4F0A1"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", "0215CFE4F0A1"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1180,7 +1189,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1212,16 +1221,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
-    m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair - cache"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair - cache"
+      v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("cache"))
@@ -1232,7 +1241,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair - cache"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1269,7 +1278,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-cache"
+      v.guest_name = "ansible-pair-#{ISOLOOM_KEY}-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1287,17 +1296,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "ansible-pair-cache"
+      v.vmname = "ansible-pair-#{ISOLOOM_KEY}-cache"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215605C41D5"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", "0215605C41D5"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1355,7 +1364,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1387,20 +1396,20 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-lab", libvirt__network_name: "isoloom-ansible-pair-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "ansible-pair - isoloom-controller"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "ansible-pair - isoloom-controller"
+      v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "768"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "ansible-pair - isoloom-controller"
+      v.name = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
@@ -1430,7 +1439,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "ansible-pair-isoloom-controller"
+      v.guest_name = "ansible-pair-#{ISOLOOM_KEY}-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 768
     end
@@ -1442,7 +1451,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.memory = 768
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "ansible-pair-isoloom-controller"
+      v.vmname = "ansible-pair-#{ISOLOOM_KEY}-isoloom-controller"
       v.cpus = 1
       v.memory = 768
       v.linked_clone = true
@@ -1451,10 +1460,10 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-lab", "0215B7AAD166"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", "0215B7AAD166"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1512,7 +1521,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-ansible-pair-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
@@ -2286,8 +2295,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "lab",
       "cidr": "10.63.0.0/24",
-      "internet": true,
-      "native": "isoloom-ansible-pair-lab"
+      "internet": true
     }
   ],
   "machines": [
@@ -2305,16 +2313,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "ansible-pair - web",
-          "vmware_desktop": "ansible-pair - web",
-          "hyperv": "ansible-pair-web",
-          "parallels": "ansible-pair - web",
-          "libvirt": "ansible-pair_web",
-          "utm": "ansible-pair - web",
-          "vmware_esxi": "ansible-pair-web"
-        },
-        "boot_digest": "sha256:078f7b68b76897e7037bd04d93169077bd44276257f4809746aa10acec3fb063",
+        "vm_names": {},
+        "boot_digest": "sha256:c5b915ae1c191ecfd9006841faa34a47c82057d4e2210540b6f7b12c4f2af38b",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2433,16 +2433,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "cache",
-        "vm_names": {
-          "virtualbox": "ansible-pair - cache",
-          "vmware_desktop": "ansible-pair - cache",
-          "hyperv": "ansible-pair-cache",
-          "parallels": "ansible-pair - cache",
-          "libvirt": "ansible-pair_cache",
-          "utm": "ansible-pair - cache",
-          "vmware_esxi": "ansible-pair-cache"
-        },
-        "boot_digest": "sha256:14308ca13314522104ce54166a3e938c42842c5ec2e426c9959a4e747a7cb48e",
+        "vm_names": {},
+        "boot_digest": "sha256:b1b387e238fba72674c3518e3e776f72ee5e0544fb9768696c638f49d3f32ba2",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2559,16 +2551,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-controller",
-        "vm_names": {
-          "virtualbox": "ansible-pair - isoloom-controller",
-          "vmware_desktop": "ansible-pair - isoloom-controller",
-          "hyperv": "ansible-pair-isoloom-controller",
-          "parallels": "ansible-pair - isoloom-controller",
-          "libvirt": "ansible-pair_isoloom-controller",
-          "utm": "ansible-pair - isoloom-controller",
-          "vmware_esxi": "ansible-pair-isoloom-controller"
-        },
-        "boot_digest": "sha256:9368e02d533f001db1b96776bd107c9e6fb927138afaaf8074c7569e6f2e8687",
+        "vm_names": {},
+        "boot_digest": "sha256:e5e1338446122f36415c064529406a2ac8f5a38e18b6ab27705dffab44006ede",
         "boxes": [
           {
             "provider": "virtualbox",

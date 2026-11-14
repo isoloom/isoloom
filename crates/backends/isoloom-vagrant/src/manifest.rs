@@ -33,7 +33,7 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         identity: providers::identity(env, &PathTemplate::in_state_dir(&RelPath::parse(DOTFILE)?))?,
         params: slots::params(&machines, &runners)?,
         secrets: slots::slots(env, &lifecycle)?,
-        networks: run_manifest::networks(env, |n| Template::text(&env.names().network(n)))?,
+        networks: unnamed(run_manifest::networks(env, Template::text)?),
         outputs: run_manifest::outputs_on_their_hosts(&machines)?,
         machines,
         ready: lifecycle::ready(&shape)?,
@@ -49,6 +49,12 @@ pub(crate) fn vagrant(env: &Environment) -> Result<Manifest> {
         guest: None,
     }
     .manifest(env, isoloom_manifest::Target::Vagrant, None, Driver::Vagrant)?)
+}
+
+/// The networks with no host name: a copy's networks are named after its key, which only the
+/// Vagrantfile reads when Vagrant loads it, so the manifest doesn't name them (as it names no VM).
+fn unnamed(networks: Vec<isoloom_manifest::Network>) -> Vec<isoloom_manifest::Network> {
+    networks.into_iter().map(|n| isoloom_manifest::Network { native: None, ..n }).collect()
 }
 
 /// `boxes` as a run manifest lists them: each with its provider, version, build and the

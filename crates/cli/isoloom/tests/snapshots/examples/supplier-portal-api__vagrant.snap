@@ -473,6 +473,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -804,22 +813,22 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "supplier-portal-api_"
+    v.default_prefix = "supplier-portal-api-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "database" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "database"
-    m.vm.network "private_network", ip: "10.20.0.32", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-lab", libvirt__network_name: "isoloom-supplier-portal-api-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.20.0.32", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "supplier-portal-api - database"
+      v.name = "supplier-portal-api-#{ISOLOOM_KEY} - database"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "supplier-portal-api - database"
+      v.vmx["displayName"] = "supplier-portal-api-#{ISOLOOM_KEY} - database"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("database"))
@@ -830,7 +839,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "supplier-portal-api - database"
+      v.name = "supplier-portal-api-#{ISOLOOM_KEY} - database"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -867,7 +876,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "supplier-portal-api-database"
+      v.guest_name = "supplier-portal-api-#{ISOLOOM_KEY}-database"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -885,17 +894,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "supplier-portal-api-database"
+      v.vmname = "supplier-portal-api-#{ISOLOOM_KEY}-database"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-supplier-portal-api-lab", "0215579685EB"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", "0215579685EB"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -953,7 +962,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1054,17 +1063,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.20.0.31", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-lab", libvirt__network_name: "isoloom-supplier-portal-api-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.20.0.31", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 8206, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 8206), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
-      v.name = "supplier-portal-api - web"
+      v.name = "supplier-portal-api-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "supplier-portal-api - web"
+      v.vmx["displayName"] = "supplier-portal-api-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -1075,7 +1084,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "supplier-portal-api - web"
+      v.name = "supplier-portal-api-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1112,7 +1121,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "supplier-portal-api-web"
+      v.guest_name = "supplier-portal-api-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1130,17 +1139,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "supplier-portal-api-web"
+      v.vmname = "supplier-portal-api-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-supplier-portal-api-lab", "0215E37AFAB4"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", "0215E37AFAB4"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1199,7 +1208,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[8206, ISOLOOM_HOSTPORTS.fetch("web/portal", 8206)]]); IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[8206, ISOLOOM_HOSTPORTS.fetch("web/portal", 8206)]]); IsoloomHyperV.prune(["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1233,20 +1242,20 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.20.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-lab", libvirt__network_name: "isoloom-supplier-portal-api-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.20.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "supplier-portal-api - isoloom-controller"
+      v.name = "supplier-portal-api-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "supplier-portal-api - isoloom-controller"
+      v.vmx["displayName"] = "supplier-portal-api-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "supplier-portal-api - isoloom-controller"
+      v.name = "supplier-portal-api-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -1276,7 +1285,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "supplier-portal-api-isoloom-controller"
+      v.guest_name = "supplier-portal-api-#{ISOLOOM_KEY}-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1288,7 +1297,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "supplier-portal-api-isoloom-controller"
+      v.vmname = "supplier-portal-api-#{ISOLOOM_KEY}-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1297,10 +1306,10 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-supplier-portal-api-lab", "02152636E795"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab", "02152636E795"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1358,7 +1367,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-supplier-portal-api-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-supplier-portal-api-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
@@ -2077,8 +2086,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "lab",
       "cidr": "10.20.0.0/24",
-      "internet": true,
-      "native": "isoloom-supplier-portal-api-lab"
+      "internet": true
     }
   ],
   "machines": [
@@ -2096,16 +2104,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "database",
-        "vm_names": {
-          "virtualbox": "supplier-portal-api - database",
-          "vmware_desktop": "supplier-portal-api - database",
-          "hyperv": "supplier-portal-api-database",
-          "parallels": "supplier-portal-api - database",
-          "libvirt": "supplier-portal-api_database",
-          "utm": "supplier-portal-api - database",
-          "vmware_esxi": "supplier-portal-api-database"
-        },
-        "boot_digest": "sha256:4029c7cb32abd5ad464af7b453ce18d5018ed8b164c48f6dda5517923073814d",
+        "vm_names": {},
+        "boot_digest": "sha256:4f75fcd1b702b0ca60c7bfc455c7c023172538f0262a63f0fbe1e935b7fa2239",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2224,16 +2224,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "supplier-portal-api - web",
-          "vmware_desktop": "supplier-portal-api - web",
-          "hyperv": "supplier-portal-api-web",
-          "parallels": "supplier-portal-api - web",
-          "libvirt": "supplier-portal-api_web",
-          "utm": "supplier-portal-api - web",
-          "vmware_esxi": "supplier-portal-api-web"
-        },
-        "boot_digest": "sha256:e1a1b08e85d5eb3ca6f7f7bbee5de64868b13af21209e5e29aa4226ff11b7fbb",
+        "vm_names": {},
+        "boot_digest": "sha256:94f9da1e5f010c5328736122b904bbe1e2678c1653b5cc4ae715384638f0f52a",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2355,16 +2347,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-controller",
-        "vm_names": {
-          "virtualbox": "supplier-portal-api - isoloom-controller",
-          "vmware_desktop": "supplier-portal-api - isoloom-controller",
-          "hyperv": "supplier-portal-api-isoloom-controller",
-          "parallels": "supplier-portal-api - isoloom-controller",
-          "libvirt": "supplier-portal-api_isoloom-controller",
-          "utm": "supplier-portal-api - isoloom-controller",
-          "vmware_esxi": "supplier-portal-api-isoloom-controller"
-        },
-        "boot_digest": "sha256:c0bdc3d0dbf6d10ef622355bb89b23dff492317b5d9cc4317268ff8dd104f1f8",
+        "vm_names": {},
+        "boot_digest": "sha256:6467828a70e0ec410e0901d7e7db5b79251d253c6c4c76a3af5f728ee2544f3c",
         "boxes": [
           {
             "provider": "virtualbox",

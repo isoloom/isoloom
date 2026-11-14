@@ -473,6 +473,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -792,28 +801,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "segmented_"
+    v.default_prefix = "segmented-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.61.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.61.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-back", libvirt__network_name: "isoloom-segmented-back", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - isoloom-router"
+      v.name = "segmented-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - isoloom-router"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - isoloom-router"
+      v.name = "segmented-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -833,7 +842,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "segmented-isoloom-router"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -847,17 +856,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-isoloom-router"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-front", "isoloom-segmented-back", "isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-front", "isoloom-segmented-#{ISOLOOM_KEY}-back", "isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-front", "02155B9982B0"], ["isoloom-segmented-back", "0215581C0E5A"], ["isoloom-segmented-access", "021593D5CF93"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-front", "02155B9982B0"], ["isoloom-segmented-#{ISOLOOM_KEY}-back", "0215581C0E5A"], ["isoloom-segmented-#{ISOLOOM_KEY}-access", "021593D5CF93"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -917,7 +926,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-front", "isoloom-segmented-back", "isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-front", "isoloom-segmented-#{ISOLOOM_KEY}-back", "isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -946,17 +955,17 @@ Vagrant.configure("2") do |config|
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
-    m.vm.network "private_network", ip: "10.61.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-back", libvirt__network_name: "isoloom-segmented-back", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "10GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - cache"
+      v.name = "segmented-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - cache"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("cache"))
@@ -967,7 +976,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - cache"
+      v.name = "segmented-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1005,7 +1014,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "segmented-cache"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
       v.guest_boot_disk_size = 10
@@ -1025,17 +1034,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-cache"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-cache"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-back"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-back", "0215A2748606"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-back", "0215A2748606"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1093,7 +1102,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-back"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1220,16 +1229,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.61.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - web"
+      v.name = "segmented-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - web"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -1240,7 +1249,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - web"
+      v.name = "segmented-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1277,7 +1286,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "segmented-web"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1295,17 +1304,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-web"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-front"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-front"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-front", "02158239B368"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-front", "02158239B368"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1363,7 +1372,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-front"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-front"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1434,16 +1443,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.61.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - user"
+      v.name = "segmented-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - user"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("user"))
@@ -1454,7 +1463,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - user"
+      v.name = "segmented-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1491,7 +1500,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([3])
-      v.guest_name = "segmented-user"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1509,17 +1518,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-user"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-user"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-access", "02154AF607BC"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-access", "02154AF607BC"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1577,7 +1586,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -2288,20 +2297,17 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "front",
       "cidr": "10.61.10.0/24",
-      "internet": true,
-      "native": "isoloom-segmented-front"
+      "internet": true
     },
     {
       "name": "back",
       "cidr": "10.61.20.0/24",
-      "internet": false,
-      "native": "isoloom-segmented-back"
+      "internet": false
     },
     {
       "name": "access",
       "cidr": "10.61.99.0/24",
-      "internet": true,
-      "native": "isoloom-segmented-access"
+      "internet": true
     }
   ],
   "machines": [
@@ -2319,16 +2325,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-router",
-        "vm_names": {
-          "virtualbox": "segmented - isoloom-router",
-          "vmware_desktop": "segmented - isoloom-router",
-          "hyperv": "segmented-isoloom-router",
-          "parallels": "segmented - isoloom-router",
-          "libvirt": "segmented_isoloom-router",
-          "utm": "segmented - isoloom-router",
-          "vmware_esxi": "segmented-isoloom-router"
-        },
-        "boot_digest": "sha256:42425451d14f51395a3255309216663fa8a7e4ec7b9118d1b2166ad82ee8610f",
+        "vm_names": {},
+        "boot_digest": "sha256:67acc65b1939a93dd15690e432853f9bd39d00b97e59a482343c15fa8a2c11fd",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2377,16 +2375,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "cache",
-        "vm_names": {
-          "virtualbox": "segmented - cache",
-          "vmware_desktop": "segmented - cache",
-          "hyperv": "segmented-cache",
-          "parallels": "segmented - cache",
-          "libvirt": "segmented_cache",
-          "utm": "segmented - cache",
-          "vmware_esxi": "segmented-cache"
-        },
-        "boot_digest": "sha256:741bf040c952f4ebf4054afdcae465645fc2fdc147f6c8a8e2e07b04663f05cb",
+        "vm_names": {},
+        "boot_digest": "sha256:70a8908c7f9ebad9b26ba4f3f81140f18fa02c4b7e63a8a230c1e8f21aaecd53",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2505,16 +2495,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "segmented - web",
-          "vmware_desktop": "segmented - web",
-          "hyperv": "segmented-web",
-          "parallels": "segmented - web",
-          "libvirt": "segmented_web",
-          "utm": "segmented - web",
-          "vmware_esxi": "segmented-web"
-        },
-        "boot_digest": "sha256:37090f48e50cb1d16301be9c4bfce3411e02db48d7d0d71814331e954ae5c9e6",
+        "vm_names": {},
+        "boot_digest": "sha256:6db3a9eeb3a63d7e9255599e977fe2d2f11c2491a30f3968ab3f888873698974",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2640,16 +2622,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "user",
-        "vm_names": {
-          "virtualbox": "segmented - user",
-          "vmware_desktop": "segmented - user",
-          "hyperv": "segmented-user",
-          "parallels": "segmented - user",
-          "libvirt": "segmented_user",
-          "utm": "segmented - user",
-          "vmware_esxi": "segmented-user"
-        },
-        "boot_digest": "sha256:8a34d6678e943b3e361d199ddfd0617b743d575899179986af0c6dee88b21592",
+        "vm_names": {},
+        "boot_digest": "sha256:92dfa8f1180a752edc05f1a09c0cdd3cdb4251e3160c338117b63f2f953181f4",
         "boxes": [
           {
             "provider": "virtualbox",
