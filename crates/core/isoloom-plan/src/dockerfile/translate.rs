@@ -61,8 +61,6 @@ pub(super) struct Image {
     /// The step ([`Op::Entry`]) of the catalogue entry it is, when it is one: the last stage's
     /// entry takes its settings from the image's environment.
     pub entry: Option<usize>,
-    /// kCTF's challenge base: the VM is the jail.
-    pub jail: bool,
 }
 
 /// One step of the translation, in order.
@@ -103,7 +101,6 @@ impl Image {
             cmd: base.cmd,
             shell: None,
             entry: None,
-            jail: base.jail,
         }
     }
 
@@ -348,16 +345,6 @@ impl<'a> Run<'a> {
     fn base(&mut self, f: &File<'_>, line: &Line, image_ref: &str) -> Result<Image, Untranslatable> {
         match matrix::of(image_ref) {
             Ok(mut base) => {
-                // A base that takes the VM's OS (kCTF's): the stages before made it.
-                if base.jail {
-                    base.os = self.os.as_ref().map(|(os, _)| os.clone()).ok_or_else(|| {
-                        f.at(
-                            line,
-                            format!("`{image_ref}` runs on the OS its stages before give, and none comes before it"),
-                            "build a stage FROM an OS before it",
-                        )
-                    })?;
-                }
                 let entry = match base.entry.take() {
                     Some(call) => {
                         let op = release(&call, self.wanted).map_err(|(reason, fix)| f.at(line, reason, &fix))?;
@@ -486,7 +473,7 @@ fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<Strin
     };
     let mut lines = vec![format!("dest={}", quote(&dest))];
     for src in &c.sources {
-        lines.push(copy_one(&substitute(src, &vars), root.as_deref(), add, into, st.img.jail)?);
+        lines.push(copy_one(&substitute(src, &vars), root.as_deref(), add, into)?);
     }
     if let Some(owner) = &c.chown {
         lines.push(format!("chown -R {} \"$dest\"", quote(&substitute(owner, &vars))));
@@ -498,9 +485,8 @@ fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<Strin
 }
 
 /// One source of a `COPY`/`ADD` into `$dest`: from the project copy under `root`, or (`None`)
-/// from an earlier stage on this VM; `into`: `$dest` is a folder; `jail`: the VM is kCTF's jail,
-/// whose chroot is the VM itself.
-fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) -> Result<String, (String, &'static str)> {
+/// from an earlier stage on this VM; `into`: `$dest` is a folder.
+fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool) -> Result<String, (String, &'static str)> {
     if add && (src.starts_with("http://") || src.starts_with("https://")) {
         let name = src.rsplit('/').next().unwrap_or("download");
         let to = if into { format!("\"$dest\"/{}", quote(name)) } else { "\"$dest\"".to_owned() };
@@ -509,9 +495,6 @@ fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) ->
     let rel = src.trim_start_matches("./");
     let path = match root {
         Some(root) => format!("{root}/{rel}"),
-        None if (rel == "/" || rel.is_empty()) && jail => {
-            return Ok(": a stage's whole filesystem into kCTF's chroot: the VM itself is the jail".to_owned());
-        }
         None if rel == "/" || rel.is_empty() => {
             return Err((
                 "it copies a stage's whole filesystem: a VM can't be two systems".to_owned(),

@@ -759,6 +759,30 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^jenkins(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "jenkins's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^mariadb(@.+)?$"
               }
             },

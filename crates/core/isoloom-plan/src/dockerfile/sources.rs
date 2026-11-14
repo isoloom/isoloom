@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn a_fetch_is_wanted_for_unknown_bases_only() {
-        let text = "ARG V=lts-jdk21\nFROM jenkins/jenkins:${V} AS j\nFROM php:8.2-apache\nFROM j\nFROM scratch\n";
-        assert_eq!(wanted(text, &Sources::default()), ["jenkins/jenkins:lts-jdk21"]);
+        let text = "ARG V=2.462.3-lts-jdk17\nFROM jenkins/jenkins:${V} AS j\nFROM php:8.2-apache\nFROM jenkins/jenkins:lts-jdk21\nFROM j\nFROM scratch\n";
+        assert_eq!(wanted(text, &Sources::default()), ["jenkins/jenkins:2.462.3-lts-jdk17"]);
     }
 }

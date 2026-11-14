@@ -1,0 +1,6 @@
+# Written by `cargo xtask catalogue refresh jenkins`, never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin.
+refreshed: 2026-11-14
+releases:
+  2.580.2: {}
