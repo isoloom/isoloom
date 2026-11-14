@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{bundle_bytes, bundle_target_bytes, choices, own_files, plan};
 
-/// One target's zip: `isoloom.yml` and only that target's folder (`docker`, `hybrid`,
+/// One target's zip: `isoloom.yml` and only that target's folder (`docker`, `vagrant`,
 /// `cloud-docker/aws`...), with every one of the project's own files.
 ///
 /// # Errors

@@ -31,7 +31,7 @@ fn compiled(name: &str, targets: &[&str]) -> Outcome<String> {
 
 #[test]
 fn the_office_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
-    insta::assert_snapshot!("office", compiled("office", &["hybrid"])?);
+    insta::assert_snapshot!("office", compiled("office", &["vagrant"])?);
     Ok(())
 }
 
@@ -49,7 +49,7 @@ fn the_cisco_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
 
 #[test]
 fn the_wan_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
-    insta::assert_snapshot!("wan-links", compiled("wan-links", &["hybrid"])?);
+    insta::assert_snapshot!("wan-links", compiled("wan-links", &["vagrant"])?);
     Ok(())
 }
 

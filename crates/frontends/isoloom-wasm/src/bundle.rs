@@ -19,7 +19,7 @@ pub(crate) fn bundle_bytes(topology_json: &str) -> Result<Vec<u8>> {
     bundle_filtered(topology_json, None)
 }
 
-/// One target's zip: `isoloom.yml` and only that target's folder (`docker`, `hybrid`,
+/// One target's zip: `isoloom.yml` and only that target's folder (`docker`, `vagrant`,
 /// `cloud-docker/aws`...), with every one of the project's own files: which ones a target's files
 /// use is Isoloom's to know, and a file left out would break the project where one kept that
 /// isn't run costs a few lines.
