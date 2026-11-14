@@ -97,8 +97,10 @@ seal. On the clouds and the servers (Proxmox, ESXi), machines need the internet 
 themselves up, so the runner seals the network once they are ready, where root in a machine can't
 undo it: at the cloud's own level (a second apply with `isoloom_sealed`), or at a server's router
 (its sealed ruleset applied over SSH). Egress is then limited to the environment's networks. The
-seal fails closed, and every later apply keeps it. [ADR 0004](adr/0004-egress-seal.md) explains
-the design and its one residual channel (the cloud's DNS resolver).
+seal fails closed: a failed seal means the environment is not ready. Every later apply keeps it,
+so a later change can't silently reopen the network. One channel stays open on the clouds: the
+cloud's own DNS resolver still answers for public names, so a machine can still resolve them,
+and a program that tunnels data through DNS lookups can still reach out.
 
 ## Expiry
 

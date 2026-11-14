@@ -16,16 +16,14 @@ maintainer.
 - **Day to day.** Changes land through pull requests that pass CI ([CONTRIBUTING.md](CONTRIBUTING.md)).
   A maintainer reviews and merges them.
 - **Larger decisions** (a new target, a spec change, a crate split, a policy change) are discussed
-  in an issue or a [Discussion](https://github.com/isoloom/isoloom/discussions) first. The ones
-  that shape the design are recorded as
-  [architecture decision records](../docs/explanation/adr/README.md).
+  in an issue or a [Discussion](https://github.com/isoloom/isoloom/discussions) first.
 - **The maintainer decides** when a discussion doesn't reach agreement, and says why.
 
 ## Releases
 
 A maintainer decides when to release and which version number it takes, following the
 [versioning and stability policy](../docs/reference/policies.md). The steps are in
-[Releasing](../docs/dev/releasing.md). Only maintainers push release tags.
+[Releasing](CONTRIBUTING.md#releasing-maintainers). Only maintainers push release tags.
 
 ## Security
 
