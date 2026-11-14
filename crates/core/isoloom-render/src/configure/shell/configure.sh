@@ -268,6 +268,18 @@ isoloom_file() {
   isoloom_attrs "$_path" "$_file_owner" "$_file_group" "$_file_mode"
 }
 
+# The host of URL (https://), as an apt origin names it: without a user (`user@`) or a port
+# (`:8443`); an IPv6 address keeps its brackets (`isoloom_url_host URL`).
+isoloom_url_host() {
+  _h=${1#https://}
+  _h=${_h%%[/?#]*}
+  _h=${_h##*@}
+  case $_h in
+    \[*) printf '%s\n' "${_h%%]*}]" ;;
+    *) printf '%s\n' "${_h%%:*}" ;;
+  esac
+}
+
 # The `repository` step: KIND (apt, rpm or apk) repository NAME at URL, its key from KEY_URL
 # checked against KEY_SHA256, with PRIORITY (empty: the package manager's default), and, for
 # apt, its SUITE and COMPONENT... (`isoloom_repository KIND NAME URL KEY_URL KEY_SHA256
@@ -288,9 +300,9 @@ Components: $*
 Signed-By: $_key
 " || return 1
       if [ -n "$_priority" ]; then
-        _host=${_url#https://}
+        _host=$(isoloom_url_host "$_url")
         isoloom_text "/etc/apt/preferences.d/isoloom-$_name.pref" "Package: *
-Pin: origin ${_host%%/*}
+Pin: origin $_host
 Pin-Priority: $_priority
 " || return 1
       fi

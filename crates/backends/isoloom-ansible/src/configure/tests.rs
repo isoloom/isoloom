@@ -311,3 +311,22 @@ fn each_play_climbs_from_its_folder_back_to_the_project() {
     assert_eq!(super::project_var("./.isoloom-2/external/"), "{{ (playbook_dir + '/../..') | realpath }}");
     assert_eq!(super::project_var("a/b/c"), "{{ (playbook_dir + '/../../..') | realpath }}");
 }
+
+/// An apt pin names the repository's host alone: a port or a user in its URL would pin an
+/// origin apt never matches, so the priority would silently not apply.
+#[test]
+fn an_apt_pin_names_the_host_without_a_port_or_a_user() {
+    let key = "key: { url: \"https://repo.example.com/key.asc\", sha256: 4c3f000000000000000000000000000000000000000000000000000000000000 }";
+    for url in ["https://repo.example.com:8443/deb", "https://user@repo.example.com/deb"] {
+        let m = format!("os: debian@12, app: {{ steps: [{{ repository: {{ name: ex, url: \"{url}\", components: [main], priority: 900, {key} }} }}] }}");
+        let tasks: serde_yaml_ng::Value = serde_yaml_ng::from_str(&tasks(&m, Target::Vagrant, &[])).expect("YAML");
+        let pins: Vec<&str> = tasks
+            .as_sequence()
+            .into_iter()
+            .flatten()
+            .filter_map(|t| t.get("ansible.builtin.copy")?.get("content")?.as_str())
+            .filter(|c| c.contains("Pin:"))
+            .collect();
+        assert_eq!(pins, ["Package: *\nPin: origin repo.example.com\nPin-Priority: 900\n"], "{url}");
+    }
+}
