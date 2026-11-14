@@ -452,6 +452,78 @@ module IsoloomHyperV
     ps(names.map { |n| "if ((Hyper-V\\Get-VMSwitch -Name #{q(n)} -ErrorAction SilentlyContinue) -and -not (Hyper-V\\Get-VMNetworkAdapter -All | Where-Object { $_.SwitchName -eq #{q(n)} })) { Hyper-V\\Remove-VMSwitch -Name #{q(n)} -Force }" }.join("; "))
   end
 end
+# UTM (`vagrant up --provider utm`, vagrant_utm 0.2.0 or later, UTM from GitHub or Homebrew: the
+# App Store build has no vmnet). The plugin makes no adapter for a private network and sets no
+# address in the guest, so Isoloom does it:
+# - each network is an isolated vmnet network (QEMU's `vmnet-host` with a `net-uuid`): the VMs
+#   on it see each other and nothing else, not the host, not another network, and get no DHCP.
+#   Its id is made from this copy's folder and the network's name (`net_uuid`): two copies of an
+#   environment never share a network, and a reload finds its own again;
+# - before each boot (the VM stopped, its configuration editable), the VM's adapters on them, with
+#   the MACs Isoloom gives them, as QEMU arguments of its UTM configuration, the earlier ones of
+#   Isoloom's replaced and the plugin's own (its shared folders) kept (`attach`);
+# - once the guest answers, before its provisioning, each adapter's address set in the guest, found
+#   by its MAC (`address`), as on Hyper-V.
+# Every call to UTM is an Apple event: UTM must be open in this session, and this app allowed to
+# control it (System Settings, Privacy & Security, Automation).
+module IsoloomUtm
+  def self.fail!(message)
+    raise Class.new(Vagrant::Errors::VagrantError) { define_method(:error_message) { "UTM: #{message}" } }
+  end
+
+  # Network `net`'s vmnet id: a UUID (version 4 layout) made from this copy's folder and the
+  # network's name.
+  def self.net_uuid(net)
+    require "digest"
+    h = Digest::SHA256.hexdigest("#{__dir__}\0#{net}")
+    variant = ((h[16].to_i(16) & 0x3) | 0x8).to_s(16)
+    "#{h[0, 8]}-#{h[8, 4]}-4#{h[13, 3]}-#{variant}#{h[17, 3]}-#{h[20, 12]}"
+  end
+
+  # The marker of the QEMU arguments Isoloom puts in a VM's UTM configuration: its netdevs' ids.
+  MARK = "isoloomnet"
+
+  # Replaces the VM's QEMU arguments marked `MARK` with `args`, the others kept (AppleScript, read
+  # from stdin; the VM is stopped).
+  SET_ARGS = <<~'APPLESCRIPT'
+    on run argv
+      set vmId to item 1 of argv
+      set mark to item 2 of argv
+      tell application "UTM"
+        set vm to virtual machine id vmId
+        set config to configuration of vm
+        set kept to {}
+        repeat with arg in (qemu additional arguments of config)
+          if (argument string of arg) does not contain mark then set end of kept to (contents of arg)
+        end repeat
+        repeat with i from 3 to (count of argv)
+          set end of kept to {argument string:(item i of argv)}
+        end repeat
+        set qemu additional arguments of config to kept
+        update configuration of vm with config
+      end tell
+    end run
+  APPLESCRIPT
+
+  # Before the VM boots: an adapter on each network of `nics` (`[[network, mac], ...]`), in
+  # order, a virtio card on the network's vmnet network.
+  def self.attach(machine, nics)
+    require "open3"
+    args = nics.each_with_index.flat_map do |(net, mac), i|
+      ["-netdev vmnet-host,id=#{MARK}#{i},net-uuid=#{net_uuid(net)}",
+       "-device virtio-net-pci,netdev=#{MARK}#{i},mac=#{mac}"]
+    end
+    out, status = Open3.capture2e("osascript", "-", machine.id.to_s, MARK, *args, stdin_data: SET_ARGS)
+    fail!("#{machine.name}'s adapters on the environment's networks couldn't be set: #{out.strip}") unless status.success?
+  end
+
+  # Once the guest answers (a UTM step, so this runs on UTM only), before its provisioning: its
+  # addresses on the networks.
+  def self.address(machine, script)
+    fail!("#{machine.name} didn't answer within #{machine.config.vm.boot_timeout} s") unless machine.communicate.wait_for_ready(machine.config.vm.boot_timeout)
+    machine.communicate.sudo(script)
+  end
+end
 # Vagrant's own check of a host port before forwarding it (`Vagrant::Util::IsPortOpen`) asks
 # `Socket.tcp` with a timeout, and on macOS 27 that hands back a socket for a refused connection
 # (Ruby bug #22223: the retried `connect_nonblock` answers EISCONN while the socket's SO_ERROR
@@ -880,7 +952,7 @@ Vagrant.configure("2") do |config|
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -932,6 +1004,74 @@ Vagrant.configure("2") do |config|
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", "isoloom-vlan-office-#{ISOLOOM_KEY}-servers"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
+      v.cpus = 1
+      v.memory = 512
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["office-vlan10", "02:15:73:b1:19:c0"], ["office-vlan20", "02:15:05:b8:bb:5b"], ["servers", "02:15:5d:44:e9:2b"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:73:b1:19:c0 10.70.10.254/24 || rc=1
+          set_address 02:15:05:b8:bb:5b 10.70.20.254/24 || rc=1
+          set_address 02:15:5d:44:e9:2b 10.70.99.254/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:73:b1:19:c0;mac:02:15:05:b8:bb:5b;mac:02:15:5d:44:e9:2b\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -1053,7 +1193,7 @@ Vagrant.configure("2") do |config|
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1103,6 +1243,72 @@ Vagrant.configure("2") do |config|
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-servers"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "vlan-office-#{ISOLOOM_KEY} - intranet"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["servers", "02:15:a0:bd:8f:2e"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:a0:bd:8f:2e 10.70.99.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:a0:bd:8f:2e\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 # nmcli translates its states (`connecting`) even in its terse output: read them in C.
@@ -1314,7 +1520,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1364,6 +1570,72 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "vlan-office-#{ISOLOOM_KEY} - staff"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["office-vlan10", "02:15:53:77:6e:dc"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:53:77:6e:dc 10.70.10.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:53:77:6e:dc\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 # nmcli translates its states (`connecting`) even in its terse output: read them in C.
@@ -1565,7 +1837,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1615,6 +1887,72 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "vlan-office-#{ISOLOOM_KEY} - guest"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["office-vlan20", "02:15:9c:b5:47:f5"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:9c:b5:47:f5 10.70.20.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:9c:b5:47:f5\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 # nmcli translates its states (`connecting`) even in its terse output: read them in C.
@@ -1772,7 +2110,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1823,6 +2161,73 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
       t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "vlan-office-#{ISOLOOM_KEY} - admin"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["office-vlan10", "02:15:dd:ce:59:29"], ["office-vlan20", "02:15:e3:d0:a1:32"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:dd:ce:59:29 10.70.10.50/24 || rc=1
+          set_address 02:15:e3:d0:a1:32 10.70.20.50/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:dd:ce:59:29;mac:02:15:e3:d0:a1:32\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 # nmcli translates its states (`connecting`) even in its terse output: read them in C.
@@ -2441,6 +2846,15 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "refusal": "`isoloom-router` is on 3 networks, and QEMU gives a VM one"
         },
         {
+          "id": "utm",
+          "hosts": [
+            "macos"
+          ],
+          "plugin": "vagrant_utm",
+          "elevation": "none",
+          "refusal": null
+        },
+        {
           "id": "vmware_esxi",
           "hosts": [
             "linux",
@@ -2681,7 +3095,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "isoloom-router",
         "vm_names": {},
-        "boot_digest": "sha256:53a8de0771114aef5d8728dae6bd792707c240b84c3f9aaa94aa1fa7a5c314fa",
+        "boot_digest": "sha256:be57b55f8053f6237e44d997ceb7d47c6e4bef9059717872b68d74f7ab669c9e",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2709,6 +3123,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
             "box": "cloud-image/debian-12"
           },
           {
+            "provider": "utm",
+            "box": "utm/bookworm"
+          },
+          {
             "provider": "vmware_esxi",
             "box": "bento/debian-12",
             "architecture": "amd64"
@@ -2731,7 +3149,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "intranet",
         "vm_names": {},
-        "boot_digest": "sha256:1c82946b895a0d3e2d8a8592c4328f3a5c9b9fd06b233781f6db254c3a9f01b5",
+        "boot_digest": "sha256:7ebcf488680bd1098e028d9013c82afd37247ac714e9aeef70c5f656d63c693f",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2759,6 +3177,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
             "provider": "qemu",
             "box": "cloud-image/debian-12",
             "architecture": "amd64"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
           },
           {
             "provider": "vmware_esxi",
@@ -2829,6 +3251,13 @@ echo "isoloom-check: END $passed passed, $failed failed"
         },
         {
           "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
+        },
+        {
+          "providers": [
             "vmware_esxi"
           ],
           "protocol": "none",
@@ -2852,7 +3281,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "staff",
         "vm_names": {},
-        "boot_digest": "sha256:099d1b0d167970487171ec1d06c8a9c5e355ebc35488d9fdb035366797735182",
+        "boot_digest": "sha256:66c8c7def900fd1a0dd75031df8cbcf5ab73fa133c5ee9b23ce51a13a82b5d02",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2880,6 +3309,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
             "provider": "qemu",
             "box": "cloud-image/debian-12",
             "architecture": "amd64"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
           },
           {
             "provider": "vmware_esxi",
@@ -2939,6 +3372,13 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
+        },
+        {
+          "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [
@@ -2964,7 +3404,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "guest",
         "vm_names": {},
-        "boot_digest": "sha256:74880142dad247100dcfc68db7b52910f8ddf100d6c1cac51ef73b0021262743",
+        "boot_digest": "sha256:eaade4a62fc58edfc9c21236ded2c0341c9a5587172960023c447b199e3ca930",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2992,6 +3432,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
             "provider": "qemu",
             "box": "cloud-image/debian-12",
             "architecture": "amd64"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
           },
           {
             "provider": "vmware_esxi",
@@ -3051,6 +3495,13 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
+        },
+        {
+          "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [
@@ -3077,7 +3528,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "native": {
         "vagrant": "admin",
         "vm_names": {},
-        "boot_digest": "sha256:940b57153227e3ce110b27e2cb7d3dbe069402ee469e91d9589a51c65b7258cc",
+        "boot_digest": "sha256:8bcdf4a973d97376ab4fbacb475b639b9dd46d874fe9b6084122b76537724924",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3105,6 +3556,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
             "provider": "qemu",
             "box": "cloud-image/debian-12",
             "architecture": "amd64"
+          },
+          {
+            "provider": "utm",
+            "box": "utm/bookworm"
           },
           {
             "provider": "vmware_esxi",
@@ -3164,6 +3619,13 @@ echo "isoloom-check: END $passed passed, $failed failed"
           "source": {
             "from": "qemu_monitor"
           }
+        },
+        {
+          "providers": [
+            "utm"
+          ],
+          "protocol": "none",
+          "note": "UTM shows a VM's screen over SPICE only, which Isoloom doesn't relay"
         },
         {
           "providers": [
