@@ -34,7 +34,7 @@ pub(crate) fn environment_blocks(env: &Environment) -> Expression {
 pub(crate) fn refusal(env: &Environment, cloud: &str) -> Option<String> {
     let (net, _) = env.networks.iter().find(|(n, _)| crate::seal::any(env) && crate::seal::closed(env, n))?;
     Some(format!(
-        "network `{net}` has no internet: {cloud}'s firewalls only allow, and each machine's is made with it, so the apply couldn't close its way out once its machines are set up"
+        "network `{net}` has no internet: {cloud} can't seal an offline network (its firewalls only allow, and each machine's is made with it, so nothing made after the set-up can close its way out). Use `internet: true` (outbound only: nothing is reachable from outside but the published ports and SSH from allowed_cidr), or a provider that seals (AWS, Azure, GCP, OCI, Proxmox)"
     ))
 }
 

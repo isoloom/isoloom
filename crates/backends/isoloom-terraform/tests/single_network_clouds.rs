@@ -84,7 +84,7 @@ fn refusals_keep_their_messages() -> Outcome {
     // machines are set up.
     for (name, net) in [("hello-stack", "app"), ("segmented", "back")] {
         let sealed = s(&format!(
-            "network `{net}` has no internet: Linode's firewalls only allow, and each machine's is made with it, so the apply couldn't close its way out once its machines are set up"
+            "network `{net}` has no internet: Linode can't seal an offline network (its firewalls only allow, and each machine's is made with it, so nothing made after the set-up can close its way out). Use `internet: true` (outbound only: nothing is reachable from outside but the published ports and SSH from allowed_cidr), or a provider that seals (AWS, Azure, GCP, OCI, Proxmox)"
         ));
         assert_eq!(
             refusals(name)?,
@@ -124,4 +124,52 @@ fn an_os_without_an_image_is_refused() -> Outcome {
     );
     assert_eq!(CloudVmBackend.refusal(&e).map(|r| r.starts_with("no cloud can run it (")), Some(true));
     Ok(())
+}
+
+/// With internet, DigitalOcean's and Linode's firewalls let nothing in from outside but SSH and
+/// the published ports from allowed_cidr: every other inbound rule is from the environment's own
+/// networks, and none from anywhere (`0.0.0.0/0`, `::/0`).
+#[test]
+fn an_open_network_on_the_allow_only_clouds_lets_in_ssh_and_the_published_ports_alone() -> Outcome {
+    let yaml = "version: 1\nname: o\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, ports: { site: { port: 80, publish: 8080 } }, app: { steps: [{ run: web.sh }] } }\n";
+    for cloud in [Cloud::DigitalOcean, Cloud::Linode] {
+        let tf = testing::cloud_vm(cloud, yaml)?;
+        let mut from_outside = Vec::new();
+        for block in inbound(&tf) {
+            assert!(!block.contains("0.0.0.0/0") && !block.contains("::/0"), "{cloud:?}: {block}");
+            if block.contains("var.allowed_cidr") {
+                from_outside.push(block);
+            }
+        }
+        assert!(!from_outside.is_empty(), "{cloud:?}: SSH from allowed_cidr");
+        for block in from_outside {
+            assert!(
+                block.contains("\"22\"") || block.contains("\"8080\""),
+                "{cloud:?}: only SSH and 8080 from outside: {block}"
+            );
+        }
+        assert!(tf.contains("\"8080\""), "{cloud:?}: the published port");
+    }
+    Ok(())
+}
+
+/// The inbound rule blocks of a module: DigitalOcean's `inbound_rule`, Linode's `inbound`.
+fn inbound(tf: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut lines = tf.lines();
+    while let Some(line) = lines.next() {
+        let t = line.trim();
+        if t == "inbound_rule {" || t == "inbound {" {
+            let mut block = String::new();
+            for l in lines.by_ref() {
+                if l.trim() == "}" {
+                    break;
+                }
+                block.push_str(l.trim());
+                block.push(' ');
+            }
+            out.push(block);
+        }
+    }
+    out
 }
