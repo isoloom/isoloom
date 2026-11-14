@@ -224,3 +224,33 @@ fn google_cloud_sets_the_mtu_and_the_others_refuse_it() -> Outcome {
     assert_eq!(mtus(&none)?, ["1500", "1500"]);
     Ok(())
 }
+
+/// A machine's Azure security group numbers its allow rules from 100 in steps of 10 below the
+/// deny rule at 4000: a machine needing more than fit is refused, never given rules at or past
+/// the deny (which never apply) or past 4096 (which Azure refuses).
+#[test]
+fn azure_refuses_a_machine_with_more_allow_rules_than_fit_below_its_deny_rule() -> Outcome {
+    let spec = |ports: u16| {
+        let list: Vec<String> = (1..=ports).map(|p| (2000 + p).to_string()).collect();
+        format!(
+            "version: 1\nname: many\nnetworks:\n  a: {{ cidr: 10.70.0.0/24 }}\n  b: {{ cidr: 10.70.1.0/24 }}\nreach: [{{ from: a, to: b, ports: [{}] }}]\nmachines:\n  x: {{ networks: {{ a: 10 }}, os: debian@12, app: {{ steps: [{{ run: x.sh }}] }} }}\n  y: {{ networks: {{ b: 10 }}, os: debian@12, app: {{ steps: [{{ run: y.sh }}] }} }}\n",
+            list.join(", ")
+        )
+    };
+    // y: its network, SSH, then each port in TCP and UDP: 2 + 2 * 190 = 382 rules fit (390).
+    assert_eq!(refusal(Cloud::Azure, &env(&spec(190))?), None);
+    let tf = parsed(Cloud::Azure, &env(&spec(190))?)?;
+    let priorities: Vec<u64> = hcl_nested(resource(&tf, "azurerm_network_security_group", "y"), "security_rule")
+        .iter()
+        .filter(|r| hcl_text(r.body(), "access") == "Allow" && hcl_text(r.body(), "direction") == "Inbound")
+        .map(|r| hcl_text(r.body(), "priority").parse().unwrap_or(u64::MAX))
+        .collect();
+    assert!(priorities.iter().all(|p| *p < 4000) && priorities.len() == 382, "{priorities:?}");
+    // 2 + 2 * 200 = 402: past the deny rule.
+    let why = refusal(Cloud::Azure, &env(&spec(200))?).ok_or("Azure takes 402 rules")?;
+    assert!(
+        why.starts_with("machine `y` needs 402 inbound rules on Azure") && why.contains("holds 390"),
+        "{why}"
+    );
+    Ok(())
+}

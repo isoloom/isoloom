@@ -105,20 +105,33 @@ pub(super) struct Nsg {
 /// Where the rest of the virtual network is denied inbound: after every allow rule.
 const DENY_VNET: u64 = 4000;
 
+/// The first allow rule's priority, and the step between two.
+const FIRST: u64 = 100;
+const STEP: u64 = 10;
+
+/// The most allow rules a group holds below its deny rule ([`DENY_VNET`]): priorities 100 to
+/// 3990, in steps of 10.
+pub(in crate::cloud::azure) const MAX_ALLOWS: u64 = (DENY_VNET - FIRST) / STEP;
+
 impl Nsg {
     /// The group `id` (its name in the cloud: `<env>-<who>`).
     pub(super) fn new(id: &str, who: &str) -> Nsg {
         Nsg {
             block: placed("azurerm_network_security_group", id, name_with(&format!("-{who}"))),
-            priority: 100,
+            priority: FIRST,
         }
+    }
+
+    /// How many allow rules it holds.
+    pub(super) fn allows(&self) -> u64 {
+        (self.priority - FIRST) / STEP
     }
 
     /// An inbound allow rule (`protocol`: `*`, `Tcp` or `Udp`; `port`: a port or `*`).
     #[must_use]
     pub(super) fn allow(mut self, name: &str, protocol: &str, port: &str, from: Expression) -> Nsg {
         self.block = self.block.add_block(rule(name, self.priority, ("Inbound", protocol, port), from));
-        self.priority += 10;
+        self.priority += STEP;
         self
     }
 
