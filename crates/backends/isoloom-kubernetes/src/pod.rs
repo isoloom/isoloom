@@ -14,7 +14,7 @@ use crate::kustomize::{SCRIPTS, SCRIPTS_DIR, run_script};
 use crate::machine::{Machine, udp};
 use crate::network::MACHINE_LABEL;
 use crate::objects::{
-    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, Image, Limits, NameValue, PodAffinity, PodSpec, Resources,
+    Affinity, AffinityTerm, Container, ContainerPort, ContainerSecurity, EmptyDir, EnvVar, FixedVar, Image, Limits, NameValue, PodAffinity, PodSpec, Resources,
     SecretKey, SecretSource, Selector, Volume, VolumeMount, VolumeSource,
 };
 use crate::process;
@@ -163,7 +163,7 @@ fn env(m: &Machine) -> Vec<EnvVar> {
     });
     fixed
         .into_iter()
-        .map(|(name, value)| EnvVar::Value(NameValue { name, value }))
+        .map(|(name, value)| EnvVar::Value(FixedVar { name, value }))
         .chain(inputs)
         .collect()
 }
