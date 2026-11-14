@@ -954,6 +954,8 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web/web", 8080)]]); IsoloomHyperV.prune(["isoloom-solo-web-#{ISOLOOM_KEY}-app"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -2069,12 +2071,10 @@ echo "isoloom-check: END $passed passed, $failed failed"
     ]
   },
   "recovery": {
-    "stale_markers": [
-      "verr_already_exists",
-      "could not rename",
-      "is locked",
-      "different provider",
-      "single provider at a time"
+    "leftovers": [
+      "virtualbox_name_taken",
+      "machine_locked",
+      "other_provider"
     ],
     "steps": [
       {

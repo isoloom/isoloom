@@ -248,7 +248,7 @@
     ]
   },
   "recovery": {
-    "stale_markers": ["verr_already_exists", "could not rename", "is locked", "different provider", "single provider at a time"],
+    "leftovers": ["virtualbox_name_taken","machine_locked","other_provider"],
     "steps": [
       { "id": "destroy", "argv": ["vagrant", "destroy", "--force"], "timeout_s": 180, "when": "always", "failure": "tolerate" },
       { "id": "orphans", "action": "vagrant.remove_orphans", "providers": ["virtualbox", "parallels"], "when": "always", "failure": "tolerate" },

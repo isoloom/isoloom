@@ -5,7 +5,9 @@
 
 use std::num::NonZeroU32;
 
-use isoloom_manifest::{Action, Condition, Lifecycle, Name, NonEmpty, Park, Placeholder, Provider, Provision, Recovery, Retries, Step, StepId, Template};
+use isoloom_manifest::{
+    Action, Condition, Leftover, Lifecycle, Name, NonEmpty, Park, Placeholder, Provider, Provision, Recovery, Retries, Step, StepId, Template,
+};
 use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{act, cleanup, noted, run, tolerated};
 
@@ -46,16 +48,6 @@ const HYPERV_STATUS_PER_VM_S: u32 = 30;
 const VIRTUALBOX_STATUS_BASE_S: u32 = 40;
 /// What each VM adds to a status read on VirtualBox.
 const VIRTUALBOX_STATUS_PER_VM_S: u32 = 20;
-
-/// What a failed start's output says when it tripped over a previous run's leftovers, not over
-/// the environment (VirtualBox's names taken, a lock, a record on another provider).
-const STALE_MARKERS: [&str; 5] = [
-    "verr_already_exists",
-    "could not rename",
-    "is locked",
-    "different provider",
-    "single provider at a time",
-];
 
 /// Ansible's failure line on the controller: the last one leads a failed step's error.
 const ANSIBLE_VERDICT: &str = "fatal: \\[[^\\]]+\\]: (UNREACHABLE|FAILED)!.*";
@@ -272,7 +264,7 @@ pub(super) fn recovery() -> Result<Recovery> {
     destroy.note = Some("Clearing what an earlier run left, then starting again…".into());
     let reset = act("reset", Action::VagrantResetState)?;
     Ok(Recovery {
-        stale_markers: STALE_MARKERS.map(String::from).into(),
+        leftovers: vec![Leftover::VirtualboxNameTaken, Leftover::MachineLocked, Leftover::OtherProvider],
         steps: vec![destroy, orphans()?, reset],
         retries: Retries::new(1)?,
         apply_retries: None,

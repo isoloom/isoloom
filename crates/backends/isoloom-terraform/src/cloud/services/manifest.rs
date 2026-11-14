@@ -93,7 +93,7 @@ pub(super) fn manifest(env: &Environment, cloud: &CloudServices) -> Result<Manif
         }],
         checks: crate::module::manifest::checks(Vec::new()),
         recovery: Some(Recovery {
-            stale_markers: Vec::new(),
+            leftovers: Vec::new(),
             steps: Vec::new(),
             retries: Retries::default(),
             apply_retries: Some(Retries::new(cloud.apply_retries.min(MAX_RETRIES))?),
