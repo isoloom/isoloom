@@ -19,6 +19,7 @@ use super::{Spec, old_keys};
 pub fn parse(yaml: &str) -> Result<Spec, Problems> {
     let spans = Spans::of(yaml);
     let mut doc: Value = serde_yaml_ng::from_str(yaml).map_err(|e| vec![yaml_problem(&e)])?;
+    crate::as_written::keep(yaml, &mut doc, crate::as_written::environment);
     let mut problems = old_keys::scan(&doc);
     let clones = crate::clones::expand(&mut doc).unwrap_or_else(|refused| {
         problems.extend(refused);
