@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that ISOTHRUM_REF pins the Isothrum runner the real runs build: a release tag (vX.Y.Z)
-# or a commit SHA, never a branch, so a run is reproducible (docs/dev/ci-real-hosts.md).
+# or a commit SHA, never a branch, so a run is reproducible.
 #
 # Usage: isothrum-ref.sh required|optional
 # Exit 0: pinned. Exit 3: unset and optional (the runs that need the runner are skipped).
@@ -9,7 +9,7 @@ set -euo pipefail
 
 mode="${1:?required or optional}"
 ref="${ISOTHRUM_REF:-}"
-help="an Isothrum release tag (vX.Y.Z) or commit SHA; docs/dev/ci-real-hosts.md"
+help="an Isothrum release tag (vX.Y.Z) or commit SHA"
 
 if [ -z "$ref" ]; then
   if [ "$mode" = optional ]; then

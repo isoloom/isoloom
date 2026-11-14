@@ -182,7 +182,7 @@ fn ci_runs_every_gate_the_release_gate_runs() -> Outcome {
     Ok(())
 }
 
-/// The repository's Markdown files a workflow points its reader to (`docs/dev/releasing.md`,
+/// The repository's Markdown files a workflow points its reader to (`.github/CONTRIBUTING.md`,
 /// `SECURITY.md`): each word ending in `.md` in its comments and in the notices it prints, from
 /// the root. Its commands' own files (release notes it writes) aren't pointers.
 fn named_documents(text: &str) -> BTreeSet<String> {
