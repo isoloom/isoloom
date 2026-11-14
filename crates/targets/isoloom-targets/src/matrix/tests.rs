@@ -376,6 +376,11 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
         "kubernetes",
         "the base has no port, so no Service whose IP families the IPv6 side sets",
     ),
+    (
+        "machines.*.hardware.nested_virtualization",
+        "proxmox",
+        "an amd64 VM always takes the server's CPU (cpu.type = host), which nests; an arm64 one is refused",
+    ),
 ];
 
 /// Rows a target marks generated without its files changing, and no reason found yet: each one
@@ -384,11 +389,6 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
 const SUSPECTED_DROPS: &[(&str, &str, &str)] = &[
     ("machines.*.dns", "vagrant", "unverified: Proxmox and ESXi write the resolver, these don't"),
     ("machines.*.dns", "cloud-vm", "unverified: Proxmox and ESXi write the resolver, these don't"),
-    (
-        "machines.*.hardware.nested_virtualization",
-        "proxmox",
-        "unverified: the VM's CPU type is the same either way",
-    ),
 ];
 
 /// The target's own files `lab` generates on `target`, or None when it doesn't generate: the

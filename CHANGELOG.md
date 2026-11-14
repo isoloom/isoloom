@@ -85,6 +85,8 @@ stable spec format.
 
 ### Fixed
 
+- **Proxmox refuses `nested_virtualization` on an arm64 VM (#324),** whose CPU QEMU emulates, so it
+  can't nest.
 - **A Linux VM mounts its `tmpfs` entries (#322),** in fstab and at once (or remounts a path that
   is one already), where the VM targets wrote nothing for them; a Windows machine's `tmpfs` is
   refused at validation.

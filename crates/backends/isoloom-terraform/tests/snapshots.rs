@@ -144,7 +144,10 @@ fn an_arm64_vm_running_vms_inside_is_refused_on_proxmox_and_an_amd64_one_takes_t
     let nested = |arch: &str| one_vm(&format!("os: debian@12, hardware: {{ arch: {arch}, nested_virtualization: true }}"));
     let arm = planned(&nested("arm64")?, Target::Proxmox)?;
     let why = ProxmoxBackend.refusal(&arm).unwrap_or_default();
-    assert!(why.contains("machine `w` runs VMs inside (`nested_virtualization`), and an arm64 VM's CPU is emulated"), "{why}");
+    assert!(
+        why.contains("machine `w` runs VMs inside (`nested_virtualization`), and an arm64 VM's CPU is emulated"),
+        "{why}"
+    );
     let amd = ProxmoxBackend.render(&planned(&nested("amd64")?, Target::Proxmox)?)?;
     let main = file(&amd, "proxmox/main.tf")?;
     assert!(main.contains("type  = \"host\"") || main.contains("type = \"host\""), "{main}");
