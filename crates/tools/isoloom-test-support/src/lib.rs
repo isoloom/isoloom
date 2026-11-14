@@ -15,6 +15,10 @@
 //! A test-only crate: it panics where a test should fail.
 
 #![expect(clippy::panic, reason = "a test-support helper fails the test that called it")]
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests' helpers run the tools a test checks generated files with: this crate is their adapter"
+)]
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output};

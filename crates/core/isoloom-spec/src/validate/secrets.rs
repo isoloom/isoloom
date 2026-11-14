@@ -9,19 +9,19 @@ use super::{Problems, is_variable};
 use crate::model::{MachineSecret, SecretSource, Spec, after_drive};
 
 /// The declared secrets, then every machine's.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
     for (name, source) in &spec.secrets {
         let at = format!("secrets.{name}");
         if name.len() > KEBAB_MAX {
-            p.add(&at, format!("secret names are at most {KEBAB_MAX} characters"));
+            problems.add(&at, format!("secret names are at most {KEBAB_MAX} characters"));
         } else if !is_kebab(name) {
-            p.add(&at, "secret names are kebab-case: lowercase letters, digits and dashes (e.g. db-password)");
+            problems.add(&at, "secret names are kebab-case: lowercase letters, digits and dashes (e.g. db-password)");
         }
         if let Some(why) = source_problem(source) {
-            p.add(format!("{at}.{}", source.store()), why);
+            problems.add(format!("{at}.{}", source.store()), why);
         }
         if !spec.machines.values().any(|m| m.secrets.iter().any(|s| s.source() == name)) {
-            p.add(at, "no machine gets it: place it as a file, `files: [{ path, secret: <name> }]`");
+            problems.add(at, "no machine gets it: place it as a file, `files: [{ path, secret: <name> }]`");
         }
     }
     for (machine, m) in &spec.machines {
@@ -29,14 +29,14 @@ pub(super) fn check(spec: &Spec, p: &mut Problems) {
         let mut paths = BTreeSet::new();
         for (i, s) in m.secrets.iter().enumerate() {
             let at = format!("machines.{machine}.secrets[{i}]");
-            of_machine(spec, &at, s, p);
+            of_machine(spec, &at, s, problems);
             if windows {
-                on_windows(&at, s, p);
+                on_windows(&at, s, problems);
             } else {
-                safe_path(&at, &s.path(), p);
+                check_secret_path(&at, &s.path(), problems);
             }
             if !paths.insert(s.path()) {
-                p.add(at, format!("`{}` already holds another secret of this machine", s.path()));
+                problems.add(at, format!("`{}` already holds another secret of this machine", s.path()));
             }
         }
     }
@@ -69,7 +69,7 @@ fn split_reference(r: &str) -> bool {
 }
 
 /// One secret of a machine: declared.
-fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, p: &mut Problems) {
+fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, problems: &mut Problems) {
     let source = s.source();
     if !spec.secrets.contains_key(source) {
         let known: Vec<&str> = spec.secrets.keys().map(String::as_str).collect();
@@ -78,7 +78,7 @@ fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, p: &mut Problems) {
         } else {
             format!("{at}.source")
         };
-        p.unknown(
+        problems.unknown(
             field,
             if known.is_empty() {
                 format!("`{source}` isn't declared: add it under the top-level `secrets` with its store (`{{ env: VAR }}`, `{{ file: path }}`...)")
@@ -91,9 +91,9 @@ fn of_machine(spec: &Spec, at: &str, s: &MachineSecret, p: &mut Problems) {
 
 /// A path a Compose mount target and a Kubernetes mount path can be: no spaces or ':' (the
 /// short syntaxes split on them), no `..`, not a directory.
-fn safe_path(at: &str, path: &str, p: &mut Problems) {
+fn check_secret_path(at: &str, path: &str, problems: &mut Problems) {
     if path.split('/').any(|c| c == "..") || path.contains([':', ' ', '\t']) || path.ends_with('/') {
-        p.add(
+        problems.add(
             format!("{at}.target"),
             format!("`{path}` isn't a safe file path inside the machine (no spaces, ':' or '..'), like /etc/app/db-password"),
         );
@@ -102,18 +102,18 @@ fn safe_path(at: &str, path: &str, p: &mut Problems) {
 
 /// A Windows machine's secret: a file path from `/` or on a drive, and no owner or mode (the
 /// file is readable by SYSTEM and Administrators only, which a Unix mode can't say).
-fn on_windows(at: &str, s: &MachineSecret, p: &mut Problems) {
+fn on_windows(at: &str, s: &MachineSecret, problems: &mut Problems) {
     let path = s.path();
     let rest = after_drive(&path).unwrap_or(&path);
     if rest.split(['/', '\\']).any(|c| c == "..") || rest.contains(':') || rest.ends_with(['/', '\\']) {
-        p.add(
+        problems.add(
             format!("{at}.target"),
             format!("`{path}` isn't a file path on the machine (no ':' past the drive, no '..'), like C:\\app\\db-password"),
         );
     }
     let m = s.mount();
     if m.uid.is_some() || m.gid.is_some() || m.mode.is_some() {
-        p.add(
+        problems.add(
             at,
             "a Windows machine's secret has no `uid`, `gid` or `mode`: its file is readable by SYSTEM and Administrators only",
         );

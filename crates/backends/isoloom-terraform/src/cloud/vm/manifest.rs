@@ -16,7 +16,7 @@ use isoloom_render::run_manifest::{held_secrets, outputs_with, timeout_s};
 use crate::module::manifest::terraform_output as state;
 use isoloom_spec::model::Target;
 
-use super::Driver;
+use super::VmDriver;
 use crate::cloud::manifest::{Frame, Guest, connection, steps};
 use crate::cloud::{Cloud, operator};
 use crate::machine::controller;
@@ -41,7 +41,7 @@ fn at(machine: &str) -> Result<Template, ManifestError> {
 }
 
 /// The run manifest of `env` on `cloud`, whose module `driver` writes.
-pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &Driver) -> Result<isoloom_manifest::Manifest, ManifestError> {
+pub(crate) fn manifest(env: &Environment, cloud: Cloud, driver: &VmDriver) -> Result<isoloom_manifest::Manifest, ManifestError> {
     let mut guests: Vec<Guest> = env
         .vms()
         .filter(|vm| !vm.plan.is_windows())

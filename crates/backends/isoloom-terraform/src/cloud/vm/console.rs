@@ -45,9 +45,9 @@ pub(crate) fn opens_rdp(env: &Environment, vm: Vm<'_>) -> bool {
 
 /// The module's output of the Windows machines' password, when a Windows machine's Remote
 /// Desktop is reached: sensitive, so `terraform output` hides it and the runner masks it.
-pub(crate) fn outputs(env: &Environment, m: &mut Module) {
+pub(crate) fn outputs(env: &Environment, module: &mut Module) {
     if env.vms().any(|vm| opens_rdp(env, vm)) {
-        m.commented(
+        module.commented(
             "The Windows machines' administrator password (user isoloom), for their Remote Desktop.",
             Block::builder("output")
                 .add_label(PASSWORD_OUTPUT)

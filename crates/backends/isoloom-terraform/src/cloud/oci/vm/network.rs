@@ -46,25 +46,25 @@ fn display(net: &str) -> Expression {
 }
 
 /// The VCN, its internet gateway and route tables, a security list and a subnet per network.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let cidrs: Vec<String> = env.networks.values().map(|n| n.cidr.to_string()).collect();
     let vcn = owned(resource("oci_core_vcn", "env")).add_attribute(("display_name", reference("local.name")));
     let vcn = match cidrs.as_slice() {
         [one] => vcn.add_attribute(("cidr_block", string(one.as_str()))),
         many => vcn.add_attribute(("cidr_blocks", list(many.iter().map(|c| string(c.as_str()))))),
     };
-    m.commented(
+    module.commented(
         "The environment's networks: a VCN holding each one's block, routed to the internet.",
         ipv6_vcn(env, vcn).build(),
     );
-    m.block(in_vcn(resource("oci_core_internet_gateway", "env"), reference("local.name")).build());
-    m.block(
+    module.block(in_vcn(resource("oci_core_internet_gateway", "env"), reference("local.name")).build());
+    module.block(
         in_vcn(resource("oci_core_route_table", "env"), reference("local.name"))
             .add_block(route_out())
             .build(),
     );
     for (net, p) in &env.networks {
-        m.commented(
+        module.commented(
             &format!("Network `{net}`: what may reach its machines, and where they may go."),
             security_list(env, (net, p)),
         );
@@ -84,10 +84,10 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                     .build(),
             );
         }
-        m.block(subnet.build());
+        module.block(subnet.build());
         // A routed network's seal comes with its own table (`gateway_routes`).
         if closed(env, net) && routed(env).is_empty() {
-            sealed(env, net, Vec::new(), m);
+            sealed(env, net, Vec::new(), module);
         }
     }
 }
@@ -263,7 +263,7 @@ fn gateway_ip(hop: &Hop, net: &str) -> Option<(String, Block)> {
 
 /// With a machine routing a network: each network's own route table, attached to its subnet
 /// once the gateways exist, and the gateways' private IPs it names.
-pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
+pub(super) fn gateway_routes(env: &Environment, module: &mut Module) {
     if routed(env).is_empty() {
         return;
     }
@@ -273,7 +273,7 @@ pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
         for hop in through(env, net) {
             let Some((id, data)) = gateway_ip(&hop, net) else { continue };
             if !lookups.contains(&id) {
-                m.block(data);
+                module.block(data);
                 lookups.push(id.clone());
             }
             let ip = attr(index(reference(&format!("data.oci_core_private_ips.{id}.private_ips")), 0), "id");
@@ -287,14 +287,14 @@ pub(super) fn gateway_routes(env: &Environment, m: &mut Module) {
         if closed(env, net) {
             // Through its gateway once sealed; until then the internet table, the VCN routing
             // between its subnets itself.
-            sealed(env, net, hops, m);
+            sealed(env, net, hops, module);
             continue;
         }
         let table = in_vcn(resource("oci_core_route_table", &ident(net)), display(net))
             .add_block(route_out())
             .add_blocks(hops);
-        m.block(table.build());
-        m.block(
+        module.block(table.build());
+        module.block(
             resource("oci_core_route_table_attachment", &ident(net))
                 .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(net)))))
                 .add_attribute(("route_table_id", reference(&format!("oci_core_route_table.{}.id", ident(net)))))

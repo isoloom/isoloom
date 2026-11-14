@@ -396,10 +396,7 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
 /// Rows a target marks generated without its files changing, and no reason found yet: each one
 /// is either a field the backend drops (to refuse or render) or a reason to move above. Listed so
 /// the test holds every other row; none may be added without one of those two outcomes.
-const SUSPECTED_DROPS: &[(&str, &str, &str)] = &[
-    ("machines.*.dns", "vagrant", "unverified: Proxmox and ESXi write the resolver, these don't"),
-    ("machines.*.dns", "cloud-vm", "unverified: Proxmox and ESXi write the resolver, these don't"),
-];
+const SUSPECTED_DROPS: &[(&str, &str, &str)] = &[];
 
 /// The target's own files `lab` generates on `target`, or None when it doesn't generate: the
 /// resolved snapshot and `.gitignore` that go with every target are left out, since the

@@ -20,8 +20,8 @@ pub(crate) const fn with_token<'a>(folder: &'a str, auth: &'a str) -> Usage<'a> 
 }
 
 /// A provider configured by the environment alone (its token): `provider "<name>" {}`.
-pub(crate) fn bare_provider(m: &mut Module, name: &str) {
-    m.block(Block::builder("provider").add_label(name).build());
+pub(crate) fn bare_provider(module: &mut Module, name: &str) {
+    module.block(Block::builder("provider").add_label(name).build());
 }
 
 /// Who may reach the machines, the operator's key (both halves: Terraform signs in to wait for

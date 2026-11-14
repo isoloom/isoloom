@@ -19,9 +19,10 @@ use crate::objects::{Container, EmptyDir, Image, KeyToPath, Volume, VolumeMount,
 pub(crate) const SECRETS: &str = "isoloom-secrets";
 /// The pod volume a machine's secrets are mounted from.
 const VOLUME: &str = "isoloom-secrets";
-/// The memory-backed `emptyDir` holding the secrets with an owner, and the init container
-/// filling it.
-const OWNED: &str = "isoloom-secrets-owned";
+/// The memory-backed `emptyDir` holding the secrets with an owner.
+const OWNED_VOLUME: &str = "isoloom-secrets-owned";
+/// The init container filling [`OWNED_VOLUME`].
+const OWNED_CONTAINER: &str = "isoloom-secrets-owned";
 /// Where the init container sees the Secret's files and the `emptyDir`.
 const DIR: &str = "/isoloom-secrets";
 
@@ -36,7 +37,7 @@ pub(crate) fn volumes(m: &Machine) -> Vec<Volume> {
     let mut out: Vec<Volume> = volume(m).into_iter().collect();
     if m.plan.secrets.iter().any(owned) {
         out.push(Volume {
-            name: OWNED.into(),
+            name: OWNED_VOLUME.into(),
             source: VolumeSource::EmptyDir(EmptyDir {
                 medium: Some("Memory"),
                 size_limit: None,
@@ -68,13 +69,13 @@ pub(crate) fn init_container(m: &Machine) -> Option<Container> {
     if script.is_empty() {
         return None;
     }
-    let mut c = Container::new(OWNED, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
+    let mut c = Container::new(OWNED_CONTAINER, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
     c.command = vec!["sh".into(), "-c".into(), script.join(" && ")];
     // As the image's own user: the secrets' files are written for the machine that reads them.
     c.security_context = Some(crate::security::image_user());
     c.volume_mounts = vec![
         VolumeMount::read_only(VOLUME, format!("{DIR}/in")),
-        VolumeMount::at(OWNED, format!("{DIR}/out")),
+        VolumeMount::at(OWNED_VOLUME, format!("{DIR}/out")),
     ];
     Some(c)
 }
@@ -111,7 +112,7 @@ pub(crate) fn mounts(m: &Machine) -> Vec<VolumeMount> {
         .iter()
         .map(|s| VolumeMount {
             sub_path: Some(s.name.clone()),
-            ..VolumeMount::read_only(if owned(s) { OWNED } else { VOLUME }, &s.path)
+            ..VolumeMount::read_only(if owned(s) { OWNED_VOLUME } else { VOLUME }, &s.path)
         })
         .collect()
 }

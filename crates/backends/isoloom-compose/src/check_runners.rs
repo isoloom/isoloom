@@ -82,7 +82,7 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
     match pos {
         Position::Machine(name) => {
             if let Some(m) = Machine::of(env, name) {
-                let ns = namespace(env, m, &mut c, services);
+                let ns = join_namespace(env, m, &mut c, services);
                 c.network_mode = Some(NetworkMode::Service(ns));
             }
         }
@@ -91,9 +91,10 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
     c
 }
 
-/// The namespace a machine's checks run in: its own container, else the stand-in (added once,
-/// with its sidecar, both only started with the check profile).
-fn namespace(env: &Environment, m: Machine<'_>, c: &mut Service, services: &mut IndexMap<String, Service>) -> String {
+/// Puts check service `c` in the namespace a machine's checks run in, and names it: the
+/// machine's own container, else the stand-in (added to `services` once, with its sidecar, both
+/// only started with the check profile).
+fn join_namespace(env: &Environment, m: Machine<'_>, c: &mut Service, services: &mut IndexMap<String, Service>) -> String {
     // An access machine lives in the `access` profile (the runner brings it up on demand), so a
     // check in the `check` profile can't share its namespace: it uses the stand-in (a check-profile
     // idle container at the same addresses) instead, even when the access box has a container form.

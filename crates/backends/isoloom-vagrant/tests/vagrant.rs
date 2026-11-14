@@ -1,6 +1,11 @@
 //! The Vagrant backend's rendering of a few examples, as snapshots, its determinism, and its
 //! refusals from the plan.
 
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
+
 use std::error::Error;
 use std::path::Path;
 use std::process::Command;
@@ -346,6 +351,91 @@ fn qemu_hub_ports(example: &str, dir: &Path, running: bool) -> Outcome<(Vec<(Str
     Ok((ports, vagrantfile))
 }
 
+/// A test's scratch folder that, dropped, stops every QEMU hub a Vagrantfile under it left
+/// running, found by its pid file: a hub runs as a daemon (`-daemonize`), so one a test leaves
+/// outlives it, holding every file it inherited open. [`HubScratch::no_hub_left`] fails the test
+/// that left one.
+struct HubScratch(tempfile::TempDir);
+
+impl HubScratch {
+    fn new(prefix: &str) -> Outcome<HubScratch> {
+        Ok(HubScratch(tempfile::Builder::new().prefix(prefix).tempdir()?))
+    }
+
+    fn path(&self) -> &Path {
+        self.0.path()
+    }
+
+    /// Stops the hubs still running under the folder: each pid file's process, when it is the
+    /// hub (its command names the pid file, as `IsoloomQemu.running` checks), not another process
+    /// given the id since. Those it found running, by pid file, each said stopped or not.
+    fn stop_hubs(&self) -> Vec<String> {
+        let mut stopped = Vec::new();
+        for pid_file in hub_pid_files(self.path()) {
+            let Some(pid) = std::fs::read_to_string(&pid_file).ok().and_then(|s| s.trim().parse::<u32>().ok()) else {
+                continue;
+            };
+            let command = Command::new("ps").args(["-ww", "-o", "command=", "-p", &pid.to_string()]).output();
+            if command.is_ok_and(|c| String::from_utf8_lossy(&c.stdout).contains(&*pid_file.to_string_lossy())) {
+                // A stand-in or a real hub alike: neither needs a clean stop here.
+                let killed = Command::new("kill").args(["-KILL", &pid.to_string()]).status();
+                let how = if killed.is_ok_and(|k| k.success()) { "stopped" } else { "not stopped" };
+                stopped.push(format!("{} (pid {pid}, {how})", pid_file.display()));
+            }
+        }
+        stopped
+    }
+
+    /// Fails when a hub still runs under the folder (stopping it): a test stops what it starts.
+    fn no_hub_left(&self) -> Outcome {
+        let left = self.stop_hubs();
+        if left.is_empty() {
+            Ok(())
+        } else {
+            Err(format!("QEMU hubs outlived the test: {left:?}").into())
+        }
+    }
+}
+
+impl Drop for HubScratch {
+    fn drop(&mut self) {
+        self.stop_hubs();
+    }
+}
+
+/// The hubs' pid files under `dir`: `.vagrant/isoloom-qemu-hubs/<network>.pid` beside each
+/// Vagrantfile.
+fn hub_pid_files(dir: &Path) -> Vec<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+    let mut found = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if entry.file_type().is_ok_and(|t| t.is_dir()) {
+            found.extend(hub_pid_files(&path));
+        } else if path.extension().is_some_and(|e| e == "pid") && path.parent().and_then(Path::file_name).is_some_and(|n| n == "isoloom-qemu-hubs") {
+            found.push(path);
+        }
+    }
+    found
+}
+
+/// A hub a test left running is stopped by its scratch folder, and the test that left it fails.
+#[cfg(unix)]
+#[test]
+fn a_hub_left_running_is_stopped_and_fails_its_test() -> Outcome {
+    let scratch = HubScratch::new("isoloom-qemu-left-")?;
+    let hubs = scratch.path().join("project/.vagrant/isoloom-qemu-hubs");
+    std::fs::create_dir_all(&hubs)?;
+    let pid_file = hubs.join("app.pid");
+    // A stand-in hub, as the Ruby tests start one: a daemon whose command names its pid file.
+    let mut hub = Command::new("sh").arg("-c").arg("while :; do sleep 0.1; done").arg(&pid_file).spawn()?;
+    std::fs::write(&pid_file, format!("{}\n", hub.id()))?;
+    assert!(scratch.no_hub_left().is_err(), "a running hub is a failure");
+    let status = hub.wait()?;
+    assert!(!status.success(), "the hub was stopped: {status}");
+    scratch.no_hub_left()
+}
+
 /// Two copies of one environment (its name, two folders) run side by side under QEMU: their
 /// networks' hubs listen on the host's loopback, so their ports are the copy's, never the spec's.
 /// They were one block from a hash of the environment's name, and a second `solo-web` failed to
@@ -357,7 +447,7 @@ fn two_copies_of_one_environment_get_disjoint_qemu_hub_ports() -> Outcome {
         eprintln!("skipped: needs ruby");
         return Ok(());
     }
-    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-hubs-").tempdir()?;
+    let scratch = HubScratch::new("isoloom-qemu-hubs-")?;
     for example in ["solo-web", "segmented"] {
         let mut copies = Vec::new();
         for copy in ["one", "two"] {
@@ -372,7 +462,7 @@ fn two_copies_of_one_environment_get_disjoint_qemu_hub_ports() -> Outcome {
         }
         assert!(copies[0].is_disjoint(&copies[1]), "{example}: the copies share ports: {copies:?}");
     }
-    Ok(())
+    scratch.no_hub_left()
 }
 
 /// A copy's hub that runs keeps its ports, even taken (it holds them); one that doesn't run gets a
@@ -383,7 +473,7 @@ fn a_running_hub_keeps_its_ports_and_a_held_port_is_passed_over() -> Outcome {
         eprintln!("skipped: needs ruby");
         return Ok(());
     }
-    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-held-").tempdir()?;
+    let scratch = HubScratch::new("isoloom-qemu-held-")?;
     let (ports, vagrantfile) = qemu_hub_ports("solo-web", scratch.path(), false)?;
     let held = std::net::TcpListener::bind(("127.0.0.1", ports[0].1))?;
     // What the hub's start recorded: its ports, by VM.
@@ -400,7 +490,7 @@ fn a_running_hub_keeps_its_ports_and_a_held_port_is_passed_over() -> Outcome {
     assert_ne!(fresh[0].1, ports[0].1, "a held port: {fresh:?}");
     assert_eq!(fresh.len(), ports.len());
     drop(held);
-    Ok(())
+    scratch.no_hub_left()
 }
 
 /// Loads a generated Vagrantfile (`ARGV[0]`) as [`QEMU_PORTS_RB`] does, then starts network
@@ -471,7 +561,7 @@ fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() 
         eprintln!("skipped: needs ruby");
         return Ok(());
     }
-    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-join-").tempdir()?;
+    let scratch = HubScratch::new("isoloom-qemu-join-")?;
     // A first start: the VMs' ports and spare ones beyond them, all listened on, all recorded.
     let (out, record) = qemu_hub("solo-web", scratch.path(), "app", false)?;
     let ports = vm_ports(&out);
@@ -509,7 +599,7 @@ fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() 
     let kept = std::fs::read_to_string(&record)?;
     assert!(kept.contains(&format!("\"{}\":{}", joined.0, spare[0])), "{kept}");
     assert!(kept.contains(&format!("\"spare\":[{}]", spares[1..].join(","))), "{kept}");
-    Ok(())
+    scratch.no_hub_left()
 }
 
 /// A hub with no spare port left for a VM that joins (one an earlier Isoloom started, whose record
@@ -521,7 +611,7 @@ fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_rest
         eprintln!("skipped: needs ruby");
         return Ok(());
     }
-    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-full-").tempdir()?;
+    let scratch = HubScratch::new("isoloom-qemu-full-")?;
     let (out, record) = qemu_hub("solo-web", scratch.path(), "app", false)?;
     let ports = vm_ports(&out);
     let (_, others) = ports.split_last().ok_or("a VM")?;
@@ -537,7 +627,7 @@ fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_rest
         .find_map(|l| l.strip_prefix("refused "))
         .ok_or_else(|| format!("not refused: {joining}"))?;
     assert!(why.contains("no spare port left") && why.contains("Destroy the environment"), "{why}");
-    Ok(())
+    scratch.no_hub_left()
 }
 
 /// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and plays a VM's visit to
@@ -561,13 +651,15 @@ module Vagrant
 end
 module IsoloomQemu; end
 $hub = nil
+$hubs = []
 $racing = false
 $stopping = false
-at_exit { Process.kill("KILL", $hub) rescue nil if $hub }
+at_exit { $hubs.each { |pid| Process.kill("KILL", pid) rescue nil } }
 IsoloomQemu.singleton_class.prepend(Module.new {
   def system(*args, **_opts)
     pidfile = args[args.index("-pidfile") + 1]
     $hub = Process.spawn("sh", "-c", 'trap "rm -f \"$0\"; exit 0" TERM; while :; do sleep 0.1; done', pidfile)
+    $hubs << $hub
     File.write(pidfile, "#{$hub}\n")
     true
   end
@@ -628,7 +720,7 @@ fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() 
         eprintln!("skipped: needs ruby");
         return Ok(());
     }
-    let scratch = tempfile::Builder::new().prefix("isoloom-qemu-visit-").tempdir()?;
+    let scratch = HubScratch::new("isoloom-qemu-visit-")?;
     let (vagrantfile, mut ruby) = loadable("solo-web", &scratch.path().join("project"))?;
     ruby.arg("-e").arg(QEMU_HUB_VISIT_RB).arg(&vagrantfile).arg(scratch.path().join("machines"));
     let out = printed(ruby)?;
@@ -638,7 +730,7 @@ fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() 
         ["up true", "joined true", "left true", "destroyed nil [\"app.lock\"]"],
         "the hub runs on through the visit and goes, files and all (its lock kept), with the environment"
     );
-    Ok(())
+    scratch.no_hub_left()
 }
 
 /// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant and starts network `app`'s
@@ -776,7 +868,7 @@ fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() 
 /// internal network and libvirt's alike (`isoloom-<environment>-#{ISOLOOM_KEY}-<network>`); the
 /// run manifest names none, since only the Vagrantfile reads the key.
 #[test]
-fn each_network_is_named_with_the_copys_key_and_the_manifest_names_none() -> Outcome {
+fn each_network_is_named_with_the_copy_key_and_the_manifest_names_none() -> Outcome {
     let env = plan("segmented")?;
     let manifest = VagrantBackend.run_manifest(&env)?.ok_or("a run manifest")?;
     let file = vagrantfile("segmented")?;

@@ -24,8 +24,10 @@ use crate::storage;
 // image, as on Compose.
 use isoloom_render::container::{PROBE_DIR, PROBE_IMAGE, UTILITY_IMAGE};
 
-/// The `emptyDir` holding Isoloom's probe, and the init container filling it.
+/// The `emptyDir` holding Isoloom's probe.
 pub(crate) const PROBE_VOLUME: &str = "isoloom-probe";
+/// The init container filling [`PROBE_VOLUME`].
+const PROBE_CONTAINER: &str = "isoloom-probe";
 /// Where a seed init container sees the claim it fills.
 pub(crate) const SEED_DIR: &str = "/isoloom-seed";
 /// In the claim while a seed copy runs (see [`seed_script`]).
@@ -213,7 +215,7 @@ fn needs_probe(m: &Machine) -> bool {
 fn init_containers(m: &Machine) -> Vec<Container> {
     let mut out = Vec::new();
     if needs_probe(m) {
-        let mut c = Container::new(PROBE_VOLUME, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
+        let mut c = Container::new(PROBE_CONTAINER, Image::Tool(m.env.images.pull(PROBE_IMAGE)));
         c.command = vec!["/bin/cp".into(), "/bin/busybox".into(), "/probe/busybox".into()];
         c.security_context = Some(crate::security::helper());
         c.volume_mounts = vec![VolumeMount::at(PROBE_VOLUME, "/probe")];

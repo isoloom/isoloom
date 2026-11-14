@@ -11,33 +11,33 @@ use crate::model::{SharedVolume, Spec};
 
 /// The volumes shared between machines: mounted, held by one of their users, reachable from
 /// every other over a network they share (NFS on the VM targets), Linux machines only.
-pub(super) fn shared(spec: &Spec, p: &mut Problems) {
+pub(super) fn shared(spec: &Spec, problems: &mut Problems) {
     for (v, volume) in &spec.volumes {
         let at = format!("volumes.{v}");
         let users = spec.volume_users(v);
         if users.is_empty() {
-            p.add(at, "no machine mounts it: list it in a machine's `volumes`");
+            problems.add(at, "no machine mounts it: list it in a machine's `volumes`");
             continue;
         }
         if let Some(o) = &volume.owner
             && !users.contains(&o.as_str())
         {
-            p.add(
+            problems.add(
                 format!("{at}.owner"),
                 format!("`{o}` doesn't mount it: the owner is one of its machines ({})", users.join(", ")),
             );
             continue;
         }
-        kept(volume, &at, p);
-        host_folder(volume, &at, p);
+        kept(volume, &at, problems);
+        host_folder(volume, &at, problems);
         let Some(owner) = spec.volume_owner(v) else { continue };
         let owner_networks = spec.machines.get(owner).map(|o| &o.networks);
         for (u, m) in users.iter().filter_map(|u| Some((*u, spec.machines.get(*u)?))) {
             if m.vm.as_ref().is_some_and(|vm| crate::images::is_windows(&vm.os)) {
-                p.add(format!("machines.{u}.volumes.{v}"), windows_why(volume));
+                problems.add(format!("machines.{u}.volumes.{v}"), windows_why(volume));
             }
             if u != owner && !m.networks.keys().any(|n| owner_networks.is_some_and(|o| o.contains_key(n))) {
-                p.add(
+                problems.add(
                     format!("machines.{u}.volumes.{v}"),
                     format!("`{u}` shares no network with `{owner}`, which holds the volume (NFS on the VM targets)"),
                 );
@@ -57,12 +57,12 @@ fn windows_why(volume: &SharedVolume) -> &'static str {
 }
 
 /// A volume shared as a folder of the Proxmox server: a mapping named as Proxmox names them.
-fn host_folder(volume: &SharedVolume, at: &str, p: &mut Problems) {
+fn host_folder(volume: &SharedVolume, at: &str, problems: &mut Problems) {
     let Some(mapping) = volume.virtiofs.as_ref().and_then(|f| f.mapping.as_deref()) else {
         return;
     };
     if !crate::model::mapping_id(mapping) {
-        p.add(
+        problems.add(
             format!("{at}.virtiofs.mapping"),
             format!("`{mapping}` isn't a directory mapping id: a letter, then letters, digits, '-' and '_', at most 64"),
         );
@@ -71,16 +71,16 @@ fn host_folder(volume: &SharedVolume, at: &str, p: &mut Problems) {
 
 /// A volume kept past `down` or existing already: one or the other (an existing volume is
 /// never removed), and an existing one named as Docker and Kubernetes name volumes.
-fn kept(vol: &SharedVolume, at: &str, p: &mut Problems) {
+fn kept(vol: &SharedVolume, at: &str, problems: &mut Problems) {
     let Some(name) = &vol.external else { return };
     if vol.persistent {
-        p.add(format!("{at}.persistent"), "an external volume is never removed: leave `persistent` out");
+        problems.add(format!("{at}.persistent"), "an external volume is never removed: leave `persistent` out");
     }
     let valid = name.len() <= 63
         && name.starts_with(|c: char| c.is_ascii_alphanumeric())
         && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
     if !valid {
-        p.add(
+        problems.add(
             format!("{at}.external"),
             format!("`{name}` isn't a volume name: letters, digits, '-', '_' and '.', starting with a letter or digit, at most 63"),
         );
@@ -89,27 +89,27 @@ fn kept(vol: &SharedVolume, at: &str, p: &mut Problems) {
 
 /// A machine's volumes: kebab-case names that fit Kubernetes' labels, distinct, safe absolute
 /// paths, and a folder of a shared volume only where it can be one. Then its other storage.
-pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
+pub(super) fn of_machine(s: &Subject, problems: &mut Problems) {
     let mut paths = BTreeSet::new();
     for (v, mount) in &s.m.volumes {
         let vat = format!("{}.volumes.{v}", s.at);
         if let Some(why) = name_problem(s.name, v) {
-            p.add(&vat, why);
+            problems.add(&vat, why);
         }
         let path = mount.path();
         if !safe_path(path) {
-            p.add(
+            problems.add(
                 &vat,
                 format!("`{path}` isn't a safe absolute path inside the machine (no spaces or ':'), like /var/lib/postgresql/data"),
             );
         } else if !paths.insert(path.trim_end_matches('/')) {
-            p.add(&vat, format!("`{path}` is already a volume of this machine"));
+            problems.add(&vat, format!("`{path}` is already a volume of this machine"));
         }
         if let Some(sub) = mount.subpath() {
-            subpath(s, v, sub, &format!("{vat}.subpath"), p);
+            subpath(s, v, sub, &format!("{vat}.subpath"), problems);
         }
     }
-    super::storage::of_machine(s, &paths, p);
+    super::storage::of_machine(s, &paths, problems);
 }
 
 /// A safe absolute path for a mount. No spaces or ':' : the Docker short mount syntax
@@ -121,14 +121,14 @@ pub(super) fn safe_path(path: &str) -> bool {
 
 /// A folder of a shared volume: a relative path inside it, taken by a machine other than the
 /// owner (which holds the whole volume, and serves it on the VM targets).
-fn subpath(s: &Subject, v: &str, sub: &str, at: &str, p: &mut Problems) {
+fn subpath(s: &Subject, v: &str, sub: &str, at: &str, problems: &mut Problems) {
     if !s.spec.volumes.contains_key(v) {
-        p.add(
+        problems.add(
             at,
             format!("only a shared volume has folders to take: declare `{v}` under the top-level `volumes`"),
         );
     } else if s.spec.volume_owner(v) == Some(s.name) {
-        p.add(
+        problems.add(
             at,
             format!(
                 "`{}` holds the whole volume `{v}`: give the subpath to another machine, or make another one the `owner`",
@@ -141,7 +141,7 @@ fn subpath(s: &Subject, v: &str, sub: &str, at: &str, p: &mut Problems) {
         && sub.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
         && sub.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'));
     if !safe {
-        p.add(
+        problems.add(
             at,
             format!("`{sub}` isn't a folder inside the volume: a relative path like `www` or `logs/app`, no `..`"),
         );

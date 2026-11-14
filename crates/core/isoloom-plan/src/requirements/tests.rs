@@ -113,6 +113,14 @@ fn about_storage() -> Vec<(Requirement, &'static str)> {
             "machine `web` sets `sysctls`: Isoloom doesn't set up a host that already exists",
         ),
         (
+            Requirement::SharedHostPort {
+                first: "web-01".into(),
+                second: "web-02".into(),
+                port: 80,
+            },
+            "machines `web-01` and `web-02` both publish on host port 80 (`publish: true` asks for a free one)",
+        ),
+        (
             Requirement::ExistingHostScriptCheck { check: "c1".into() },
             "check \"c1\" runs a project script, and an existing host has no copy of the project",
         ),

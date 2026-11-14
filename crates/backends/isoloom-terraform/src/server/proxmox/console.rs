@@ -28,9 +28,9 @@ fn shown(env: &Environment) -> impl Iterator<Item = &str> {
 }
 
 /// The module's outputs of each displayed VM's id, which its console is asked for by.
-pub(super) fn outputs(env: &Environment, m: &mut Module) {
+pub(super) fn outputs(env: &Environment, module: &mut Module) {
     for name in shown(env) {
-        m.commented(
+        module.commented(
             &format!("{name}'s VM id: its console is asked for by it (Proxmox's vncproxy)."),
             output(&vm_id_output(name), reference(&format!("proxmox_virtual_environment_vm.{}.vm_id", ident(name)))),
         );

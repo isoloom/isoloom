@@ -79,7 +79,7 @@ fn every_fixture_translates_to_its_golden_form() {
 fn a_refusal_names_the_file_the_line_and_the_instruction() {
     let (copied, _) = outcome(&fixtures().join("refused-copy-from-image"));
     assert!(
-        copied.starts_with("refused: build/refused-copy-from-image/Dockerfile line 2 (`COPY`): `--from=composer:2.8`"),
+        copied.starts_with("refused: build/refused-copy-from-image/Dockerfile line 2 (`COPY`): `--from=mlocati/php-extension-installer:2`"),
         "{copied}"
     );
     let (unknown, _) = outcome(&fixtures().join("refused-unknown-base"));
@@ -168,7 +168,7 @@ fn a_postgres_image_installs_the_exact_release_with_the_images_defaults() {
 }
 
 #[test]
-fn a_catalogue_image_brings_its_entrys_recipe_with_the_images_settings() {
+fn a_catalogue_image_brings_its_entry_recipe_with_the_images_settings() {
     let text = std::fs::read_to_string(fixtures().join("mysql-catalogue/Dockerfile")).unwrap();
     let build = Build {
         path: "build/db/Dockerfile",
@@ -233,4 +233,39 @@ fn a_mongo_image_installs_the_exact_build_and_its_service_reads_the_images_envir
     };
     let newest = translate(&latest, &Sources::default()).unwrap();
     assert!(newest.yaml.contains("catalogue: mongodb@7.0.28 on ubuntu@20.04"), "{}", newest.yaml);
+}
+
+#[test]
+fn a_jenkins_image_installs_the_lts_release_and_runs_the_dockerfiles_steps_as_jenkins() {
+    let text = std::fs::read_to_string(fixtures().join("jenkins-catalogue/Dockerfile")).unwrap();
+    let build = Build {
+        path: "build/jenkins/Dockerfile",
+        text: &text,
+        context: "build/jenkins",
+        args: &[],
+        os: None,
+    };
+    let t = translate(&build, &Sources::default()).unwrap();
+    assert_eq!(t.os.to_string(), "debian@13");
+    assert!(t.yaml.contains("catalogue: jenkins@2.580.2 on debian@13"), "{}", t.yaml);
+    // `jenkins-plugin-cli` runs as the image's user, with its environment.
+    assert!(t.yaml.contains("export JENKINS_HOME=/var/jenkins_home"), "{}", t.yaml);
+    // The entry's service runs Jenkins: the Dockerfile keeps the image's command.
+    assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
+}
+
+#[test]
+fn a_file_copied_out_of_composers_image_is_its_catalogue_entrys() {
+    let text = std::fs::read_to_string(fixtures().join("composer-copy/Dockerfile")).unwrap();
+    let build = Build {
+        path: "build/web/Dockerfile",
+        text: &text,
+        context: "build/web",
+        args: &[],
+        os: None,
+    };
+    let t = translate(&build, &Sources::default()).unwrap();
+    // The series' newest release, on the VM's own OS (the php image's).
+    assert!(t.yaml.contains("catalogue: composer@2.8.12 on debian@12"), "{}", t.yaml);
+    assert!(t.yaml.contains("catalogue: php@8.2"), "{}", t.yaml);
 }

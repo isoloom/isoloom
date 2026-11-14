@@ -24,7 +24,7 @@ pub(super) enum Guest {
 }
 
 /// An IP set per network.
-pub(super) fn ipsets(env: &Environment, m: &mut Module) {
+pub(super) fn ipsets(env: &Environment, module: &mut Module) {
     for (i, (net, plan)) in env.networks.iter().enumerate() {
         let mut b = Block::builder("resource")
             .add_label("proxmox_virtual_environment_firewall_ipset")
@@ -35,7 +35,7 @@ pub(super) fn ipsets(env: &Environment, m: &mut Module) {
         if let Some(v6) = &plan.ipv6 {
             b = b.add_block(Block::builder("cidr").add_attribute(("name", string(v6.cidr.to_string()))).build());
         }
-        m.commented(&format!("Network `{net}`, for the machines' firewall rules."), b.build());
+        module.commented(&format!("Network `{net}`, for the machines' firewall rules."), b.build());
     }
 }
 
@@ -96,7 +96,7 @@ fn rules(env: &Environment, name: &str) -> Vec<Block> {
 }
 
 /// Machine `name`'s firewall: on, dropping what its rules don't accept.
-pub(super) fn guest(env: &Environment, name: &str, kind: Guest, m: &mut Module) {
+pub(super) fn guest(env: &Environment, name: &str, kind: Guest, module: &mut Module) {
     let (resource, key) = match kind {
         Guest::Vm => ("proxmox_virtual_environment_vm", "vm_id"),
         Guest::Container => ("proxmox_virtual_environment_container", "container_id"),
@@ -111,7 +111,7 @@ pub(super) fn guest(env: &Environment, name: &str, kind: Guest, m: &mut Module) 
         .add_attribute(("input_policy", string("DROP")))
         .add_attribute(("output_policy", string("ACCEPT")))
         .build();
-    m.commented(&format!("Machine `{name}`'s firewall: what reaches it, outside the guest."), options);
+    module.commented(&format!("Machine `{name}`'s firewall: what reaches it, outside the guest."), options);
     let rules = Block::builder("resource")
         .add_label("proxmox_virtual_environment_firewall_rules")
         .add_label(ident(name))
@@ -119,5 +119,5 @@ pub(super) fn guest(env: &Environment, name: &str, kind: Guest, m: &mut Module) 
         .add_attribute((key, id()))
         .add_blocks(rules(env, name))
         .build();
-    m.block(rules);
+    module.block(rules);
 }

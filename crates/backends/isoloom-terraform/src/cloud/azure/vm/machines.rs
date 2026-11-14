@@ -26,11 +26,11 @@ const CAP: Capped = Capped {
 };
 
 /// A Linux machine: its security group, public IP, interfaces and VM, set up from its custom data.
-pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, module: &mut Module) -> Result<()> {
     let id = ident(name);
-    m.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
-    m.block(public_ip(&id, name));
-    m.blocks(nics(&id, name, mp));
+    module.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
+    module.block(public_ip(&id, name));
+    module.blocks(nics(&id, name, mp));
     let disk = mp.size().disk_gb.max(30);
     let ids = mp
         .addresses
@@ -39,8 +39,8 @@ pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mu
     let own = own_image::of(mp, own_image::azure);
     let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
     let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
-    m.block(linux_vm(&id, name, (os, own), (RULES.size_of(mp), disk, mp.tpm.is_some()), (list(ids), setup)));
-    m.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
+    module.block(linux_vm(&id, name, (os, own), (RULES.size_of(mp), disk, mp.tpm.is_some()), (list(ids), setup)));
+    module.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
     Ok(())
 }
 
@@ -186,14 +186,14 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
 
 /// A Windows machine: its security group, public IP, interface and VM (its name, the
 /// administrator and a WinRM listener set at creation), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, vm @ Vm { name, plan: mp, .. }: Vm<'_>, m: &mut Module) {
+pub(super) fn windows(env: &Environment, vm @ Vm { name, plan: mp, .. }: Vm<'_>, module: &mut Module) {
     let id = ident(name);
-    m.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, (name, mp), true));
-    m.block(public_ip(&id, name));
-    m.blocks(nics(&id, name, mp));
-    m.block(windows_vm(vm));
-    m.blocks(disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
-    m.blocks(windows::blocks(windows::Machine {
+    module.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, (name, mp), true));
+    module.block(public_ip(&id, name));
+    module.blocks(nics(&id, name, mp));
+    module.block(windows_vm(vm));
+    module.blocks(disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
+    module.blocks(windows::blocks(windows::Machine {
         remote: Remote {
             env,
             name,
@@ -254,19 +254,19 @@ fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
 /// The controller: its security group (every network may reach it, and SSH from
 /// `allowed_cidr`), an interface on every network at the controller address, its VM, set up from
 /// its custom data (it waits for every machine's own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
+pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
     let mut g = Nsg::new(id, controller::NAME);
     for (n, p) in &env.networks {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
     }
-    m.commented(
+    module.commented(
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
         g.allow("ssh", "Tcp", "22", reference("var.allowed_cidr")).build(),
     );
-    m.block(public_ip(id, controller::NAME));
+    module.block(public_ip(id, controller::NAME));
     let addresses = controller::addresses(env);
-    m.blocks(controller_nics(id, controller::NAME, (&addresses, &IndexMap::new(), &IndexMap::new()), false));
+    module.blocks(controller_nics(id, controller::NAME, (&addresses, &IndexMap::new(), &IndexMap::new()), false));
     let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
     let (_, _, disk) = controller::size(env);
     // Azure's Debian image is a 30 GB disk: the least it takes.
@@ -274,7 +274,7 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
     let inventory = controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm);
     let at_boot = interfaces::up(env, &addresses, &|n| mac(&nic_id(id, n)));
     let setup = controller_setup::set_up(env, &|_| USER.to_owned(), inventory, &at_boot);
-    m.block(linux_vm(
+    module.block(linux_vm(
         id,
         controller::NAME,
         (controller::OS, None),

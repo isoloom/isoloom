@@ -1,0 +1,8 @@
+# Written by `cargo xtask catalogue refresh composer`, never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin.
+refreshed: 2026-11-14
+releases:
+  2.7.9: {}
+  2.8.12: {}
+  2.11.2: {}

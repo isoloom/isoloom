@@ -12,9 +12,9 @@ use crate::cloud::vm::private_dns::{TTL, address, records};
 use crate::module::{ident, resource};
 
 /// The zone and its records, when the environment has one.
-pub(super) fn write(env: &Environment, m: &mut Module) {
+pub(super) fn write(env: &Environment, module: &mut Module) {
     let Some(zone) = &env.private_dns else { return };
-    m.commented(
+    module.commented(
         "The environment's names, served by Azure DNS inside the virtual network (`dns.private`).",
         tagged(
             resource("azurerm_private_dns_zone", "private")
@@ -23,7 +23,7 @@ pub(super) fn write(env: &Environment, m: &mut Module) {
         )
         .build(),
     );
-    m.block(
+    module.block(
         tagged(
             resource("azurerm_private_dns_zone_virtual_network_link", "private")
                 .add_attribute(("name", reference("local.name")))
@@ -33,13 +33,13 @@ pub(super) fn write(env: &Environment, m: &mut Module) {
         .build(),
     );
     for (id, r) in records(zone) {
-        m.block(record("azurerm_private_dns_a_record", &id, r, address(r)));
+        module.block(record("azurerm_private_dns_a_record", &id, r, address(r)));
         // A machine on an IPv6 network first: its IPv6 address there too.
         if let Some(v6) = address6(env, r) {
-            m.block(record("azurerm_private_dns_aaaa_record", &id, r, list([string(v6.to_string())])));
+            module.block(record("azurerm_private_dns_aaaa_record", &id, r, list([string(v6.to_string())])));
         }
     }
-    reverse_zones(zone, m);
+    reverse_zones(zone, module);
 }
 
 /// One of the zone's records (relative name), of `kind`, with its values.
@@ -76,13 +76,13 @@ fn reverse(a: Ipv4Addr) -> (String, String) {
 /// The reverse names: a reverse zone per network block (each /24 holding a machine's
 /// address) linked to the virtual network, and a PTR record per machine at its first address,
 /// naming the machine (its aliases point at it, but an address names one machine).
-fn reverse_zones(zone: &PrivateDns, m: &mut Module) {
+fn reverse_zones(zone: &PrivateDns, module: &mut Module) {
     let mut zones: Vec<String> = Vec::new();
     for r in zone.records.iter().filter(|r| r.label == r.machine) {
         let (name, label) = reverse(r.address);
         let zid = format!("reverse_{}", ident(name.trim_end_matches(".in-addr.arpa")));
         if !zones.contains(&name) {
-            m.commented(
+            module.commented(
                 &format!("The reverse names of {name}: each machine's name at its address."),
                 tagged(
                     resource("azurerm_private_dns_zone", &zid)
@@ -91,7 +91,7 @@ fn reverse_zones(zone: &PrivateDns, m: &mut Module) {
                 )
                 .build(),
             );
-            m.block(
+            module.block(
                 tagged(
                     resource("azurerm_private_dns_zone_virtual_network_link", &zid)
                         .add_attribute(("name", reference("local.name")))
@@ -102,7 +102,7 @@ fn reverse_zones(zone: &PrivateDns, m: &mut Module) {
             );
             zones.push(name);
         }
-        m.block(
+        module.block(
             tagged(
                 resource("azurerm_private_dns_ptr_record", &ident(&r.name))
                     .add_attribute(("name", string(label)))

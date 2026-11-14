@@ -30,9 +30,6 @@ pub struct Base {
     /// The catalogue entry the image is, which the translation resolves (its OS then the
     /// release's): `None` for a distro or an install written here.
     pub entry: Option<EntryCall>,
-    /// kCTF's challenge base: it takes the VM's OS (its chroot stage's), and the VM is the
-    /// jail, so copying a stage's whole filesystem into it is nothing to do.
-    pub jail: bool,
 }
 
 /// A catalogue entry a base image is: the entry, the version its tag asks for (`None`: the
@@ -84,7 +81,6 @@ impl Base {
             entrypoint: None,
             cmd: None,
             entry: None,
-            jail: false,
         }
     }
 
@@ -138,6 +134,18 @@ pub fn split(image: &str) -> (String, String) {
     }
 }
 
+/// The catalogue entry an image a Dockerfile copies files out of (`COPY --from=composer:2.8
+/// /usr/bin/composer …`) installs where the image has them, on the VM itself: `None` for an image
+/// it copies nothing out of.
+#[must_use]
+pub fn copied(image: &str) -> Option<EntryCall> {
+    let (name, tag) = split(image);
+    match name.as_str() {
+        "composer" | "composer/composer" => Base::entry("composer", &tag, &[], &[]).entry,
+        _ => None,
+    }
+}
+
 /// The base image `image` as a VM.
 ///
 /// # Errors
@@ -154,6 +162,7 @@ pub fn of(image: &str) -> Result<Base, NoEntry> {
         "mysql" | "mysql/mysql-server" => Ok(Base::entry("mysql", &tag, MYSQL_UNSET, &[])),
         "postgres" => Ok(Base::entry("postgres", &tag, POSTGRES_UNSET, &[])),
         "mongo" => Ok(Base::entry("mongodb", &tag, &[], &[])),
+        "jenkins/jenkins" => jenkins(&name, &tag),
         "python" => Ok(Base::entry("python", &tag, &[], &[])),
         "node" => Ok(Base::entry("node", &tag, &[], &[])),
         // The image's `USER` and the folders its entrypoints read: a lab's own entrypoint runs.
@@ -172,12 +181,6 @@ pub fn of(image: &str) -> Result<Base, NoEntry> {
             ],
             workdir: Some("/go".to_owned()),
             ..Base::entry("golang", &tag, &[], &[])
-        }),
-        // kCTF's challenge base: its OS is the VM's (an empty `os` takes it), its jail the VM.
-        "gcr.io/kctf-docker/challenge" => Ok(Base {
-            prelude: vec![KCTF.to_owned()],
-            jail: true,
-            ..Base::os("")
         }),
         "scratch" => Err(NoEntry::Refused {
             reason: "`FROM scratch` has no OS to install onto".to_owned(),
@@ -237,7 +240,44 @@ fn version_and_variants(tag: &str) -> (String, Vec<String>) {
     (version, words.map(str::to_owned).collect())
 }
 
-const KCTF: &str = include_str!("matrix/kctf.sh");
+/// `jenkins/jenkins:<tag>`: the catalogue's jenkins, as the image's user with its environment
+/// and folder, when the catalogue has the tag's release on the tag's Java (21); any other tag is
+/// left to its fetched Dockerfile (jenkinsci/docker at that release).
+fn jenkins(name: &str, tag: &str) -> Result<Base, NoEntry> {
+    let java = tag.split('-').find_map(|w| w.strip_prefix("jdk")).unwrap_or("21");
+    let base = Base {
+        env: JENKINS_ENV.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect(),
+        workdir: Some("/".to_owned()),
+        user: Some("jenkins".to_owned()),
+        ..Base::entry("jenkins", tag, &[], &[])
+    };
+    let has = |v: &str| {
+        let Ok(asked) = v.parse::<isoloom_catalogue::Version>() else { return false };
+        isoloom_catalogue::Catalogue::embedded()
+            .ok()
+            .and_then(|c| c.entry("jenkins"))
+            .is_some_and(|e| e.definition().releases.iter().any(|r| r.version.starts_with(&asked)))
+    };
+    let release = base.entry.as_ref().and_then(|c| c.version.clone());
+    if java != "21" || release.is_some_and(|v| !has(&v)) {
+        return Err(NoEntry::Unknown(name.to_owned()));
+    }
+    Ok(base)
+}
+
+/// The jenkins/jenkins image's environment, which its Dockerfiles' steps read.
+const JENKINS_ENV: &[(&str, &str)] = &[
+    ("JENKINS_HOME", "/var/jenkins_home"),
+    ("JENKINS_SLAVE_AGENT_PORT", "50000"),
+    ("REF", "/usr/share/jenkins/ref"),
+    ("JENKINS_UC", "https://updates.jenkins.io"),
+    ("JENKINS_UC_EXPERIMENTAL", "https://updates.jenkins.io/experimental"),
+    ("JENKINS_INCREMENTALS_REPO_MIRROR", "https://repo.jenkins-ci.org/incrementals"),
+    ("COPY_REFERENCE_FILE_LOG", "/var/jenkins_home/copy_reference_file.log"),
+    ("JAVA_HOME", "/opt/java/openjdk"),
+    ("LANG", "C.UTF-8"),
+    ("PATH", "/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"),
+];
 
 /// `php:<version>[-apache|-fpm]`: the catalogue's php at that version, its `server` the variant
 /// (none for the CLI image), with the image's `PHP_INI_DIR` and folder.
@@ -309,6 +349,24 @@ mod tests {
         assert_eq!(call("postgres:15.4-alpine"), Some(("postgres", Some("15.4".to_owned()))));
         assert_eq!(call("mongo:4.0.4"), Some(("mongodb", Some("4.0.4".to_owned()))));
         assert_eq!(call("debian:12"), None);
+    }
+
+    #[test]
+    fn composer_is_copied_out_of_its_catalogue_entry() {
+        let copied = |image: &str| copied(image).map(|c| (c.entry, c.version));
+        assert_eq!(copied("composer:2.8"), Some(("composer", Some("2.8".to_owned()))));
+        assert_eq!(copied("composer:latest"), Some(("composer", None)));
+        assert_eq!(copied("node:20"), None);
+    }
+
+    #[test]
+    fn jenkins_is_the_catalogues_when_it_has_the_tags_release_and_java() {
+        let call = |image: &str| of(image).unwrap().entry.map(|c| (c.entry, c.version));
+        assert_eq!(call("jenkins/jenkins:lts-jdk21"), Some(("jenkins", None)));
+        assert_eq!(call("jenkins/jenkins:2.580.2-lts-jdk21"), Some(("jenkins", Some("2.580.2".to_owned()))));
+        // A release or a Java the catalogue lacks: its fetched Dockerfile instead.
+        assert_eq!(of("jenkins/jenkins:2.462.3-lts-jdk17"), Err(NoEntry::Unknown("jenkins/jenkins".into())));
+        assert_eq!(of("jenkins/jenkins:2.462.3"), Err(NoEntry::Unknown("jenkins/jenkins".into())));
     }
 
     #[test]

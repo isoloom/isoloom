@@ -4,7 +4,7 @@ use crate::Error;
 /// A list with one entry, `entry`, whose runs are `runs` (JSON objects), on the usual hosts.
 fn one(entry: &str, goal: u8, exists_on: &str, runs: &str) -> Result<TierEntry> {
     let json = format!(
-        r#"{{ "hosts": {{ "macos-arm64": "macos", "linux-1": "linux", "windows-11": "windows" }},
+        r#"{{ "hosts": {{ "macos": "macos", "linux": "linux", "windows": "windows" }},
              "entries": [{{ "entry": "{entry}", "goal": {goal}, "exists_on": {exists_on}, "runs": [{runs}] }}] }}"#
     );
     let mut entries = file::parse(&json)?;
@@ -15,9 +15,9 @@ fn one(entry: &str, goal: u8, exists_on: &str, runs: &str) -> Result<TierEntry> 
 }
 
 const EVERY_OS: &str = r#"["linux", "macos", "windows"]"#;
-const MACOS_PASS: &str = r#"{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass" }"#;
-const LINUX_PASS: &str = r#"{ "host": "linux-1", "date": "2026-10-16", "result": "pass" }"#;
-const WINDOWS_PASS: &str = r#"{ "host": "windows-11", "date": "2026-10-16", "result": "pass" }"#;
+const MACOS_PASS: &str = r#"{ "host": "macos", "date": "2026-10-15", "result": "pass" }"#;
+const LINUX_PASS: &str = r#"{ "host": "linux", "date": "2026-10-16", "result": "pass" }"#;
+const WINDOWS_PASS: &str = r#"{ "host": "windows", "date": "2026-10-16", "result": "pass" }"#;
 
 #[test]
 fn the_embedded_list_reads() {
@@ -30,7 +30,7 @@ fn a_target_proven_on_one_host_os_of_three_stays_at_tier_2_with_the_others_pendi
     let docker = one("docker", 1, EVERY_OS, MACOS_PASS).unwrap();
     assert_eq!(docker.tier(), Tier::Two);
     assert_eq!(docker.pending(), BTreeSet::from([HostOs::Linux, HostOs::Windows]));
-    assert_eq!(docker.evidence(), "real runs: macos (macos-arm64, 2026-10-15); tier 1 pending: linux, windows");
+    assert_eq!(docker.evidence(), "real runs: macos (2026-10-15); tier 1 pending: linux, windows");
 }
 
 #[test]
@@ -44,22 +44,19 @@ fn a_passing_run_on_every_host_os_it_exists_on_makes_tier_1() {
 
 #[test]
 fn a_later_failing_run_on_a_host_os_takes_tier_1_back() {
-    let failed = r#"{ "host": "linux-1", "date": "2026-10-20", "result": "fail" }"#;
+    let failed = r#"{ "host": "linux", "date": "2026-10-20", "result": "fail" }"#;
     let docker = one("docker", 1, EVERY_OS, &[MACOS_PASS, LINUX_PASS, WINDOWS_PASS, failed].join(",")).unwrap();
     assert_eq!(docker.tier(), Tier::Two);
     assert_eq!(docker.pending(), BTreeSet::from([HostOs::Linux]));
-    assert!(docker.evidence().contains("failed linux (linux-1, 2026-10-20)"), "{}", docker.evidence());
+    assert!(docker.evidence().contains("failed linux (2026-10-20)"), "{}", docker.evidence());
 }
 
 #[test]
 fn a_partial_run_is_evidence_but_proves_no_host_os() {
-    let partial = r#"{ "host": "windows-11", "date": "2026-10-15", "result": "partial", "note": "up and checks" }"#;
+    let partial = r#"{ "host": "windows", "date": "2026-10-15", "result": "partial", "note": "up and checks" }"#;
     let hyperv = one("vagrant/hyperv", 1, r#"["windows"]"#, partial).unwrap();
     assert_eq!(hyperv.tier(), Tier::Two);
-    assert_eq!(
-        hyperv.evidence(),
-        "real runs: partial windows (windows-11, 2026-10-15); tier 1 pending: windows"
-    );
+    assert_eq!(hyperv.evidence(), "real runs: partial windows (2026-10-15); tier 1 pending: windows");
     assert_eq!(hyperv.json()["runs"][0]["result"], "partial");
 }
 
@@ -72,19 +69,17 @@ fn an_entry_without_runs_is_validated_only_and_one_not_aiming_for_tier_1_has_not
 }
 
 #[test]
-fn a_server_run_names_its_server() {
-    let run = r#"{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass", "server": "pve-lab" }"#;
+fn the_evidence_names_the_host_os_and_the_day_not_the_test_machines() {
+    let run = r#"{ "host": "macos", "date": "2026-10-15", "result": "pass", "server": "pve-1" }"#;
     let proxmox = one("proxmox", 1, EVERY_OS, run).unwrap();
-    assert!(
-        proxmox.evidence().starts_with("real runs: macos (macos-arm64, pve-lab, 2026-10-15)"),
-        "{}",
-        proxmox.evidence()
-    );
+    assert!(proxmox.evidence().starts_with("real runs: macos (2026-10-15);"), "{}", proxmox.evidence());
+    assert_eq!(proxmox.runs[0].server.as_deref(), Some("pve-1"), "the list keeps it");
 }
 
 #[test]
 fn a_run_says_the_isoloom_version_whose_files_ran_when_it_was_recorded() {
-    let runs = r#"{ "host": "macos-arm64", "date": "2026-11-09", "result": "pass", "isoloom": "2.0.0" }, { "host": "macos-arm64", "date": "2026-10-15", "result": "pass" }"#;
+    let runs =
+        r#"{ "host": "macos", "date": "2026-11-09", "result": "pass", "isoloom": "2.0.0" }, { "host": "macos", "date": "2026-10-15", "result": "pass" }"#;
     let docker = one("docker", 1, EVERY_OS, runs).unwrap();
     assert_eq!(docker.runs[0].isoloom.as_deref(), Some("2.0.0"));
     assert_eq!(docker.runs[1].isoloom, None, "an older run has none");
@@ -93,8 +88,8 @@ fn a_run_says_the_isoloom_version_whose_files_ran_when_it_was_recorded() {
 
 #[test]
 fn an_experimental_entry_is_tier_3_whatever_its_runs() {
-    let json = r#"{ "hosts": { "macos-arm64": "macos" }, "entries": [{ "entry": "vagrant/qemu", "goal": 2, "exists_on": ["macos"], "experimental": true,
-        "runs": [{ "host": "macos-arm64", "date": "2026-10-15", "result": "pass" }] }] }"#;
+    let json = r#"{ "hosts": { "macos": "macos" }, "entries": [{ "entry": "vagrant/qemu", "goal": 2, "exists_on": ["macos"], "experimental": true,
+        "runs": [{ "host": "macos", "date": "2026-10-15", "result": "pass" }] }] }"#;
     let qemu = file::parse(json).unwrap().pop().unwrap();
     assert_eq!((qemu.tier(), qemu.evidence()), (Tier::Three, "experimental".to_owned()));
 }
@@ -110,7 +105,7 @@ fn an_entry_naming_what_doesnt_exist_is_refused_with_its_reason() {
     assert!(refused("vagrant", EVERY_OS, "").contains("no such target"), "a target with providers needs one");
     assert!(refused("docker", "[]", "").contains("names no host OS"));
     assert!(refused("docker", EVERY_OS, r#"{ "host": "linux-2", "date": "2026-10-15", "result": "pass" }"#).contains("`linux-2`"));
-    assert!(refused("docker", EVERY_OS, r#"{ "host": "macos-arm64", "date": "15/10/2026", "result": "pass" }"#).contains("isn't a date"));
+    assert!(refused("docker", EVERY_OS, r#"{ "host": "macos", "date": "15/10/2026", "result": "pass" }"#).contains("isn't a date"));
     assert!(refused("vagrant/hyperv", r#"["windows"]"#, MACOS_PASS).contains("where it doesn't exist"));
     assert!(matches!(one("docker", 4, EVERY_OS, ""), Err(Error::Tiers { what, .. }) if what.contains("goal 4")));
     assert!(matches!(file::parse("{}"), Err(Error::TiersJson(_))));

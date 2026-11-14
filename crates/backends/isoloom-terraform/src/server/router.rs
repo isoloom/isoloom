@@ -10,6 +10,7 @@ use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, Join, MachinePlan, MachineShape, OutsideAddress};
 use isoloom_render::router;
 use isoloom_spec::model::Target;
+use isoloom_spec::shell::quote;
 
 use crate::checks::{Invocation, Runner, output_block};
 use crate::machine::cloud_init::{self, CloudConfig, file};
@@ -94,7 +95,7 @@ fn sealed_file(env: &Environment) -> Option<Expression> {
 /// an invalid ruleset isn't kept), then keep it as `/etc/nftables.conf` so a reboot stays sealed.
 #[must_use]
 pub(crate) fn sealed_reload() -> String {
-    format!("sudo sh -c 'nft -f {SEALED_NFT} && cp {SEALED_NFT} /etc/nftables.conf'")
+    format!("sudo sh -c {}", quote(&format!("nft -f {SEALED_NFT} && cp {SEALED_NFT} /etc/nftables.conf")))
 }
 
 /// The router's ruleset before the seal, or after it.
@@ -211,20 +212,20 @@ pub(crate) fn is_default_gateway(env: &Environment, mp: &MachinePlan) -> bool {
 /// The outputs of `target`'s module, once `local.router_address` holds the router's uplink
 /// address: the address (`ip`), the machines' ready file, the published services there, the
 /// machines through it, the checks.
-pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
+pub(crate) fn outputs(env: &Environment, target: Target, module: &mut Module) {
     let dir = target.id();
-    m.commented(
+    module.commented(
         "The router's uplink address: the environment's way in.",
         output("ip", reference("local.router_address")),
     );
-    m.commented(
+    module.commented(
         "Each Linux machine's set-up progress (`isoloom-ready/1`: `running: <step>`, `failed: <step>`, `ready`).",
         output("ready_file", string(isoloom_render::steps::READY_FILE)),
     );
     let on_networks = env.machines.iter().filter(|(_, mp)| !mp.addresses.is_empty()).map(|(n, mp)| (n.as_str(), mp));
-    let published = crate::module::published(on_networks, |_| reference("local.router_address"));
+    let published = crate::module::published_output_entries(on_networks, |_| reference("local.router_address"));
     if !published.is_empty() {
-        m.commented("Published services, from the router's uplink address.", output("published", object(published)));
+        module.commented("Published services, from the router's uplink address.", output("published", object(published)));
     }
     let machines: Vec<(String, Expression)> = env
         .machines
@@ -232,13 +233,13 @@ pub(crate) fn outputs(env: &Environment, target: Target, m: &mut Module) {
         .filter(|(_, mp)| mp.shape == MachineShape::Vm)
         .filter_map(|(n, _)| first_address(env, n).map(|a| (n.clone(), string(a))))
         .collect();
-    m.commented(
+    module.commented(
         "The machines, through the router: ssh -J isoloom@<ip> isoloom@<machine>.",
         output("machines", object(machines)),
     );
-    m.block(output("ssh_user", string(crate::machine::USER)));
+    module.block(output("ssh_user", string(crate::machine::USER)));
     if let Some(checks) = output_block(env, dir, Invocation::Script, &|p| runner(env, p)) {
-        m.commented(
+        module.commented(
             "The checks: each runner piped to its machine (ssh -J isoloom@<ip> isoloom@<host> sh -s < <script>).",
             checks,
         );

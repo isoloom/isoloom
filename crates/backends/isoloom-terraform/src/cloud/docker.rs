@@ -53,7 +53,7 @@ pub(crate) const HOST_OS: &str = "debian-12";
 /// `terraform` block, the module's head (`cloud::head`), and the Docker host's set-up once its
 /// resources are there.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Driver {
+pub(crate) struct DockerDriver {
     /// What the cloud's modules share with its `cloud-vm` module: the usage, the variables, the
     /// provider, the images' users.
     pub(crate) base: Base,
@@ -68,7 +68,7 @@ pub(crate) struct Driver {
     pub(crate) instance: &'static str,
 }
 
-impl Driver {
+impl DockerDriver {
     /// The SSH user the operator's key logs in as on the host: one with `sudo`, or root (Linode),
     /// whose commands run without it (`AsRoot`).
     pub(crate) fn user(&self) -> &'static str {
@@ -199,7 +199,7 @@ impl HostSizes {
 }
 
 /// `cloud`'s own part.
-const fn driver(cloud: Cloud) -> Driver {
+const fn driver(cloud: Cloud) -> DockerDriver {
     match cloud {
         Cloud::Aws => aws::docker::DRIVER,
         Cloud::Azure => azure::docker::DRIVER,

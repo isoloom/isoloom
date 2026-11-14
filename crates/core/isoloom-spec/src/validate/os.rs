@@ -6,7 +6,7 @@ use super::machines::Subject;
 use crate::os::{by_name, resolve};
 
 /// The machine's `os` agrees with its `vm.os`.
-pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
+pub(super) fn of_machine(s: &Subject, problems: &mut Problems) {
     let Some(os) = s.m.os.as_deref().and_then(|t| resolve(t).ok()) else {
         return;
     };
@@ -14,7 +14,7 @@ pub(super) fn of_machine(s: &Subject, p: &mut Problems) {
         return;
     };
     if vm.name != os.name {
-        p.add(
+        problems.add(
             format!("{}.vm.os", s.at),
             format!(
                 "`vm.os` is {} but the machine's `os` is {}: they must agree; leave `vm.os` out (it defaults to `os`) or write the same OS in both",

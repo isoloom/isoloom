@@ -12,7 +12,7 @@ use crate::net::NetworkBlock;
 const MAX_TOOLS: usize = 3;
 
 /// Tools take the addresses just below the controller on every network: no machine there.
-pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
+pub(super) fn reserved(spec: &Spec, blocks: &Blocks, problems: &mut Problems) {
     if spec.tools.is_empty() {
         return;
     }
@@ -21,7 +21,7 @@ pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
             if let Some(c) = block(blocks, net).and_then(NetworkBlock::new)
                 && (0..spec.tools.len()).any(|i| c.tool(i).is_some_and(|t| t.octets()[3] == *octet))
             {
-                p.add(
+                problems.add(
                     format!("machines.{mname}.networks.{net}"),
                     format!(
                         ".{octet} is reserved for the tools (the {} addresses below .{}) when `tools:` is set",
@@ -35,32 +35,32 @@ pub(super) fn reserved(spec: &Spec, blocks: &Blocks, p: &mut Problems) {
 }
 
 /// Tools: names, a recipe or an image, ports; three at most.
-pub(super) fn each(spec: &Spec, p: &mut Problems) {
+pub(super) fn each(spec: &Spec, problems: &mut Problems) {
     for (name, t) in &spec.tools {
         let at = format!("tools.{name}");
         if name.len() > KEBAB_MAX {
-            p.add(&at, format!("tool names are at most {KEBAB_MAX} characters: a DNS label"));
+            problems.add(&at, format!("tool names are at most {KEBAB_MAX} characters: a DNS label"));
         } else if !dns_label(name) {
-            p.add(&at, "tool names are kebab-case and start with a letter");
+            problems.add(&at, "tool names are kebab-case and start with a letter");
         }
         if spec.machines.contains_key(name) || spec.groups.contains_key(name) {
-            p.add(&at, format!("`{name}` is already a machine's or a group's name"));
+            problems.add(&at, format!("`{name}` is already a machine's or a group's name"));
         }
         let recipe = TOOL_RECIPES.contains(&name.as_str());
         if !recipe && t.image.is_none() {
-            p.add(
+            problems.add(
                 format!("{at}.image"),
                 format!("give a container image, or use a recipe: {}", TOOL_RECIPES.join(", ")),
             );
         }
         if recipe && t.image.is_some() {
-            p.add(
+            problems.add(
                 format!("{at}.image"),
                 format!("`{name}` is a recipe with its own image; leave `image` out or choose another name"),
             );
         }
         if t.publish.is_some() && t.port.is_none() {
-            p.add(format!("{at}.publish"), "say which `port` the tool serves");
+            problems.add(format!("{at}.publish"), "say which `port` the tool serves");
         }
         if let Some(port) = t.publish
             && spec
@@ -68,10 +68,10 @@ pub(super) fn each(spec: &Spec, p: &mut Problems) {
                 .values()
                 .any(|m| m.ports.iter().any(|s| s.publish == Some(port) && s.protocol.is_tcp()))
         {
-            p.add(format!("{at}.publish"), format!("host port {port} is already published by a machine"));
+            problems.add(format!("{at}.publish"), format!("host port {port} is already published by a machine"));
         }
         if spec.tools.len() > MAX_TOOLS {
-            p.add(
+            problems.add(
                 "tools",
                 format!("at most {MAX_TOOLS} tools (each takes one of the addresses Isoloom reserves on every network)"),
             );

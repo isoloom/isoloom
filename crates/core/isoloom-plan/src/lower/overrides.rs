@@ -4,7 +4,7 @@
 
 use indexmap::IndexMap;
 use isoloom_spec::model::{External, Network, NetworkDocker, SharedVolume, Target, VmImage};
-use isoloom_spec::syntax;
+use isoloom_spec::syntax::{self, FieldPath};
 
 use super::Scope;
 
@@ -49,27 +49,32 @@ pub(super) fn volumes(source: &syntax::Spec, scope: Scope) -> IndexMap<String, S
     out
 }
 
-/// The entry of `entries` for machine `name`: its own, else a counted machine's (its clones
-/// share it), else the first of its groups'.
-pub(super) fn for_machine<'a, T>(source: &syntax::Spec, entries: &'a IndexMap<String, T>, name: &str) -> Option<&'a T> {
-    keyed_for_machine(source, entries, name).map(|(_, e)| e)
+/// A value read from the spec, with the path it is written at: what reports where it came from
+/// takes `at`, never a path rebuilt from the machine it was looked up for.
+#[derive(Debug)]
+pub(super) struct Found<'a, T> {
+    /// The value.
+    pub value: &'a T,
+    /// Where it is written (`overrides.vagrant.machines.windows` for a group's entry).
+    pub at: FieldPath,
 }
 
-/// [`for_machine`]'s entry with the key it is written under (the machine's, its counted
-/// machine's or a group's).
-pub(super) fn keyed_for_machine<'a, T>(source: &syntax::Spec, entries: &'a IndexMap<String, T>, name: &str) -> Option<(&'a str, &'a T)> {
-    if let Some((key, e)) = entries.get_key_value(name) {
-        return Some((key, e));
-    }
-    if let Some((key, e)) = source
-        .clones
-        .iter()
-        .find(|(_, c)| c.iter().any(|n| n == name))
-        .and_then(|(base, _)| entries.get_key_value(base.as_str()))
-    {
-        return Some((key, e));
-    }
-    entries.iter().find(|(key, _)| member(source, key, name, 0)).map(|(key, e)| (key.as_str(), e))
+/// The entry of `overrides.<section>.machines` (`entries`) for machine `name`: its own, else a
+/// counted machine's (its clones share it), else the first of its groups'.
+pub(super) fn for_machine<'a, T>(source: &syntax::Spec, section: &str, entries: &'a IndexMap<String, T>, name: &str) -> Option<Found<'a, T>> {
+    let clone_base = || {
+        source
+            .clones
+            .iter()
+            .find(|(_, c)| c.iter().any(|n| n == name))
+            .and_then(|(base, _)| entries.get_key_value(base.as_str()))
+    };
+    let (key, value) = entries
+        .get_key_value(name)
+        .or_else(clone_base)
+        .or_else(|| entries.iter().find(|(key, _)| member(source, key, name, 0)))?;
+    let at = FieldPath::new("overrides").key(section).key("machines").key(key);
+    Some(Found { value, at })
 }
 
 /// Whether group `group` holds machine `name` (its members' names, globs and nested groups).
@@ -89,21 +94,21 @@ pub(super) fn lxc(source: &syntax::Spec, name: &str, scope: Scope) -> bool {
             .overrides
             .proxmox
             .as_ref()
-            .and_then(|p| for_machine(source, &p.machines, name))
-            .is_some_and(|m| m.lxc)
+            .and_then(|p| for_machine(source, "proxmox", &p.machines, name))
+            .is_some_and(|m| m.value.lxc)
 }
 
 /// Machine `name`'s existing host, from `overrides.external`.
 pub(super) fn external(source: &syntax::Spec, name: &str) -> Option<External> {
     let x = source.overrides.external.as_ref()?;
-    for_machine(source, &x.machines, name).map(|m| m.ssh.clone())
+    for_machine(source, "external", &x.machines, name).map(|m| m.value.ssh.clone())
 }
 
 /// Machine `name`'s VM images, one per target: its Vagrant box, its Proxmox image, each cloud's.
 pub(super) fn vm_image(source: &syntax::Spec, name: &str) -> Option<VmImage> {
     let o = &source.overrides;
     let mut image = VmImage::default();
-    if let Some(v) = o.vagrant.as_ref().and_then(|v| for_machine(source, &v.machines, name)) {
+    if let Some(Found { value: v, .. }) = o.vagrant.as_ref().and_then(|v| for_machine(source, "vagrant", &v.machines, name)) {
         image.vagrant.clone_from(&v.box_name);
         image.vagrant_version.clone_from(&v.box_version);
         image.box_url.clone_from(&v.box_url);
@@ -116,10 +121,10 @@ pub(super) fn vm_image(source: &syntax::Spec, name: &str) -> Option<VmImage> {
     image.proxmox = o
         .proxmox
         .as_ref()
-        .and_then(|p| for_machine(source, &p.machines, name))
-        .and_then(|m| m.image.clone());
+        .and_then(|p| for_machine(source, "proxmox", &p.machines, name))
+        .and_then(|m| m.value.image.clone());
     for (cloud, c) in o.clouds() {
-        let id = c.and_then(|c| for_machine(source, &c.machines, name)).map(|m| m.image.clone());
+        let id = c.and_then(|c| for_machine(source, cloud, &c.machines, name)).map(|m| m.value.image.clone());
         match cloud {
             "aws" => image.aws = id,
             "azure" => image.azure = id,

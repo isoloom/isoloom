@@ -24,7 +24,7 @@ pub(super) const INDEX: u64 = 0;
 const ADDRESS_WAIT_SECS: u64 = 600;
 
 /// The router's VM.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let config = crate::server::router::cloud_config(env, Platform::default());
     let mut nics = vec![Nic::at(reference("var.uplink_port_group"), None)];
     nics.extend(env.networks.iter().map(|(net, plan)| {
@@ -56,7 +56,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
     } else {
         ""
     };
-    m.commented(
+    module.commented(
         &format!("The router: forwards between networks with the reach rules, and to the internet.{sealed} VMware Tools reports its uplink address."),
         guest.block(&env.name),
     );
@@ -79,11 +79,11 @@ fn uplink_checked(env: &Environment) -> Block {
 }
 
 /// The outputs: the server router's, from its uplink address.
-pub(super) fn outputs(env: &Environment, m: &mut Module) {
-    m.block(
+pub(super) fn outputs(env: &Environment, module: &mut Module) {
+    module.block(
         Block::builder("locals")
             .add_attribute(("router_address", reference("esxi_guest.isoloom_router.ip_address")))
             .build(),
     );
-    crate::server::router::outputs(env, Target::Esxi, m);
+    crate::server::router::outputs(env, Target::Esxi, module);
 }

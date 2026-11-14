@@ -23,9 +23,9 @@ pub(crate) fn any(env: &Environment) -> bool {
 
 /// The Windows machines' administrator password (user `isoloom`), for WinRM, when a VM runs
 /// Windows.
-pub(crate) fn write_password(env: &Environment, m: &mut Module) {
+pub(crate) fn write_password(env: &Environment, module: &mut Module) {
     if any(env) {
-        m.commented(
+        module.commented(
             "The Windows machines' administrator password (user isoloom), for WinRM.",
             module::password("windows"),
         );

@@ -16,7 +16,7 @@ use crate::cloud::Cloud;
 use crate::cloud::instance::{name_with, tag_list};
 use crate::cloud::user_data_limit::Limit;
 use crate::cloud::vm::rules::{FIREWALLS_TC, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Volumes};
-use crate::cloud::vm::{self, Driver, disks, gpus::GpuSizes, hooks, outputs, own_image};
+use crate::cloud::vm::{self, VmDriver, disks, gpus::GpuSizes, hooks, outputs, own_image};
 use crate::limits::Limits;
 use crate::machine::user_data::Capped;
 use crate::module::{self, ident, providers, resource};
@@ -100,7 +100,7 @@ const CAP: Capped = Capped {
 };
 
 /// Its `cloud-vm` driver: its module authenticates with a token in the environment.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::LINODE, providers::RANDOM], &[]),
     refusal,
@@ -108,12 +108,12 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module after its providers: the VPC and its subnets, the firewalls, each machine, the outputs.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
-    network::blocks(env, m);
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
+    network::blocks(env, module);
     for (vm, at) in vm::at_first_address(env) {
-        machine(env, vm, at, m)?;
+        machine(env, vm, at, module)?;
     }
-    outputs::write_as(env, super::BASE.user, &public_ip, "linode_instance", m);
+    outputs::write_as(env, super::BASE.user, &public_ip, "linode_instance", module);
     Ok(())
 }
 
@@ -128,9 +128,9 @@ fn public_ip(name: &str) -> Expression {
 /// # Errors
 ///
 /// [`crate::Error::Refused`] when the Linode's user data is over Linode's cap ([`CAP`]).
-fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address): (&str, Ipv4Addr), m: &mut Module) -> crate::Result<()> {
+fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address): (&str, Ipv4Addr), module: &mut Module) -> crate::Result<()> {
     let id = ident(name);
-    m.block(module::password(&id));
+    module.block(module::password(&id));
     let at_boot = std::iter::once(Template::text(SUDO)).chain(network::routes(env, net)).collect();
     let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
     let mut vpc = Block::builder("interface")
@@ -142,7 +142,7 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address):
     if let Some(more) = mp.more_addresses.get(net) {
         vpc = vpc.add_attribute(("ip_ranges", list(more.iter().map(|a| string(format!("{a}/32"))))));
     }
-    m.block(
+    module.block(
         resource("linode_instance", &id)
             .add_attribute(("label", name_with(&format!("-{name}"))))
             .add_attribute(("region", reference("var.region")))
@@ -161,6 +161,6 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address):
             .add_block(super::set_up_once())
             .build(),
     );
-    m.blocks(disks::linode(env, name, &mp.disks));
+    module.blocks(disks::linode(env, name, &mp.disks));
     Ok(())
 }

@@ -13,7 +13,7 @@ use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::Protocol;
 
 /// The ports the containers publish over `protocol`, sorted, each once.
-pub(crate) fn published(env: &Environment, protocol: Protocol) -> Vec<u16> {
+pub(crate) fn container_ports(env: &Environment, protocol: Protocol) -> Vec<u16> {
     let mut ports: Vec<u16> = env
         .machines
         .values()
@@ -31,7 +31,7 @@ pub(crate) fn published(env: &Environment, protocol: Protocol) -> Vec<u16> {
 /// ports opens.
 pub(crate) fn tcp_ports(env: &Environment) -> Vec<u16> {
     let mut tcp = vec![22];
-    tcp.extend(published(env, Protocol::Tcp));
+    tcp.extend(container_ports(env, Protocol::Tcp));
     tcp
 }
 
@@ -82,8 +82,8 @@ mod tests {
     #[test]
     fn published_ports_are_sorted_once_per_protocol() {
         let e = env(SPEC);
-        assert_eq!(published(&e, Protocol::Tcp), [8080, 15432]);
-        assert_eq!(published(&e, Protocol::Udp), [5353]);
+        assert_eq!(container_ports(&e, Protocol::Tcp), [8080, 15432]);
+        assert_eq!(container_ports(&e, Protocol::Udp), [5353]);
         assert_eq!(tcp_ports(&e), [22, 8080, 15432]);
     }
 

@@ -182,7 +182,7 @@ fn ci_runs_every_gate_the_release_gate_runs() -> Outcome {
     Ok(())
 }
 
-/// The repository's Markdown files a workflow points its reader to (`docs/dev/releasing.md`,
+/// The repository's Markdown files a workflow points its reader to (`.github/CONTRIBUTING.md`,
 /// `SECURITY.md`): each word ending in `.md` in its comments and in the notices it prints, from
 /// the root. Its commands' own files (release notes it writes) aren't pointers.
 fn named_documents(text: &str) -> BTreeSet<String> {
@@ -199,10 +199,9 @@ fn named_documents(text: &str) -> BTreeSet<String> {
 #[test]
 fn every_document_the_workflows_point_to_is_there() -> Outcome {
     let github = root().join(".github");
-    let mut files: Vec<PathBuf> = std::fs::read_dir(github.join("workflows"))?
+    let files: Vec<PathBuf> = std::fs::read_dir(github.join("workflows"))?
         .map(|e| e.map(|e| e.path()))
         .collect::<Result<_, _>>()?;
-    files.push(github.join("actionlint.yaml"));
     let mut missing = Vec::new();
     for file in &files {
         let text = std::fs::read_to_string(file)?;
@@ -218,35 +217,48 @@ fn every_document_the_workflows_point_to_is_there() -> Outcome {
     Ok(())
 }
 
-/// What `.github/scripts/isothrum-ref.sh <mode>` says of `reference`: its exit code.
+/// The script of the CI step named `name`: its `run: |` block, unindented.
+fn step_script(workflow: &str, name: &str) -> Outcome<String> {
+    let text = std::fs::read_to_string(root().join(".github/workflows").join(workflow))?;
+    let mut lines = text.lines().skip_while(|l| l.trim() != format!("- name: {name}")).skip(1);
+    lines.by_ref().find(|l| l.trim() == "run: |").ok_or("no `run: |` in the step")?;
+    let body: Vec<&str> = lines.take_while(|l| l.trim().is_empty() || l.starts_with("          ")).collect();
+    Ok(body.iter().map(|l| l.get(10..).unwrap_or_default()).collect::<Vec<_>>().join("\n"))
+}
+
+/// What CI's ref check says of `reference`: its exit code and what it writes to `GITHUB_OUTPUT`.
 #[cfg(unix)]
-fn pinned(mode: &str, reference: &str) -> Outcome<Option<i32>> {
-    let script = root().join(".github/scripts/isothrum-ref.sh");
-    Ok(Command::new("bash")
+fn pinned(reference: &str) -> Outcome<(Option<i32>, String)> {
+    let script = step_script("ci.yml", "Isothrum's ref, pinned")?;
+    let dir = scratch("isothrum-ref")?;
+    let output = dir.join("output");
+    std::fs::write(&output, "")?;
+    let status = Command::new("bash")
+        .arg("-c")
         .arg(script)
-        .arg(mode)
         .env("ISOTHRUM_REF", reference)
+        .env("GITHUB_OUTPUT", &output)
         .output()?
         .status
-        .code())
+        .code();
+    Ok((status, std::fs::read_to_string(&output)?))
 }
 
 #[cfg(unix)]
 #[test]
 fn the_isothrum_runner_is_built_only_at_a_release_tag_or_a_commit() -> Outcome {
     for reference in ["v2.0.0", "v2.0.0-rc.1", "0123456789abcdef0123456789abcdef01234567"] {
-        assert_eq!(pinned("required", reference)?, Some(0), "{reference}");
+        assert_eq!(pinned(reference)?, (Some(0), "runner=true\n".to_owned()), "{reference}");
     }
     for reference in ["main", "release/2.0", "0123abc"] {
-        assert_eq!(pinned("optional", reference)?, Some(1), "{reference}");
+        assert_eq!(pinned(reference)?.0, Some(1), "{reference}");
     }
-    assert_eq!(pinned("optional", "")?, Some(3), "unset: the runs that need it are skipped");
-    assert_eq!(pinned("required", "")?, Some(1));
+    assert_eq!(pinned("")?, (Some(0), "runner=false\n".to_owned()), "unset: the runs that need it are skipped");
     // Every workflow that builds the runner checks its ref first, and none falls back to a branch.
     for entry in std::fs::read_dir(root().join(".github/workflows"))? {
         let text = std::fs::read_to_string(entry?.path())?;
         if let Some(checkout) = text.find("repository: Isothrum/isothrum") {
-            let check = text.find(".github/scripts/isothrum-ref.sh").ok_or("no ref check")?;
+            let check = text.find("- name: Isothrum's ref, pinned").ok_or("no ref check")?;
             assert!(check < checkout && !text.contains("ISOTHRUM_REF ||"), "{text}");
         }
     }

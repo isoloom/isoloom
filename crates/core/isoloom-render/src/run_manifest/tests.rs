@@ -143,6 +143,7 @@ fn model_port(port: u16, protocol: model::Protocol, http: bool) -> model::Port {
         tls: false,
         publish: None,
         fixed: false,
+        free: false,
         dormant: false,
         protocol,
         login: None,

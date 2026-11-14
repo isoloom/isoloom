@@ -83,6 +83,10 @@ fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Vec<Problem>
             refused.push(past);
             continue;
         }
+        if let Some(same) = one_host_port_for_all(base, m, count) {
+            refused.push(same);
+            continue;
+        }
         let mut names = Vec::new();
         for i in 1..=count {
             let n = name(base, i);
@@ -129,6 +133,26 @@ fn past_the_last_octet(base: &str, m: &Mapping, count: u8) -> Option<Problem> {
                 format!("{count} machines from .{first} run past .255 (the last would be .{last}): start lower or count fewer"),
             )
         })
+    })
+}
+
+/// The problem when counted machine `base` publishes a port on a host port of its own number
+/// (`publish: 8080`, `{ host: 8080 }`): every clone would ask for that one port. One problem, on
+/// the machine as written, rather than one per clone; `publish: true` gives each a free one.
+fn one_host_port_for_all(base: &str, m: &Mapping, count: u8) -> Option<Problem> {
+    let Some(Value::Mapping(ports)) = m.get(key("ports")) else { return None };
+    ports.iter().find_map(|(name, port)| {
+        let Value::Mapping(port) = port else { return None };
+        let host = match port.get(key("publish"))? {
+            Value::Number(n) => n.as_u64()?,
+            Value::Mapping(h) => h.get(key("host"))?.as_u64()?,
+            _ => return None,
+        };
+        Some(Problem::new(
+            Code::InvalidValue,
+            FieldPath::new("machines").key(base).key("ports").key(name.as_str().unwrap_or_default()).key("publish"),
+            format!("its {count} clones (`count`) can't all have host port {host}: `publish: true` gives each a free host port"),
+        ))
     })
 }
 

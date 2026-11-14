@@ -50,37 +50,37 @@ app:
   - command: |
       set -e
       export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
+      export JAVA_RELEASE=17
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/tmp/jdk_installers.txt
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/adoptium/jdk_installers.txt; do isoloom_copy_to "$s" "$dest"; done
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-2.462.3-lts-jdk17/adoptium/jdk_installers.txt; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
     creates: /var/lib/isoloom/dockerfile/003
   - command: |
       set -e
       export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
+      export JAVA_RELEASE=17
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/local/share/adoptium.key
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/adoptium.key; do isoloom_copy_to "$s" "$dest"; done
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-2.462.3-lts-jdk17/adoptium.key; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
     creates: /var/lib/isoloom/dockerfile/004
   - command: |
       set -e
       export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
+      export JAVA_RELEASE=17
       export TEMP_JAVA_HOME=/opt/jdk
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
@@ -91,7 +91,7 @@ app:
   - command: |
       set -e
       export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
+      export JAVA_RELEASE=17
       export TEMP_JAVA_HOME=/opt/jdk
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
@@ -102,28 +102,28 @@ app:
   - command: |
       set -e
       export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
+      export JAVA_RELEASE=17
       export TEMP_JAVA_HOME=/opt/jdk
-      export JENKINS_VERSION=2.580.2
-      export WAR_URL=https://get.jenkins.io/war/2.580.2/jenkins.war
+      export JENKINS_VERSION=2.462.3
+      export WAR_URL=https://get.jenkins.io/war/2.462.3/jenkins.war
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/war/jenkins-key.pub
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins.io-2026.key; do isoloom_copy_to "$s" "$dest"; done
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-2.462.3-lts-jdk17/jenkins.io-2026.key; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/007
     creates: /var/lib/isoloom/dockerfile/007
   - command: |
       set -e
       export TARGETPLATFORM=linux/amd64
-      export JAVA_RELEASE=21
+      export JAVA_RELEASE=17
       export TEMP_JAVA_HOME=/opt/jdk
-      export JENKINS_VERSION=2.580.2
-      export WAR_URL=https://get.jenkins.io/war/2.580.2/jenkins.war
+      export JENKINS_VERSION=2.462.3
+      export WAR_URL=https://get.jenkins.io/war/2.462.3/jenkins.war
       export PATH=/opt/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
@@ -297,8 +297,8 @@ app:
       export JAVA_HOME=/opt/java/openjdk
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/opt/java/openjdk
@@ -332,8 +332,8 @@ app:
       export JAVA_HOME=/opt/java/openjdk
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/share/jenkins/jenkins.war
@@ -367,12 +367,12 @@ app:
       export JAVA_HOME=/opt/java/openjdk
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/local/bin/jenkins-support
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins-support; do isoloom_copy_to "$s" "$dest"; done
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-2.462.3-lts-jdk17/jenkins-support; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/018
     creates: /var/lib/isoloom/dockerfile/018
   - command: |
@@ -402,12 +402,12 @@ app:
       export JAVA_HOME=/opt/java/openjdk
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/local/bin/jenkins.sh
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins.sh; do isoloom_copy_to "$s" "$dest"; done
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-2.462.3-lts-jdk17/jenkins.sh; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/019
     creates: /var/lib/isoloom/dockerfile/019
   - command: |
@@ -437,12 +437,12 @@ app:
       export JAVA_HOME=/opt/java/openjdk
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/bin/jenkins-plugin-cli
-      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-lts-jdk21/jenkins-plugin-cli.sh; do isoloom_copy_to "$s" "$dest"; done
+      for s in /opt/isoloom/vendor/bases/jenkins-jenkins-2.462.3-lts-jdk17/jenkins-plugin-cli.sh; do isoloom_copy_to "$s" "$dest"; done
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/020
     creates: /var/lib/isoloom/dockerfile/020
   - command: |
@@ -457,7 +457,7 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
-      export JENKINS_VERSION=2.580.2
+      export JENKINS_VERSION=2.462.3
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
@@ -475,11 +475,11 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
-      export JENKINS_VERSION=2.580.2
+      export JENKINS_VERSION=2.462.3
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/usr/share/jenkins/ref/plugins.txt
@@ -500,7 +500,7 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
-      export JENKINS_VERSION=2.580.2
+      export JENKINS_VERSION=2.462.3
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
       jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
@@ -519,11 +519,11 @@ app:
       export JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
       export COPY_REFERENCE_FILE_LOG=/var/jenkins_home/copy_reference_file.log
       export JAVA_HOME=/opt/java/openjdk
-      export JENKINS_VERSION=2.580.2
+      export JENKINS_VERSION=2.462.3
       export PATH="/usr/local/lib/isoloom/shims:$PATH"
       mkdir -p / && cd /
-      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
       isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
       isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
       dest=/var/jenkins_home/casc.yaml
@@ -551,7 +551,7 @@ app:
   - command: |
       set -e
       mkdir -p /usr/local/lib/isoloom
-      printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS9vcHQvamF2YS9vcGVuamRrL2JpbjovdXNyL2xvY2FsL3NiaW46L3Vzci9sb2NhbC9iaW46L3Vzci9zYmluOi91c3IvYmluOi9zYmluOi9iaW4KZXhwb3J0IExBTkc9Qy5VVEYtOApleHBvcnQgSkVOS0lOU19IT01FPS92YXIvamVua2luc19ob21lCmV4cG9ydCBKRU5LSU5TX1NMQVZFX0FHRU5UX1BPUlQ9NTAwMDAKZXhwb3J0IFJFRj0vdXNyL3NoYXJlL2plbmtpbnMvcmVmCmV4cG9ydCBKRU5LSU5TX1VDPWh0dHBzOi8vdXBkYXRlcy5qZW5raW5zLmlvCmV4cG9ydCBKRU5LSU5TX1VDX0VYUEVSSU1FTlRBTD1odHRwczovL3VwZGF0ZXMuamVua2lucy5pby9leHBlcmltZW50YWwKZXhwb3J0IEpFTktJTlNfSU5DUkVNRU5UQUxTX1JFUE9fTUlSUk9SPWh0dHBzOi8vcmVwby5qZW5raW5zLWNpLm9yZy9pbmNyZW1lbnRhbHMKZXhwb3J0IENPUFlfUkVGRVJFTkNFX0ZJTEVfTE9HPS92YXIvamVua2luc19ob21lL2NvcHlfcmVmZXJlbmNlX2ZpbGUubG9nCmV4cG9ydCBKQVZBX0hPTUU9L29wdC9qYXZhL29wZW5qZGsKZXhwb3J0IEpFTktJTlNfVkVSU0lPTj0yLjU4MC4yCmV4cG9ydCBDQVNDX0pFTktJTlNfQ09ORklHPS92YXIvamVua2luc19ob21lL2Nhc2MueWFtbApjZCAvCmV4ZWMgL3Vzci9iaW4vdGluaSAtLSAvdXNyL2xvY2FsL2Jpbi9qZW5raW5zLnNoCg== | base64 -d > /usr/local/lib/isoloom/app-start
+      printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS9vcHQvamF2YS9vcGVuamRrL2JpbjovdXNyL2xvY2FsL3NiaW46L3Vzci9sb2NhbC9iaW46L3Vzci9zYmluOi91c3IvYmluOi9zYmluOi9iaW4KZXhwb3J0IExBTkc9Qy5VVEYtOApleHBvcnQgSkVOS0lOU19IT01FPS92YXIvamVua2luc19ob21lCmV4cG9ydCBKRU5LSU5TX1NMQVZFX0FHRU5UX1BPUlQ9NTAwMDAKZXhwb3J0IFJFRj0vdXNyL3NoYXJlL2plbmtpbnMvcmVmCmV4cG9ydCBKRU5LSU5TX1VDPWh0dHBzOi8vdXBkYXRlcy5qZW5raW5zLmlvCmV4cG9ydCBKRU5LSU5TX1VDX0VYUEVSSU1FTlRBTD1odHRwczovL3VwZGF0ZXMuamVua2lucy5pby9leHBlcmltZW50YWwKZXhwb3J0IEpFTktJTlNfSU5DUkVNRU5UQUxTX1JFUE9fTUlSUk9SPWh0dHBzOi8vcmVwby5qZW5raW5zLWNpLm9yZy9pbmNyZW1lbnRhbHMKZXhwb3J0IENPUFlfUkVGRVJFTkNFX0ZJTEVfTE9HPS92YXIvamVua2luc19ob21lL2NvcHlfcmVmZXJlbmNlX2ZpbGUubG9nCmV4cG9ydCBKQVZBX0hPTUU9L29wdC9qYXZhL29wZW5qZGsKZXhwb3J0IEpFTktJTlNfVkVSU0lPTj0yLjQ2Mi4zCmV4cG9ydCBDQVNDX0pFTktJTlNfQ09ORklHPS92YXIvamVua2luc19ob21lL2Nhc2MueWFtbApjZCAvCmV4ZWMgL3Vzci9iaW4vdGluaSAtLSAvdXNyL2xvY2FsL2Jpbi9qZW5raW5zLnNoCg== | base64 -d > /usr/local/lib/isoloom/app-start
       chmod 755 /usr/local/lib/isoloom/app-start
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/026
     creates: /var/lib/isoloom/dockerfile/026

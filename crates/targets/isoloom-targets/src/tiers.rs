@@ -72,7 +72,7 @@ impl fmt::Display for Tier {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Run {
-    /// The machine that ran the tools (`macos-arm64`, `linux-1`, `windows-11`).
+    /// The machine that ran the tools, as the list's `hosts` names it (`macos`, `linux`, `windows`).
     pub host: String,
     /// Its operating system.
     pub os: HostOs,
@@ -80,7 +80,7 @@ pub struct Run {
     pub date: Date,
     /// Whether it passed.
     pub result: RunResult,
-    /// The server it ran on, for a server target (`pve-lab`).
+    /// The server it ran on, for a server target, when the run names it.
     pub server: Option<String>,
     /// What ran, in a few words.
     pub note: Option<String>,
@@ -163,8 +163,8 @@ impl TierEntry {
         self.exists_on.difference(&self.proven()).copied().collect()
     }
 
-    /// What proves it, in a line: the latest run on each host OS (`real runs: linux (linux-2,
-    /// 2026-10-15)`), or `validated only`; then the host OSes tier 1 waits for.
+    /// What proves it, in a line: the latest run on each host OS (`real runs: linux
+    /// (2026-10-15)`), or `validated only`; then the host OSes tier 1 waits for.
     #[must_use]
     pub fn evidence(&self) -> String {
         let runs: Vec<String> = self.latest().into_iter().map(shown).collect();
@@ -220,16 +220,15 @@ impl TierEntry {
     }
 }
 
-/// A run in a line: `macos (macos-arm64, pve-lab, 2026-10-15)`, after `failed` or `partial` when it
-/// was.
+/// A run in a line: its host OS and day, `macos (2026-10-15)`, after `failed` or `partial` when it
+/// was. The test machine's and the server's names stay in the list, out of the published evidence.
 fn shown(run: &Run) -> String {
-    let server = run.server.as_deref().map(|s| format!(", {s}")).unwrap_or_default();
     let how = match run.result {
         RunResult::Pass => "",
         RunResult::Partial => "partial ",
         RunResult::Fail => "failed ",
     };
-    format!("{how}{} ({}{server}, {})", os_id(run.os), run.host, run.date)
+    format!("{how}{} ({})", os_id(run.os), run.date)
 }
 
 /// A host OS by the name `tiers.json` and the run manifest write it with.

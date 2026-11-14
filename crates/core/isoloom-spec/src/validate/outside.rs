@@ -8,11 +8,11 @@ use crate::model::{Network, Spec};
 
 /// Each outside network: one kind, a name or interface that reads as one, and none of the
 /// settings that only Isoloom's own networks take.
-pub(super) fn networks(spec: &Spec, p: &mut Problems) {
+pub(super) fn networks(spec: &Spec, problems: &mut Problems) {
     for (name, net) in &spec.networks {
         let at = format!("networks.{name}");
         if net.external.is_some() && net.bridged.is_some() {
-            p.add(
+            problems.add(
                 &at,
                 "a network is either `external` (an existing network, joined by name) or `bridged` (to a host interface), not both",
             );
@@ -20,27 +20,27 @@ pub(super) fn networks(spec: &Spec, p: &mut Problems) {
         if let Some(e) = &net.external
             && !word(e)
         {
-            p.add(format!("{at}.external"), "the existing network's name, like `corp-net` or `vmbr1` (no spaces)");
+            problems.add(format!("{at}.external"), "the existing network's name, like `corp-net` or `vmbr1` (no spaces)");
         }
         if let Some(b) = &net.bridged {
             if b.interface.as_deref().is_some_and(|i| i.trim().is_empty()) {
-                p.add(format!("{at}.bridged.interface"), "name the host interface, or leave `interface` out");
+                problems.add(format!("{at}.bridged.interface"), "name the host interface, or leave `interface` out");
             }
             if b.default_route && !b.dhcp {
-                p.add(
+                problems.add(
                     format!("{at}.bridged.default_route"),
                     "the default route comes from the LAN's DHCP server: set `dhcp: true`, or leave `default_route` out",
                 );
             }
             if b.vlan.is_some_and(|v| !crate::vlans::VLAN_IDS.contains(&v)) {
-                p.add(
+                problems.add(
                     format!("{at}.bridged.vlan"),
                     format!("a VLAN tag is {} to {}", crate::vlans::VLAN_IDS.start(), crate::vlans::VLAN_IDS.end()),
                 );
             }
         }
         if net.is_outside() {
-            own_settings(&at, name, net, p);
+            own_settings(&at, name, net, problems);
         }
     }
 }
@@ -51,28 +51,28 @@ fn word(s: &str) -> bool {
 }
 
 /// What only the environment's own networks take: Isoloom routes, impairs and lays them out.
-fn own_settings(at: &str, name: &str, net: &Network, p: &mut Problems) {
+fn own_settings(at: &str, name: &str, net: &Network, problems: &mut Problems) {
     let why = format!("`{name}` is outside the environment: its own routing decides");
     if net.gateway.is_some() {
-        p.add(format!("{at}.gateway"), format!("{why}, so leave `gateway` out"));
+        problems.add(format!("{at}.gateway"), format!("{why}, so leave `gateway` out"));
     }
     if !net.internet {
-        p.add(format!("{at}.internet"), format!("{why}, so leave `internet` out"));
+        problems.add(format!("{at}.internet"), format!("{why}, so leave `internet` out"));
     }
     if net.tc.is_some() {
-        p.add(format!("{at}.tc"), format!("{why}, so leave `tc` out (it applies on Isoloom's router)"));
+        problems.add(format!("{at}.tc"), format!("{why}, so leave `tc` out (it applies on Isoloom's router)"));
     }
     if net.docker.is_some() {
-        p.add(
+        problems.add(
             format!("{at}.docker"),
             format!("`{name}` keeps its own block on Docker: leave its `cidr` out of `overrides.docker`"),
         );
     }
     if net.switch.is_some() {
-        p.add(format!("{at}.switch"), format!("{why}, so leave `switch` out"));
+        problems.add(format!("{at}.switch"), format!("{why}, so leave `switch` out"));
     }
     if net.ipv6.is_some() {
-        p.add(
+        problems.add(
             format!("{at}.ipv6"),
             format!("`{name}` is outside the environment: its IPv6 is its own, so leave `ipv6` out"),
         );
@@ -80,11 +80,11 @@ fn own_settings(at: &str, name: &str, net: &Network, p: &mut Problems) {
 }
 
 /// No `reach` rule names an outside network: Isoloom's router isn't on it.
-pub(super) fn reach(spec: &Spec, p: &mut Problems) {
+pub(super) fn reach(spec: &Spec, problems: &mut Problems) {
     for (i, r) in spec.reach.iter().enumerate() {
         for (field, net) in [("from", &r.from), ("to", &r.to)] {
             if spec.networks.get(net).is_some_and(Network::is_outside) {
-                p.add(
+                problems.add(
                     format!("reach[{i}].{field}"),
                     format!("`{net}` is outside the environment: Isoloom's router isn't on it, so its own routing decides"),
                 );
@@ -94,11 +94,11 @@ pub(super) fn reach(spec: &Spec, p: &mut Problems) {
 }
 
 /// Each machine's first network is one of the environment's own: it is reached there.
-pub(super) fn first_networks(spec: &Spec, p: &mut Problems) {
+pub(super) fn first_networks(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let Some((first, _)) = m.networks.first() else { continue };
         if spec.networks.get(first).is_some_and(Network::is_outside) {
-            p.add(
+            problems.add(
                 format!("machines.{name}.networks"),
                 format!("`{first}` is outside the environment: list one of the environment's own networks first (a machine is reached on its first network)"),
             );
@@ -109,12 +109,12 @@ pub(super) fn first_networks(spec: &Spec, p: &mut Problems) {
 /// A machine's address on network `net` when DHCP decides it or `octet` asks for DHCP: `0`, on
 /// a `bridged: { dhcp: true }` network only. True when this settles the address (the caller
 /// checks a fixed one otherwise).
-pub(super) fn dhcp_address(spec: &Spec, net: &str, octet: u8, at: &str, p: &mut Problems) -> bool {
+pub(super) fn dhcp_address(spec: &Spec, net: &str, octet: u8, at: &str, problems: &mut Problems) -> bool {
     let dhcp = spec.networks.get(net).is_some_and(Network::is_dhcp);
     match (dhcp, octet) {
         (true, 0) => {}
-        (true, _) => p.add(at, format!("`{net}` gives addresses by DHCP: write `{net}: 0`")),
-        (false, 0) => p.add(at, "0 asks for an address by DHCP, on a `bridged: { dhcp: true }` network only"),
+        (true, _) => problems.add(at, format!("`{net}` gives addresses by DHCP: write `{net}: 0`")),
+        (false, 0) => problems.add(at, "0 asks for an address by DHCP, on a `bridged: { dhcp: true }` network only"),
         (false, _) => return false,
     }
     true

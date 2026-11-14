@@ -22,6 +22,7 @@ mod machines;
 mod network;
 mod outputs;
 mod private_dns;
+mod resources;
 mod routing;
 
 use crate::hcl_builder::{Block, BlockBuilder, Module, string};
@@ -32,7 +33,7 @@ use isoloom_spec::windows::Tpm;
 use super::{INSTANCE_TYPES, ami, ami_filter, zones};
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
-use crate::cloud::vm::{self, Driver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
+use crate::cloud::vm::{self, VmDriver, disks, gateways, gpus::GpuSizes, nested, own_image, windows};
 use crate::limits::Limits;
 use crate::machine::controller;
 use crate::module::ident;
@@ -242,7 +243,7 @@ fn machines_refusal(env: &Environment) -> Option<String> {
 }
 
 /// Its `cloud-vm` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::AWS], &[providers::RANDOM, providers::TIME, providers::LOCAL]),
     write,
@@ -250,15 +251,15 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
-    m.block(zones());
-    network::blocks(env, m);
-    private_dns::write(env, m);
-    crate::machine::credentials(env, m);
-    m.blocks(amis(env));
-    MACHINES.write(env, m)?;
-    outputs::blocks(env, m);
+    module.block(zones());
+    network::blocks(env, module);
+    private_dns::write(env, module);
+    crate::machine::credentials(env, module);
+    module.blocks(amis(env));
+    MACHINES.write(env, module)?;
+    outputs::blocks(env, module);
     Ok(())
 }
 

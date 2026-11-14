@@ -61,8 +61,6 @@ pub(super) struct Image {
     /// The step ([`Op::Entry`]) of the catalogue entry it is, when it is one: the last stage's
     /// entry takes its settings from the image's environment.
     pub entry: Option<usize>,
-    /// kCTF's challenge base: the VM is the jail.
-    pub jail: bool,
 }
 
 /// One step of the translation, in order.
@@ -103,7 +101,6 @@ impl Image {
             cmd: base.cmd,
             shell: None,
             entry: None,
-            jail: base.jail,
         }
     }
 
@@ -301,11 +298,7 @@ impl<'a> Run<'a> {
                 return Err(f.at(line, "`RUN --mount`/`--network` needs BuildKit's build sandbox".to_owned(), "a plain `RUN`"));
             }
             Instruction::Run { command, .. } => self.run(st, command),
-            Instruction::Copy(c) | Instruction::Add(c) => {
-                let add = matches!(line.instruction, Instruction::Add(_));
-                let body = copy(f, i, c, add, st).map_err(|(reason, fix)| f.at(line, reason, fix))?;
-                self.push(st, &body, true);
-            }
+            Instruction::Copy(_) | Instruction::Add(_) => self.copy(f, i, st, line)?,
             Instruction::Volume(paths) => {
                 let dirs: Vec<String> = paths.iter().map(|p| quote(&absolute(&st.img.workdir, &substitute(p, &st.vars())))).collect();
                 self.push(st, &format!("mkdir -p {}", dirs.join(" ")), true);
@@ -343,21 +336,27 @@ impl<'a> Run<'a> {
         self.push(st, &body, false);
     }
 
+    /// The `COPY`/`ADD` at `line` of stage `i`; out of an image the catalogue has an entry for, the
+    /// entry first, installing the files where the image has them on the VM itself.
+    fn copy(&mut self, f: &File<'_>, i: usize, st: &Stage, line: &Line) -> Result<(), Untranslatable> {
+        let (Instruction::Copy(c) | Instruction::Add(c)) = &line.instruction else {
+            return Ok(());
+        };
+        let add = matches!(line.instruction, Instruction::Add(_));
+        if let Some(call) = copied_entry(f, c, st) {
+            let op = release(&call, Some(&st.img.os)).map_err(|(reason, fix)| f.at(line, reason, &fix))?;
+            self.steps.push(Op::Entry(op));
+        }
+        let body = copy(f, i, c, add, st).map_err(|(reason, fix)| f.at(line, reason, fix))?;
+        self.push(st, &body, true);
+        Ok(())
+    }
+
     /// The image `image_ref` (a `FROM` at `line` of `f`) as a VM: the matrix's entry, else a
     /// fetched Dockerfile translated first.
     fn base(&mut self, f: &File<'_>, line: &Line, image_ref: &str) -> Result<Image, Untranslatable> {
         match matrix::of(image_ref) {
             Ok(mut base) => {
-                // A base that takes the VM's OS (kCTF's): the stages before made it.
-                if base.jail {
-                    base.os = self.os.as_ref().map(|(os, _)| os.clone()).ok_or_else(|| {
-                        f.at(
-                            line,
-                            format!("`{image_ref}` runs on the OS its stages before give, and none comes before it"),
-                            "build a stage FROM an OS before it",
-                        )
-                    })?;
-                }
                 let entry = match base.entry.take() {
                     Some(call) => {
                         let op = release(&call, self.wanted).map_err(|(reason, fix)| f.at(line, reason, &fix))?;
@@ -466,14 +465,26 @@ fn release(call: &EntryCall, wanted: Option<&str>) -> Result<EntryOp, (String, S
     })
 }
 
-/// A `COPY`/`ADD`'s shell (stage `i` of `f`), or why it has none and the fix.
+/// The catalogue entry `c` copies out of: its `--from` names an image (not a stage) the matrix
+/// knows files of ([`matrix::copied`]).
+fn copied_entry(f: &File<'_>, c: &Copy, st: &Stage) -> Option<EntryCall> {
+    match &c.source {
+        Source::From(name) if stage_index(&f.stages, name).is_none() && name.parse::<usize>().is_err() => matrix::copied(&substitute(name, &st.vars())),
+        _ => None,
+    }
+}
+
+/// A `COPY`/`ADD`'s shell (stage `i` of `f`), or why it has none and the fix. Out of an image a
+/// catalogue entry installed ([`copied_entry`]), its files are on the VM itself.
 fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<String, (String, &'static str)> {
+    let installed = copied_entry(f, c, st).is_some();
     let vars = st.vars();
     let dest = substitute(&c.dest, &vars);
     let into = dest.ends_with('/') || dest == "." || c.sources.len() > 1;
     let dest = absolute(&st.img.workdir, &dest);
     let root = match &c.source {
         Source::Context => Some(format!("/opt/isoloom/{}", f.df.context.trim_end_matches('/'))),
+        Source::From(_) if installed => Some(String::new()),
         Source::From(stage) => match stage_index(&f.stages, stage).or_else(|| stage.parse().ok()) {
             Some(j) if j < i => None,
             _ => {
@@ -486,7 +497,7 @@ fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<Strin
     };
     let mut lines = vec![format!("dest={}", quote(&dest))];
     for src in &c.sources {
-        lines.push(copy_one(&substitute(src, &vars), root.as_deref(), add, into, st.img.jail)?);
+        lines.push(copy_one(&substitute(src, &vars), root.as_deref(), add, into)?);
     }
     if let Some(owner) = &c.chown {
         lines.push(format!("chown -R {} \"$dest\"", quote(&substitute(owner, &vars))));
@@ -498,9 +509,8 @@ fn copy(f: &File<'_>, i: usize, c: &Copy, add: bool, st: &Stage) -> Result<Strin
 }
 
 /// One source of a `COPY`/`ADD` into `$dest`: from the project copy under `root`, or (`None`)
-/// from an earlier stage on this VM; `into`: `$dest` is a folder; `jail`: the VM is kCTF's jail,
-/// whose chroot is the VM itself.
-fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) -> Result<String, (String, &'static str)> {
+/// from an earlier stage on this VM; `into`: `$dest` is a folder.
+fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool) -> Result<String, (String, &'static str)> {
     if add && (src.starts_with("http://") || src.starts_with("https://")) {
         let name = src.rsplit('/').next().unwrap_or("download");
         let to = if into { format!("\"$dest\"/{}", quote(name)) } else { "\"$dest\"".to_owned() };
@@ -509,9 +519,6 @@ fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) ->
     let rel = src.trim_start_matches("./");
     let path = match root {
         Some(root) => format!("{root}/{rel}"),
-        None if (rel == "/" || rel.is_empty()) && jail => {
-            return Ok(": a stage's whole filesystem into kCTF's chroot: the VM itself is the jail".to_owned());
-        }
         None if rel == "/" || rel.is_empty() => {
             return Err((
                 "it copies a stage's whole filesystem: a VM can't be two systems".to_owned(),
@@ -531,8 +538,8 @@ fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) ->
 
 /// `COPY`'s semantics as shell functions: a folder's contents into the destination, a file to
 /// it (or into it, when it is a folder), a missing source an error.
-const COPY_HELPERS: &str = r#"isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
-isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+const COPY_HELPERS: &str = r#"isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
 isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
 isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
 "#;

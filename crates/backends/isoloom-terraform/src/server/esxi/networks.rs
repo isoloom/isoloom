@@ -14,16 +14,16 @@ pub(super) fn suffix(net: &str) -> String {
 }
 
 /// A vSwitch and a port group per network.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     for (net, plan) in &env.networks {
         let name = || slotted(&suffix(net));
         let mut vswitch = resource("esxi_vswitch", &ident(net)).add_attribute(("name", name()));
         if let Some(mtu) = plan.mtu {
             vswitch = vswitch.add_attribute(("mtu", number(mtu.into())));
         }
-        m.commented(&format!("Network `{net}`: {}, on its own vSwitch with no uplink.", plan.cidr), vswitch.build());
+        module.commented(&format!("Network `{net}`: {}, on its own vSwitch with no uplink.", plan.cidr), vswitch.build());
         // VLAN 4095 passes the machines' own VLAN tags (trunks), and untagged frames as well.
-        m.block(
+        module.block(
             resource("esxi_portgroup", &ident(net))
                 .add_attribute(("name", name()))
                 .add_attribute(("vswitch", reference(&format!("esxi_vswitch.{}.name", ident(net)))))

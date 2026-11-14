@@ -96,16 +96,20 @@ An `internet: false` network is a guarantee, not a convention. On Compose, the c
 route out and a privileged container on such a network is refused unless it accepts a best-effort
 seal. On the clouds and the servers (Proxmox, ESXi), machines need the internet while they set
 themselves up, so the module seals the network once they are ready, within the same `terraform
-apply`, where root in a machine can't undo it: at the cloud's own level (resources made after
-every machine's set-up: a network ACL, a subnet security group, deny rules, a route table), or at
-a server's router (its sealed ruleset applied over SSH). Egress is then limited to the
-environment's networks. The seal fails closed (the apply fails), and every later apply keeps it.
-DigitalOcean and Linode, whose firewalls can't be closed after the fact, refuse such a network.
+apply`, where root in a machine can't undo it. The closing resources depend on each machine's
+readiness wait (its ready file, read over SSH), at the cloud's own level (a network ACL on AWS, a
+security group on Azure, deny rules on Google Cloud, a route table on Oracle Cloud), or at a
+server's router (its sealed ruleset applied over SSH). Egress is then limited to the
+environment's networks. The seal fails closed: a failed seal fails the apply, and the environment
+is not ready. Every later apply keeps it, so a later change can't silently reopen the network.
+DigitalOcean and Linode, whose firewalls only allow and are made with the machine, can't close a
+network once it is set up, so they refuse one without internet. One channel stays open on the
+clouds: the cloud's own DNS resolver still answers for public names, so a machine can still resolve
+them, and a program that tunnels data through DNS lookups can still reach out.
 
 On the Terraform targets, values given at launch are module variables (`sensitive` for secrets
 and sensitive inputs), written into a machine by its user data, its cloud-init snippet or an
-upload over SSH. Terraform stores sensitive values in its state, as it does for every variable. [ADR 0004](adr/0004-egress-seal.md) explains
-the design and its one residual channel (the cloud's DNS resolver).
+upload over SSH. Terraform stores sensitive values in its state, as it does for every variable.
 
 ## Expiry
 

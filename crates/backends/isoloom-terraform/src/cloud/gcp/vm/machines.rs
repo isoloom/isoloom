@@ -38,17 +38,17 @@ fn at_boot(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> Vec<Tem
 }
 
 /// A Linux machine: what may reach it, its instance, set up by its startup script.
-pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, module: &mut Module) -> Result<()> {
     let id = ident(name);
     if mp.addresses.is_empty() {
         return Ok(());
     }
     let rules = firewalls(env, (name, mp));
     if let Some((first, rest)) = rules.split_first() {
-        m.commented(&format!("Machine `{name}`: what may reach it."), first.clone());
-        m.blocks(rest.iter().cloned());
+        module.commented(&format!("Machine `{name}`: what may reach it."), first.clone());
+        module.blocks(rest.iter().cloned());
     }
-    m.blocks(disks::gcp(env, name, &mp.disks));
+    module.blocks(disks::gcp(env, name, &mp.disks));
     let setup = hooks::user_data(env, (name, mp), user(os), at_boot(env, &mp.addresses), CAP)?;
     let mut vm = instance(&Instance {
         env,
@@ -66,7 +66,7 @@ pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, m: &mu
         setup,
     });
     vm.body.extend(disks::gcp_attached(name, &mp.disks));
-    m.block(vm);
+    module.block(vm);
     Ok(())
 }
 
@@ -266,7 +266,7 @@ fn hardware(mut b: BlockBuilder, i: &Instance) -> BlockBuilder {
 /// The controller: what may reach it (every network, SSH from `allowed_cidr`), its instance
 /// with an interface on every network at the controller address, set up by its startup script
 /// (it waits for every machine's own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
+pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
     let id = "isoloom_controller";
     let Some(first) = env.networks.keys().next() else { return Ok(()) };
     let addresses = controller::addresses(env);
@@ -276,15 +276,15 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
         .iter()
         .map(|(n, p)| firewall(who, (&format!("net-{n}"), n), list([string(p.cidr.to_string())]), vec![allow("all", &[])]));
     if let Some(rule) = rules.next() {
-        m.commented("The controller (Ansible): every network may reach it, and SSH from allowed_cidr.", rule);
+        module.commented("The controller (Ansible): every network may reach it, and SSH from allowed_cidr.", rule);
     }
-    m.blocks(rules);
-    m.block(firewall(who, ("ssh", first), list([reference("var.allowed_cidr")]), vec![allow("tcp", &[22])]));
+    module.blocks(rules);
+    module.block(firewall(who, ("ssh", first), list([reference("var.allowed_cidr")]), vec![allow("tcp", &[22])]));
     let (_, _, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| user(os).to_owned(), WinrmAuth::Basic);
     let who_logs_in = |os: &str| user(os).to_owned();
     let setup = controller_setup::set_up(env, &who_logs_in, inventory, &at_boot(env, &addresses));
-    m.block(instance(&Instance {
+    module.block(instance(&Instance {
         env,
         id,
         who: controller::NAME,

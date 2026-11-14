@@ -1,0 +1,10 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's jenkins entry: the jenkins/jenkins image's command, as its
+# user, with its environment: the entry's (jenkins.env), then the image's as a translated
+# Dockerfile left it (/etc/isoloom/image.env).
+set -a
+. /etc/jenkins/jenkins.env
+[ ! -r /etc/isoloom/image.env ] || . /etc/isoloom/image.env
+set +a
+exec setpriv --reuid jenkins --regid jenkins --init-groups -- /usr/local/bin/jenkins.sh "$@"

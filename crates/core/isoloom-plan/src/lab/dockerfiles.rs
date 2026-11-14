@@ -150,9 +150,9 @@ mod tests {
         let lab = Lab::parse(LAB).unwrap().with_dockerfiles(texts(&[
             (
                 "build/web/Dockerfile",
-                "FROM php:8.2-apache\nCOPY --from=composer:2 /usr/bin/composer /usr/bin/\n",
+                "FROM php:8.2-apache\nCOPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/bin/\n",
             ),
-            ("build/db/Dockerfile.lab", "FROM mariadb:10.11\n"),
+            ("build/db/Dockerfile.lab", "FROM mariadb:10.11\nENV MARIADB_ROOT_PASSWORD=root\n"),
         ]));
         let refusal = lab.refusal(Target::Vagrant).unwrap();
         assert_eq!(refusal.path.as_str(), "machines.web.app.build");

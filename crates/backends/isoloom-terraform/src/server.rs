@@ -97,15 +97,15 @@ impl Parts {
 /// A server module's start: the `terraform` block requiring the server's providers (`own`, and
 /// `random` for the Windows machines' password), the server's `variables` (its run manifest's
 /// params and slots too), the values given at launch (`inputs`), then its `provider`.
-pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
+pub(crate) fn head(env: &Environment, module: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
     let mut required = own.to_vec();
     if windows::any(env) {
         required.push(providers::RANDOM);
     }
-    m.block(providers::terraform(&required));
-    m.blocks(variables.into_iter().map(Variable::block));
-    m.blocks(inputs::variables(env));
-    m.block(provider);
+    module.block(providers::terraform(&required));
+    module.blocks(variables.into_iter().map(Variable::block));
+    module.blocks(inputs::variables(env));
+    module.block(provider);
 }
 
 /// Why a server can't give a machine of `env` its secrets, if it can't: a Linux VM gets them from

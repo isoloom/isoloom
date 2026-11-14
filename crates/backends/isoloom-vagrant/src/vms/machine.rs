@@ -51,7 +51,9 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         super::bridged::networks(r, env, mp);
         let published = published(name, mp);
         for (p, host) in &published {
-            r.call(vagrantfile::forwarded_port("m", p.port, host.clone(), p.protocol));
+            let forward = vagrantfile::forwarded_port("m", p.port, host.clone(), p.protocol);
+            // Not `fixed`: a free host port when this one is taken (another machine's, a clone's).
+            r.call(if p.fixed { forward } else { forward.kw("auto_correct", true) });
         }
         let mut guest = guest(env, planned, &image, link);
         guest.hyperv.published = relays(&published);

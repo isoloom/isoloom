@@ -15,8 +15,8 @@ use crate::cloud::vm::reach::{self, Rule};
 use crate::module::{ident, resource};
 
 /// The VPC and a subnet per network.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    m.commented(
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    module.commented(
         "The environment's networks: a VPC with a subnet per network at its exact range, so every\nmachine keeps its address.",
         resource("linode_vpc", "env")
             .add_attribute(("label", reference("local.name")))
@@ -24,7 +24,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             .build(),
     );
     for (net, p) in &env.networks {
-        m.block(
+        module.block(
             resource("linode_vpc_subnet", &ident(net))
                 .add_attribute(("vpc_id", reference("linode_vpc.env.id")))
                 .add_attribute(("label", string(net.as_str())))
@@ -36,7 +36,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         let Some((net, plan)) = mp.addresses.keys().next().and_then(|n| env.networks.get_key_value(n)) else {
             continue;
         };
-        m.commented(
+        module.commented(
             &format!("Machine `{name}` on `{net}`: what may reach it, and where it may not go."),
             firewall(env, (name, mp), (net, &plan.cidr.to_string())),
         );

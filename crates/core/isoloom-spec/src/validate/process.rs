@@ -6,33 +6,33 @@ use super::Problems;
 use crate::model::{Healthcheck, Machine, Spec, seconds};
 
 /// Every machine's process fields.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let at = format!("machines.{name}");
-        command(&at, m, p);
+        command(&at, m, problems);
         if let Some(dir) = &m.working_dir
             && !dir.starts_with('/')
         {
-            p.add(format!("{at}.working_dir"), format!("`{dir}` must be an absolute path, like /srv/app"));
+            problems.add(format!("{at}.working_dir"), format!("`{dir}` must be an absolute path, like /srv/app"));
         }
         if let Some(h) = &m.healthcheck {
-            healthcheck(&format!("{at}.healthcheck"), h, p);
+            healthcheck(&format!("{at}.healthcheck"), h, problems);
         }
     }
 }
 
 /// A command to run, on a machine that runs one of its own (an appliance or an idle machine
 /// has Isoloom's).
-fn command(at: &str, m: &Machine, p: &mut Problems) {
+fn command(at: &str, m: &Machine, problems: &mut Problems) {
     if m.command.as_ref().is_some_and(crate::model::CommandLine::is_empty) {
-        p.add(format!("{at}.command"), "give the program to run (a text, or a list starting with the program)");
+        problems.add(format!("{at}.command"), "give the program to run (a text, or a list starting with the program)");
     }
     let set = m.command.is_some() || m.working_dir.is_some();
     let Some(d) = m.docker.as_ref().filter(|_| set) else { return };
     if d.appliance.is_some() {
-        p.add(at, "a network appliance runs its own OS: no `command` or `working_dir`");
+        problems.add(at, "a network appliance runs its own OS: no `command` or `working_dir`");
     } else if d.idle {
-        p.add(
+        problems.add(
             at,
             "an `idle` machine runs nothing of its own: leave `idle` out to give it a `command` or `working_dir`",
         );
@@ -40,33 +40,33 @@ fn command(at: &str, m: &Machine, p: &mut Problems) {
 }
 
 /// One test, a pace in seconds, and at least one try.
-fn healthcheck(at: &str, h: &Healthcheck, p: &mut Problems) {
+fn healthcheck(at: &str, h: &Healthcheck, problems: &mut Problems) {
     match (&h.test, &h.http) {
-        (Some(_), Some(_)) => p.add(at, "use `test` or `http`, not both"),
-        (None, None) => p.add(at, "say what to check: `test` (a command) or `http` (a page, with its `port`)"),
-        (Some(t), None) if t.is_empty() => p.add(format!("{at}.test"), "give the command to run"),
+        (Some(_), Some(_)) => problems.add(at, "use `test` or `http`, not both"),
+        (None, None) => problems.add(at, "say what to check: `test` (a command) or `http` (a page, with its `port`)"),
+        (Some(t), None) if t.is_empty() => problems.add(format!("{at}.test"), "give the command to run"),
         _ => {}
     }
     if let Some(http) = &h.http {
         if http.port == 0 {
-            p.add(format!("{at}.http.port"), "1 to 65535");
+            problems.add(format!("{at}.http.port"), "1 to 65535");
         }
         if !http.path.starts_with('/') {
-            p.add(format!("{at}.http.path"), format!("`{}` must start with /, like /healthz", http.path));
+            problems.add(format!("{at}.http.path"), format!("`{}` must start with /, like /healthz", http.path));
         }
     }
     let paces = [("interval", &h.interval, 1), ("timeout", &h.timeout, 1), ("start_period", &h.start_period, 0)];
     for (field, value, least) in paces {
         let Some(v) = value else { continue };
         if seconds(v).is_none_or(|s| s < least) {
-            p.add(
+            problems.add(
                 format!("{at}.{field}"),
                 format!("`{v}` isn't a duration of at least {least}s, like 5s, 1m or 1m30s"),
             );
         }
     }
     if h.retries == Some(0) {
-        p.add(format!("{at}.retries"), "at least 1 try");
+        problems.add(format!("{at}.retries"), "at least 1 try");
     }
 }
 

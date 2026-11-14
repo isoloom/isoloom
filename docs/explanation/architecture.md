@@ -24,5 +24,4 @@ Three ideas shape it:
   safe to run offline, and keeps every step unit-testable.
 
 The crates, their dependency direction and the rules they keep: [ARCHITECTURE.md](../../ARCHITECTURE.md).
-The decisions behind them: [architecture decision records](adr/README.md). The contract with a
-runner: [the run manifest](../reference/run-manifest.md).
+The contract with a runner: [the run manifest](../reference/run-manifest.md).

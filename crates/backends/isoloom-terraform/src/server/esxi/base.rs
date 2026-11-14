@@ -18,12 +18,12 @@ use crate::server::{self, user};
 const MAX_SLOT: u64 = 63;
 
 /// Everything before the router.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    server::head(env, m, &[providers::ESXI, providers::TLS, providers::LOCAL], variables(env), provider());
-    m.commented("The project's root, and the `isoloom` user on every VM.", locals());
-    credentials(env, m);
-    super::networks::blocks(env, m);
-    super::outside::blocks(env, m);
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    server::head(env, module, &[providers::ESXI, providers::TLS, providers::LOCAL], variables(env), provider());
+    module.commented("The project's root, and the `isoloom` user on every VM.", locals());
+    credentials(env, module);
+    super::networks::blocks(env, module);
+    super::outside::blocks(env, module);
 }
 
 /// The OSes the module deploys, the router's and the controller's among them, sorted.

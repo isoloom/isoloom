@@ -115,7 +115,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
 }
 
 /// A directory mapping per volume that names none: the folder on the node.
-pub(super) fn mappings(env: &Environment, m: &mut Module) {
+pub(super) fn mappings(env: &Environment, module: &mut Module) {
     for (v, _) in volumes(env).filter(|(_, f)| f.mapping.is_none()) {
         let path = Template::new()
             .with_expr(reference("var.virtiofs_root"))
@@ -128,7 +128,7 @@ pub(super) fn mappings(env: &Environment, m: &mut Module) {
             .add_attribute(("comment", string(format!("Isoloom: {}, volume {v}", env.name))))
             .add_attribute(("map", list([object([("node", reference("var.node")), ("path", path)])])))
             .build();
-        m.commented(
+        module.commented(
             &format!("Volume `{v}`: a folder of the server, shared into each VM that mounts it (virtiofs). Make the folder on the node first."),
             block,
         );

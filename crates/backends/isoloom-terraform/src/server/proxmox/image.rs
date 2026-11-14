@@ -58,10 +58,10 @@ pub(super) fn refusal(env: &Environment) -> Option<String> {
 }
 
 /// One download per machine with a cloud image of its own, named after the machine.
-pub(super) fn downloads(env: &Environment, m: &mut Module) {
+pub(super) fn downloads(env: &Environment, module: &mut Module) {
     for Vm { name, plan: mp, .. } in env.vms() {
         let Some(Own::Url(url)) = own(mp) else { continue };
-        m.commented(
+        module.commented(
             &format!("Machine `{name}`'s own cloud image (`overrides.proxmox`)."),
             super::base::download(&own_res(name), url, &format!("-{name}.img"), None),
         );

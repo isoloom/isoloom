@@ -9,16 +9,16 @@ use crate::cloud::vm::private_dns::{TTL, records};
 use crate::module::resource;
 
 /// The zone, its records and the resolver's view, when the environment has one.
-pub(super) fn write(env: &Environment, m: &mut Module) {
+pub(super) fn write(env: &Environment, module: &mut Module) {
     let Some(zone) = &env.private_dns else { return };
-    m.commented(
+    module.commented(
         "The environment's names, served by the VCN's resolver from a private view (`dns.private`).",
         owned(resource("oci_dns_view", "private"))
             .add_attribute(("scope", string("PRIVATE")))
             .add_attribute(("display_name", reference("local.name")))
             .build(),
     );
-    m.block(
+    module.block(
         owned(resource("oci_dns_zone", "private"))
             .add_attribute(("name", string(zone.domain.as_str())))
             .add_attribute(("zone_type", string("PRIMARY")))
@@ -34,7 +34,7 @@ pub(super) fn write(env: &Environment, m: &mut Module) {
             .add_attribute(("ttl", number(TTL)))
             .build();
         // The zone gives its scope and view: an rrset's own are ignored.
-        m.block(
+        module.block(
             resource("oci_dns_rrset", &id)
                 .add_attribute(("zone_name_or_id", reference("oci_dns_zone.private.id")))
                 .add_attribute(("domain", string(r.name.as_str())))
@@ -43,7 +43,7 @@ pub(super) fn write(env: &Environment, m: &mut Module) {
                 .build(),
         );
     }
-    m.block(
+    module.block(
         Block::builder("data")
             .add_label("oci_core_vcn_dns_resolver_association")
             .add_label("env")
@@ -53,7 +53,7 @@ pub(super) fn write(env: &Environment, m: &mut Module) {
     let attached = Block::builder("attached_views")
         .add_attribute(("view_id", reference("oci_dns_view.private.id")))
         .build();
-    m.block(
+    module.block(
         resource("oci_dns_resolver", "env")
             .add_attribute(("resolver_id", reference("data.oci_core_vcn_dns_resolver_association.env.dns_resolver_id")))
             .add_attribute(("scope", string("PRIVATE")))

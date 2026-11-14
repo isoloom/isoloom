@@ -30,7 +30,7 @@ use isoloom_plan::{Environment, NetworkPlan, Vm};
 use super::{own_project, public_ip};
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{Images, Kept, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Size, Sizes, Subnets, Volumes};
-use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image};
+use crate::cloud::vm::{self, VmDriver, gateways, gpus::GpuSizes, own_image};
 use crate::limits::Limits;
 use crate::module::providers;
 
@@ -165,7 +165,7 @@ fn mtu(n: &NetworkPlan) -> u16 {
 }
 
 /// Its `cloud-vm` driver: its module takes the billing account its project goes on.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::GOOGLE], &[]),
     refusal,
@@ -173,9 +173,9 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated_with(env, &|e, n, _| relocate(e, n));
-    network::blocks(env, m);
-    private_dns::write(env, own_project(), m);
-    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
+    network::blocks(env, module);
+    private_dns::write(env, own_project(), module);
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, module)
 }

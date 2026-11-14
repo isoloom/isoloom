@@ -7,6 +7,7 @@ use crate::machine::controller::WinrmAuth;
 use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::network::{controller_group, security_group};
+use super::resources as res;
 use super::{RULES, addresses, image_user, machine_type, nesting};
 use crate::Result;
 use crate::cloud::auto_stop;
@@ -16,7 +17,7 @@ use crate::cloud::vm::controller_setup;
 use crate::cloud::vm::{disks, hooks, interfaces, own_image};
 use crate::machine::user_data::Capped;
 use crate::machine::{Remote, controller, user_data, windows};
-use crate::module::{ident, resource};
+use crate::module::{ResourceRef, ident};
 
 /// How AWS takes a Linux instance's user data: gzipped ([`user_data()`]), 16 KB of it.
 const CAP: Capped = Capped {
@@ -32,11 +33,10 @@ fn user_data(script: Expression) -> (&'static str, Expression) {
 /// The address Terraform reaches a machine at: its instance's own public address on one
 /// network, its Elastic IP on several (AWS doesn't auto-assign one then).
 pub(super) fn public_ip(env: &Environment, name: &str) -> Expression {
-    let id = ident(name);
     if env.machines.get(name).is_some_and(|mp| !mp.is_windows() && addresses::needs_interfaces(mp)) {
-        reference(&format!("aws_eip.{id}.public_ip"))
+        res::eip(name).attr("public_ip")
     } else {
-        reference(&format!("aws_instance.{id}.public_ip"))
+        res::instance(name).attr("public_ip")
     }
 }
 
@@ -46,25 +46,24 @@ fn ami(vm: Vm<'_>) -> Expression {
 }
 
 /// A Linux machine: its security group, its instance, set up from its user data.
-pub(super) fn linux(env: &Environment, vm: Vm<'_>, m: &mut Module) -> Result<()> {
+pub(super) fn linux(env: &Environment, vm: Vm<'_>, module: &mut Module) -> Result<()> {
     let Vm { name, plan: mp, os } = vm;
-    let id = ident(name);
-    m.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
-    let instance = ec2_instance(&id)
+    module.commented(&format!("Machine `{name}`: what may reach it."), security_group(env, (name, mp), false));
+    let instance = ec2_instance(res::instance(name).name())
         .add_attribute(("ami", ami(vm)))
         .add_attribute(("instance_type", string(machine_type(mp))))
         .add_blocks(disks::aws(&mp.disks));
     // A looked-up AMI says whether it has NitroTPM; an own AMI is the author's to choose.
     let tpm_ami = (mp.tpm.is_some() && own_image::of(mp, own_image::aws).is_none()).then(|| ident(os));
-    let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&format!("aws_network_interface.{id}_{}", ident(n))));
+    let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&res::interface(name, n)));
     let user = image_user(os);
     let instance = nesting(instance, mp)
         .add_attribute(user_data(hooks::user_data(env, (name, mp), user, at_boot, CAP)?))
         .add_block(lifecycle("user_data_base64", tpm_ami.as_deref()));
     if addresses::needs_interfaces(mp) {
-        m.blocks(several_networks(vm, instance));
+        module.blocks(several_networks(vm, instance));
     } else {
-        m.block(one_network(vm, instance));
+        module.block(one_network(vm, instance));
     }
     Ok(())
 }
@@ -100,7 +99,6 @@ fn lifecycle(attribute: &str, tpm_ami: Option<&str>) -> Block {
 /// The instance on its network, at its address.
 fn one_network(vm: Vm<'_>, instance: BlockBuilder) -> Block {
     let Vm { name, plan: mp, .. } = vm;
-    let id = ident(name);
     let Some((net, addr)) = mp.addresses.first() else { return instance.build() };
     // A gateway forwards traffic that isn't its own.
     let instance = if mp.is_gateway {
@@ -110,11 +108,11 @@ fn one_network(vm: Vm<'_>, instance: BlockBuilder) -> Block {
     };
     let instance = addresses::on_instance(instance, mp, net);
     instance
-        .add_attribute(("subnet_id", reference(&format!("aws_subnet.{}.id", ident(net)))))
+        .add_attribute(("subnet_id", res::subnet(net).attr("id")))
         .add_attribute(("private_ip", string(addr.to_string())))
         .add_attribute(("associate_public_ip_address", boolean(true)))
         .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
-        .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
+        .add_attribute(("vpc_security_group_ids", list([res::security_group(name).attr("id")])))
         .add_block(root_disk(root_disk_gb(vm)))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
         .build()
@@ -125,18 +123,17 @@ fn one_network(vm: Vm<'_>, instance: BlockBuilder) -> Block {
 /// and an Elastic IP on the first.
 fn several_networks(vm: Vm<'_>, instance: BlockBuilder) -> Vec<Block> {
     let Vm { name, plan: mp, .. } = vm;
-    let id = ident(name);
-    let group = reference(&format!("aws_security_group.{id}.id"));
+    let group = res::security_group(name).attr("id");
     let mut out: Vec<Block> = mp
         .addresses
         .iter()
         .map(|(n, a)| {
-            interface(&format!("{id}_{}", ident(n)), n, &a.to_string(), group.clone(), Some(mp))
+            interface(&res::interface(name, n), n, &a.to_string(), group.clone(), Some(mp))
                 .add_attribute(("tags", object([("Name", name_with(&format!("-{name}-{n}")))])))
                 .build()
         })
         .collect();
-    let first = mp.addresses.keys().next().map(|n| format!("{id}_{}", ident(n))).unwrap_or_default();
+    let first = res::interface(name, mp.addresses.keys().next().map_or("", String::as_str));
     out.push(
         instance
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
@@ -145,87 +142,88 @@ fn several_networks(vm: Vm<'_>, instance: BlockBuilder) -> Vec<Block> {
             .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])))
             .build(),
     );
-    out.extend(attachments(&id, mp.addresses.keys().map(|n| format!("{id}_{}", ident(n)))));
-    out.push(eip(&id, &first));
+    out.extend(attachments(name, mp.addresses.keys()));
+    out.push(eip(name, &first));
     out
 }
 
 /// A network interface, started: on its network's subnet, at `address` (then the machine's
 /// further addresses there).
-fn interface(id: &str, net: &str, address: &str, group: Expression, mp: Option<&MachinePlan>) -> BlockBuilder {
-    let nic = resource("aws_network_interface", id).add_attribute(("subnet_id", reference(&format!("aws_subnet.{}.id", ident(net)))));
+fn interface(nic: &ResourceRef, net: &str, address: &str, group: Expression, mp: Option<&MachinePlan>) -> BlockBuilder {
+    let nic = nic.block().add_attribute(("subnet_id", res::subnet(net).attr("id")));
     addresses::on_interface(nic, mp, net, address)
         .add_attribute(("security_groups", list([group])))
         .add_attribute(("source_dest_check", boolean(false)))
 }
 
-fn primary(interface: &str) -> Block {
+fn primary(interface: &ResourceRef) -> Block {
     Block::builder("primary_network_interface")
-        .add_attribute(("network_interface_id", reference(&format!("aws_network_interface.{interface}.id"))))
+        .add_attribute(("network_interface_id", interface.attr("id")))
         .build()
 }
 
-/// The interfaces after the first, attached to instance `id` in order.
-fn attachments(id: &str, interfaces: impl Iterator<Item = String>) -> Vec<Block> {
+/// Machine `machine`'s interfaces on `nets` after the first, attached to its instance in order.
+fn attachments<'a>(machine: &str, nets: impl Iterator<Item = &'a String>) -> Vec<Block> {
     (0_u64..)
-        .zip(interfaces)
+        .zip(nets)
         .skip(1)
-        .map(|(i, nic)| {
-            resource("aws_network_interface_attachment", &nic)
-                .add_attribute(("instance_id", reference(&format!("aws_instance.{id}.id"))))
-                .add_attribute(("network_interface_id", reference(&format!("aws_network_interface.{nic}.id"))))
+        .map(|(i, net)| {
+            res::interface_attachment(machine, net)
+                .block()
+                .add_attribute(("instance_id", res::instance(machine).attr("id")))
+                .add_attribute(("network_interface_id", res::interface(machine, net).attr("id")))
                 .add_attribute(("device_index", number(i)))
                 .build()
         })
         .collect()
 }
 
-fn eip(id: &str, interface: &str) -> Block {
-    resource("aws_eip", id)
-        .add_attribute(("network_interface", reference(&format!("aws_network_interface.{interface}.id"))))
-        .add_attribute(("depends_on", list([reference("aws_internet_gateway.env")])))
+fn eip(machine: &str, interface: &ResourceRef) -> Block {
+    res::eip(machine)
+        .block()
+        .add_attribute(("network_interface", interface.attr("id")))
+        .add_attribute(("depends_on", list([res::internet_gateway().whole()])))
         .build()
 }
 
 /// The MAC address of an AWS interface, as `ip link` writes it.
-fn mac(nic: &str) -> Expression {
-    call("lower", [reference(&format!("{nic}.mac_address"))])
+fn mac(nic: &ResourceRef) -> Expression {
+    call("lower", [nic.attr("mac_address")])
 }
 
 /// A Windows machine: its security group, its instance (the administrator and WinRM at first
 /// boot), its set-up over WinRM.
-pub(super) fn windows(env: &Environment, vm: Vm<'_>, m: &mut Module) {
+pub(super) fn windows(env: &Environment, vm: Vm<'_>, module: &mut Module) {
     let Vm { name, plan: mp, .. } = vm;
-    let id = ident(name);
-    m.commented(
+    module.commented(
         &format!("Machine `{name}` (Windows): what may reach it."),
         security_group(env, (name, mp), true),
     );
     let Some((net, addr)) = mp.addresses.first() else { return };
-    let instance = ec2_instance(&id)
+    let instance = ec2_instance(res::instance(name).name())
         .add_attribute(("ami", ami(vm)))
         .add_attribute(("instance_type", string(machine_type(mp))))
-        .add_attribute(("subnet_id", reference(&format!("aws_subnet.{}.id", ident(net)))))
+        .add_attribute(("subnet_id", res::subnet(net).attr("id")))
         .add_attribute(("private_ip", string(addr.to_string())))
         .add_attribute(("associate_public_ip_address", boolean(true)))
-        .add_attribute(("vpc_security_group_ids", list([reference(&format!("aws_security_group.{id}.id"))])))
+        .add_attribute(("vpc_security_group_ids", list([res::security_group(name).attr("id")])))
         .add_attribute(("user_data", windows_user_data()))
         .add_block(lifecycle("user_data", None))
         .add_block(root_disk(mp.size().disk_gb.max(50)))
         .add_blocks(disks::aws(&mp.disks))
         .add_attribute(("tags", object([("Name", name_with(&format!("-{name}")))])));
     let instance = nesting(addresses::on_instance(instance, mp, net), mp).build();
-    m.commented(
+    module.commented(
         "No key pair: AWS refuses ED25519 keys on Windows, and WinRM uses the generated password.",
         instance,
     );
-    m.blocks(windows::blocks(windows::Machine {
+    module.blocks(windows::blocks(windows::Machine {
         remote: Remote {
             env,
             name,
             plan: mp,
-            replace_on: reference(&format!("aws_instance.{id}.id")),
-            host: reference(&format!("aws_instance.{id}.public_ip")),
+            replace_on: res::instance(name).attr("id"),
+            host: res::instance(name).attr("public_ip"),
         },
         password: reference(windows::PASSWORD),
         skip: hooks::network_does,
@@ -252,24 +250,24 @@ fn windows_user_data() -> Expression {
 /// The controller: its security group, an interface on every network at the controller
 /// address, its instance and Elastic IP, set up from its user data (it waits for every machine's
 /// own set-up before the playbooks).
-pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
-    m.commented(
+pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
+    module.commented(
         "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
         controller_group(env),
     );
-    let nic = |n: &str| format!("isoloom_controller_{}", ident(n));
     let addresses = controller::addresses(env);
     for (n, at) in &addresses {
-        m.block(interface(&nic(n), n, &at.to_string(), reference("aws_security_group.isoloom_controller.id"), None).build());
+        let group = res::security_group(res::CONTROLLER).attr("id");
+        module.block(interface(&res::interface(res::CONTROLLER, n), n, &at.to_string(), group, None).build());
     }
-    let first = env.networks.keys().next().map(|n| nic(n)).unwrap_or_default();
+    let first = res::interface(res::CONTROLLER, env.networks.keys().next().map_or("", String::as_str));
     let (_, _, disk) = controller::size(env);
     let inventory = controller::cloud_inventory(env, |os| image_user(os).to_owned(), WinrmAuth::Ntlm);
-    let at_boot = interfaces::up(env, &addresses, &|n| mac(&format!("aws_network_interface.{}", nic(n))));
+    let at_boot = interfaces::up(env, &addresses, &|n| mac(&res::interface(res::CONTROLLER, n)));
     let user = |os: &str| image_user(os).to_owned();
     let setup = controller_setup::set_up(env, &user, inventory, &at_boot);
-    m.block(
-        ec2_instance("isoloom_controller")
+    module.block(
+        ec2_instance(res::instance(res::CONTROLLER).name())
             .add_attribute(("ami", reference(&format!("data.aws_ami.{}.id", ident(controller::OS)))))
             .add_attribute(("instance_type", string(RULES.controller_size(env))))
             .add_attribute(("key_name", reference("aws_key_pair.env.key_name")))
@@ -280,12 +278,12 @@ pub(super) fn controller(env: &Environment, m: &mut Module) -> Result<()> {
             .add_attribute(("tags", object([("Name", name_with(&format!("-{}", controller::NAME)))])))
             .build(),
     );
-    m.block(eip("isoloom_controller", &first));
-    m.blocks(attachments("isoloom_controller", env.networks.keys().map(|n| nic(n))));
+    module.block(eip(res::CONTROLLER, &first));
+    module.blocks(attachments(res::CONTROLLER, env.networks.keys()));
     Ok(())
 }
 
 /// The address to stand at for the checks and a session when no Linux machine can.
 pub(super) fn controller_ip() -> Expression {
-    reference("aws_eip.isoloom_controller.public_ip")
+    res::eip(res::CONTROLLER).attr("public_ip")
 }

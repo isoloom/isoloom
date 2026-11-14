@@ -211,16 +211,16 @@ const PARTS: Parts = Parts {
 };
 
 /// The VMs, the LXC containers, the controller, then the waits for their set-up and the seal.
-fn guests(env: &Environment, m: &mut Module) {
+fn guests(env: &Environment, module: &mut Module) {
     for vm in env.vms() {
-        machine::blocks(env, vm, m);
+        machine::blocks(env, vm, module);
     }
-    lxc::blocks(env, m);
+    lxc::blocks(env, module);
     if core_controller::needed(env) {
-        controller::blocks(env, m);
+        controller::blocks(env, module);
     }
-    let waited = waits(env, m);
-    m.blocks(server_router::seal(
+    let waited = waits(env, module);
+    module.blocks(server_router::seal(
         env,
         reference("proxmox_virtual_environment_vm.isoloom_router.id"),
         crate::ready::all(waited.iter().map(String::as_str)),

@@ -50,27 +50,27 @@ fn resource_of(kind: &str, name: &str) -> String {
 
 /// The outputs of a cloud with no controller, its SSH users `user` (the cloud's), its instances
 /// `kind`s named after their machines.
-pub(crate) fn write_as(env: &Environment, user: fn(&str) -> &'static str, public_ip: &dyn Fn(&str) -> Expression, kind: &str, m: &mut Module) {
+pub(crate) fn write_as(env: &Environment, user: fn(&str) -> &'static str, public_ip: &dyn Fn(&str) -> Expression, kind: &str, module: &mut Module) {
     let reach = Reach {
         public_ip,
         instance: &|n| reference(&format!("{}.id", resource_of(kind, n))),
         user,
         controller: None,
     };
-    write(env, &reach, m);
+    write(env, &reach, module);
 }
 
 /// The outputs of a cloud whose machines' resources are named after them (`ident`), the
 /// controller's `isoloom_controller`: `public_ip` of a resource name, the cloud's SSH `user`,
 /// its instances `kind`s.
-pub(crate) fn write_named(env: &Environment, user: fn(&str) -> &'static str, public_ip: fn(&str) -> Expression, kind: &str, m: &mut Module) {
+pub(crate) fn write_named(env: &Environment, user: fn(&str) -> &'static str, public_ip: fn(&str) -> Expression, kind: &str, module: &mut Module) {
     let reach = Reach {
         public_ip: &|n| public_ip(&crate::module::ident(n)),
         instance: &|n| reference(&format!("{}.id", resource_of(kind, n))),
         user,
         controller: Some(public_ip("isoloom_controller")),
     };
-    write(env, &reach, m);
+    write(env, &reach, module);
 }
 
 /// The machines Terraform waits for (`crate::ready`): each Linux VM, then the controller when
@@ -121,32 +121,32 @@ fn waits(env: &Environment, reach: &Reach, m: &mut Module) {
 /// The outputs every cloud module gives: `machines`, each machine's `address_<m>` and
 /// `ssh_user_<m>` (what the run manifest reads), `ssh_users` (for an operator reading
 /// `terraform output`), `ip`, `ready_file`, `checks` and `published`.
-pub(crate) fn write(env: &Environment, reach: &Reach, m: &mut Module) {
-    waits(env, reach, m);
+pub(crate) fn write(env: &Environment, reach: &Reach, module: &mut Module) {
+    waits(env, reach, module);
     let machines: Vec<(&str, Expression)> = env.vms().map(|Vm { name: n, .. }| (n, (reach.public_ip)(n))).collect();
     let users: Vec<(&str, Expression)> = env.vms().map(|vm| (vm.name, string(reach.user_of(vm)))).collect();
-    m.block(output("machines", object(machines)));
+    module.block(output("machines", object(machines)));
     for vm in env.vms() {
-        m.block(output(&super::manifest::address_output(vm.name), (reach.public_ip)(vm.name)));
-        m.block(output(&super::manifest::ssh_user_output(vm.name), string(reach.user_of(vm))));
+        module.block(output(&super::manifest::address_output(vm.name), (reach.public_ip)(vm.name)));
+        module.block(output(&super::manifest::ssh_user_output(vm.name), string(reach.user_of(vm))));
     }
     if let Some(address) = reach.controller.as_ref().filter(|_| controller::needed(env)) {
-        m.block(output(&super::manifest::address_output(controller::NAME), address.clone()));
-        m.block(output(
+        module.block(output(&super::manifest::address_output(controller::NAME), address.clone()));
+        module.block(output(
             &super::manifest::ssh_user_output(controller::NAME),
             string((reach.user)(controller::OS)),
         ));
     }
-    m.block(output("ssh_users", object(users)));
-    m.block(output("ip", stand_at(env, reach)));
-    m.block(output("ready_file", string(isoloom_render::steps::READY_FILE)));
-    super::console::outputs(env, m);
+    module.block(output("ssh_users", object(users)));
+    module.block(output("ip", stand_at(env, reach)));
+    module.block(output("ready_file", string(isoloom_render::steps::READY_FILE)));
+    super::console::outputs(env, module);
     if let Some(checks) = output_block(env, Target::CloudVm.id(), Invocation::Command, &|p| runner(env, reach, p)) {
-        m.commented("The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>').", checks);
+        module.commented("The checks: each runner on the machine it stands for (ssh <user>@<host> '<command>').", checks);
     }
-    let published = crate::module::published(env.vms().map(|vm| (vm.name, vm.plan)), |n| (reach.public_ip)(n));
+    let published = crate::module::published_output_entries(env.vms().map(|vm| (vm.name, vm.plan)), |n| (reach.public_ip)(n));
     if !published.is_empty() {
-        m.block(output("published", object(published)));
+        module.block(output("published", object(published)));
     }
 }
 

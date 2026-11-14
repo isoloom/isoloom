@@ -15,6 +15,14 @@ ignore = [
   # unsafe-libyaml (under serde_yaml_ng) is archived upstream: an "unmaintained" notice, with no
   # known vulnerability. Drop this once the YAML parsing moves to a maintained crate.
   { id = "RUSTSEC-2024-0449", reason = "unmaintained only (no vulnerability); used through serde_yaml_ng until the YAML crate is replaced" },
+  # zip 2.x's extraction advisories (SUID/SGID bits kept, symlink traversal, an abort on a symlink
+  # entry's declared size), all in ZipArchive::extract and the stream extraction. isoloom-wasm only
+  # writes its bundles (ZipWriter in bundle.rs) and never extracts one, so none is reachable. The
+  # fix is zip >= 9.0.0, a major upgrade of the write API, still to come.
+  { id = "RUSTSEC-2026-0367", reason = "zip extraction; isoloom-wasm only writes archives, never extracts; zip 9.x upgrade to come" },
+  { id = "RUSTSEC-2026-0368", reason = "zip extraction; isoloom-wasm only writes archives, never extracts; zip 9.x upgrade to come" },
+  { id = "RUSTSEC-2026-0369", reason = "zip extraction; isoloom-wasm only writes archives, never extracts; zip 9.x upgrade to come" },
+  { id = "RUSTSEC-2026-0429", reason = "zip extraction abort; isoloom-wasm only writes archives, never extracts; zip 9.x upgrade to come" },
 ]
 
 [licenses]
