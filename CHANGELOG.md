@@ -53,6 +53,9 @@ stable spec format.
 
 ### Fixed
 
+- **`--profile` takes the inputs of a spec that declares them as a map (#312).** With
+  `inputs: { FLAG: { sensitive: false } }`, every input a profile gave was "not one of the spec's
+  inputs", and every command with that profile failed.
 - **A Linux VM keeps every environment variable when one value has several lines (#302).** Such
   a value broke systemd's `DefaultEnvironment`, and every service lost every variable. systemd
   now reads the line breaks escaped (`\n`), and a value of several lines reaches logins through
