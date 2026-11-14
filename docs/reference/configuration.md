@@ -81,11 +81,11 @@ files by hand):
 | `ISOLOOM_HYPERV_SWITCH` | Vagrant | The Hyper-V switch (default `Default Switch`) |
 | `ISOLOOM_SSH_PROXY_COMMAND` | Vagrant | An SSH `ProxyCommand` for VMs on a remote ESXi host |
 | `VAGRANT_HOST_ARCHITECTURE` | Vagrant | Vagrant's own: `amd64` on a remote ESXi host, so Vagrant takes each box's x86-64 build ([Vagrant](../guide/targets/vagrant.md#a-remote-esxi-host)) |
-| `ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX` | the run manifest | The image or box a runner gives the access machine when the spec leaves it to the runner |
+| `ISOLOOM_ACCESS_IMAGE`, `ISOLOOM_ACCESS_BOX` | the generated files | The image or box a runner gives the access machine when the spec leaves it to the runner |
 
 Other `ISOLOOM_*` names in the generated files (`ISOLOOM_HOSTPORTS`, `ISOLOOM_FILE_*`,
-`ISOLOOM_HOST_FOLDER_*`, `ISOLOOM_RETRY_PAUSE`) are set by a runner from the run manifest; you
-don't set them.
+`ISOLOOM_HOST_FOLDER_*`, `ISOLOOM_RETRY_PAUSE`) are set by a runner; you don't
+set them.
 
 ## Profiles
 

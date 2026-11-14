@@ -2,10 +2,10 @@
 
 Isoloom is a converter. It reads one `isoloom.yml`, checks it, lowers each machine into a
 target-neutral plan that carries both a container form and a VM form, and renders that plan into
-each tool's own files plus a run manifest. It runs nothing: a runner, or you, runs the files.
+each tool's own files, and nothing else. It runs nothing: a runner, or you, runs the files.
 
 ```text
-isoloom.yml ─► parse and validate ─► lower (plan) ─► backends ─► .isoloom/<target>/ + run.json
+isoloom.yml ─► parse and validate ─► lower (plan) ─► backends ─► .isoloom/<target>/
                 (isoloom-spec)       (isoloom-plan,   (Compose, Kubernetes,
                                       the catalogue)   Vagrant, Terraform,
                                                        Ansible)
@@ -24,4 +24,4 @@ Three ideas shape it:
   safe to run offline, and keeps every step unit-testable.
 
 The crates, their dependency direction and the rules they keep: [ARCHITECTURE.md](../../ARCHITECTURE.md).
-The contract with a runner: [the run manifest](../reference/run-manifest.md).
+A runner, such as Isothrum, runs the native files as they are.

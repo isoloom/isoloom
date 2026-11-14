@@ -1,8 +1,8 @@
 # Tool versions
 
 `isoloom` itself needs nothing else to validate and generate. Running what it generates needs
-each target's tools. A run manifest lists them under `tools`, with the minimum versions below, and
-a runner checks them before it creates anything.
+each target's tools, with the minimum versions below; a runner checks them before it creates
+anything.
 
 ## The tools each target needs
 
@@ -14,11 +14,10 @@ a runner checks them before it creates anything.
 | `proxmox` | Terraform, an OpenSSH client | Terraform 1.6.0 |
 | `esxi` | Terraform, `ovftool`, an OpenSSH client | Terraform 1.6.0 |
 | `cloud-vm`, `cloud-docker` | Terraform, an OpenSSH client | Terraform 1.6.0 |
-| `cloud-services` | Terraform, and what the spec's `cloud.requires` lists | none set |
+| `cloud-services` | Terraform, and what the spec's `cloud.requires` lists (installed by you) | none set |
 | `external` | Ansible, an OpenSSH client | none set |
 
-Terraform 1.6 or later works for every target. On macOS the Proxmox run manifest may run
-Terraform from the pinned image `hashicorp/terraform:1.16.7` instead.
+Terraform 1.6 or later works for every target.
 
 A VM target installs on the controller VM the Ansible it runs (`ansible-core` 2.15 or 2.16, with
 `pywinrm`) and the pinned Galaxy collections `ansible.posix` 2.2.2 and `ansible.windows` 3.8.0

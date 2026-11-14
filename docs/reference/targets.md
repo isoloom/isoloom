@@ -43,10 +43,8 @@ Two targets fan out:
 - **`cloud-vm`, `cloud-docker` and `cloud-services`** target six clouds: AWS, Azure, Google
   Cloud, DigitalOcean, Linode and Oracle Cloud.
 
-A Vagrant run manifest is one file for every provider, chosen when the runner brings it up; the
-cloud targets write one per cloud (`.isoloom/cloud-vm/<cloud>/run.json`). `kubernetes`,
-`external` and `hosted` write no run manifest, and `cloud-services` none
-without `cloud:`: [the run manifest](run-manifest.md) lists which target has one, and where.
+The Vagrantfile is one file for every provider, chosen at `vagrant up --provider`; the cloud
+targets write one module per cloud (`.isoloom/cloud-vm/<cloud>/main.tf`).
 
 ## Tiers: how far a target is proven
 
@@ -89,7 +87,6 @@ matrix, so the published tiers always reflect the evidence.
 
 - [Spec reference](../spec.md) — the fields each target reads.
 - [The target matrix](../matrix.md) — the generated grid and the full tier table.
-- [The run manifest](run-manifest.md) — how a target's run manifest is executed.
 - The guide of each target: [Docker](../guide/targets/docker.md),
   [Kubernetes](../guide/targets/kubernetes.md), [Vagrant](../guide/targets/vagrant.md),
   [Proxmox](../guide/targets/proxmox.md), [ESXi](../guide/targets/esxi.md),

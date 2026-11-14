@@ -12,7 +12,7 @@
 - **A security vulnerability.** Don't open an issue: follow [SECURITY.md](SECURITY.md).
 - **A problem while running an environment** (bringing it up, checks, teardown, the reaper): the
   runner's own issues, for Isothrum at [Isothrum/isothrum](https://github.com/Isothrum/isothrum).
-  A wrong generated file (Compose file, Vagrantfile, Terraform module, run manifest) is Isoloom's.
+  A wrong generated file (Compose file, Vagrantfile, Terraform module) is Isoloom's.
 
 Isoloom is maintained on a best-effort basis: there is no paid support and no guaranteed response
 time, except for security reports ([SECURITY.md](SECURITY.md)). Which releases get fixes:

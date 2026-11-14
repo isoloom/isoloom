@@ -82,6 +82,20 @@ stable spec format.
   Dockerfile or its OS gives it). A lab that used `docker-vm` runs on `docker` (its containers) or
   on `vagrant` (their VM forms); one that used `hybrid` runs on `vagrant`, its containers in their
   VM forms.
+- **The run manifest (`run.json`) and the `isoloom-manifest` crate.** Each target writes its tool's
+  native files only, complete enough that `docker compose up -d --wait`, `vagrant up` and
+  `terraform apply` bring the environment to ready. The schema
+  (`schemas/run-manifest-v1.schema.json`) and its fixtures go with the crate. The contract's
+  names, the project copy's rules, the project-relative path and the ready and check lines'
+  grammars live in `isoloom-spec` (`isoloom_spec::contract`, `ignore`, `path::RelPath`,
+  `ready_line`, `check_line`). Breaking for the Rust API: `Backend::run_manifest`,
+  `Backend::run_manifests` and `Placed` are gone, with `isoloom_render::run_manifest`;
+  `isoloom_compose::guest` is replaced by `isoloom_compose::vm_start` (`VmStart { start, values }`);
+  `isoloom_terraform::cloud_docker_manifests` is gone; `isoloom_targets::tiers::HostOs` is
+  isoloom-targets' own type. `cloud-services` writes its fixed variables only
+  (`terraform.tfvars.json`): its launch inputs are given as `TF_VAR_<name>`, and no generated file
+  acts on `cloud.before`, `cloud.env`, `cloud.apply_retries` or `cloud.requires`. The capability
+  matrix loses its graphical consoles section, which the run manifests fed.
 
 ### Fixed
 

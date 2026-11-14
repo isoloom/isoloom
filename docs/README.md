@@ -1,9 +1,9 @@
 # Isoloom documentation
 
 Isoloom converts one environment spec (`isoloom.yml`) into the native files of each
-infrastructure tool, plus a run manifest (`run.json`) that a runner such as
-[Isothrum](https://github.com/Isothrum/isothrum) executes. These pages are grouped by what you
-want to do.
+infrastructure tool, and nothing else: the tools run them, by hand or through a runner such as
+[Isothrum](https://github.com/Isothrum/isothrum). These pages are grouped by what you want to
+do.
 
 ## Guides: learn and get things done
 
@@ -48,7 +48,6 @@ How-tos:
   image table
 - [Tool versions](reference/tool-versions.md): the tools each target needs, and the Terraform
   provider pins
-- [The run manifest](reference/run-manifest.md): the contract between Isoloom and a runner
 - [Examples](reference/examples.md): the example projects under `examples/`
 - [Policies](reference/policies.md): versioning, what is stable, deprecation, supported
   releases, MSRV
