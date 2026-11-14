@@ -65,58 +65,9 @@ Some entry recipes are refused on a form the configuration renderers don't carry
 names the step and the phase. One service per container is the rule (several services share a VM,
 but a container runs one).
 
-## Writing an entry
-
-An entry is a folder `catalogue/<entry>/`:
-
-| File | Written by | Holds |
-|---|---|---|
-| `entry.yml` | by hand | the recipe, the settings schema, the ports, the releases and the OSes each runs on |
-| `lock.yml` | `cargo xtask catalogue refresh` | the pinned digests and exact package versions |
-| `contract.yml` | by hand | the parity contract: the facts that must read the same in both forms |
-| `files/` | by hand | the entry's own templates, each carrying an `SPDX-License-Identifier: Apache-2.0` header |
-
-The catalogue is embedded in the binary at build time (text files only, under 1 MB in all);
-generating never reads the disk or the network for it. Shared data lives beside the entries:
-`catalogue/daemons.yml` (the daemons no entry owns, with their foreground forms) and
-`catalogue/collections.yml` (the pinned Ansible Galaxy collections, referenced from Galaxy and
-never embedded). The schemas `catalogue/entry.schema.json` and `catalogue/contract.schema.json`
-are generated from the types.
-
-An entry is checked when the catalogue loads: its recipe must resolve on every release and OS it
-lists, every setting must be used by the recipe, a template's `from` must be a file of the entry,
-and the contract must have a default case. These checks run in the test suite, so a malformed
-entry fails the build.
-
-### Pinning
-
-```sh
-cargo xtask catalogue refresh [<entry>…] [--check] [--update] [--propose]
-```
-
-`refresh` pins, through `curl`, each repository signing key (by fingerprint then SHA-256), each
-official image (the tag's multi-platform digest and platforms), each vendor package's exact
-version per OS, and the Galaxy collections (version, URL and SHA-256), writing `lock.yml`. A pin
-that moved upstream fails loudly unless `--update` accepts it; `--check` writes nothing and exits
-non-zero on any drift; `--propose` lists newer upstream releases without adding them.
-
-### Proving parity
-
-```sh
-cargo xtask catalogue check <entry> --runner PATH [--release V] [--os OS]
-    [--form container|vm|both] [--case NAME]... [--provider P] [--keep]
-```
-
-`catalogue check` runs the entry's parity contract for real: each case becomes an environment, generated
-for `docker` and for `vagrant`, run through a runner (up, check, down), and a case
-passes only when every check passes in both forms and every contract fact reads the same in both.
-`--case` runs only the cases named (repeat it; default: every case), `--runner` (required) is the
-runner's command line (one taking `up`, `check --json` and `down`),
-`--provider` the Vagrant provider of the VM form (default: `virtualbox`, `libvirt` on Linux), and
-`--keep` leaves each environment running after its checks.
-
 ## See also
 
 - [Spec reference](../spec.md) — `service:`, `with:` and the ports a service machine takes.
 - [Targets and tiers](../reference/targets.md) — the forms each target gives a service machine.
 - [Getting started](getting-started.md).
+- Writing an entry: [the contributor guide](../../.github/CONTRIBUTING.md#the-catalogue-contributors).

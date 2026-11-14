@@ -10,32 +10,32 @@ Tiers: 1 proven by real runs on every host OS it exists on, 2 generated and vali
 
 | Target | Tier | Exists on | Evidence |
 |---|---|---|---|
-| `docker` | 1 | linux, macos, windows | real runs: linux (linux-1, 2026-10-15), macos (macos-arm64, 2026-10-15), windows (windows-11, 2026-10-15) |
+| `docker` | 1 | linux, macos, windows | real runs: linux (2026-10-15), macos (2026-10-15), windows (2026-10-15) |
 | `hosted` | 2 | linux, macos, windows | validated only |
-| `cloud-docker/aws` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
+| `cloud-docker/aws` | 2 | linux, macos, windows | real runs: macos (2026-10-17); tier 1 pending: linux, windows |
 | `cloud-docker/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/digitalocean` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/linode` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-docker/oci` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `kubernetes` | 2 | linux, macos, windows | validated only |
-| `vagrant/virtualbox` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
+| `vagrant/virtualbox` | 2 | linux, macos, windows | real runs: macos (2026-10-17); tier 1 pending: linux, windows |
 | `vagrant/vmware_desktop` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
-| `vagrant/hyperv` | 1 | windows | real runs: windows (windows-11, 2026-10-17) |
+| `vagrant/hyperv` | 1 | windows | real runs: windows (2026-10-17) |
 | `vagrant/parallels` | 2 | macos | validated only; tier 1 pending: macos |
-| `vagrant/libvirt` | 1 | linux | real runs: linux (linux-2, 2026-10-17) |
+| `vagrant/libvirt` | 1 | linux | real runs: linux (2026-10-17) |
 | `vagrant/qemu` | 2 | linux, macos | validated only; tier 1 pending: linux, macos |
-| `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (macos-arm64, esxi-lab, 2026-10-16); tier 1 pending: linux, windows |
-| `proxmox` | 2 | linux, macos, windows | real runs: macos (macos-arm64, pve-lab, 2026-10-17); tier 1 pending: linux, windows |
-| `esxi` | 2 | linux, macos, windows | real runs: partial macos (macos-arm64, esxi-lab, 2026-10-17) |
-| `cloud-vm/aws` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
+| `vagrant/vmware_esxi` | 2 | linux, macos, windows | real runs: macos (2026-10-16); tier 1 pending: linux, windows |
+| `proxmox` | 2 | linux, macos, windows | real runs: macos (2026-10-17); tier 1 pending: linux, windows |
+| `esxi` | 2 | linux, macos, windows | real runs: partial macos (2026-10-17) |
+| `cloud-vm/aws` | 2 | linux, macos, windows | real runs: macos (2026-10-17); tier 1 pending: linux, windows |
 | `cloud-vm/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/digitalocean` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/linode` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-vm/oci` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `external` | 2 | linux, macos | validated only |
-| `cloud-services/aws` | 2 | linux, macos, windows | real runs: macos (macos-arm64, 2026-10-17); tier 1 pending: linux, windows |
+| `cloud-services/aws` | 2 | linux, macos, windows | real runs: macos (2026-10-17); tier 1 pending: linux, windows |
 | `cloud-services/azure` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 | `cloud-services/gcp` | 2 | linux, macos, windows | validated only; tier 1 pending: linux, macos, windows |
 

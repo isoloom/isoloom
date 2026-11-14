@@ -387,14 +387,19 @@ jobs:
       - name: Isothrum's ref, pinned
         id: ref
         run: |
-          set -uo pipefail
-          status=0
-          .github/scripts/isothrum-ref.sh optional || status=$?
-          case "$status" in
-            0) echo "runner=true" >> "$GITHUB_OUTPUT" ;;
-            3) echo "runner=false" >> "$GITHUB_OUTPUT" ;;
-            *) exit 1 ;;
-          esac
+          set -euo pipefail
+          # A release tag (vX.Y.Z) or a commit SHA, never a branch; unset, the runs that need the
+          # runner are skipped.
+          help="an Isothrum release tag (vX.Y.Z) or commit SHA"
+          if [ -z "${ISOTHRUM_REF:-}" ]; then
+            echo "::notice title=Isothrum runs skipped::no ISOTHRUM_REF ($help)"
+            echo "runner=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$ISOTHRUM_REF" =~ ^([0-9a-f]{40}|v[0-9]+[.][0-9]+[.][0-9]+([-+][0-9A-Za-z.-]+)?)$ ]]; then
+            echo "runner=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error title=ISOTHRUM_REF::${ISOTHRUM_REF} is neither a release tag nor a commit SHA ($help)"
+            exit 1
+          fi
       - name: Check out Isothrum (the runner)
         if: steps.ref.outputs.runner == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

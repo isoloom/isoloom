@@ -33,7 +33,7 @@ How-tos:
 - [Use Isoloom in CI](guide/ci.md), with the GitHub Action
 - [Commit the generated files](guide/commit-generated-files.md)
 - [Keep Terraform state remotely](guide/remote-terraform-state.md)
-- [Use catalogue services, or write an entry](guide/catalogue.md)
+- [Use catalogue services](guide/catalogue.md)
 - [Troubleshooting and FAQ](guide/troubleshooting.md)
 - [Migrate to 2.0](guide/migrating-to-2.0.md), and from 0.x [to 1.0](guide/migrating-to-1.0.md)
 
