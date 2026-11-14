@@ -63,6 +63,14 @@ pub enum Error {
         /// The program as written.
         program: String,
     },
+    /// A tool a run manifest doesn't run: not one of the tools Isoloom's targets drive.
+    #[error(
+        "`{program}` isn't a tool a run manifest runs: only the tools Isoloom's targets drive (docker, vagrant, terraform, ssh and the hypervisors' own) are"
+    )]
+    UnlistedProgram {
+        /// The program as written.
+        program: String,
+    },
     /// A program that isn't a bare tool name (a path, an option, a placeholder).
     #[error("`{program}` isn't a bare tool name: write the tool's name alone (`docker`); the runner finds it on PATH")]
     ProgramNotBare {
@@ -294,6 +302,7 @@ impl Error {
             Error::OutOfRange { .. } => "out_of_range",
             Error::ShellProgram { .. } => "shell_program",
             Error::ProgramNotBare { .. } => "program_not_bare",
+            Error::UnlistedProgram { .. } => "unlisted_program",
             Error::EmptyArgv => "empty_argv",
             Error::NoHostArgv => "no_host_argv",
             Error::SecretPlaceholder { .. } => "secret_placeholder",

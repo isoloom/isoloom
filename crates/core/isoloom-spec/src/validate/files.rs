@@ -1,9 +1,10 @@
 //! The paths a spec mentions: inside the project folder, and present there.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::Problem;
 use crate::model::{Check, HostPath, Spec};
+use crate::project_path;
 use crate::syntax::Code;
 
 /// The problems with the project's paths, in the order the spec mentions them.
@@ -13,26 +14,39 @@ struct Paths<'a> {
 }
 
 impl Paths<'_> {
-    /// `path` must be relative, stay in the project and exist there.
-    fn check(&mut self, at: String, path: &str) {
-        if path.starts_with('/') || path.split('/').any(|s| s == "..") {
-            self.problems.push(Problem::new(
-                Code::InvalidValue,
-                at,
-                format!("`{path}` must be a path inside the project folder"),
-            ));
-        } else if !self.lab_dir.join(path).exists() {
-            self.problems
-                .push(Problem::new(Code::InvalidValue, at, format!("`{path}` doesn't exist in the project folder")));
+    /// `path` must be plain, exist in the project and stay in it once its links are followed: its
+    /// real place, when it does.
+    fn check(&mut self, at: String, path: &str) -> Option<PathBuf> {
+        match project_path::inside(self.lab_dir, path) {
+            Ok(real) => Some(real),
+            Err(why) => {
+                self.problems.push(Problem::new(Code::InvalidValue, at, why.about(path)));
+                None
+            }
         }
     }
-}
 
-impl Paths<'_> {
-    /// A host folder relative to the project (it may be beside it, `../shared`): a folder there.
-    /// A home or absolute one is the running computer's, which may not be this one: unchecked.
+    /// A host folder of the project (`shared`): a folder there, inside it once its links are
+    /// followed. One beside the project (`../shared`) isn't inside it, which the caller grants or
+    /// not (`crate::host_access`): it is only checked to be a folder. A home or absolute one is
+    /// the running computer's, which may not be this one: unchecked.
     fn folder(&mut self, at: String, from: &str) {
-        let dir = self.lab_dir.join(from);
+        let dir = if project_path::plain(from).is_ok() {
+            match project_path::inside(self.lab_dir, from) {
+                Ok(real) => real,
+                Err(project_path::Escape::Outside(_)) => {
+                    self.problems.push(Problem::new(
+                        Code::InvalidValue,
+                        at,
+                        format!("`{from}` leads out of the project folder through a symbolic link: name the folder it leads to instead"),
+                    ));
+                    return;
+                }
+                Err(_) => self.lab_dir.join(from),
+            }
+        } else {
+            self.lab_dir.join(from)
+        };
         if !dir.exists() {
             self.problems.push(Problem::new(
                 Code::InvalidValue,
@@ -51,7 +65,8 @@ impl Paths<'_> {
 pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
     let mut paths = Paths { lab_dir, problems: Vec::new() };
     if let Some(c) = &spec.cloud {
-        paths.check("cloud.terraform".into(), &c.terraform);
+        let module = paths.check("cloud.terraform".into(), &c.terraform);
+        paths.problems.extend(cloud_module(c, module.as_deref()));
         for (i, b) in c.before.iter().enumerate() {
             paths.check(format!("cloud.before[{i}]"), b);
         }
@@ -78,7 +93,6 @@ pub fn validate_files(spec: &Spec, lab_dir: &Path) -> Vec<Problem> {
             paths.check(at, path);
         }
     }
-    paths.problems.extend(cloud_module(spec, lab_dir));
     paths.problems
 }
 
@@ -104,8 +118,8 @@ fn machines(spec: &Spec, paths: &mut Paths) {
         }
         for (i, f) in m.files.iter().enumerate() {
             if let Some(s) = &f.source {
-                paths.check(format!("machines.{name}.files[{i}].source"), s);
-                if paths.lab_dir.join(s).is_dir() {
+                let real = paths.check(format!("machines.{name}.files[{i}].source"), s);
+                if real.is_some_and(|r| r.is_dir()) {
                     paths.problems.push(Problem::new(
                         Code::InvalidValue,
                         format!("machines.{name}.files[{i}].source"),
@@ -131,11 +145,11 @@ fn machines(spec: &Spec, paths: &mut Paths) {
     }
 }
 
-/// A cloud-services module is a folder of .tf files.
-fn cloud_module(spec: &Spec, lab_dir: &Path) -> Option<Problem> {
-    let c = spec.cloud.as_ref()?;
-    let dir = lab_dir.join(&c.terraform);
-    let tf = std::fs::read_dir(&dir).is_ok_and(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")));
+/// A cloud-services module is a folder of .tf files: `module`, its real place when it is one of
+/// the project.
+fn cloud_module(c: &crate::model::CloudServices, module: Option<&Path>) -> Option<Problem> {
+    let dir = module?;
+    let tf = std::fs::read_dir(dir).is_ok_and(|d| d.flatten().any(|e| e.path().extension().is_some_and(|x| x == "tf")));
     (!tf && dir.is_dir()).then(|| {
         Problem::new(
             Code::InvalidValue,
@@ -234,11 +248,43 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
 
     #[test]
     fn a_path_leaving_the_project_is_refused() -> Outcome {
-        let checks = "machines: { web: { networks: { lan: 10 }, docker: { image: nginx } } }\nchecks: [/etc/hosts, ../x.sh, a/../../x.sh]\n";
-        let outside = |i: usize, path: &str| format!("checks[{i}]: `{path}` must be a path inside the project folder");
+        let checks =
+            "machines: { web: { networks: { lan: 10 }, docker: { image: nginx } } }\nchecks: [/etc/hosts, ../x.sh, a/../../x.sh, '..\\..\\x.sh', 'C:/x.sh']\n";
+        let outside = |i: usize, path: &str, why: &str| format!("checks[{i}]: `{path}` must be a path inside the project folder: {why}");
         assert_eq!(
             found("outside", &["a/"], &lab(checks))?,
-            [outside(0, "/etc/hosts"), outside(1, "../x.sh"), outside(2, "a/../../x.sh")]
+            [
+                outside(0, "/etc/hosts", "it starts at the root"),
+                outside(1, "../x.sh", "it goes up a folder (`..`)"),
+                outside(2, "a/../../x.sh", "it goes up a folder (`..`)"),
+                outside(3, "..\\..\\x.sh", "it holds a `\\`: separate folders with `/`"),
+                outside(4, "C:/x.sh", "it starts with a drive"),
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn a_path_linked_out_of_the_project_is_refused_and_one_linked_inside_it_passes() -> Outcome {
+        let machine = "machines: { web: { networks: { lan: 10 }, docker: { build: ctx }, files: [{ path: /etc/a, source: conf.ini }, { path: /etc/b, source: own.ini }], host_folders: [{ from: data, path: /d }] } }\n";
+        let scratch = crate::testing::folder("files-linked")?;
+        let dir = scratch.path();
+        fs::create_dir_all(dir.join("real"))?;
+        fs::write(dir.join("real/a.ini"), "")?;
+        std::os::unix::fs::symlink("/etc", dir.join("ctx"))?;
+        std::os::unix::fs::symlink("/etc/hostname", dir.join("conf.ini"))?;
+        std::os::unix::fs::symlink("real/a.ini", dir.join("own.ini"))?;
+        std::os::unix::fs::symlink("/etc", dir.join("data"))?;
+        let spec = model(&lab(machine))?;
+        let found: Vec<String> = validate_files(&spec, dir).iter().map(ToString::to_string).collect();
+        assert_eq!(
+            found,
+            [
+                "machines.web.docker.build: `ctx` leads out of the project folder through a symbolic link: keep the file itself in the project",
+                "machines.web.files[0].source: `conf.ini` leads out of the project folder through a symbolic link: keep the file itself in the project",
+                "machines.web.host_folders[0].from: `data` leads out of the project folder through a symbolic link: name the folder it leads to instead",
+            ]
         );
         Ok(())
     }

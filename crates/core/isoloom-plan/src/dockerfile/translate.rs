@@ -508,6 +508,13 @@ fn copy_one(src: &str, root: Option<&str>, add: bool, into: bool, jail: bool) ->
     }
     let rel = src.trim_start_matches("./");
     let path = match root {
+        // A build context's path stays in the context: Docker reads `/` as the context itself.
+        Some(_) if rel.contains('\\') || rel.split('/').any(|part| part == "..") => {
+            return Err((
+                format!("`{src}` goes out of the build context"),
+                "copy files from inside the build context, with `/` between folders",
+            ));
+        }
         Some(root) => format!("{root}/{rel}"),
         None if (rel == "/" || rel.is_empty()) && jail => {
             return Ok(": a stage's whole filesystem into kCTF's chroot: the VM itself is the jail".to_owned());

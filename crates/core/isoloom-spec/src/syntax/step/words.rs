@@ -82,9 +82,9 @@ name_type!(
     /// a folder ends with `/`, `site/`).
     ProjectPath,
     "project path",
-    "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
-    "a project path is relative to the project folder and stays inside it: no leading `/`, no `..` (`provision/web.sh`)",
-    |s| !s.is_empty() && !s.starts_with(['/', '\\']) && !drive(s) && !s.split(['/', '\\']).any(|part| part == "..") && !s.contains(['\n', '\0'])
+    "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
+    "a project path is relative to the project folder and stays inside it: no leading `/` or drive, no `..`, `/` between folders (`provision/web.sh`)",
+    |s| crate::project_path::plain(s).is_ok()
 );
 
 name_type!(

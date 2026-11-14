@@ -1,6 +1,7 @@
 //! Commands: a program and its arguments, run without a shell. The program is a bare tool name
-//! the runner resolves on PATH, and never a shell or an interpreter: the manifest holds no shell
-//! code for the host.
+//! the runner resolves on PATH, one of the tools Isoloom's targets drive ([`TOOLS`]), never a
+//! shell or an interpreter: the manifest holds no shell code for the host. (The run manifest goes
+//! away once runners read the native files alone; until then this list bounds what it can run.)
 
 use std::borrow::Cow;
 use std::fmt;
@@ -42,18 +43,42 @@ const SHELLS: [&str; 24] = [
     "node",
 ];
 
+/// The tools a step or a tool probe may run: the ones Isoloom's targets drive and probe (Compose,
+/// Vagrant and its hypervisors' own tools, Terraform or OpenTofu, SSH, ESXi's `ovftool`, QEMU's
+/// seed ISO maker), and `true`. Anything else is refused: a list of what is allowed can't miss an
+/// interpreter the way a list of what isn't can. Matched whatever their case, with or without
+/// `.exe`.
+const TOOLS: [&str; 15] = [
+    "docker",
+    "docker-compose",
+    "mkisofs",
+    "ovftool",
+    "prlctl",
+    "qemu-img",
+    "ssh",
+    "terraform",
+    "tofu",
+    "true",
+    "utmctl",
+    "vagrant",
+    "vboxmanage",
+    "virsh",
+    "vmrun",
+];
+
 /// A step's program: a bare tool name (`docker`, `vagrant`), never a path, a placeholder or a
 /// shell.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Program(String);
 
 impl Program {
-    /// The program, when it is a bare tool name and not a shell.
+    /// The program, when it is a bare tool name of [`TOOLS`].
     ///
     /// # Errors
     ///
     /// [`Error::ProgramNotBare`] for a path, an option, a placeholder or anything but a
-    /// tool's name; [`Error::ShellProgram`] for a shell or an interpreter.
+    /// tool's name; [`Error::ShellProgram`] for a shell or an interpreter;
+    /// [`Error::UnlistedProgram`] for any other tool.
     pub fn parse(name: &str) -> Result<Program> {
         let mut chars = name.chars();
         let bare = chars.next().is_some_and(|c| c.is_ascii_alphabetic()) && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'));
@@ -64,6 +89,9 @@ impl Program {
         let stem = lower.strip_suffix(".exe").unwrap_or(&lower);
         if SHELLS.contains(&stem) {
             return Err(Error::ShellProgram { program: name.to_owned() });
+        }
+        if !TOOLS.contains(&stem) {
+            return Err(Error::UnlistedProgram { program: name.to_owned() });
         }
         Ok(Program(name.to_owned()))
     }
@@ -120,12 +148,11 @@ impl JsonSchema for Program {
     }
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
-        let shells: Vec<String> = SHELLS.iter().map(|s| any_case(s)).collect();
+        let tools: Vec<String> = TOOLS.iter().map(|s| any_case(s).replace('.', "\\.")).collect();
         json_schema!({
-            "description": "A bare tool name resolved on PATH (with its Windows wrapper when it has one). A shell or an interpreter is refused, whatever its case and with or without `.exe`.",
+            "description": "A bare tool name resolved on PATH (with its Windows wrapper when it has one), one of the tools Isoloom's targets drive, whatever its case and with or without `.exe`. Anything else, a shell or an interpreter above all, is refused.",
             "type": "string",
-            "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$",
-            "not": { "pattern": format!("^(?:{})(?:{})?$", shells.join("|"), any_case(".exe").replace('.', "\\.")) },
+            "pattern": format!("^(?:{})(?:{})?$", tools.join("|"), any_case(".exe").replace('.', "\\.")),
         })
     }
 }
@@ -314,7 +341,17 @@ mod tests {
         for shell in ["sh", "BASH", "cmd.exe", "PowerShell.EXE", "pwsh", "env", "sudo", "python3"] {
             assert_eq!(Program::parse(shell).unwrap_err().code(), "shell_program", "{shell}");
         }
-        assert!(Program::parse("shellcheck").is_ok());
+        assert_eq!(Program::parse("shellcheck").unwrap_err().code(), "unlisted_program");
+    }
+
+    #[test]
+    fn only_the_tools_isoloom_drives_are_programs() {
+        for ok in ["docker", "VBoxManage", "vboxmanage.exe", "terraform", "qemu-img", "true"] {
+            assert!(Program::parse(ok).is_ok(), "{ok}");
+        }
+        for other in ["python3.12", "perl5.36", "nodejs", "osascript", "awk", "xargs", "git", "make", "curl", "jq"] {
+            assert_eq!(Program::parse(other).unwrap_err().code(), "unlisted_program", "{other}");
+        }
     }
 
     #[test]

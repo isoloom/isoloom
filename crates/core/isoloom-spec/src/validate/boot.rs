@@ -43,7 +43,7 @@ fn image(at: &str, i: &VmImage, p: &mut Problems) {
     }
     if let Some(u) = &i.box_url
         && !is_url(u)
-        && (u.starts_with('/') || u.split('/').any(|s| s == ".."))
+        && crate::project_path::plain(u).is_err()
     {
         p.add(format!("{at}.box_url"), "a URL (https://, file://) or a .box file inside the project folder");
     }

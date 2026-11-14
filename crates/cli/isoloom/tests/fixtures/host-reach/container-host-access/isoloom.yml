@@ -1,0 +1,15 @@
+# A container that asks for the computer it runs on: a privileged container, a host disk, the
+# user's home folder and the container engine's socket shared in, and a file whose source the
+# test makes a link out of the project. Each is refused until allowed; the link always is.
+version: 1
+name: container-host-access
+networks: { lan: { cidr: 10.0.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    app: { image: nginx }
+    privileged: true
+    environment: { A: "${HOME:?x}\nb: c" }
+    hardware: { devices: [/dev/sda] }
+    host_folders: [{ from: '~', path: /h }, { from: /var/run/docker.sock, path: /var/run/docker.sock }]
+    files: [{ path: /etc/a.ini, source: conf.ini }]

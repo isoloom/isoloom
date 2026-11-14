@@ -1,0 +1,9 @@
+# Cloud services whose settings would change how this computer's tools run: a loader variable,
+# Terraform's own settings, and requirements written as command lines. Each is refused.
+version: 1
+name: cloud-host-commands
+cloud:
+  provider: aws
+  terraform: infra
+  env: { LD_PRELOAD: /tmp/x.so, TF_CLI_ARGS_apply: "-parallelism=1", TF_CLI_CONFIG_FILE: infra/other.tfrc }
+  requires: ["docker run --rm -v /:/host alpine true", "python3.12 -c print(1)"]

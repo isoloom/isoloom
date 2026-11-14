@@ -21,6 +21,22 @@ pub(crate) struct Settings {
     /// `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable.
     #[arg(short = 's', long = "set", value_name = "KEY=VALUE")]
     pub(crate) sets: Vec<String>,
+    /// Allow the environment to reach this computer this way: `host-folders` (a folder outside
+    /// the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged
+    /// container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host),
+    /// `host-network` (a bridged network). None by default: a spec that asks for one is refused.
+    /// Repeatable.
+    #[arg(long = "allow-host", value_name = "ACCESS", value_parser = host_access)]
+    pub(crate) allow_host: Vec<isoloom_spec::host_access::HostAccess>,
+}
+
+/// An access `--allow-host` names.
+fn host_access(id: &str) -> std::result::Result<isoloom_spec::host_access::HostAccess, String> {
+    use isoloom_spec::host_access::HostAccess;
+    HostAccess::parse(id).ok_or_else(|| {
+        let known: Vec<&str> = HostAccess::ALL.iter().map(|a| a.id()).collect();
+        format!("`{id}` isn't an access: one of {}", known.join(", "))
+    })
 }
 
 /// The profile a command runs with: `--profile`, else `ISOLOOM_PROFILE` when it isn't empty.
@@ -114,12 +130,13 @@ pub(crate) fn settled(profile: Option<&isoloom_spec::profile::Profile>, dir: &Pa
     spec.tags = settings.tags_under(&spec.tags).map_err(CliError::Defaults)?;
     let lab = Lab::new(spec)
         .with_images(settings.defaults.images.clone())
-        .with_regions(settings.defaults.regions());
+        .with_regions(settings.defaults.regions())
+        .with_host_access(isoloom_spec::host_access::Grants::of(given.allow_host.iter().copied()));
     let templates = templates(&lab, dir, unread)?;
     let lab = lab.with_templates(templates);
     let dockerfiles = dockerfiles(&lab, dir);
     let index = bases_index(dir)?;
-    let bases = isoloom_targets::dockerfile::Sources::of(&index, |p| std::fs::read_to_string(dir.join(p)).ok());
+    let bases = isoloom_targets::dockerfile::Sources::of(&index, |p| read_inside(dir, p).ok());
     Ok((lab.with_dockerfiles(dockerfiles).with_bases(bases), settings))
 }
 
@@ -129,7 +146,7 @@ pub(crate) fn settled(profile: Option<&isoloom_spec::profile::Profile>, dir: &Pa
 fn dockerfiles(lab: &Lab, dir: &Path) -> std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String> {
     lab.dockerfile_paths()
         .into_iter()
-        .filter_map(|p| std::fs::read_to_string(dir.join(p.as_str())).ok().map(|text| (p, text)))
+        .filter_map(|p| read_inside(dir, p.as_str()).ok().map(|text| (p, text)))
         .collect()
 }
 
@@ -152,22 +169,51 @@ pub(crate) fn bases_index(dir: &Path) -> Result<isoloom_targets::dockerfile::Ind
 fn templates(lab: &Lab, dir: &Path, unread: Unread) -> Result<std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String>> {
     let mut out = std::collections::BTreeMap::new();
     for p in lab.template_paths() {
-        let path = dir.join(p.as_str());
-        match std::fs::read_to_string(&path) {
+        match read_inside(dir, p.as_str()) {
             Ok(text) => {
                 out.insert(p, text);
             }
+            // A path out of the project is never read: the spec's checks refuse it.
+            Err(Unreadable::Escapes) => {}
             Err(_) if unread == Unread::Skipped => {}
-            Err(source) => return Err(CliError::Read { path, source }),
+            Err(Unreadable::Read(source)) => {
+                return Err(CliError::Read {
+                    path: dir.join(p.as_str()),
+                    source,
+                });
+            }
         }
     }
     Ok(out)
 }
 
-/// The environment, when it has no problem: generators assume a checked spec, so a spec that parses but
-/// is wrong stops with its problems, never a panic.
+/// Why a project file wasn't read.
+#[derive(Debug)]
+enum Unreadable {
+    /// It isn't a plain path of the project, or leads out of it through a symbolic link.
+    Escapes,
+    /// It can't be read (it isn't there, among others).
+    Read(std::io::Error),
+}
+
+/// The text of project file `path` in `dir`, read only when it is inside the project once its
+/// links are followed ([`isoloom_spec::project_path::inside`]): a file the project links to
+/// elsewhere on this computer is never read into the generated files.
+fn read_inside(dir: &Path, path: &str) -> std::result::Result<String, Unreadable> {
+    use isoloom_spec::project_path::{Escape, inside};
+    match inside(dir, path) {
+        Ok(real) => std::fs::read_to_string(real).map_err(Unreadable::Read),
+        Err(Escape::Missing) => Err(Unreadable::Read(std::io::Error::from(std::io::ErrorKind::NotFound))),
+        Err(_) => Err(Unreadable::Escapes),
+    }
+}
+
+/// The environment, when it has no problem, the project files it names included (each there, and
+/// inside the project once its links are followed): generators assume a checked spec, so a spec
+/// that parses but is wrong stops with its problems, never a panic, and nothing is generated from
+/// a file out of the project.
 pub(crate) fn checked(lab: Lab, dir: &Path) -> Result<Lab> {
-    let problems = lab.problems();
+    let problems = lab.problems_with_files(dir);
     if problems.is_empty() {
         Ok(lab)
     } else {

@@ -10,6 +10,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use isoloom_catalogue::Catalogue;
+use isoloom_spec::host_access::{self, Grants, HostReach};
 use isoloom_spec::images::Table;
 use isoloom_spec::model::{self, Target};
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Problems, ProjectPath};
@@ -35,6 +36,7 @@ pub struct Lab {
     templates: templates::Texts,
     dockerfiles: BTreeMap<ProjectPath, String>,
     bases: crate::dockerfile::Sources,
+    host_access: Grants,
     loaded: Loaded,
     memo: Memo,
 }
@@ -111,6 +113,7 @@ impl Lab {
             templates: templates::Texts::new(),
             dockerfiles: BTreeMap::new(),
             bases: crate::dockerfile::Sources::default(),
+            host_access: Grants::none(),
             loaded: Loaded::built_in(),
             memo: Memo::default(),
         }
@@ -131,6 +134,37 @@ impl Lab {
     pub fn with_images(mut self, images: Table) -> Lab {
         self.images = images;
         self
+    }
+
+    /// The lab with what whoever runs it allows it to reach of the computer that runs it
+    /// ([`isoloom_spec::host_access`]): nothing by default, so a spec that reaches it in any way
+    /// (a host folder outside the project or written to, the engine's socket, a privileged
+    /// container, devices, boot files of the host, a bridged network) has a `refused` problem at
+    /// each such field until its access is allowed here. [`Lab::host_access`] lists what to ask.
+    #[must_use]
+    pub fn with_host_access(mut self, grants: Grants) -> Lab {
+        self.host_access = grants;
+        self.memo.problems = OnceLock::new();
+        self
+    }
+
+    /// Where the lab reaches the computer that runs it, as written and under each target's
+    /// overrides, each field once: what a caller asks whoever runs it to allow before
+    /// [`Lab::with_host_access`].
+    #[must_use]
+    pub fn host_access(&self) -> Vec<HostReach> {
+        let mut out: Vec<HostReach> = Vec::new();
+        let scopes = std::iter::once(Scope::Lab).chain(override_targets(&self.source.overrides).into_iter().map(|(_, t)| Scope::Target(t)));
+        for scope in scopes {
+            let lowered = self.raw(scope);
+            for mut r in host_access::of(&lowered.spec) {
+                r.at = lowered.trail.path(&r.at).as_str().to_owned();
+                if !out.iter().any(|o| o.at == r.at && o.access == r.access) {
+                    out.push(r);
+                }
+            }
+        }
+        out
     }
 
     /// The lab with the region each cloud's module defaults to, by the cloud's id (`aws`), as the
@@ -370,6 +404,7 @@ impl Lab {
             .filter(|p| !follows_from(&out, p, &self.source))
             .collect();
         add(&mut out, model);
+        add(&mut out, self.refused_host_access());
         let targets: Vec<Problem> = self.target_problems().into_iter().filter(|p| !follows_from(&out, p, &self.source)).collect();
         add(&mut out, targets);
         // What only a target's overrides set (an existing network or volume) is checked once
@@ -384,6 +419,16 @@ impl Lab {
             add(&mut out, found);
         }
         self.sorted(out)
+    }
+
+    /// A `refused` problem at each field where the lab reaches the computer that runs it in a way
+    /// [`Lab::with_host_access`] didn't allow.
+    fn refused_host_access(&self) -> Vec<Problem> {
+        self.host_access()
+            .into_iter()
+            .filter(|r| !self.host_access.allows(r.access))
+            .map(|r| Problem::new(Code::Refused, FieldPath::new(r.at.clone()), r.refusal()))
+            .collect()
     }
 
     /// The targets `targets:` asks for that the spec itself rules out ([`Lab::not_possible`]),

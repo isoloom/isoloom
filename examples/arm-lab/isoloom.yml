@@ -13,7 +13,6 @@ machines:
   web:
     networks: { lab: 10 }
     hardware: { arch: arm64 }
-    privileged: true
     read_only: true
     tmpfs: [/run, /var/cache/nginx]
     shm_size: 128m

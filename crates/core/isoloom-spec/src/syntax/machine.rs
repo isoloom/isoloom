@@ -223,9 +223,11 @@ pub(crate) struct MachineInput {
     /// Data disks beside its own, by name: `{ size_gb, fs, mount }`.
     #[serde(default)]
     disks: IndexMap<String, Disk>,
-    /// Folders of the computer that runs the environment, mounted in the machine both ways (what
-    /// it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to
-    /// the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the
+    /// Folders of the computer that runs the environment, mounted in the machine (read-only unless
+    /// `read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when
+    /// whoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)
+    /// or absolute; a writable one needs `writable-host-folders`, the container engine's socket
+    /// `docker-socket`. Linux machines, on the
     /// targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each
     /// provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,
     /// libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a
@@ -250,7 +252,9 @@ pub(crate) struct MachineInput {
     /// `domain`, `options`.
     #[serde(default)]
     dns: Option<Dns>,
-    /// Kernel-level access (nested containers, kernel modules, raw devices).
+    /// Kernel-level access (nested containers, kernel modules, raw devices). A privileged
+    /// container reaches the host's kernel: refused unless whoever runs the environment allows
+    /// `privileged`.
     #[serde(default)]
     privileged: bool,
     /// How strongly its `internet: false` seal holds (`guaranteed` by default; `best-effort` lets a
