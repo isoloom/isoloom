@@ -856,7 +856,7 @@ fn two_copies_of_one_environment_never_share_a_name_on_the_host() -> Outcome {
         let runs_a = vagrant_host_names(example, &one, Some("aaaaa1"))?;
         let runs_b = vagrant_host_names(example, &one, Some("bbbbb2"))?;
         assert!(runs_a.is_disjoint(&runs_b), "{example}: two runs' keys");
-        assert!(runs_a.iter().all(|l| l.contains("-aaaaa1")), "{example}: {runs_a:?}");
+        assert!(!runs_a.is_empty() && runs_a.iter().all(|l| l.contains("-aaaaa1")), "{example}: {runs_a:?}");
         assert!(runs_a.contains(&format!("default_prefix {example}-aaaaa1_")), "{example}: {runs_a:?}");
         let label = format!("name {example}-aaaaa1 - ");
         assert!(runs_a.iter().any(|l| l.starts_with(&label)), "{example}: {runs_a:?}");
