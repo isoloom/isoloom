@@ -711,6 +711,30 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^composer(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "composer's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^gitea(@.+)?$"
               }
             },
