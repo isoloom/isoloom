@@ -1,0 +1,134 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The php entry: PHP as the official php image has it, from the Debian PHP archive
+# (packages.sury.org), the same in every form: a VM, or a container built from Debian 12's image.
+# The archive carries each series' newest release, every series from 5.6 on, which the releases
+# below pin. `server` is the image's variant: `apache` (Apache with mod_php serving /var/www/html,
+# `php:<version>-apache`), `fpm` (php-fpm on port 9000, `php:<version>-fpm`), or none (the CLI
+# image). The image's helpers come with it: `docker-php-ext-install` installs an extension's
+# package from the archive, and the configuration reads $PHP_INI_DIR (/usr/local/etc/php) as the
+# image's does. There is no official image form: the image builds PHP from source under
+# /usr/local, the archive's packages live under /etc/php, so building from the OS keeps the paths
+# the same in both forms. lock.yml beside it is written only by `cargo xtask catalogue refresh php`.
+name: php
+description: >-
+  PHP from the Debian PHP archive, as the official php image has it: its CLI, Apache with mod_php
+  or php-fpm, and the image's extension helpers.
+upstream: https://www.php.net/
+licence:
+  software: PHP-3.01
+  notes: The archive's PHP packages bundle their dependencies under those packages' own licences.
+
+# Each series' newest release in the archive (`vars.series` names its packages, php7.4-cli).
+releases:
+  - version: "5.6.40"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "5.6" }
+  - version: "7.0.33"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "7.0" }
+  - version: "7.1.33"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "7.1" }
+  - version: "7.2.34"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "7.2" }
+  - version: "7.3.33"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "7.3" }
+  - version: "7.4.33"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "7.4" }
+  - version: "8.0.30"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "8.0" }
+  - version: "8.1.34"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "8.1" }
+  - version: "8.2.35"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "8.2" }
+  - version: "8.3.36"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "8.3" }
+  - version: "8.4.27"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "8.4" }
+  - version: "8.5.12"
+    source: vendor
+    os: [debian@12]
+    vars: { series: "8.5" }
+default: "8.4.27"
+
+settings:
+  server:
+    type: string
+    values: [apache, fpm]
+    description: >-
+      What serves PHP: `apache` (Apache with mod_php on port 80, serving /var/www/html) or `fpm`
+      (php-fpm on port 9000). Without it, the CLI alone, as the php image's own variant.
+
+recipe:
+  install:
+    - packages: [ca-certificates]
+    - repository:
+        name: sury-php
+        url: https://packages.sury.org/php
+        # The archive publishes its key as a binary keyring only: the same key, armoured, from
+        # the Ubuntu keyserver. The refresh checks its fingerprint (the archive's README names
+        # the key) and writes the file's SHA-256 into lock.yml.
+        key: { url: "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x15058500A0235D97F5D10063B188E2B695BD4743", fingerprint: 15058500A0235D97F5D10063B188E2B695BD4743 }
+        priority: 900
+    # lock.yml gives the exact package string (7.4.33-31+0~…+debian12~1.gbp…).
+    - packages:
+        - { name: "php{{ vars.series }}-cli", version: "{{ version }}" }
+        - { name: "php{{ vars.series }}-common", version: "{{ version }}" }
+    - packages: [apache2]
+      when: { is: { server: apache } }
+    - packages: [{ name: "libapache2-mod-php{{ vars.series }}", version: "{{ version }}" }]
+      when: { is: { server: apache } }
+    - packages: [{ name: "php{{ vars.series }}-fpm", version: "{{ version }}" }]
+      when: { is: { server: fpm } }
+
+  configure:
+    # The image has no php.ini (PHP's defaults) and reads $PHP_INI_DIR/conf.d: the same here,
+    # with the image's two sample files beside it.
+    - file: { path: /usr/local/etc/php/conf.d, state: directory, mode: "0755" }
+    - template: { from: files/php.ini, to: /usr/local/etc/php/php.ini, mode: "0644" }
+    - command: "sh -c 'for f in development production; do cp /usr/lib/php/{{ vars.series }}/php.ini-$f /usr/local/etc/php/ 2>/dev/null || true; done; for s in cli apache2 fpm; do [ -d /etc/php/{{ vars.series }}/$s ] && ln -sf /usr/local/etc/php/php.ini /etc/php/{{ vars.series }}/$s/php.ini; done; true'"
+      creates: /usr/local/etc/php/php.ini-production
+    # The image's helpers, as commands of the VM.
+    - template: { from: files/docker-php-ext-install, to: /usr/local/bin/docker-php-ext-install, mode: "0755" }
+    - template: { from: files/docker-php-ext-enable, to: /usr/local/bin/docker-php-ext-enable, mode: "0755" }
+    - template: { from: files/docker-php-ext-configure, to: /usr/local/bin/docker-php-ext-configure, mode: "0755" }
+    - template: { from: files/docker-php-source, to: /usr/local/bin/docker-php-source, mode: "0755" }
+    # Apache: the prefork MPM with mod_php, serving /var/www/html, in the foreground.
+    - command: "sh -c 'a2dismod -q mpm_event || true; a2enmod -q mpm_prefork php{{ vars.series }} && rm -f /var/www/html/index.html'"
+      creates: "/etc/apache2/mods-enabled/php{{ vars.series }}.load"
+      when: { is: { server: apache } }
+    - template: { from: files/apache2-foreground, to: /usr/local/bin/apache2-foreground, mode: "0755" }
+      when: { is: { server: apache } }
+    # FPM: the default pool on TCP port 9000, the master in the foreground.
+    - template: { from: files/www.conf, to: "/etc/php/{{ vars.series }}/fpm/pool.d/www.conf", mode: "0644" }
+      when: { is: { server: fpm } }
+    - template: { from: files/php-fpm, to: /usr/local/sbin/php-fpm, mode: "0755" }
+      when: { is: { server: fpm } }
+    - file: { path: /var/www/html, state: directory, owner: www-data, group: www-data, mode: "0755" }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    - service: { name: apache2, run: [/usr/local/bin/apache2-foreground] }
+      when: { is: { server: apache } }
+    - service: { name: php-fpm, run: [/usr/local/sbin/php-fpm] }
+      when: { is: { server: fpm } }
+
+  start: []

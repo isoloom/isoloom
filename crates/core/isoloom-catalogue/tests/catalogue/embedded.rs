@@ -58,3 +58,17 @@ fn nginx_resolved_on_debian_12_with_a_site_and_php() {
     let r = embedded().unwrap().resolve(&spec, "web").unwrap().remove(0);
     insta::assert_snapshot!(format!("{:#?}\n{:#?}\n{:#?}\n{:#?}", r.install, r.configure, r.start, r.files));
 }
+
+#[test]
+fn php_installs_the_server_its_setting_is() {
+    let run = |with: &str| {
+        let r = resolve(embedded().unwrap(), "debian@12", "php@7.4", with).unwrap();
+        r.configure
+            .iter()
+            .filter_map(|s| if let Step::Service(s) = s { Some(s.name().to_string()) } else { None })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(run("{ server: apache }"), ["apache2"]);
+    assert_eq!(run("{ server: fpm }"), ["php-fpm"]);
+    assert_eq!(run("{}"), Vec::<String>::new(), "the CLI alone");
+}

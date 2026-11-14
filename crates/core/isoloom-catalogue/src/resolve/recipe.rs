@@ -67,6 +67,10 @@ impl Context<'_> {
             && w.release.as_ref().is_none_or(|l| l.iter().any(|word| self.release.is(word)))
             && w.set.as_ref().is_none_or(|s| self.settings.is_set(s.as_str()))
             && w.unset.as_ref().is_none_or(|s| !self.settings.is_set(s.as_str()))
+            && w.is.as_ref().is_none_or(|m| {
+                m.iter()
+                    .all(|(s, v)| matches!(self.settings.get(s.as_str()), Some(SettingValue::Text(t)) if t == v))
+            })
     }
 
     /// The items `step` repeats for: one pass without an item, unless it has `for_each`.

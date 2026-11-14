@@ -982,6 +982,20 @@
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "A setting `with:` leaves out, with no default.",
           "default": null
+        },
+        "is": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "type": "string"
+            }
+          },
+          "description": "`string` settings and the value each has (`{ server: apache }`).",
+          "default": null
         }
       },
       "description": "Where an entry's step applies: every condition given holds (a list holds when one of its\nvalues does). Never the form: both forms run the same recipe."

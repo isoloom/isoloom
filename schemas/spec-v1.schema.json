@@ -1125,6 +1125,39 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^php(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "php's settings.",
+                "properties": {
+                  "server": {
+                    "type": "string",
+                    "enum": [
+                      "apache",
+                      "fpm"
+                    ],
+                    "description": "What serves PHP: `apache` (Apache with mod_php on port 80, serving /var/www/html) or `fpm` (php-fpm on port 9000). Without it, the CLI alone, as the php image's own variant."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^php-fpm(@.+)?$"
               }
             },
