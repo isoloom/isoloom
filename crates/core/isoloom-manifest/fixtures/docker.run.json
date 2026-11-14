@@ -120,8 +120,7 @@
           "var": "DEMO_SECRET",
           "steps": [
             "up",
-            "start",
-            "job-isoloom-init-web-1"
+            "start"
           ]
         }
       ]
@@ -252,6 +251,14 @@
       "native": {
         "service": "isoloom-probe"
       }
+    },
+    {
+      "name": "isoloom-jobs-done",
+      "role": "infra",
+      "addresses": {},
+      "native": {
+        "service": "isoloom-jobs-done"
+      }
     }
   ],
   "lifecycle": {
@@ -290,34 +297,9 @@
           "--remove-orphans",
           "--wait",
           "--wait-timeout",
-          "600",
-          "db",
-          "isoloom-routes-db",
-          "web",
-          "isoloom-routes-web",
-          "isoloom-probe"
+          "600"
         ],
         "timeout_s": 1800
-      },
-      {
-        "id": "job-isoloom-init-web-1",
-        "note": "Running web's set-up script…",
-        "argv": [
-          "docker",
-          "compose",
-          "--project-name",
-          "${run.name}",
-          "--file",
-          "compose.yml",
-          "--file",
-          "${run.state_dir}/ports.yml",
-          "up",
-          "--no-deps",
-          "--exit-code-from",
-          "isoloom-init-web-1",
-          "isoloom-init-web-1"
-        ],
-        "timeout_s": 600
       }
     ],
     "down": [
@@ -431,11 +413,6 @@
       "kind": "step_ok",
       "step": "up",
       "means": "every long-running service is healthy (`--wait`: each port's probe, the route keepers, the machines' own healthchecks)"
-    },
-    {
-      "kind": "step_ok",
-      "step": "job-isoloom-init-web-1",
-      "means": "web's set-up script (isoloom-init-web-1) exited 0"
     }
   ],
   "outputs": [

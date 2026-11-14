@@ -30,6 +30,9 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
 # Start:  cd .isoloom/vagrant && vagrant up
 # Stop:   cd .isoloom/vagrant && vagrant destroy -f
+# Access: vagrant up client (`vagrant up` leaves it down)
+# Checks: vagrant ssh <vm> -c 'sudo sh /var/lib/isoloom/checks.sh', for each of dns, client; each check prints a PASS or FAIL line,
+#         and a failed one fails the command (ISOLOOM_DERIVED=0 after sudo leaves the derived checks out)
 
 # One machine at a time, in order (QEMU and libvirt would boot them all at once).
 ENV["VAGRANT_NO_PARALLEL"] = "1"
@@ -1160,7 +1163,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "provision/dns.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/dns.sh'\\'''"
+    m.vm.provision "shell", name: "provision/dns.sh", inline: <<~'SH'
+      isoloom_sum="$(cksum < '/opt/isoloom/provision/dns.sh')"
+      if [ "$(cat /var/lib/isoloom/done/06-e7cca837 2>/dev/null)" = "$isoloom_sum" ]; then
+        echo 'provision/dns.sh: done already (remove /var/lib/isoloom/done/06-e7cca837 to run it again)'
+      else
+      (
+      cd /opt/isoloom && sh -c 'sh '\''provision/dns.sh'\'''
+      ) && mkdir -p /var/lib/isoloom/done && printf '%s\n' "$isoloom_sum" > /var/lib/isoloom/done/06-e7cca837
+      fi
+    SH
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
       command -v nft >/dev/null || pkg nftables
@@ -1197,8 +1209,9 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       /etc/isoloom/egress.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
+    m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/dns.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/dns.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 
   config.vm.define "client", autostart: false do |m|
@@ -1411,7 +1424,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "wait for dns", inline: "i=0; until (bash -c '</dev/tcp/dns/53' 2>/dev/null || nc -z -w 2 dns 53 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"dns didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"dns answers\""
-    m.vm.provision "shell", name: "provision/client.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/client.sh'\\'''"
+    m.vm.provision "shell", name: "provision/client.sh", inline: <<~'SH'
+      isoloom_sum="$(cksum < '/opt/isoloom/provision/client.sh')"
+      if [ "$(cat /var/lib/isoloom/done/07-280f918d 2>/dev/null)" = "$isoloom_sum" ]; then
+        echo 'provision/client.sh: done already (remove /var/lib/isoloom/done/07-280f918d to run it again)'
+      else
+      (
+      cd /opt/isoloom && sh -c 'sh '\''provision/client.sh'\'''
+      ) && mkdir -p /var/lib/isoloom/done && printf '%s\n' "$isoloom_sum" > /var/lib/isoloom/done/07-280f918d
+      fi
+    SH
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
       command -v nft >/dev/null || pkg nftables
@@ -1448,8 +1470,9 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       /etc/isoloom/egress.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
+    m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/client.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"
     m.vm.provision "shell", name: "checks", run: "never", inline: [["checks/resolve.sh", "'/opt/isoloom/checks'", "'/opt/isoloom/checks/resolve.sh'"]].map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); "mkdir -p #{folder} && cat > #{file} <<'#{tag}'\n#{body}\n#{tag}\n" }.join + File.read(File.join(__dir__, "checks/client.sh")), env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 end
 
