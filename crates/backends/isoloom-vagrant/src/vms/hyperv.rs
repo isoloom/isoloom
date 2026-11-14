@@ -119,21 +119,21 @@ impl<'a> HyperV<'a> {
     }
 }
 
-/// The MAC address of a VM's adapter on a network under Hyper-V: locally administered, stable
-/// for the VM and the network, so the guest finds the adapter whatever it names it.
-fn mac(vm: &str, net: &str) -> [u8; 6] {
+/// The MAC address of a VM's adapter on a network under Hyper-V (and UTM): locally administered,
+/// stable for the VM and the network, so the guest finds the adapter whatever it names it.
+pub(super) fn mac(vm: &str, net: &str) -> [u8; 6] {
     let [a, b, c, d] = stable_hash::of(&format!("{vm}/{net}")).to_be_bytes();
     [0x02, 0x15, a, b, c, d]
 }
 
 /// A MAC address as Hyper-V's cmdlets and WMI write it: in capitals, `sep` between its bytes.
-fn hyperv_mac_text(mac: [u8; 6], sep: &str) -> String {
+pub(super) fn hyperv_mac_text(mac: [u8; 6], sep: &str) -> String {
     mac.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(sep)
 }
 
 /// A MAC address as Linux writes it (`/sys/class/net/*/address`): lower case, `:` between its
 /// bytes.
-fn linux_mac_text(mac: [u8; 6]) -> String {
+pub(super) fn linux_mac_text(mac: [u8; 6]) -> String {
     mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":")
 }
 
@@ -253,7 +253,7 @@ const ENV_NET_UNIT: &str = "isoloom-env-net";
 /// The script that sets a Linux VM's addresses at boot ([`ENV_NET_SCRIPT`]): each
 /// adapter found by its MAC, its address set with `ip` (NetworkManager told to leave it
 /// alone). Every network is tried; a missing adapter fails it.
-const ENV_NET: &str = "#!/bin/sh\n# This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.\nset_address() {\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${d##*/}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}\nrc=0\n";
+const ENV_NET: &str = "#!/bin/sh\n# This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.\nset_address() {\n  for d in /sys/class/net/*; do\n    [ \"$(cat \"$d/address\" 2>/dev/null)\" = \"$1\" ] || continue\n    IF=${d##*/}\n    if command -v nmcli >/dev/null; then nmcli device set \"$IF\" managed no 2>/dev/null || true; fi\n    ip link set \"$IF\" up\n    ip -4 addr show dev \"$IF\" | grep -q \" $2 \" || ip addr add \"$2\" dev \"$IF\"\n    return 0\n  done\n  echo \"isoloom: no network adapter with MAC $1\" >&2\n  return 1\n}\nrc=0\n";
 
 /// Runs [`ENV_NET_SCRIPT`] at every boot: a systemd unit, or OpenRC's `local` on Alpine.
 fn env_net_at_boot() -> String {
@@ -262,9 +262,9 @@ fn env_net_at_boot() -> String {
     )
 }
 
-/// A Linux VM's addresses on its networks under Hyper-V: [`ENV_NET_SCRIPT`] written, run at
-/// every boot, and now.
-fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
+/// A Linux VM's addresses on its networks under Hyper-V (and UTM): [`ENV_NET_SCRIPT`] written,
+/// run at every boot, and now.
+pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let macs: Vec<String> = nics.iter().map(|n| linux_mac_text(mac(vm_name, n.net))).collect();
     let lines: Vec<String> = nics
         .iter()
@@ -280,9 +280,9 @@ fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     )
 }
 
-/// A Windows VM's addresses on its networks under Hyper-V: each adapter found by the MAC Isoloom
-/// gives it ([`super::windows::static_addresses`]).
-fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
+/// A Windows VM's addresses on its networks under Hyper-V (and UTM): each adapter found by the MAC
+/// Isoloom gives it ([`super::windows::static_addresses`]).
+pub(super) fn windows_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let nics: Vec<_> = nics
         .iter()
         .map(|n| (Adapter::Mac(hyperv_mac_text(mac(vm_name, n.net), ":")), n.ip, n.mask))

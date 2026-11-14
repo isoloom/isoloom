@@ -156,6 +156,9 @@ pub struct ProviderBoxes {
     /// The box the Hyper-V provider boots.
     #[serde(default)]
     pub hyperv: Option<String>,
+    /// The box the UTM provider (`vagrant_utm`) boots: a UTM-format box.
+    #[serde(default)]
+    pub utm: Option<String>,
 }
 
 /// The controller's box on Vagrant.

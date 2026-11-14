@@ -13,6 +13,7 @@ use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{self, Os};
+use super::utm::Utm;
 use super::{Ctx, boot, checks, windows};
 use crate::host_folders::Share;
 use crate::ruby::{Call, Ruby, Start, Value};
@@ -170,6 +171,11 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         .first()
         .filter(|_| os == Os::Windows)
         .map(|(net, ip)| (*ip, env.block(net).netmask()));
+    let utm = Utm {
+        boxed: image.utm.as_deref(),
+        nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
+        windows: os == Os::Windows,
+    };
     let hyperv = HyperV {
         names: env.names(),
         boxed: image.hyperv.clone(),
@@ -195,6 +201,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
             windows_address,
         },
         hyperv,
+        utm,
         tpm: mp.tpm,
         esxi_guestos: isoloom_render::esxi::guest_os(vm_os),
         esxi_box: None,
@@ -217,6 +224,7 @@ mod tests {
             libvirt: None,
             qemu: None,
             hyperv: HyperVBox::Main,
+            utm: None,
         };
         let mut r = Ruby::new();
         boxed(&mut r, &image, Arch::Amd64, true);

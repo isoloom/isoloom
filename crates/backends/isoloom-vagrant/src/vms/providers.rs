@@ -11,6 +11,7 @@ use isoloom_spec::windows::Tpm;
 use super::hyperv::{self, HyperV};
 use super::provider::Provider;
 use super::qemu::{HubPort, Link};
+use super::utm::{self, Utm};
 use super::{boot, nested, windows};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
@@ -99,6 +100,8 @@ pub(crate) struct Guest<'a> {
     pub(crate) qemu: Qemu<'a>,
     /// How Hyper-V runs it.
     pub(crate) hyperv: HyperV<'a>,
+    /// How UTM runs it.
+    pub(crate) utm: Utm<'a>,
     /// Its virtual TPM, where the provider gives one (VirtualBox, libvirt; Hyper-V's is in
     /// `hyperv`).
     pub(crate) tpm: Option<Tpm>,
@@ -161,6 +164,7 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::VmwareEsxi), params, |r| esxi(r, g));
     libvirt(r, g);
     hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
+    utm::block(r, &g.label, &g.vm_name, g.size, &g.utm);
     if g.nested {
         nested::refuse_elsewhere(r);
     }

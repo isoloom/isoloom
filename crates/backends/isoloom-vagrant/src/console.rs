@@ -12,8 +12,7 @@
 //!   Vagrantfile in `ISOLOOM_CONSOLES`; off when it gave none (Vagrant run by hand).
 //! - **VirtualBox**: its remote display (VRDE, RDP) on `127.0.0.1`, only when the Oracle VM
 //!   VirtualBox Extension Pack is installed (VirtualBox alone has no VRDE server); off otherwise.
-//! - **Hyper-V, Parallels, ESXi**: none. UTM runs no environment's VMs (the Vagrantfile has no
-//!   block for it).
+//! - **Hyper-V, Parallels, UTM, ESXi**: none (UTM shows a VM's screen over SPICE only).
 
 use isoloom_spec::model::Arch;
 
