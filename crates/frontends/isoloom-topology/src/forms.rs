@@ -43,7 +43,7 @@ pub(crate) enum Forms {
 pub(crate) fn of(image: &str, ports: &[Service]) -> Forms {
     let (name, tag) = matrix::split(image);
     let (entry, version) = match matrix::of(image) {
-        Ok(base) if base.entry.is_none() && base.prelude.is_empty() && !base.jail => {
+        Ok(base) if base.entry.is_none() && base.prelude.is_empty() => {
             return base.os.parse().map_or(Forms::Image, Forms::Os);
         }
         Ok(base) => match base.entry {
