@@ -34,6 +34,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
+    let runner = group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g));
     // The access machine is defined but not started by `vagrant up`: `vagrant up <name>` starts
     // it, its box overridable (`ISOLOOM_ACCESS_BOX`).
     let access = mp.is_access();
@@ -67,13 +68,13 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         // Its checks installed (and their on-demand provisioner) before the readiness check,
         // the last provisioner.
         transport::provisioners(r, env, name, os, |r| {
-            if let Some(g) = group {
-                checks::installer(r, name);
+            if let (Some(g), Some(runner)) = (group, &runner) {
+                checks::installer(r, name, &runner.contents);
                 checks::provisioner(r, name, g);
             }
         });
     });
-    group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g))
+    runner
 }
 
 /// Machine `name`'s published ports, each with its host number ([`vagrantfile::chosen_host`]),

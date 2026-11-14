@@ -253,8 +253,8 @@ fn usage(env: &Environment, dir: &str, checks: &checks::Checks<'_>) -> String {
     }
     if !vms.is_empty() {
         lines.push(format!(
-            "Checks: vagrant ssh <vm> -c '{}', for each of {}; each check prints a PASS or FAIL line,\n        and a failed one fails the command (ISOLOOM_DERIVED=0 after sudo leaves the derived checks out)",
-            checks::command(),
+            "Checks: vagrant ssh <vm> -c {}, for each of {}; each check prints a PASS or FAIL line,\n        and a failed one fails the command (ISOLOOM_DERIVED=0 after sudo leaves the derived checks out)",
+            isoloom_spec::shell::quote(&checks::command()),
             vms.join(", ")
         ));
     }

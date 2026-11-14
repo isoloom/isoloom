@@ -179,7 +179,7 @@ fn linux_dns(d: &Dns) -> String {
         String::new()
     } else {
         format!(
-            "rm -f /etc/resolv.conf && printf %s {} > /etc/resolv.conf\n",
+            "rm -f /etc/resolv.conf\n  printf %s {} > /etc/resolv.conf\n",
             quote(&lines("nameserver 127.0.0.53\n"))
         )
     };
