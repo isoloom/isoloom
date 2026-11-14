@@ -43,6 +43,9 @@ fn managed(service: &Service) -> Placement {
         Service::Kafka(k) if k.publish.is_some() => {
             Placement::Refused("a managed Kafka's brokers stay inside the cloud's network: publish it from a container or VM target".to_owned())
         }
+        Service::ObjectStorage(o) if o.publish.is_some() => Placement::Refused(
+            "a cloud bucket is already at the cloud's public endpoint, behind its keys, and an IP allow-list would shut its clients out: leave `publish` out (the module's outputs give its facts)".to_owned(),
+        ),
         _ => Placement::Managed,
     }
 }

@@ -77,6 +77,8 @@ pub fn file_facts(service: &Service, access: Access) -> Vec<FileFact> {
             ];
             if keys {
                 out.extend([fact("ACCESS_KEY_FILE", "access-key", true), fact("SECRET_KEY_FILE", "secret-key", true)]);
+            } else {
+                out.push(fact("IDENTITY_FILE", "identity", false));
             }
             out
         }
@@ -88,6 +90,8 @@ pub fn file_facts(service: &Service, access: Access) -> Vec<FileFact> {
             ];
             if keys {
                 out.extend([fact("USER_FILE", "user", true), fact("PASSWORD_FILE", "password", true)]);
+            } else {
+                out.push(fact("IDENTITY_FILE", "identity", false));
             }
             out
         }

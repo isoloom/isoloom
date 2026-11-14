@@ -251,6 +251,8 @@ impl CloudVmModule {
         let copy = ProjectCopy::Archive;
         super::head(env, &mut m, own_variables(env, &driver), driver.base.provider, copy);
         (driver.write)(env, &mut m)?;
+        #[cfg(feature = "paas")]
+        crate::paas::attach(self.0, env, &mut m);
         module::file(Target::CloudVm, &folder, m, copy)
     }
 }
