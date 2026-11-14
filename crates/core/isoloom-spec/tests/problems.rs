@@ -155,3 +155,32 @@ fn clones_past_the_last_address() {
         "one problem, saying why: {shown}"
     );
 }
+
+#[test]
+fn a_value_of_the_wrong_kind_says_what_the_field_takes() {
+    let reason = |machine: &str| {
+        let found = problems(&spec(&format!("machines:\n  m: {{ app: {{ image: nginx }}, {machine} }}\n")));
+        let [p] = &found[..] else { panic!("one problem: {found:?}") };
+        (p.path.to_string(), p.reason.clone())
+    };
+    assert_eq!(
+        reason("networks: { lab: 300 }"),
+        (
+            "machines.m.networks.lab".to_owned(),
+            "`300` isn't the last number of an address: 0 to 255".to_owned()
+        )
+    );
+    assert_eq!(reason("networks: { lab: [10, 256] }").1, "`256` isn't the last number of an address: 0 to 255");
+    let typed = reason("networks: { lab: \"10\" }").1;
+    assert!(
+        typed.ends_with("expected the last number of its address (0 to 255, like 10), or a list of them ([10, 11])"),
+        "{typed}"
+    );
+    let limit = reason("networks: { lab: 10 }, ulimits: { nofile: abc }").1;
+    assert!(limit.ends_with("expected a number for both limits (65536), or `{ soft, hard }`"), "{limit}");
+    let test = reason("networks: { lab: 10 }, healthcheck: { test: 5 }").1;
+    assert!(
+        test.ends_with("expected a text the shell runs, or a list of arguments run as they are"),
+        "{test}"
+    );
+}

@@ -39,6 +39,10 @@ stable spec format.
 
 ### Fixed
 
+- **A machine's address, `ulimits` entry or `healthcheck.test` of the wrong kind says what the
+  field takes (#314)** (`` `300` isn't the last number of an address: 0 to 255 ``), where the spec
+  was refused with "data did not match any variant of untagged enum". A ulimit written
+  `{ soft, hard }` now refuses a key it doesn't know.
 - **A counted machine whose clones run past `.255` on a network is one problem at that network
   (#313),** saying why, where the spec was refused with a raw "untagged enum" error from the
   parser.

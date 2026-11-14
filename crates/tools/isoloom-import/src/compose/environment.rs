@@ -87,7 +87,15 @@ mod tests {
         for value in ["$DB", "${DB}", "${DB:?unset}", "${DB?unset}"] {
             assert!(reads_itself("DB", value), "{value}");
         }
-        for value in ["${DB_PASSWORD}", "$DB_PASSWORD", "${DBX}", "postgres://${DB}@db", "${DB:-x}", "${DB:+x}", "x$DB"] {
+        for value in [
+            "${DB_PASSWORD}",
+            "$DB_PASSWORD",
+            "${DBX}",
+            "postgres://${DB}@db",
+            "${DB:-x}",
+            "${DB:+x}",
+            "x$DB",
+        ] {
             assert!(!reads_itself("DB", value), "{value}");
         }
     }

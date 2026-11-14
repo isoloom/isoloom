@@ -41,7 +41,7 @@ pub struct Services {
 }
 
 /// A machine's address on a network: one last octet, or several (the first the primary one).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, JsonSchema)]
 #[serde(untagged)]
 pub enum Octets {
     /// The last octet of its address (0: an address from the LAN's DHCP server, on a bridged
@@ -49,6 +49,43 @@ pub enum Octets {
     One(u8),
     /// Several addresses on the network, by last octet: the first is its primary address.
     Several(Vec<u8>),
+}
+
+/// What an address on a network is written as, for a value that isn't one.
+const OCTETS: &str = "the last number of its address (0 to 255, like 10), or a list of them ([10, 11])";
+
+/// One last octet: a number from 0 to 255.
+fn octet<E: de::Error>(n: u64) -> Result<u8, E> {
+    u8::try_from(n).map_err(|_| E::custom(format!("`{n}` isn't the last number of an address: 0 to 255")))
+}
+
+impl<'de> Deserialize<'de> for Octets {
+    fn deserialize<D: de::Deserializer<'de>>(d: D) -> Result<Octets, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = Octets;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str(OCTETS)
+            }
+            fn visit_u64<E: de::Error>(self, n: u64) -> Result<Octets, E> {
+                octet(n).map(Octets::One)
+            }
+            fn visit_i64<E: de::Error>(self, n: i64) -> Result<Octets, E> {
+                u64::try_from(n).map_or_else(
+                    |_| Err(E::custom(format!("`{n}` isn't the last number of an address: 0 to 255"))),
+                    |n| self.visit_u64(n),
+                )
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Octets, A::Error> {
+                let mut all = Vec::new();
+                while let Some(n) = seq.next_element::<u64>()? {
+                    all.push(octet(n)?);
+                }
+                Ok(Octets::Several(all))
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 /// A machine of the environment.

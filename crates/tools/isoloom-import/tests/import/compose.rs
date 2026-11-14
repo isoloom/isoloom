@@ -303,7 +303,11 @@ fn a_host_folder_read_from_the_shell_is_noted_as_a_bind_not_drafted_as_a_volume(
     let compose = "services:\n  db:\n    image: postgres:16\n    volumes:\n      - ${DATA_DIR:-./data}:/var/lib/postgresql/data\n";
     let d = draft(compose, "x", "compose.yaml")?;
     assert!(spec(&d)?.machines["db"].volumes.is_empty(), "{}", d.yaml);
-    assert!(has(&d, NoteKind::InImage, "services.db.volumes", "${DATA_DIR:-./data}:/var/lib/postgresql/data"), "{:?}", d.notes);
+    assert!(
+        has(&d, NoteKind::InImage, "services.db.volumes", "${DATA_DIR:-./data}:/var/lib/postgresql/data"),
+        "{:?}",
+        d.notes
+    );
     assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
     Ok(())
 }
@@ -313,8 +317,20 @@ fn a_variable_set_from_another_one_is_noted_not_renamed_silently() -> Outcome {
     let compose = "services:\n  db:\n    image: postgres:16\n    environment:\n      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}\n      DB_USER: ${DB_USER}\n";
     let d = draft(compose, "x", "compose.yaml")?;
     let db = &spec(&d)?.machines["db"];
-    assert!(db.environment.contains_key("DB_PASSWORD") && db.environment.contains_key("DB_USER"), "{}", d.yaml);
-    assert!(has(&d, NoteKind::Changed, "services.db.environment", "POSTGRES_PASSWORD=${DB_PASSWORD:-secret}"), "{:?}", d.notes);
-    assert!(!d.notes.iter().any(|n| n.text.contains("DB_USER=")), "a variable read under its own name is the input: {:?}", d.notes);
+    assert!(
+        db.environment.contains_key("DB_PASSWORD") && db.environment.contains_key("DB_USER"),
+        "{}",
+        d.yaml
+    );
+    assert!(
+        has(&d, NoteKind::Changed, "services.db.environment", "POSTGRES_PASSWORD=${DB_PASSWORD:-secret}"),
+        "{:?}",
+        d.notes
+    );
+    assert!(
+        !d.notes.iter().any(|n| n.text.contains("DB_USER=")),
+        "a variable read under its own name is the input: {:?}",
+        d.notes
+    );
     Ok(())
 }
