@@ -347,3 +347,83 @@ machines:
     );
     Ok(())
 }
+
+/// What the kubelet makes of `text` in a container's `command`, `args` or an `env` value:
+/// `$(NAME)` is the value of a variable defined before it (left as written when none is), `$$`
+/// is one `$`, any other `$` stays.
+fn kubelet_expands(text: &str, defined: &[(String, String)]) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some((before, after)) = rest.split_once('$') {
+        out.push_str(before);
+        if let Some(tail) = after.strip_prefix('$') {
+            out.push('$');
+            rest = tail;
+        } else if let Some((name, tail)) = after.strip_prefix('(').and_then(|r| r.split_once(')')) {
+            if let Some((_, value)) = defined.iter().rev().find(|(n, _)| n == name) {
+                out.push_str(value);
+            } else {
+                out.push_str("$(");
+                out.push_str(name);
+                out.push(')');
+            }
+            rest = tail;
+        } else {
+            out.push('$');
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The `web` container of the manifests rendered for `yaml`.
+fn web_container(yaml: &str) -> Outcome<serde_yaml_ng::Value> {
+    let files = KubernetesBackend.render(&parsed(yaml)?)?;
+    let manifests = file(&files, "kubernetes/environment.yaml")?;
+    for doc in manifests.split("---\n") {
+        let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(doc)?;
+        let containers = doc
+            .get("spec")
+            .and_then(|s| s.get("template"))
+            .and_then(|t| t.get("spec"))
+            .and_then(|s| s.get("containers"))
+            .and_then(serde_yaml_ng::Value::as_sequence);
+        if let Some(web) = containers
+            .into_iter()
+            .flatten()
+            .find(|c| c.get("name").and_then(serde_yaml_ng::Value::as_str) == Some("web"))
+        {
+            return Ok(web.clone());
+        }
+    }
+    Err("no web container".into())
+}
+
+#[test]
+fn the_kubelet_reads_back_a_command_and_values_with_dollars_as_written() -> Outcome {
+    let spec = format!(
+        "{BASE}    environment:\n      FIRST: 'one'\n      PASSWORD: 'pa$$word'\n      REF: '$(FIRST) $HOME'\n    command: 'echo pid $$ $(FIRST) $HOME'\n"
+    );
+    let web = web_container(&spec)?;
+    let text = |v: &serde_yaml_ng::Value| v.as_str().map(str::to_owned).ok_or("not a text");
+    let mut defined: Vec<(String, String)> = Vec::new();
+    for var in web.get("env").and_then(serde_yaml_ng::Value::as_sequence).ok_or("no env")? {
+        let (Some(name), Some(value)) = (var.get("name"), var.get("value")) else {
+            continue;
+        };
+        let value = kubelet_expands(&text(value)?, &defined);
+        defined.push((text(name)?, value));
+    }
+    let read = |name: &str| defined.iter().find(|(n, _)| n == name).map(|(_, v)| v.as_str());
+    assert_eq!(read("PASSWORD"), Some("pa$$word"));
+    assert_eq!(read("REF"), Some("$(FIRST) $HOME"));
+    let argv: Vec<String> = ["command", "args"]
+        .iter()
+        .filter_map(|k| web.get(*k).and_then(serde_yaml_ng::Value::as_sequence))
+        .flatten()
+        .map(|a| text(a).map(|a| kubelet_expands(&a, &defined)))
+        .collect::<Result<_, _>>()?;
+    assert_eq!(argv.last().map(String::as_str), Some("echo pid $$ $(FIRST) $HOME"), "{argv:?}");
+    Ok(())
+}

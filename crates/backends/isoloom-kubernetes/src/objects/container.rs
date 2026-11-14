@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use super::{Image, NameValue};
+use super::Image;
 
 /// One container.
 #[derive(Debug, Clone, Serialize)]
@@ -15,11 +15,11 @@ pub(crate) struct Container {
     /// `IfNotPresent` for a machine's image (a built one is only local).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) image_pull_policy: Option<&'static str>,
-    /// Its command, instead of the image's entrypoint.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// Its command, instead of the image's entrypoint (written literal: see [`kubelet_literal`]).
+    #[serde(skip_serializing_if = "Vec::is_empty", serialize_with = "literals")]
     pub(crate) command: Vec<String>,
-    /// Its arguments, instead of the image's command.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// Its arguments, instead of the image's command (written literal: see [`kubelet_literal`]).
+    #[serde(skip_serializing_if = "Vec::is_empty", serialize_with = "literals")]
     pub(crate) args: Vec<String>,
     /// The directory it starts in, instead of the image's.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,7 +166,7 @@ pub(crate) struct Exec {
 #[serde(untagged)]
 pub(crate) enum EnvVar {
     /// A fixed value.
-    Value(NameValue),
+    Value(FixedVar),
     /// A key of a Secret.
     Secret {
         /// The variable.
@@ -175,6 +175,33 @@ pub(crate) enum EnvVar {
         #[serde(rename = "valueFrom")]
         value_from: SecretSource,
     },
+}
+
+/// A variable with a fixed value, written literal (see [`kubelet_literal`]).
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct FixedVar {
+    /// The variable.
+    pub(crate) name: String,
+    /// Its value, as the container reads it.
+    #[serde(serialize_with = "literal")]
+    pub(crate) value: String,
+}
+
+/// `text` as the kubelet passes it on: every `$` doubled. The kubelet expands `$(NAME)` in a
+/// container's `command`, `args` and `env` values from the variables defined before it, and
+/// reads `$$` as one `$`; doubled, a `$` is never either (Kubernetes' own escape).
+fn kubelet_literal(text: &str) -> String {
+    text.replace('$', "$$")
+}
+
+/// Serializes a value the kubelet expands as [`kubelet_literal`] writes it.
+fn literal<S: serde::Serializer>(text: &str, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&kubelet_literal(text))
+}
+
+/// Serializes a list the kubelet expands, each item as [`kubelet_literal`] writes it.
+fn literals<S: serde::Serializer>(items: &[String], serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.collect_seq(items.iter().map(|t| kubelet_literal(t)))
 }
 
 /// Where a variable's value comes from: a Secret's key.

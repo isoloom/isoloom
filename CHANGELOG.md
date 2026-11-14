@@ -53,6 +53,9 @@ stable spec format.
 
 ### Fixed
 
+- **A Kubernetes container's command, arguments and environment values reach it as written
+  (#300).** The kubelet expands `$(VAR)` in them, so `pa$$word` arrived as `pa$word`; every `$` is
+  doubled now, so it expands nothing. Probe commands, which it doesn't expand, are left as they are.
 - **An environment value reaches every format as it is written (#315).** An unquoted `1.10`,
   `0x10` or `1e3` was read as a number and written back as `1.1`, `16` or `1000`, through the
   spec, `-s` overrides, written-back specs and profiles; it keeps its text now, and Compose,

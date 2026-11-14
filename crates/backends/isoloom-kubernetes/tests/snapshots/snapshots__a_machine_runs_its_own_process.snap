@@ -126,7 +126,7 @@ spec:
         command:
         - sh
         - -c
-        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $DEMO_SECRET ); do sleep 2; done && sh /isoloom/scripts/secret.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $$DEMO_SECRET ); do sleep 2; done && sh /isoloom/scripts/secret.sh && exec sleep infinity
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -436,7 +436,7 @@ spec:
         command:
         - sh
         - -c
-        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $DEMO_SECRET ); do sleep 2; done && sh /isoloom/scripts/secret.sh && exec sleep infinity
+        - until /.isoloom-probe/busybox nc -z -w 2 127.0.0.1 8000 && ( test -s /srv/secret && echo $$DEMO_SECRET ); do sleep 2; done && sh /isoloom/scripts/secret.sh && exec sleep infinity
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
