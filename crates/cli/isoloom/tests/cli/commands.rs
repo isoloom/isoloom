@@ -812,7 +812,12 @@ fn generate_fails_on_a_template_or_check_script_it_cant_read_with_the_read_error
     std::fs::remove_file(no_script.join("checks/api-answers.sh"))?;
     let k = isoloom(&no_script, &[&"generate", &no_script, &"--target", &"kubernetes"])?;
     assert_ne!(k.code, Some(0), "{k:?}");
-    assert!(k.stderr.contains("checks/api-answers.sh") && k.stderr.contains(&missing), "{}", k.stderr);
+    // Generate checks the project's files first: a missing script is the spec's problem.
+    assert!(
+        k.stderr.contains("checks/api-answers.sh") && k.stderr.contains("doesn't exist in the project folder"),
+        "{}",
+        k.stderr
+    );
     // `validate` still lists it as a problem of the spec, not as an error.
     let v = isoloom(&no_script, &[&"validate", &no_script])?;
     assert_eq!(v.code, Some(1), "{v:?}");

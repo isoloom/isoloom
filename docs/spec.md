@@ -191,7 +191,7 @@ IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (t
 
 ### `networks.*.bridged`
 
-Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed addresses in `cidr`, or DHCP from the LAN).
+Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed addresses in `cidr`, or DHCP from the LAN). Only when whoever runs the environment allows `host-network`.
 
 - **Type:** mapping
 
@@ -405,7 +405,7 @@ Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's of
 A project script (`.sh`; `.ps1` on Windows), run as root from the project folder.
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].creates`
 
@@ -431,7 +431,7 @@ A project file or folder copied into the machine.
 A file or folder of the project (a folder ends with `/`).
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].copy.to`
 
@@ -479,7 +479,7 @@ Its exact version, as the family's package manager writes it (`1.30.6-1~bookworm
 An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`).
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].repository`
 
@@ -616,7 +616,7 @@ A project file with its `{{ path }}` placeholders filled in, placed in the machi
 A file of the project holding `{{ path }}` placeholders: `{{ machine.name }}`, `{{ machine.addresses.<network> }}`, `{{ machines.<m>.addresses.<network> }}` and `{{ machines.<m>.ports.<name>.port }}`. Filled in when Isoloom generates; no logic.
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].template.to`
 
@@ -1121,13 +1121,13 @@ Where it is mounted: an absolute path on Linux and in containers, a drive letter
 
 ### `machines.*.host_folders`
 
-Folders of the computer that runs the environment, mounted in the machine both ways (what it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
+Folders of the computer that runs the environment, mounted in the machine (read-only unless `read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when whoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`) or absolute; a writable one needs `writable-host-folders`, the container engine's socket `docker-socket`. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
 
 - **Type:** list of mappings
 
 ### `machines.*.host_folders[].from`
 
-The folder on the computer that runs the environment: relative to the project folder (`shared`, `../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist; a home or absolute one is the running computer's (the environment may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
+The folder on the computer that runs the environment: in the project folder (`shared`), or, when whoever runs the environment allows a folder outside it (`host-folders`, see `crate::host_access`), beside it (`../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist and stay in the project once its links are followed; a home or absolute one is the running computer's (the environment may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
 
 - **Type:** string
 
@@ -1139,7 +1139,7 @@ The absolute path in the machine (Linux machines), not inside Isoloom's own fold
 
 ### `machines.*.host_folders[].read_only`
 
-The machine only reads it (it can't write there). Off by default.
+The machine only reads it (it can't write there). On by default: a folder the machine writes in (`read_only: false`) is one whoever runs the environment allows (`writable-host-folders`, see `crate::host_access`).
 
 - **Type:** boolean
 
@@ -1256,7 +1256,7 @@ Options for the container runtime's GPU driver (Compose only).
 
 ### `machines.*.hardware.devices`
 
-The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest, permissions }`). A container only.
+The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest, permissions }`). A container only, and only when whoever runs the environment allows `devices`.
 
 - **Type:** list of strings or mappings
 
@@ -1293,7 +1293,7 @@ How it boots, when not the way its image does: its own kernel, firmware, boot or
 
 ### `machines.*.hardware.boot.kernel`
 
-A kernel to boot directly, instead of the image's boot loader.
+A kernel to boot directly, instead of the image's boot loader. Like every file of the hypervisor's host a boot names (`initrd`, `dtb`, `loader`, `nvram`, `network.tftp_root`), only when whoever runs the environment allows `boot-files`.
 
 - **Type:** string
 
@@ -1407,7 +1407,7 @@ Resolver options, as resolv.conf's `options` line writes them: `name` or `name:v
 
 ### `machines.*.privileged`
 
-Kernel-level access (nested containers, kernel modules, raw devices).
+Kernel-level access (nested containers, kernel modules, raw devices). A privileged container reaches the host's kernel: refused unless whoever runs the environment allows `privileged`.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -2211,7 +2211,7 @@ Steps run on this machine before Terraform applies the module (a key pair the mo
 
 ### `cloud.env`
 
-Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`). Not for credentials: those come from the user's own environment.
+Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`, `TF_VAR_size: small`): plain upper-case names of the module's own. Not for credentials or tool settings: those come from the user's own environment, so the names a loader, a shell, an interpreter, Terraform (`TF_*` but `TF_VAR_*`) or a cloud's CLI read to change what runs or where it connects are refused (a region setting is allowed).
 
 - **Type:** map of name to string
 
@@ -2223,6 +2223,6 @@ How many times to apply again when an apply fails (a module that only converges 
 
 ### `cloud.requires`
 
-What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`) that must be on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`). A runner checks them before applying.
+What the module needs on this machine besides Terraform: commands by their bare name (`jq`, `gsed`) that must be on the PATH. A runner checks each before applying by asking it for its `--version`, and runs nothing else.
 
 - **Type:** list of strings

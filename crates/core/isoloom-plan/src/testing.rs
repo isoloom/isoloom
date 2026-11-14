@@ -16,9 +16,10 @@ pub(crate) fn lab(yaml: &str) -> Lab {
     Lab::parse(yaml).unwrap_or_else(|problems| panic!("the test's spec parses: {problems:?}"))
 }
 
-/// The environment of `yaml`, checked valid.
+/// The environment of `yaml`, checked valid, with every way to reach the host allowed: what the
+/// tests that use it check is elsewhere (`host_access` has its own).
 pub(crate) fn valid(yaml: &str) -> Lab {
-    let lab = lab(yaml);
+    let lab = lab(yaml).with_host_access(isoloom_spec::host_access::Grants::of(isoloom_spec::host_access::HostAccess::ALL));
     assert_eq!(lab.problems(), [], "the test's spec is valid");
     lab
 }

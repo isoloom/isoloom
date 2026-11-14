@@ -474,12 +474,9 @@
       }
     },
     "Program": {
-      "description": "A bare tool name resolved on PATH (with its Windows wrapper when it has one). A shell or an interpreter is refused, whatever its case and with or without `.exe`.",
+      "description": "A bare tool name resolved on PATH (with its Windows wrapper when it has one), one of the tools Isoloom's targets drive, whatever its case and with or without `.exe`. Anything else, a shell or an interpreter above all, is refused.",
       "type": "string",
-      "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$",
-      "not": {
-        "pattern": "^(?:[sS][hH]|[bB][aA][sS][hH]|[zZ][sS][hH]|[dD][aA][sS][hH]|[aA][sS][hH]|[kK][sS][hH]|[cC][sS][hH]|[tT][cC][sS][hH]|[fF][iI][sS][hH]|[bB][uU][sS][yY][bB][oO][xX]|[cC][mM][dD]|[pP][oO][wW][eE][rR][sS][hH][eE][lL][lL]|[pP][wW][sS][hH]|[wW][sS][lL]|[eE][nN][vV]|[sS][uU][dD][oO]|[dD][oO][aA][sS]|[sS][uU]|[pP][yY][tT][hH][oO][nN]|[pP][yY][tT][hH][oO][nN]2|[pP][yY][tT][hH][oO][nN]3|[pP][eE][rR][lL]|[rR][uU][bB][yY]|[nN][oO][dD][eE])(?:\\.[eE][xX][eE])?$"
-      }
+      "pattern": "^(?:[dD][oO][cC][kK][eE][rR]|[dD][oO][cC][kK][eE][rR]-[cC][oO][mM][pP][oO][sS][eE]|[mM][kK][iI][sS][oO][fF][sS]|[oO][vV][fF][tT][oO][oO][lL]|[pP][rR][lL][cC][tT][lL]|[qQ][eE][mM][uU]-[iI][mM][gG]|[sS][sS][hH]|[tT][eE][rR][rR][aA][fF][oO][rR][mM]|[tT][oO][fF][uU]|[tT][rR][uU][eE]|[uU][tT][mM][cC][tT][lL]|[vV][aA][gG][rR][aA][nN][tT]|[vV][bB][oO][xX][mM][aA][nN][aA][gG][eE]|[vV][iI][rR][sS][hH]|[vV][mM][rR][uU][nN])(?:\\.[eE][xX][eE])?$"
     },
     "PerHostArgv": {
       "type": "object",

@@ -28,7 +28,7 @@ fn clean_plan(topology: &str) -> Outcome<(Plan, String)> {
 /// The paths in a zip, in order.
 fn names(zip: Vec<u8>) -> Outcome<Vec<String>> {
     let mut archive = zip::ZipArchive::new(Cursor::new(zip))?;
-    (0..archive.len()).map(|i| Ok(archive.by_index(i)?.name().to_owned())).collect()
+    (0..archive.len()).map(|i| Ok(archive.by_index(i)?.name()?.into_owned())).collect()
 }
 
 /// What file `path` of a zip holds.

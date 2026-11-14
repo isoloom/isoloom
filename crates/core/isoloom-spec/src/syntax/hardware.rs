@@ -41,7 +41,8 @@ pub struct Hardware {
     #[schemars(with = "Option<GpusInput>")]
     pub gpus: Option<Gpus>,
     /// The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest,
-    /// permissions }`). A container only.
+    /// permissions }`). A container only, and only when whoever runs the environment allows
+    /// `devices`.
     #[serde(default)]
     #[schemars(with = "Vec<DeviceInput>")]
     pub devices: Vec<Device>,

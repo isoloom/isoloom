@@ -42,7 +42,8 @@ pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, sour
                 .host_folders
                 .iter()
                 .map(|f| {
-                    let ro = if f.read_only { ", read_only: true" } else { "" };
+                    // Read-only is the spec's default: a folder Vagrant shares both ways says so.
+                    let ro = if f.read_only { "" } else { ", read_only: false" };
                     format!("{{ from: {}, path: {}{ro} }}", scalar(&f.from), scalar(&f.path))
                 })
                 .collect();

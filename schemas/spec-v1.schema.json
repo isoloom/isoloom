@@ -194,7 +194,7 @@
           "$ref": "#/$defs/Ipv6"
         },
         "bridged": {
-          "description": "Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed\naddresses in `cidr`, or DHCP from the LAN).",
+          "description": "Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed\naddresses in `cidr`, or DHCP from the LAN). Only when whoever runs the environment allows\n`host-network`.",
           "$ref": "#/$defs/Bridged"
         },
         "mtu": {
@@ -604,7 +604,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine (read-only unless\n`read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when\nwhoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)\nor absolute; a writable one needs `writable-host-folders`, the container engine's socket\n`docker-socket`. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -629,7 +629,7 @@
         },
         "privileged": {
           "type": "boolean",
-          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices). A privileged\ncontainer reaches the host's kernel: refused unless whoever runs the environment allows\n`privileged`.",
           "default": false
         },
         "seal": {
@@ -1500,7 +1500,7 @@
       "properties": {
         "run": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "A project script (`.sh`; `.ps1` on Windows), run as root from the project folder."
         },
         "creates": {
@@ -1537,7 +1537,7 @@
         },
         "playbook": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`)."
         },
         "repository": {
@@ -1593,7 +1593,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "A file or folder of the project (a folder ends with `/`)."
         },
         "to": {
@@ -1799,7 +1799,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "A file of the project holding `{{ path }}` placeholders: `{{ machine.name }}`,\n`{{ machine.addresses.<network> }}`, `{{ machines.<m>.addresses.<network> }}` and\n`{{ machines.<m>.ports.<name>.port }}`. Filled in when Isoloom generates; no logic."
         },
         "to": {
@@ -2492,7 +2492,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "description": "The folder on the computer that runs the environment: relative to the project folder (`shared`,\n`../notes`), in the home folder of the user running it (`~/work`), or absolute\n(`/srv/share`, `C:\\share`). A project folder must exist; a home or absolute one is the\nrunning computer's (the environment may run on another computer than the one generating it), so\nit isn't checked, and it is created when missing."
+          "description": "The folder on the computer that runs the environment: in the project folder (`shared`),\nor, when whoever runs the environment allows a folder outside it (`host-folders`, see\n[`crate::host_access`]), beside it (`../notes`), in the home folder of the user running it\n(`~/work`), or absolute (`/srv/share`, `C:\\share`). A project folder must exist and stay in\nthe project once its links are followed; a home or absolute one is the running computer's\n(the environment may run on another computer than the one generating it), so it isn't\nchecked, and it is created when missing."
         },
         "path": {
           "type": "string",
@@ -2500,7 +2500,7 @@
         },
         "read_only": {
           "type": "boolean",
-          "description": "The machine only reads it (it can't write there). Off by default."
+          "description": "The machine only reads it (it can't write there). On by default: a folder the machine\nwrites in (`read_only: false`) is one whoever runs the environment allows\n(`writable-host-folders`, see [`crate::host_access`])."
         }
       },
       "required": [
@@ -2596,7 +2596,7 @@
           "items": {
             "$ref": "#/$defs/DeviceInput"
           },
-          "description": "The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest,\npermissions }`). A container only.",
+          "description": "The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest,\npermissions }`). A container only, and only when whoever runs the environment allows\n`devices`.",
           "default": []
         },
         "nested_virtualization": {
@@ -2757,7 +2757,7 @@
       "properties": {
         "kernel": {
           "type": "string",
-          "description": "A kernel to boot directly, instead of the image's boot loader."
+          "description": "A kernel to boot directly, instead of the image's boot loader. Like every file of the\nhypervisor's host a boot names (`initrd`, `dtb`, `loader`, `nvram`, `network.tftp_root`),\nonly when whoever runs the environment allows `boot-files`."
         },
         "initrd": {
           "type": "string",
@@ -3051,7 +3051,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine (read-only unless\n`read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when\nwhoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)\nor absolute; a writable one needs `writable-host-folders`, the container engine's socket\n`docker-socket`. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -3076,7 +3076,7 @@
         },
         "privileged": {
           "type": "boolean",
-          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices). A privileged\ncontainer reaches the host's kernel: refused unless whoever runs the environment allows\n`privileged`.",
           "default": false
         },
         "read_only": {
@@ -3192,7 +3192,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine (read-only unless\n`read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when\nwhoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)\nor absolute; a writable one needs `writable-host-folders`, the container engine's socket\n`docker-socket`. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a\nread-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -3217,7 +3217,7 @@
         },
         "privileged": {
           "type": "boolean",
-          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices). A privileged\ncontainer reaches the host's kernel: refused unless whoever runs the environment allows\n`privileged`.",
           "default": false
         },
         "read_only": {
@@ -4098,7 +4098,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).\nNot for credentials: those come from the user's own environment."
+          "description": "Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`,\n`TF_VAR_size: small`): plain upper-case names of the module's own. Not for credentials or\ntool settings: those come from the user's own environment, so the names a loader, a shell,\nan interpreter, Terraform (`TF_*` but `TF_VAR_*`) or a cloud's CLI read to change what\nruns or where it connects are refused (a region setting is allowed)."
         },
         "apply_retries": {
           "type": "integer",
@@ -4112,7 +4112,7 @@
           "items": {
             "type": "string"
           },
-          "description": "What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)\nthat must be on the PATH, or a shell command that must succeed\n(`python3 -c 'import boto3'`). A runner checks them before applying."
+          "description": "What the module needs on this machine besides Terraform: commands by their bare name\n(`jq`, `gsed`) that must be on the PATH. A runner checks each before applying by asking it\nfor its `--version`, and runs nothing else."
         }
       },
       "required": [

@@ -38,17 +38,20 @@ pub struct CloudServices {
     /// environment up: make them idempotent.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub before: Vec<String>,
-    /// Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).
-    /// Not for credentials: those come from the user's own environment.
+    /// Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`,
+    /// `TF_VAR_size: small`): plain upper-case names of the module's own. Not for credentials or
+    /// tool settings: those come from the user's own environment, so the names a loader, a shell,
+    /// an interpreter, Terraform (`TF_*` but `TF_VAR_*`) or a cloud's CLI read to change what
+    /// runs or where it connects are refused (a region setting is allowed).
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub env: IndexMap<String, String>,
     /// How many times to apply again when an apply fails (a module that only converges on a
     /// second apply), 0 to 5. 0 by default.
     #[serde(default, skip_serializing_if = "super::is_default")]
     pub apply_retries: u8,
-    /// What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)
-    /// that must be on the PATH, or a shell command that must succeed
-    /// (`python3 -c 'import boto3'`). A runner checks them before applying.
+    /// What the module needs on this machine besides Terraform: commands by their bare name
+    /// (`jq`, `gsed`) that must be on the PATH. A runner checks each before applying by asking it
+    /// for its `--version`, and runs nothing else.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<String>,
 }

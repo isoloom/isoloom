@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Boot {
-    /// A kernel to boot directly, instead of the image's boot loader.
+    /// A kernel to boot directly, instead of the image's boot loader. Like every file of the
+    /// hypervisor's host a boot names (`initrd`, `dtb`, `loader`, `nvram`, `network.tftp_root`),
+    /// only when whoever runs the environment allows `boot-files`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kernel: Option<String>,
     /// The initial RAM disk booted with `kernel`.

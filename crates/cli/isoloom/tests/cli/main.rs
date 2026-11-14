@@ -11,6 +11,7 @@
 mod commands;
 mod docs;
 mod errors;
+mod host_reach;
 mod imports;
 mod secrets;
 mod testing;
