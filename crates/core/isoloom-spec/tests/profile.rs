@@ -116,6 +116,18 @@ fn a_profile_names_only_what_the_spec_has() -> Outcome {
 }
 
 #[test]
+fn a_profile_gives_inputs_the_spec_declares_as_a_map() -> Outcome {
+    let spec: serde_yaml_ng::Value = serde_yaml_ng::from_str(&SPEC.replace(
+        "inputs: [REGISTRY]",
+        "inputs: { REGISTRY: { sensitive: false, description: the mirror }, TOKEN: {} }",
+    ))?;
+    let p = parse("inputs: { REGISTRY: r.local, TOKEN: t, NOPE: x }\n")?;
+    let lines: Vec<String> = p.check(&spec).iter().map(ToString::to_string).collect();
+    assert_eq!(lines, ["profile `p`: input `NOPE` isn't one of the spec's `inputs`"]);
+    Ok(())
+}
+
+#[test]
 fn a_profile_file_is_strict() -> Outcome {
     let refused = |text: &str| profile::parse("p", PathBuf::from("p.yml"), text).unwrap_err().to_string();
     let typo = refused("targt: docker\n");

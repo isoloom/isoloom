@@ -259,11 +259,12 @@ impl Profile {
                 }
             }
         }
-        let declared: Vec<String> = spec
-            .get("inputs")
-            .and_then(Value::as_sequence)
-            .map(|s| s.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
-            .unwrap_or_default();
+        // `inputs` is a list of names or a map of name to `{ sensitive, description }`.
+        let declared: Vec<String> = match spec.get("inputs") {
+            Some(Value::Sequence(list)) => list.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect(),
+            Some(Value::Mapping(inputs)) => inputs.keys().filter_map(|k| k.as_str().map(str::to_owned)).collect(),
+            _ => Vec::new(),
+        };
         for k in self.inputs.keys() {
             if !declared.iter().any(|d| d == k) {
                 problems.push(ProfileProblem::Input {
