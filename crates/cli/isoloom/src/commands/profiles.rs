@@ -88,7 +88,10 @@ fn problems_of(dir: &Path, p: &isoloom_spec::profile::Profile, settings: &Settin
         && problems.is_empty()
         && !lab.possible().contains(&t)
     {
-        let why = isoloom_targets::refusal(&lab, t).unwrap_or_else(|| "not one of its targets".into());
+        let why = match isoloom_targets::refusal(&lab, t) {
+            Ok(why) => why.unwrap_or_else(|| "not one of its targets".into()),
+            Err(failed) => failed.to_string(),
+        };
         problems.push(format!("can't run on `{}`: {why}", t.id()));
     }
     problems

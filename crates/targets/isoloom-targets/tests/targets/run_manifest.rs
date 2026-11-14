@@ -425,7 +425,9 @@ fn a_secret_and_an_input_get_the_same_slot_on_every_target() -> Outcome {
 #[test]
 fn proxmox_refuses_values_as_files_it_could_never_deliver() -> Outcome {
     // Its machines sat waiting half an hour for a delivery the run manifest had no slot for.
-    let why = isoloom_targets::refusal(&lab(VALUES)?, Target::Proxmox).ok_or("proxmox takes the lab")?;
+    let why = isoloom_targets::refusal(&lab(VALUES)?, Target::Proxmox)
+        .unwrap()
+        .ok_or("proxmox takes the lab")?;
     assert!(why.contains("machine `db` gets `secrets`") && why.contains("nothing delivers them"), "{why}");
     // An input in a machine's environment still goes in through the module's `inputs`.
     let env_only = VALUES

@@ -27,7 +27,7 @@
 //! let files = generate(&lab, Target::Docker)?;
 //! assert!(files.iter().any(|f| f.path == ".isoloom/docker/compose.yml"));
 //! assert!(files.iter().any(|f| f.path == isoloom_targets::resolved::PATH));
-//! assert!(refusal(&lab, Target::Vagrant).is_some(), "an image has no VM form");
+//! assert!(refusal(&lab, Target::Vagrant)?.is_some(), "an image has no VM form");
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 

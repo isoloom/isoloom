@@ -55,6 +55,19 @@ stable spec format.
 - **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
   (`Kept`, `Stripped`) instead of a `strip: bool`** (breaking, for 3.0): a call says what it does
   with the archive's top folder instead of passing a bare `true` or `false`.
+### Changed
+
+- **A lab that doesn't plan for a target is a failure, never a target shown as generated
+  (#381).** **Breaking, for library users:** `isoloom_targets::refusal`, `refusal_on` and
+  `cloud_refusals` return a `Result` (`GenerateError::Internal` when the lab doesn't plan, as
+  `generate` fails there), not an `Option` that read such a lab as generated; `isoloom targets`
+  and the capability matrix fail with it, and the resolved snapshot's `targets` lists it under
+  `failed`, a key it has only then.
+- **Errors split by what can return them (#381).** **Breaking, for library users:**
+  `isoloom_spec::instance::apply` fails with its own `InstanceError` (`Number`, `Name`, `Port`,
+  `Docker`, `Ipv6`), no longer five variants of the crate-wide `isoloom_spec::Error`. A lab
+  whose built-in catalogue doesn't load fails to plan with the new `PlanError::Catalogue`, never
+  plans with an empty catalogue.
 
 ### Fixed
 

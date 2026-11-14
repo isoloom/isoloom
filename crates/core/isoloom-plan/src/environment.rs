@@ -442,6 +442,13 @@ pub enum PlanError {
         /// Each step its family can't carry, in step order.
         unportable: Vec<crate::configure::Unportable>,
     },
+    /// The catalogue built into Isoloom doesn't load, so the environment's services and daemons
+    /// can't be known: planning stops rather than plan with an empty catalogue.
+    #[error("this Isoloom's catalogue doesn't load: {reason}")]
+    Catalogue {
+        /// Why it doesn't load.
+        reason: String,
+    },
     /// A machine's `rate_limit` isn't a rate ([`Rate::parse`]).
     #[error("machine `{machine}`: `rate_limit`: `{rate}` {error}")]
     RateLimit {

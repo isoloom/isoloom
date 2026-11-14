@@ -28,8 +28,8 @@ fn the_router_applies_netem_on_its_interface_into_the_network() -> Outcome {
     let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
     assert!(vf.contains("isoloom-tc.service") && vf.contains("netem delay 80ms 10ms loss 1%"), "{vf}");
     // No router in the path on Kubernetes or in the cloud.
-    assert!(refusal(&spec, Target::Kubernetes).unwrap().contains("router"));
-    assert!(refusal(&spec, Target::CloudVm).unwrap().contains("router"));
+    assert!(refusal(&spec, Target::Kubernetes).unwrap().unwrap().contains("router"));
+    assert!(refusal(&spec, Target::CloudVm).unwrap().unwrap().contains("router"));
     Ok(())
 }
 

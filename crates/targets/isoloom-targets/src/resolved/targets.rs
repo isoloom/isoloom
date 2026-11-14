@@ -1,5 +1,7 @@
 //! The snapshot's targets: possible by the machines' forms, narrowed by `targets:`, then what
-//! the generators actually produce and why they refuse the rest, with the clouds of `cloud-vm`.
+//! the generators actually produce and why they refuse the rest, with the clouds of `cloud-vm`. A
+//! target whose generation fails (the environment doesn't plan for it) is neither: it is listed under
+//! `failed`, a key the section has only then.
 
 use isoloom_plan::Lab;
 use isoloom_spec::model::Target;
@@ -13,22 +15,33 @@ pub(super) fn section(lab: &Lab) -> Value {
     let mut generated = Vec::new();
     let mut refused = Map::new();
     let mut not_possible = Map::new();
+    let mut failed = Map::new();
     for t in Target::ALL {
         if let Some(why) = lab.not_possible(t) {
             not_possible.insert(t.id().into(), json!(why.to_string()));
-        } else if let Some(why) = refusal(lab, t) {
-            refused.insert(t.id().into(), json!(why));
-        } else {
-            generated.push(t.id());
+            continue;
+        }
+        match refusal(lab, t) {
+            Ok(Some(why)) => {
+                refused.insert(t.id().into(), json!(why));
+            }
+            Ok(None) => generated.push(t.id()),
+            Err(e) => {
+                failed.insert(t.id().into(), json!(e.to_string()));
+            }
         }
     }
-    json!({
+    let mut section = json!({
         "possible": possible.iter().map(|t| t.id()).collect::<Vec<_>>(),
         "generated": generated,
         "refused": refused,
         "not_possible": not_possible,
         "clouds": clouds(lab),
-    })
+    });
+    if let (Value::Object(map), false) = (&mut section, failed.is_empty()) {
+        map.insert("failed".into(), failed.into());
+    }
+    section
 }
 
 /// Per generated multi-cloud target (`cloud-vm`, `cloud-docker`), the clouds whose module is written and each
@@ -37,7 +50,8 @@ fn clouds(lab: &Lab) -> Map<String, Value> {
     Target::ALL
         .into_iter()
         .filter_map(|t| {
-            let clouds = cloud_refusals(lab, t)?;
+            // A target that fails is listed under `failed`, by `section`.
+            let clouds = cloud_refusals(lab, t).ok()??;
             let refused: Map<String, Value> = clouds.refused.into_iter().map(|r| (r.cloud.to_owned(), json!(r.reason))).collect();
             Some((t.id().to_owned(), json!({ "generated": clouds.generated, "refused": refused })))
         })

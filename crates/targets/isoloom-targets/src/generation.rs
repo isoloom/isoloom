@@ -117,7 +117,7 @@ pub fn project_copies(lab: &Lab, files: &[GeneratedFile], dir: &Path) -> Result<
 
 /// `spec`, the environment as `target` runs it (as instance `instance`), planned. An environment that lowered
 /// clean always plans: one that doesn't is a failure, not a refusal.
-fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std::result::Result<Environment, GenerateError> {
+pub(crate) fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std::result::Result<Environment, GenerateError> {
     lab.plan(spec, target, instance).map_err(|e| GenerateError::Internal {
         target,
         what: "the lab couldn't be planned".to_owned(),
@@ -129,11 +129,7 @@ fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std:
 fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Spec, GenerateError> {
     let spec = lab.for_target(target);
     match instance {
-        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|e| GenerateError::Instance {
-            target,
-            number: n,
-            source: std::sync::Arc::new(e),
-        }),
+        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|source| GenerateError::Instance { target, number: n, source }),
         None => Ok(spec),
     }
 }

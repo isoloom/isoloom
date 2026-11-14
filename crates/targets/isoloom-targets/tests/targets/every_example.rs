@@ -28,7 +28,10 @@ fn generations() -> Outcome<Vec<Generation>> {
     for dir in example_dirs()? {
         let spec = std::fs::read_to_string(dir.join("isoloom.yml"))?;
         let lab = isoloom_targets::Lab::new(isoloom_spec::load(&dir)?);
-        for target in lab.possible().into_iter().filter(|t| refusal(&lab, *t).is_none()) {
+        for target in lab.possible() {
+            if refusal(&lab, target)?.is_some() {
+                continue;
+            }
             let files = generate(&lab, target).map_err(|e| format!("{}: {}: {e}", dir.display(), target.id()))?;
             all.push(Generation {
                 dir: dir.clone(),
@@ -77,7 +80,7 @@ fn the_examples_reference_lists_every_example_with_the_targets_it_allows() -> Ou
         let allowed: Vec<String> = lab
             .possible()
             .into_iter()
-            .filter(|t| refusal(&lab, *t).is_none())
+            .filter(|t| refusal(&lab, *t).unwrap().is_none())
             .map(|t| t.id().to_owned())
             .collect();
         let row = documented.iter().find(|(n, _)| *n == name).map(|(_, t)| t);
