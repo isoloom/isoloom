@@ -132,6 +132,8 @@ mod tests {
             ("backends/isoloom-vagrant/src/vms/hyperv.rs", "<<'UNIT'"),
             // The set-up's unit, written by `unit()` from constants.
             ("backends/isoloom-terraform/src/machine/user_data.rs", "<<'ISOLOOM_UNIT'"),
+            // The account-id shims a translated Dockerfile's steps run first: Isoloom's own text.
+            ("core/isoloom-plan/src/dockerfile.rs", "<<'SHIM'"),
         ];
         let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut found = Vec::new();
