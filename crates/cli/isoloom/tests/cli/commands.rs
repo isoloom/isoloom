@@ -842,3 +842,44 @@ fn profiles_checks_the_lab_generate_writes_its_defaults_tags_included() -> Outco
     assert!(o.stdout.contains("✗ p") && o.stdout.contains("`Team` and `team`"), "{}", o.stdout);
     Ok(())
 }
+
+#[test]
+fn an_environment_value_reaches_every_format_as_written() -> Outcome {
+    let dir = project(
+        "env-as-written",
+        "version: 1\nname: written\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    environment: { APP_VERSION: 1.10, MASK: 0x10, BIG: 1e3 }\n",
+    )?;
+    let generated = isoloom(&dir, &[&"generate", &"-s", &"machines.web.environment.EXTRA=2.50", &dir])?;
+    assert_eq!(generated.code, Some(0), "{}", generated.stderr);
+    let read = |file: &str| std::fs::read_to_string(dir.join(".isoloom").join(file));
+    let written = [("APP_VERSION", "1.10"), ("MASK", "0x10"), ("BIG", "1e3"), ("EXTRA", "2.50")];
+    // Compose and Kubernetes read YAML: each value must be a string there, the text as written.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
+    for (k, v) in written {
+        assert_eq!(compose["services"]["web"]["environment"][k].as_str(), Some(v), "compose: {k}");
+    }
+    let manifests = read("kubernetes/environment.yaml")?;
+    let mut env = Vec::new();
+    for doc in manifests.split("---\n") {
+        let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(doc)?;
+        let containers = doc["spec"]["template"]["spec"]["containers"].as_sequence().cloned().unwrap_or_default();
+        for var in containers
+            .iter()
+            .filter(|c| c["name"].as_str() == Some("web"))
+            .flat_map(|c| c["env"].as_sequence().cloned().unwrap_or_default())
+        {
+            env.push((var["name"].as_str().map(str::to_owned), var["value"].as_str().map(str::to_owned)));
+        }
+    }
+    for (k, v) in written {
+        assert!(env.contains(&(Some(k.to_owned()), Some(v.to_owned()))), "kubernetes: {k} in {env:?}");
+    }
+    // The VM forms write each variable as `NAME=value` into the machine's settings script.
+    for file in ["vagrant/Vagrantfile", "proxmox/main.tf"] {
+        let text = read(file)?;
+        for (k, v) in written {
+            assert!(text.contains(&format!("{k}={v}")), "{file} has no `{k}={v}`");
+        }
+    }
+    Ok(())
+}

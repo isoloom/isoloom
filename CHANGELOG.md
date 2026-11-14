@@ -53,6 +53,10 @@ stable spec format.
 
 ### Fixed
 
+- **An environment value reaches every format as it is written (#315).** An unquoted `1.10`,
+  `0x10` or `1e3` was read as a number and written back as `1.1`, `16` or `1000`, through the
+  spec, `-s` overrides, written-back specs and profiles; it keeps its text now, and Compose,
+  Kubernetes, Vagrant and Proxmox write it as text.
 - **`--profile` takes the inputs of a spec that declares them as a map (#312).** With
   `inputs: { FLAG: { sensitive: false } }`, every input a profile gave was "not one of the spec's
   inputs", and every command with that profile failed.

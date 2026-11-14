@@ -13,6 +13,7 @@
 //! ```
 
 pub mod appliance;
+mod as_written;
 mod clones;
 pub mod defaults;
 mod error;

@@ -167,7 +167,11 @@ pub fn load(project: &Path, name: &str) -> Result<Profile> {
 /// [`Error::ProfileMapping`] for a `spec` or `defaults` that isn't a mapping, and
 /// [`Error::ProfileInput`] for an input that isn't one value.
 pub fn parse(name: &str, path: PathBuf, text: &str) -> Result<Profile> {
-    let file: File = match serde_yaml_ng::from_str(text) {
+    // A launch value and an environment value are text: kept as written (`1.10`, not 1.1).
+    let file: File = match serde_yaml_ng::from_str::<Value>(text).and_then(|mut doc| {
+        crate::as_written::keep(text, &mut doc, |at| matches!(at, ["inputs", _]) || crate::as_written::environment(at));
+        serde_yaml_ng::from_value(doc)
+    }) {
         Ok(file) => file,
         Err(source) => {
             return Err(Error::ProfileYaml {

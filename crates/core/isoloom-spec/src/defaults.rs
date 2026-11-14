@@ -295,12 +295,14 @@ pub(crate) fn parse_set(s: &str) -> Result<(&str, &str)> {
     Ok((k, v))
 }
 
-/// The value `text` gives the key `key` from the environment or a `-s`: a tag's as written (a
-/// tag is text, so `ISOLOOM_TAGS__ACCOUNT=0x1F` is `0x1F`, not 31), any other as YAML reads it
+/// The value `text` gives the key `key` from the environment or a `-s`: a tag's or an
+/// environment variable's as written (both are text, so `ISOLOOM_TAGS__ACCOUNT=0x1F` is `0x1F`,
+/// not 31, and `-s machines.web.environment.V=1.10` is `1.10`), any other as YAML reads it
 /// (`3` a number, `true` a boolean, else text).
 #[must_use]
 pub(crate) fn typed(key: &str, text: &str) -> Value {
-    if key.split('.').next() == Some("tags") {
+    let keys: Vec<&str> = key.split('.').collect();
+    if keys.first() == Some(&"tags") || crate::as_written::environment(&keys) {
         return Value::String(text.to_owned());
     }
     serde_yaml_ng::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()))
@@ -369,6 +371,8 @@ pub(crate) fn override_spec(yaml: &str, sets: &[String]) -> Result<String> {
 /// a set without an `=`, [`Error::SetKey`] when its key isn't a dotted path.
 pub fn override_spec_with(yaml: &str, base: Option<&Value>, sets: &[String]) -> Result<String> {
     let mut doc: Value = serde_yaml_ng::from_str(yaml)?;
+    // Written back as text below: an environment value keeps its written text (`1.10`, not 1.1).
+    crate::as_written::keep(yaml, &mut doc, crate::as_written::environment);
     let mut any = false;
     if let Some(b) = base.filter(|b| b.as_mapping().is_some_and(|m| !m.is_empty())) {
         merge(&mut doc, b);
