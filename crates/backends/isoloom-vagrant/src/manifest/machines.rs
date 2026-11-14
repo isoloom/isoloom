@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use isoloom_manifest::{Machine, Name, Native, OsName, Provider, Role, Template};
-use isoloom_plan::{Environment, Names};
+use isoloom_plan::Environment;
 use isoloom_render::run_manifest::{addresses, arch, port};
 use isoloom_spec::model::Target;
 use isoloom_spec::net::NetworkBlock;
@@ -96,25 +96,7 @@ fn on_every_network(env: &Environment, at: impl Fn(NetworkBlock) -> Option<std::
         .collect()
 }
 
-/// A VM's name under each provider that names one, as the environment's [`Names`] build them:
-/// the display name of `shown` on the desktop hypervisors, the plain name of `shown` on Hyper-V
-/// and ESXi, the libvirt domain of `define` on libvirt. QEMU names none.
-pub(super) fn vm_names(names: Names<'_>, shown: &str, define: &str) -> BTreeMap<Provider, String> {
-    let (plain, libvirt) = (names.vm_name(shown), names.libvirt_domain(define));
-    let shown = names.vm_label(shown);
-    BTreeMap::from([
-        (Provider::Virtualbox, shown.clone()),
-        (Provider::VmwareDesktop, shown.clone()),
-        (Provider::Parallels, shown.clone()),
-        (Provider::Utm, shown),
-        (Provider::Hyperv, plain.clone()),
-        (Provider::VmwareEsxi, plain),
-        (Provider::Libvirt, libvirt),
-    ])
-}
-
 fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
-    let vm_names = vm_names(env.names(), &d.name, &d.name);
     let offered: Vec<Provider> = crate::vms::provider::Provider::ALL
         .iter()
         .filter(|k| k.provider.runs_vms())
@@ -122,7 +104,9 @@ fn native(env: &Environment, d: &Define, boot_digest: &str) -> Result<Native> {
         .collect();
     Ok(Native::Vagrant {
         vagrant: Name::parse(&d.name)?,
-        vm_names,
+        // No VM name: each holds the copy's key, which only the Vagrantfile reads, when Vagrant
+        // loads it. A runner finds the VMs by the ids Vagrant records.
+        vm_names: BTreeMap::new(),
         boot_digest: Some(boot_digest.to_owned()),
         boxes: super::listed(crate::vms::boxes(env, d, &offered))?,
     })
@@ -157,10 +141,7 @@ checks: [{ http: 'http://web/', wait: 30 }]
             panic!()
         };
         assert_eq!(boot_digest.as_deref(), Some("sha256:0"));
-        assert_eq!(vm_names[&Provider::Virtualbox], "shop - web");
-        assert_eq!(vm_names[&Provider::Hyperv], "shop-web");
-        assert_eq!(vm_names[&Provider::Libvirt], "shop_web");
-        assert!(!vm_names.contains_key(&Provider::Qemu));
+        assert!(vm_names.is_empty(), "a VM's name holds the copy's key, which only the Vagrantfile reads");
         assert_eq!(ms[0].role, Role::Member);
         let site = &ms[0].ports[0];
         // Not fixed in the spec, so the host port is the runner's to pick (ephemeral); 8086 is the
@@ -171,10 +152,7 @@ checks: [{ http: 'http://web/', wait: 30 }]
         );
         assert_eq!((ms[1].role, ms[1].keep_running), (Role::Infra, false));
         assert_eq!(ms[1].addresses[&Name::parse("lab").unwrap()].to_string(), "10.9.0.253");
-        let Some(Native::Vagrant { vm_names: controller, .. }) = &ms[1].native else {
-            panic!()
-        };
-        assert_eq!(controller[&Provider::VmwareEsxi], "shop-isoloom-controller");
+        assert!(matches!(&ms[1].native, Some(Native::Vagrant { vagrant, vm_names: none, .. }) if vagrant.as_str() == "isoloom-controller" && none.is_empty()));
     }
 
     #[test]

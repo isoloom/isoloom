@@ -471,6 +471,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -771,27 +780,27 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "dual-stack_"
+    v.default_prefix = "dual-stack-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.67.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-front", libvirt__network_name: "isoloom-dual-stack-front", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:10::1", libvirt__ipv6_prefix: "64"
-    m.vm.network "private_network", ip: "10.67.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-back", libvirt__network_name: "isoloom-dual-stack-back", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:20::1", libvirt__ipv6_prefix: "64"
+    m.vm.network "private_network", ip: "10.67.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-#{ISOLOOM_KEY}-front", libvirt__network_name: "isoloom-dual-stack-#{ISOLOOM_KEY}-front", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:10::1", libvirt__ipv6_prefix: "64"
+    m.vm.network "private_network", ip: "10.67.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-#{ISOLOOM_KEY}-back", libvirt__network_name: "isoloom-dual-stack-#{ISOLOOM_KEY}-back", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:20::1", libvirt__ipv6_prefix: "64"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dual-stack - isoloom-router"
+      v.name = "dual-stack-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dual-stack - isoloom-router"
+      v.vmx["displayName"] = "dual-stack-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dual-stack - isoloom-router"
+      v.name = "dual-stack-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -811,7 +820,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "dual-stack-isoloom-router"
+      v.guest_name = "dual-stack-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -825,17 +834,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dual-stack-isoloom-router"
+      v.vmname = "dual-stack-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-front", "isoloom-dual-stack-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-#{ISOLOOM_KEY}-front", "isoloom-dual-stack-#{ISOLOOM_KEY}-back"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-front", "0215F261A19F"], ["isoloom-dual-stack-back", "021568400B93"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-#{ISOLOOM_KEY}-front", "0215F261A19F"], ["isoloom-dual-stack-#{ISOLOOM_KEY}-back", "021568400B93"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -894,7 +903,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dual-stack-front", "isoloom-dual-stack-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dual-stack-#{ISOLOOM_KEY}-front", "isoloom-dual-stack-#{ISOLOOM_KEY}-back"]) }
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -964,16 +973,16 @@ Vagrant.configure("2") do |config|
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.67.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-back", libvirt__network_name: "isoloom-dual-stack-back", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:20::1", libvirt__ipv6_prefix: "64"
+    m.vm.network "private_network", ip: "10.67.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-#{ISOLOOM_KEY}-back", libvirt__network_name: "isoloom-dual-stack-#{ISOLOOM_KEY}-back", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:20::1", libvirt__ipv6_prefix: "64"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dual-stack - web"
+      v.name = "dual-stack-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dual-stack - web"
+      v.vmx["displayName"] = "dual-stack-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -984,7 +993,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dual-stack - web"
+      v.name = "dual-stack-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1021,7 +1030,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "dual-stack-web"
+      v.guest_name = "dual-stack-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1039,17 +1048,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dual-stack-web"
+      v.vmname = "dual-stack-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-#{ISOLOOM_KEY}-back"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-back", "0215C982726D"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-#{ISOLOOM_KEY}-back", "0215C982726D"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1107,7 +1116,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dual-stack-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dual-stack-#{ISOLOOM_KEY}-back"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1251,16 +1260,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.67.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-front", libvirt__network_name: "isoloom-dual-stack-front", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:10::1", libvirt__ipv6_prefix: "64"
+    m.vm.network "private_network", ip: "10.67.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-dual-stack-#{ISOLOOM_KEY}-front", libvirt__network_name: "isoloom-dual-stack-#{ISOLOOM_KEY}-front", libvirt__dhcp_enabled: false, libvirt__guest_ipv6: "yes", libvirt__ipv6_address: "fd00:67:10::1", libvirt__ipv6_prefix: "64"
     m.vm.provider "virtualbox" do |v|
-      v.name = "dual-stack - user"
+      v.name = "dual-stack-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "dual-stack - user"
+      v.vmx["displayName"] = "dual-stack-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("user"))
@@ -1271,7 +1280,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "dual-stack - user"
+      v.name = "dual-stack-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1308,7 +1317,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "dual-stack-user"
+      v.guest_name = "dual-stack-#{ISOLOOM_KEY}-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1326,17 +1335,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "dual-stack-user"
+      v.vmname = "dual-stack-#{ISOLOOM_KEY}-user"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-front"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-dual-stack-#{ISOLOOM_KEY}-front"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-front", "02159E029E52"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-dual-stack-#{ISOLOOM_KEY}-front", "02159E029E52"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1394,7 +1403,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dual-stack-front"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-dual-stack-#{ISOLOOM_KEY}-front"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -2042,14 +2051,12 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "front",
       "cidr": "10.67.10.0/24",
-      "internet": true,
-      "native": "isoloom-dual-stack-front"
+      "internet": true
     },
     {
       "name": "back",
       "cidr": "10.67.20.0/24",
-      "internet": false,
-      "native": "isoloom-dual-stack-back"
+      "internet": false
     }
   ],
   "machines": [
@@ -2066,16 +2073,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-router",
-        "vm_names": {
-          "virtualbox": "dual-stack - isoloom-router",
-          "vmware_desktop": "dual-stack - isoloom-router",
-          "hyperv": "dual-stack-isoloom-router",
-          "parallels": "dual-stack - isoloom-router",
-          "libvirt": "dual-stack_isoloom-router",
-          "utm": "dual-stack - isoloom-router",
-          "vmware_esxi": "dual-stack-isoloom-router"
-        },
-        "boot_digest": "sha256:84d731837e5ec02ba366fcc88f573fac0055a7acfff29f9280f3c5775605032a",
+        "vm_names": {},
+        "boot_digest": "sha256:c9b363f6ea964e80f3843a4617d1947271bdc65812594b933b3de0fcb5bbb21c",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2124,16 +2123,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "dual-stack - web",
-          "vmware_desktop": "dual-stack - web",
-          "hyperv": "dual-stack-web",
-          "parallels": "dual-stack - web",
-          "libvirt": "dual-stack_web",
-          "utm": "dual-stack - web",
-          "vmware_esxi": "dual-stack-web"
-        },
-        "boot_digest": "sha256:956cda355f7d3f7382a62eef82f19646a7bdd046930654e91c83d8488bcfef87",
+        "vm_names": {},
+        "boot_digest": "sha256:7efcb16ec8485ae88e66ea018efcb2e6ec1d59f4918cac6371a35214bb617d9b",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2253,16 +2244,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "user",
-        "vm_names": {
-          "virtualbox": "dual-stack - user",
-          "vmware_desktop": "dual-stack - user",
-          "hyperv": "dual-stack-user",
-          "parallels": "dual-stack - user",
-          "libvirt": "dual-stack_user",
-          "utm": "dual-stack - user",
-          "vmware_esxi": "dual-stack-user"
-        },
-        "boot_digest": "sha256:62b0cad392297f964a3ecffd835338d3becad2ea3b6c4bd039d8dac3b937275a",
+        "vm_names": {},
+        "boot_digest": "sha256:cb2458cc755d6e1a36bdc2e46c7995b7ef40d96123d24a13b62b48d7d904db4c",
         "boxes": [
           {
             "provider": "virtualbox",

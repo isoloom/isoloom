@@ -121,6 +121,7 @@ fn written(env: &Environment, guest: &GuestCompose) -> Result<Ruby> {
     r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
     r.text(&crate::vms::project_rb());
     r.text(vagrantfile::PORT_CHECK_RB);
+    r.text(vagrantfile::KEY_RB);
     // `IsoloomQemu.disk`, for the helper VM's disk on QEMU.
     r.text(crate::vms::qemu::QEMU_RB);
     crate::vms::utm::constant(&mut r);
@@ -211,10 +212,10 @@ fn own_box(r: &mut Ruby, name: &str) {
 /// The size on the providers of this machine (VirtualBox, VMware, Parallels, UTM, QEMU,
 /// libvirt), named `label` where the provider shows a name, and the box of each that boots its
 /// own (`choice`'s).
-fn desktop_providers(r: &mut Ruby, choice: &Choice, label: &str, (cpus, mem): (u32, u32), disk_gb: u32) {
+fn desktop_providers(r: &mut Ruby, choice: &Choice, label: &isoloom_plan::HostName, (cpus, mem): (u32, u32), disk_gb: u32) {
     let provider = |name: &str| Call::new("config.vm.provider").arg(Value::str(name));
     let named = |v: &mut Ruby| {
-        v.assign("v.name", Value::str(label));
+        v.assign("v.name", vagrantfile::host_name(label));
         v.assign("v.cpus", cpus);
         v.assign("v.memory", mem);
     };
@@ -231,7 +232,7 @@ fn desktop_providers(r: &mut Ruby, choice: &Choice, label: &str, (cpus, mem): (u
         named(r);
     });
     r.block(provider("vmware_desktop"), "v", |r| {
-        r.assign(&format!("v.vmx[{}]", Value::str("displayName")), Value::str(label));
+        r.assign(&format!("v.vmx[{}]", Value::str("displayName")), vagrantfile::host_name(label));
         r.assign(&format!("v.vmx[{}]", Value::str("numvcpus")), Value::str(&cpus.to_string()));
         r.assign(&format!("v.vmx[{}]", Value::str("memsize")), Value::str(&mem.to_string()));
     });
@@ -285,14 +286,14 @@ fn desktop_providers(r: &mut Ruby, choice: &Choice, label: &str, (cpus, mem): (u
 }
 
 /// The size and placement on an ESXi host (vagrant-vmware-esxi), the host from the environment.
-fn esxi(r: &mut Ruby, guest: &str, (cpus, mem): (u32, u32)) {
+fn esxi(r: &mut Ruby, guest: &isoloom_plan::HostName, (cpus, mem): (u32, u32)) {
     r.block(Call::new("config.vm.provider").arg(Value::str("vmware_esxi")), "v", |r| {
         vagrantfile::esxi_host(r);
         r.assign(
             "v.esxi_virtual_network",
             Value::array([Value::raw(format!("{}.split(\",\").first.strip", settings::ESXI_VIRTUAL_NETWORK.fetch()))]),
         );
-        r.assign("v.guest_name", Value::str(guest));
+        r.assign("v.guest_name", vagrantfile::host_name(guest));
         r.assign("v.guest_numvcpus", cpus);
         r.assign("v.guest_memsize", mem);
     });
@@ -399,7 +400,7 @@ mod tests {
         // ("'virtiofs' requires shared memory"): the host had been created without any.
         let mut r = Ruby::new();
         let debian = boxes::debian_12();
-        desktop_providers(&mut r, &host_boxes(&debian), "env_vm", (2, 2048), 20);
+        desktop_providers(&mut r, &host_boxes(&debian), &isoloom_plan::Names::new("env").vm_label("vm"), (2, 2048), 20);
         crate::host_folders::render(
             &mut r,
             "config",

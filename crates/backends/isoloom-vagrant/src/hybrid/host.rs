@@ -23,8 +23,10 @@ pub(super) struct Nic {
     cidr: String,
     /// The macvlan network's gateway: the router, else the network's own.
     gateway: String,
-    /// The Docker (and VirtualBox internal) network's name.
+    /// The Docker network's name, inside the copy's own host.
     name: String,
+    /// The VirtualBox internal network it is on, shared with the environment's VMs: the copy's.
+    intnet: isoloom_plan::HostName,
 }
 
 /// The host's interface on each of the containers' networks.
@@ -55,7 +57,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
             .kw("ip", Value::str(&n.ip))
             .kw("auto_config", false)
             .kw("mac", Value::str(&n.mac))
-            .kw("virtualbox__intnet", Value::str(&n.name));
+            .kw("virtualbox__intnet", vagrantfile::host_name(&n.intnet));
         r.call(call);
     }
     virtualbox(r, env, nics.len());
@@ -71,7 +73,7 @@ fn define(r: &mut Ruby, env: &Environment, containers: &Containers, nics: &[Nic]
 fn virtualbox(r: &mut Ruby, env: &Environment, nics: usize) {
     let size = HostSize::of(env);
     r.block(Call::new("m.vm.provider").arg(Value::str("virtualbox")), "v", |r| {
-        r.assign("v.name", Value::str(&env.names().vm_label(HOST)));
+        r.assign("v.name", crate::vagrantfile::host_name(&env.names().vm_label(HOST)));
         r.assign("v.cpus", size.cpus);
         r.assign("v.memory", size.memory_mb);
         for i in 0..nics {
@@ -100,6 +102,7 @@ fn nic(env: &Environment, net: &str, index: usize) -> Result<Nic> {
         cidr: c.to_string(),
         gateway: gateway.to_string(),
         name: docker_net(env, net),
+        intnet: env.names().network(net),
     })
 }
 
@@ -141,6 +144,7 @@ mod tests {
             cidr: "10.0.0.0/24".into(),
             gateway: "10.0.0.1".into(),
             name: "isoloom-e-lab".into(),
+            intnet: isoloom_plan::Names::new("e").network("lab"),
         };
         let sh = networks_script(&[n]);
         assert!(sh.starts_with("set -e\nIF=$(ip -o link | grep -i '0a:15:ab:cd:ef:01'"), "{sh}");

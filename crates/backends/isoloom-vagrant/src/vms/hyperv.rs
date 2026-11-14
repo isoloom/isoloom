@@ -109,13 +109,13 @@ impl<'a> HyperV<'a> {
     }
 
     /// The private switch of a network.
-    fn switch(&self, net: &str) -> String {
-        self.names.network(net)
+    fn switch(&self, net: &str) -> Value {
+        crate::vagrantfile::host_name(&self.names.network(net))
     }
 
     /// The networks' switches, as a Ruby array.
     fn switches(&self) -> Value {
-        Value::array(self.nics.iter().map(|n| Value::str(&self.switch(n.net))))
+        Value::array(self.nics.iter().map(|n| self.switch(n.net)))
     }
 }
 
@@ -134,7 +134,11 @@ fn mac_text(mac: [u8; 6], sep: &str, upper: bool) -> String {
 }
 
 /// The VM `vm_name`'s Hyper-V provider block, then the triggers that give it its networks there.
-pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
+/// Its adapters' MAC addresses are seeded by its name without the copy's key: the same in every
+/// copy, each on its own copy's switches.
+pub(crate) fn block(r: &mut Ruby, vm: &isoloom_plan::HostName, size: Size, hv: &HyperV) {
+    let seed = vm.unkeyed();
+    let vm_name = seed.as_str();
     r.block(Call::new("m.vm.provider").arg(Value::str("hyperv")), "v, o", |r| {
         match &hv.boxed {
             HyperVBox::Main => {}
@@ -147,7 +151,7 @@ pub(crate) fn block(r: &mut Ruby, vm_name: &str, size: Size, hv: &HyperV) {
                 r.comment("No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`.");
             }
         }
-        r.assign("v.vmname", Value::str(vm_name));
+        r.assign("v.vmname", crate::vagrantfile::host_name(vm));
         r.assign("v.cpus", size.cpus);
         r.assign("v.memory", size.mem);
         r.assign("v.linked_clone", true);
@@ -185,7 +189,7 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
     let nics = Value::array(
         hv.nics
             .iter()
-            .map(|n| Value::array([Value::str(&hv.switch(n.net)), Value::str(&mac_text(mac(vm_name, n.net), "", true))])),
+            .map(|n| Value::array([hv.switch(n.net), Value::str(&mac_text(mac(vm_name, n.net), "", true))])),
     );
     let mut before_start = Vec::new();
     if !hv.nics.is_empty() {

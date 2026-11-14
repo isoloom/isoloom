@@ -48,7 +48,7 @@ fn reports_cover_addresses_services_wiring_and_resources() -> Outcome {
     assert!(services.contains("| web | 80 | web | yes |  | front, access |"), "{services}");
     let wiring = report("wiring", &r, false).unwrap();
     assert!(
-        wiring.contains("isoloom-segmented-front") && wiring.contains("net.isoloom.com/front=member") && wiring.contains("10.61.10.254"),
+        wiring.contains("isoloom-segmented-<key>-front") && wiring.contains("net.isoloom.com/front=member") && wiring.contains("10.61.10.254"),
         "{wiring}"
     );
     let resources = report("resources", &r, false).unwrap();

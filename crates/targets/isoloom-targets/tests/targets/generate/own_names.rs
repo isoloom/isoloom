@@ -5,7 +5,6 @@
 
 use std::collections::BTreeSet;
 
-use isoloom_manifest::{Native, Provider};
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
@@ -55,20 +54,28 @@ checks:
   - { tcp: \"containers:80\" }
 ";
 
-/// Every VM name the run manifest of `target` gives, with the provider that shows it.
-fn vm_names(files: &[isoloom_render::GeneratedFile], target: &str) -> Outcome<Vec<(Provider, String)>> {
-    let manifest = isoloom_manifest::parse(file(files, &format!("{target}/run.json"))?)?;
+/// The names `target`'s Vagrantfile gives its VMs, by the provider setting that takes each
+/// (`v.name`: VirtualBox and Parallels; `v.vmname`: Hyper-V; `v.guest_name`: ESXi), the copy's key
+/// still to read (`#{ISOLOOM_KEY}`).
+fn vm_names(files: &[isoloom_render::GeneratedFile], target: &str) -> Outcome<Vec<(&'static str, String)>> {
+    let vagrantfile = file(files, &format!("{target}/Vagrantfile"))?;
     let mut names = Vec::new();
-    for m in &manifest.machines {
-        if let Some(Native::Vagrant { vm_names, .. }) = &m.native {
-            names.extend(vm_names.iter().map(|(p, n)| (*p, n.clone())));
+    for line in vagrantfile.lines().map(str::trim) {
+        for setting in ["v.name", "v.vmname", "v.guest_name"] {
+            if let Some(name) = line
+                .strip_prefix(setting)
+                .and_then(|r| r.strip_prefix(" = \""))
+                .and_then(|r| r.strip_suffix('"'))
+            {
+                names.push((setting, name.to_owned()));
+            }
         }
     }
     Ok(names)
 }
 
-/// Whether `name` is a VM's name under some provider among `names`.
-fn named(names: &[(Provider, String)], name: &str) -> bool {
+/// Whether `name` is a VM's name under some setting among `names`.
+fn named(names: &[(&'static str, String)], name: &str) -> bool {
     names.iter().any(|(_, n)| n == name)
 }
 
@@ -77,11 +84,12 @@ fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_vagrant()
     let lab = valid(LAB)?;
     let files = generate(&lab, Target::Vagrant)?;
     let names = vm_names(&files, "vagrant")?;
-    let distinct: BTreeSet<_> = names.iter().collect();
-    assert_eq!(distinct.len(), names.len(), "a provider shows each VM under its own name: {names:?}");
+    let hyperv: Vec<_> = names.iter().filter(|(s, _)| *s == "v.vmname").collect();
+    let distinct: BTreeSet<_> = hyperv.iter().collect();
+    assert_eq!(distinct.len(), hyperv.len(), "Hyper-V shows each VM under its own name: {names:?}");
     for own in ["isoloom-router", "isoloom-tool-shell", "isoloom-controller"] {
-        assert!(named(&names, &format!("names - {own}")), "{own}: {names:?}");
-        assert!(named(&names, &format!("names-{own}")), "{own}: {names:?}");
+        assert!(named(&names, &format!("names-#{{ISOLOOM_KEY}} - {own}")), "{own}: {names:?}");
+        assert!(named(&names, &format!("names-#{{ISOLOOM_KEY}}-{own}")), "{own}: {names:?}");
     }
     let manifest = isoloom_manifest::parse(file(&files, "vagrant/run.json")?)?;
     let runners: Vec<&str> = manifest.checks.runners.iter().map(|r| r.step.id.as_str()).collect();
@@ -101,7 +109,7 @@ fn a_lab_machine_named_as_one_of_isoloom_s_own_vms_stands_beside_it_on_hybrid() 
     let lab = valid(HYBRID)?;
     let files = generate(&lab, Target::Hybrid)?;
     let vagrantfile = file(&files, "hybrid/Vagrantfile")?;
-    assert!(vagrantfile.contains("v.name = \"names - isoloom-docker-host\""), "{vagrantfile}");
+    assert!(vagrantfile.contains("v.name = \"names-#{ISOLOOM_KEY} - isoloom-docker-host\""), "{vagrantfile}");
     let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
     assert!(paths.iter().any(|p| p.ends_with("hybrid/checks/controller.sh")), "{paths:?}");
     assert!(paths.iter().any(|p| p.ends_with("hybrid/checks/isoloom-controller.sh")), "{paths:?}");
@@ -120,7 +128,7 @@ machines:
     )?;
     let files = generate(&lab, Target::DockerVm)?;
     let names = vm_names(&files, "docker-vm")?;
-    assert!(named(&names, "names - isoloom-docker-host"), "{names:?}");
-    assert!(named(&names, "names-isoloom-docker-host"), "{names:?}");
+    assert!(named(&names, "names-#{ISOLOOM_KEY} - isoloom-docker-host"), "{names:?}");
+    assert!(named(&names, "names-#{ISOLOOM_KEY}-isoloom-docker-host"), "{names:?}");
     Ok(())
 }

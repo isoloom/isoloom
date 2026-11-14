@@ -477,6 +477,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -780,23 +789,23 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "configured-app_"
+    v.default_prefix = "configured-app-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.66.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/http", 8086), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-app - web"
+      v.name = "configured-app-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-app - web"
+      v.vmx["displayName"] = "configured-app-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -807,7 +816,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-app - web"
+      v.name = "configured-app-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -844,7 +853,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "configured-app-web"
+      v.guest_name = "configured-app-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -862,17 +871,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "configured-app-web"
+      v.vmname = "configured-app-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-app-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-app-lab", "021583FEE5E0"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-app-#{ISOLOOM_KEY}-lab", "021583FEE5E0"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -931,7 +940,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web/http", 8086)]]); IsoloomHyperV.prune(["isoloom-configured-app-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web/http", 8086)]]); IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1361,16 +1370,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "api" do |m|
     m.vm.box = "bento/ubuntu-24.04"
     m.vm.hostname = "api"
-    m.vm.network "private_network", ip: "10.66.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-app - api"
+      v.name = "configured-app-#{ISOLOOM_KEY} - api"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-app - api"
+      v.vmx["displayName"] = "configured-app-#{ISOLOOM_KEY} - api"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("api"))
@@ -1381,7 +1390,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-app - api"
+      v.name = "configured-app-#{ISOLOOM_KEY} - api"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1416,7 +1425,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "configured-app-api"
+      v.guest_name = "configured-app-#{ISOLOOM_KEY}-api"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1431,17 +1440,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "gusztavvargadr/ubuntu-server-2404-lts"
       o.vm.box_version = "2607.0.0"
-      v.vmname = "configured-app-api"
+      v.vmname = "configured-app-#{ISOLOOM_KEY}-api"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-app-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-app-lab", "0215B846C78A"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-app-#{ISOLOOM_KEY}-lab", "0215B846C78A"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1499,7 +1508,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-configured-app-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1788,20 +1797,20 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.66.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-lab", libvirt__network_name: "isoloom-configured-app-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.66.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "configured-app - isoloom-controller"
+      v.name = "configured-app-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "configured-app - isoloom-controller"
+      v.vmx["displayName"] = "configured-app-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "configured-app - isoloom-controller"
+      v.name = "configured-app-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -1831,7 +1840,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "configured-app-isoloom-controller"
+      v.guest_name = "configured-app-#{ISOLOOM_KEY}-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1843,7 +1852,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "configured-app-isoloom-controller"
+      v.vmname = "configured-app-#{ISOLOOM_KEY}-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1852,10 +1861,10 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-app-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-app-lab", "0215DB57FBD1"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-configured-app-#{ISOLOOM_KEY}-lab", "0215DB57FBD1"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1913,7 +1922,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-configured-app-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.66.0.10 web' '10.66.0.20 api' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
@@ -2597,8 +2606,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "lab",
       "cidr": "10.66.0.0/24",
-      "internet": true,
-      "native": "isoloom-configured-app-lab"
+      "internet": true
     }
   ],
   "machines": [
@@ -2616,16 +2624,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "configured-app - web",
-          "vmware_desktop": "configured-app - web",
-          "hyperv": "configured-app-web",
-          "parallels": "configured-app - web",
-          "libvirt": "configured-app_web",
-          "utm": "configured-app - web",
-          "vmware_esxi": "configured-app-web"
-        },
-        "boot_digest": "sha256:2a64b1d8d93e93e46e2a29f8186497abe4d8d62f4e436e3a5a0ccd0d6f172f77",
+        "vm_names": {},
+        "boot_digest": "sha256:78d00c8a84fe3ffa6d3325f575d5504a8efe5fcba49ce55c0e15bca279d800ac",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2749,16 +2749,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "api",
-        "vm_names": {
-          "virtualbox": "configured-app - api",
-          "vmware_desktop": "configured-app - api",
-          "hyperv": "configured-app-api",
-          "parallels": "configured-app - api",
-          "libvirt": "configured-app_api",
-          "utm": "configured-app - api",
-          "vmware_esxi": "configured-app-api"
-        },
-        "boot_digest": "sha256:27ae705fc0b255066470b22c25b519cc33b28f278bf86368c414f0ff22685b59",
+        "vm_names": {},
+        "boot_digest": "sha256:ff70168765dd907ad7197e8cded0ee2d79f3377d24b1761e2094fc09d67ccc79",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2880,16 +2872,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-controller",
-        "vm_names": {
-          "virtualbox": "configured-app - isoloom-controller",
-          "vmware_desktop": "configured-app - isoloom-controller",
-          "hyperv": "configured-app-isoloom-controller",
-          "parallels": "configured-app - isoloom-controller",
-          "libvirt": "configured-app_isoloom-controller",
-          "utm": "configured-app - isoloom-controller",
-          "vmware_esxi": "configured-app-isoloom-controller"
-        },
-        "boot_digest": "sha256:97bc475bfeac995cc148aa856592ab93ef8ab0e343199a4d9c3493e0c45bb0db",
+        "vm_names": {},
+        "boot_digest": "sha256:21134dbe1f9d3b49fd99a1e7d3a11be2db023ab931d97f7b038cc7ea09fe6d3f",
         "boxes": [
           {
             "provider": "virtualbox",

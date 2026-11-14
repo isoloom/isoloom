@@ -386,8 +386,7 @@
     {
       "name": "lab",
       "cidr": "10.50.0.0/24",
-      "internet": true,
-      "native": "isoloom-mini-ad-lab"
+      "internet": true
     }
   ],
   "machines": [
@@ -406,16 +405,8 @@
       },
       "native": {
         "vagrant": "dc01",
-        "vm_names": {
-          "virtualbox": "mini-ad - dc01",
-          "vmware_desktop": "mini-ad - dc01",
-          "hyperv": "mini-ad-dc01",
-          "parallels": "mini-ad - dc01",
-          "libvirt": "mini-ad_dc01",
-          "utm": "mini-ad - dc01",
-          "vmware_esxi": "mini-ad-dc01"
-        },
-        "boot_digest": "sha256:5d8ad607f93e09e9f0dedf91fc820fa405d053b62358bdd1b5f81292950c6f33",
+        "vm_names": {},
+        "boot_digest": "sha256:2bacb74d7a777efc540be3128d2d11ee2a0dff540d02af20d32b5d45cb7478a8",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -545,16 +536,8 @@
       },
       "native": {
         "vagrant": "ws01",
-        "vm_names": {
-          "virtualbox": "mini-ad - ws01",
-          "vmware_desktop": "mini-ad - ws01",
-          "hyperv": "mini-ad-ws01",
-          "parallels": "mini-ad - ws01",
-          "libvirt": "mini-ad_ws01",
-          "utm": "mini-ad - ws01",
-          "vmware_esxi": "mini-ad-ws01"
-        },
-        "boot_digest": "sha256:1dd4b11fed7fa3aa81f7c5ee817d289b3473f93542b31e27758e5f9cfd58128a",
+        "vm_names": {},
+        "boot_digest": "sha256:c4cc564d758288e906ad687d64c5984c2ecab9072ad167951f207cbe5d88c6bb",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -668,16 +651,8 @@
       },
       "native": {
         "vagrant": "isoloom-controller",
-        "vm_names": {
-          "virtualbox": "mini-ad - isoloom-controller",
-          "vmware_desktop": "mini-ad - isoloom-controller",
-          "hyperv": "mini-ad-isoloom-controller",
-          "parallels": "mini-ad - isoloom-controller",
-          "libvirt": "mini-ad_isoloom-controller",
-          "utm": "mini-ad - isoloom-controller",
-          "vmware_esxi": "mini-ad-isoloom-controller"
-        },
-        "boot_digest": "sha256:c68ef757c8108b36d3f46e7b3a65917d57c46aa0d51b27970fdec664a75faeaf",
+        "vm_names": {},
+        "boot_digest": "sha256:d900b6ed2beaa2575a86c31d660030a382afef5d550e864075830095e157aacf",
         "boxes": [
           {
             "provider": "virtualbox",

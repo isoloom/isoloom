@@ -144,13 +144,13 @@ fn hostname(r: &mut Ruby, name: &str, os: Os) {
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
 pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
-    let netname = env.names().network(net);
+    let netname = crate::vagrantfile::host_name(&env.names().network(net));
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
         .kw("ip", Value::str(&ip.to_string()))
         .kw("netmask", Value::str(&env.block(net).netmask().to_string()))
-        .kw("virtualbox__intnet", Value::str(&netname))
-        .kw("libvirt__network_name", Value::str(&netname));
+        .kw("virtualbox__intnet", netname.clone())
+        .kw("libvirt__network_name", netname);
     // Every VM on the network carries its network boot: libvirt creates the network with the
     // options of the first VM that comes up on it.
     call = boot::network(call, isoloom_plan::boot::network_boots(&env.machines).get(net));

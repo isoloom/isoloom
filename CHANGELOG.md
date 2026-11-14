@@ -10,6 +10,24 @@ stable spec format.
 
 ## [Unreleased]
 
+### Changed
+
+- **Two copies of one environment never share a VM, network or libvirt domain name, numbered or
+  not (#285).** **Breaking:** every name a Vagrantfile gives on the host carries the copy's key
+  after the environment's name: `<env>-<key> - <machine>` (VirtualBox, VMware Desktop,
+  Parallels, UTM), `<env>-<key>-<machine>` (Hyper-V, ESXi), the libvirt prefix `<env>-<key>_`,
+  and `isoloom-<env>-<key>-<network>` (VirtualBox internal network, libvirt network, Hyper-V
+  private switch, the hybrid Docker host's interfaces). The Vagrantfile reads the key when Vagrant
+  loads it, from `ISOLOOM_KEY` (six lowercase letters or digits; another value stops the load),
+  which a runner sets for every command of a run; unset (`vagrant up` by hand), it makes one from
+  its folder's path, so two copies in two folders differ too. `isoloom_plan::Names` gives each name
+  as a `HostName` (with a key, around the key, or without it); `KEY_VAR` and `KEY_LEN` are new.
+  The run manifest names no VM (`vm_names` is empty) and no Vagrant network (`native` absent): a
+  runner finds the VMs by the ids Vagrant records. A Hyper-V adapter's MAC address and the
+  hybrid host's Docker networks, which are the copy's own already, keep their names without the
+  key. A copy started before keeps working through Vagrant, which finds its VMs by the ids it
+  recorded, but stop it before the upgrade to keep its VMs' names and networks consistent.
+
 ### Fixed
 
 - **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer
@@ -27,9 +45,8 @@ stable spec format.
   hybrid Docker host's network) all come from the environment's name, which carries its
   instance's suffix. The Vagrantfiles and the run manifests of the `vagrant`, `docker-vm` and
   `hybrid` targets now read them there, so the two can't drift apart, and a test holds two
-  instances of the VM examples to disjoint VM, network and prefix names (#285). An environment
-  generated without an instance keeps every name it had; to run two copies of one environment
-  side by side, give each its own instance number (`isoloom_targets::generate_instance`).
+  instances of the VM examples to disjoint VM, network and prefix names (#285). Two copies of
+  one environment are also told apart by their key (below).
 
 ## [2.1.9] — 2026-11-12
 

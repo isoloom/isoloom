@@ -46,13 +46,14 @@ pub(crate) mod utm;
 pub(crate) mod values;
 mod windows;
 
-/// The name of a network on the host, `isoloom-<environment>-<network>` (after the contract's
-/// [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)): its VirtualBox internal
-/// network, its libvirt network and its Hyper-V private switch, as the Vagrantfile makes them and
-/// the run manifest names them ([`isoloom_plan::Names::network`]).
+/// The name of a network on the host as a report shows it, `isoloom-<environment>-<key>-<network>`
+/// (after the contract's [`RESERVED_PREFIX`](isoloom_manifest::contract::RESERVED_PREFIX)), the
+/// copy's key written `<key>`: its VirtualBox internal network, its libvirt network and its
+/// Hyper-V private switch, as the Vagrantfile makes them with the key it reads
+/// ([`isoloom_plan::Names::network`]).
 #[must_use]
 pub fn network_name(environment: &str, network: &str) -> String {
-    isoloom_plan::Names::new(environment).network(network)
+    isoloom_plan::Names::new(environment).network(network).with_key("<key>")
 }
 
 use indexmap::IndexMap;
@@ -220,6 +221,7 @@ fn preamble(r: &mut Ruby, env: &Environment, dir: &str) {
     r.text(&project_rb());
     r.text(&hyperv::hyperv_rb());
     r.text(vagrantfile::PORT_CHECK_RB);
+    r.text(vagrantfile::KEY_RB);
     if env.vms().next().is_some() {
         r.text(crate::console::CONSOLE_RB);
     }

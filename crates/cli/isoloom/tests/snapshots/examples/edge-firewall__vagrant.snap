@@ -475,6 +475,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -775,24 +784,24 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "edge-firewall_"
+    v.default_prefix = "edge-firewall-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "fw" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "fw"
-    m.vm.network "private_network", ip: "10.70.0.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-outside", libvirt__network_name: "isoloom-edge-firewall-outside", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.10.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-dmz", libvirt__network_name: "isoloom-edge-firewall-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.20.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-lan", libvirt__network_name: "isoloom-edge-firewall-lan", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.0.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", libvirt__network_name: "isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.1", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-#{ISOLOOM_KEY}-lan", libvirt__network_name: "isoloom-edge-firewall-#{ISOLOOM_KEY}-lan", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "edge-firewall - fw"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - fw"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "edge-firewall - fw"
+      v.vmx["displayName"] = "edge-firewall-#{ISOLOOM_KEY} - fw"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("fw"))
@@ -803,7 +812,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "edge-firewall - fw"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - fw"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -831,7 +840,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "edge-firewall-fw"
+      v.guest_name = "edge-firewall-#{ISOLOOM_KEY}-fw"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -849,17 +858,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "edge-firewall-fw"
+      v.vmname = "edge-firewall-#{ISOLOOM_KEY}-fw"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-outside", "isoloom-edge-firewall-dmz", "isoloom-edge-firewall-lan"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", "isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", "isoloom-edge-firewall-#{ISOLOOM_KEY}-lan"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-outside", "02156057533D"], ["isoloom-edge-firewall-dmz", "021559EC901D"], ["isoloom-edge-firewall-lan", "0215FEC0E5B5"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", "02156057533D"], ["isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", "021559EC901D"], ["isoloom-edge-firewall-#{ISOLOOM_KEY}-lan", "0215FEC0E5B5"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -919,7 +928,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-outside", "isoloom-edge-firewall-dmz", "isoloom-edge-firewall-lan"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", "isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", "isoloom-edge-firewall-#{ISOLOOM_KEY}-lan"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -953,16 +962,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-dmz", libvirt__network_name: "isoloom-edge-firewall-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "edge-firewall - web"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "edge-firewall - web"
+      v.vmx["displayName"] = "edge-firewall-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -973,7 +982,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "edge-firewall - web"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1010,7 +1019,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "edge-firewall-web"
+      v.guest_name = "edge-firewall-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1028,17 +1037,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "edge-firewall-web"
+      v.vmname = "edge-firewall-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-dmz"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-dmz", "02157C108D14"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz", "02157C108D14"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1096,7 +1105,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-dmz"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-#{ISOLOOM_KEY}-dmz"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1202,16 +1211,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
-    m.vm.network "private_network", ip: "10.70.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-lan", libvirt__network_name: "isoloom-edge-firewall-lan", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-#{ISOLOOM_KEY}-lan", libvirt__network_name: "isoloom-edge-firewall-#{ISOLOOM_KEY}-lan", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "edge-firewall - cache"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "edge-firewall - cache"
+      v.vmx["displayName"] = "edge-firewall-#{ISOLOOM_KEY} - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("cache"))
@@ -1222,7 +1231,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "edge-firewall - cache"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1259,7 +1268,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([3])
-      v.guest_name = "edge-firewall-cache"
+      v.guest_name = "edge-firewall-#{ISOLOOM_KEY}-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1277,17 +1286,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "edge-firewall-cache"
+      v.vmname = "edge-firewall-#{ISOLOOM_KEY}-cache"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-lan"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-#{ISOLOOM_KEY}-lan"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-lan", "0215E7C7FE88"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-#{ISOLOOM_KEY}-lan", "0215E7C7FE88"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1345,7 +1354,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-lan"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-#{ISOLOOM_KEY}-lan"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1451,16 +1460,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.70.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-outside", libvirt__network_name: "isoloom-edge-firewall-outside", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", libvirt__network_name: "isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "edge-firewall - user"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "edge-firewall - user"
+      v.vmx["displayName"] = "edge-firewall-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("user"))
@@ -1471,7 +1480,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "edge-firewall - user"
+      v.name = "edge-firewall-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1508,7 +1517,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "edge-firewall-user"
+      v.guest_name = "edge-firewall-#{ISOLOOM_KEY}-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1526,17 +1535,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "edge-firewall-user"
+      v.vmname = "edge-firewall-#{ISOLOOM_KEY}-user"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-outside"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-edge-firewall-#{ISOLOOM_KEY}-outside"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-outside", "0215C62A8821"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-edge-firewall-#{ISOLOOM_KEY}-outside", "0215C62A8821"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1594,7 +1603,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-outside"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-edge-firewall-#{ISOLOOM_KEY}-outside"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -2405,20 +2414,17 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "outside",
       "cidr": "10.70.0.0/24",
-      "internet": true,
-      "native": "isoloom-edge-firewall-outside"
+      "internet": true
     },
     {
       "name": "dmz",
       "cidr": "10.70.10.0/24",
-      "internet": true,
-      "native": "isoloom-edge-firewall-dmz"
+      "internet": true
     },
     {
       "name": "lan",
       "cidr": "10.70.20.0/24",
-      "internet": false,
-      "native": "isoloom-edge-firewall-lan"
+      "internet": false
     }
   ],
   "machines": [
@@ -2438,16 +2444,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "fw",
-        "vm_names": {
-          "virtualbox": "edge-firewall - fw",
-          "vmware_desktop": "edge-firewall - fw",
-          "hyperv": "edge-firewall-fw",
-          "parallels": "edge-firewall - fw",
-          "libvirt": "edge-firewall_fw",
-          "utm": "edge-firewall - fw",
-          "vmware_esxi": "edge-firewall-fw"
-        },
-        "boot_digest": "sha256:ddaae026761d2785f7abfecb3e8e772679bae733bc4c4f63d0b0a7d9e92ed319",
+        "vm_names": {},
+        "boot_digest": "sha256:21dbb2967adeadfe993183a460fa3a8e0888875b471e97fbabc4379d8d9bfa64",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2566,16 +2564,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web",
-        "vm_names": {
-          "virtualbox": "edge-firewall - web",
-          "vmware_desktop": "edge-firewall - web",
-          "hyperv": "edge-firewall-web",
-          "parallels": "edge-firewall - web",
-          "libvirt": "edge-firewall_web",
-          "utm": "edge-firewall - web",
-          "vmware_esxi": "edge-firewall-web"
-        },
-        "boot_digest": "sha256:559cf62a0c77edab2424142aeb265f5c3c023eff8fea42b9e174327f0b6639a6",
+        "vm_names": {},
+        "boot_digest": "sha256:82b0febbc5895bdd663d67d1fe84b68582a575d7406741f039c2d6cec06d38f2",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2694,16 +2684,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "cache",
-        "vm_names": {
-          "virtualbox": "edge-firewall - cache",
-          "vmware_desktop": "edge-firewall - cache",
-          "hyperv": "edge-firewall-cache",
-          "parallels": "edge-firewall - cache",
-          "libvirt": "edge-firewall_cache",
-          "utm": "edge-firewall - cache",
-          "vmware_esxi": "edge-firewall-cache"
-        },
-        "boot_digest": "sha256:aa227a5a938cf7043adbc4ed3f1332dac5794150458dfd535c77dd1e83a79a41",
+        "vm_names": {},
+        "boot_digest": "sha256:7911adaf339b3cad07b9b381d0dc4fc8a32862b7c4efb01f2b9efc5e65740393",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2823,16 +2805,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "user",
-        "vm_names": {
-          "virtualbox": "edge-firewall - user",
-          "vmware_desktop": "edge-firewall - user",
-          "hyperv": "edge-firewall-user",
-          "parallels": "edge-firewall - user",
-          "libvirt": "edge-firewall_user",
-          "utm": "edge-firewall - user",
-          "vmware_esxi": "edge-firewall-user"
-        },
-        "boot_digest": "sha256:c4873ebfc73eb64b20456003a773a342e138de7009b316d551c06e55ac6e1d3f",
+        "vm_names": {},
+        "boot_digest": "sha256:3688e958dad6ab677badf0f317b075963ea07cdfe677b22dc30fa698f528bc11",
         "boxes": [
           {
             "provider": "virtualbox",

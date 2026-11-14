@@ -471,6 +471,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -771,22 +780,22 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "air-gapped_"
+    v.default_prefix = "air-gapped-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "store" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "store"
-    m.vm.network "private_network", ip: "192.168.62.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "192.168.62.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-air-gapped-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "air-gapped - store"
+      v.name = "air-gapped-#{ISOLOOM_KEY} - store"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "air-gapped - store"
+      v.vmx["displayName"] = "air-gapped-#{ISOLOOM_KEY} - store"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("store"))
@@ -797,7 +806,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "air-gapped - store"
+      v.name = "air-gapped-#{ISOLOOM_KEY} - store"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -834,7 +843,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "air-gapped-store"
+      v.guest_name = "air-gapped-#{ISOLOOM_KEY}-store"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -852,17 +861,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "air-gapped-store"
+      v.vmname = "air-gapped-#{ISOLOOM_KEY}-store"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-air-gapped-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-air-gapped-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-air-gapped-lab", "0215E128C0CF"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-air-gapped-#{ISOLOOM_KEY}-lab", "0215E128C0CF"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -920,7 +929,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-air-gapped-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-air-gapped-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -989,16 +998,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "app" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "app"
-    m.vm.network "private_network", ip: "192.168.62.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-lab", libvirt__network_name: "isoloom-air-gapped-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "192.168.62.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-air-gapped-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-air-gapped-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "air-gapped - app"
+      v.name = "air-gapped-#{ISOLOOM_KEY} - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "air-gapped - app"
+      v.vmx["displayName"] = "air-gapped-#{ISOLOOM_KEY} - app"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("app"))
@@ -1009,7 +1018,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "air-gapped - app"
+      v.name = "air-gapped-#{ISOLOOM_KEY} - app"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1046,7 +1055,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "air-gapped-app"
+      v.guest_name = "air-gapped-#{ISOLOOM_KEY}-app"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1064,17 +1073,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "air-gapped-app"
+      v.vmname = "air-gapped-#{ISOLOOM_KEY}-app"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-air-gapped-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-air-gapped-#{ISOLOOM_KEY}-lab"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-air-gapped-lab", "0215B28A8ADD"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-air-gapped-#{ISOLOOM_KEY}-lab", "0215B28A8ADD"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1132,7 +1141,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-air-gapped-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-air-gapped-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1749,8 +1758,7 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "lab",
       "cidr": "192.168.62.0/24",
-      "internet": false,
-      "native": "isoloom-air-gapped-lab"
+      "internet": false
     }
   ],
   "machines": [
@@ -1768,16 +1776,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "store",
-        "vm_names": {
-          "virtualbox": "air-gapped - store",
-          "vmware_desktop": "air-gapped - store",
-          "hyperv": "air-gapped-store",
-          "parallels": "air-gapped - store",
-          "libvirt": "air-gapped_store",
-          "utm": "air-gapped - store",
-          "vmware_esxi": "air-gapped-store"
-        },
-        "boot_digest": "sha256:b415c59aa89a9b1457c8255c26eb9ae24c1203a49b55da6ae26e4a37f32d4072",
+        "vm_names": {},
+        "boot_digest": "sha256:90430cd071e347604a20ad6b09a9cd369ee278e1ff31b053bbfde1387d53c814",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -1896,16 +1896,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "app",
-        "vm_names": {
-          "virtualbox": "air-gapped - app",
-          "vmware_desktop": "air-gapped - app",
-          "hyperv": "air-gapped-app",
-          "parallels": "air-gapped - app",
-          "libvirt": "air-gapped_app",
-          "utm": "air-gapped - app",
-          "vmware_esxi": "air-gapped-app"
-        },
-        "boot_digest": "sha256:e68741d9018aa6b7a030904e10a2831576058d38f3a470fd9968a1d30445c195",
+        "vm_names": {},
+        "boot_digest": "sha256:38b0575d6231390c507d6638cb600d39199368674a392d1f204d5b1f3e04a0a0",
         "boxes": [
           {
             "provider": "virtualbox",

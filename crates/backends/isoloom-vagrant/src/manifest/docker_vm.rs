@@ -13,7 +13,6 @@ use isoloom_manifest::{
     Run, Step, Template,
 };
 use isoloom_plan::Environment;
-use isoloom_render::container::DOCKER_HOST as VM;
 use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 use isoloom_render::run_manifest::{self, act, noted, outputs_on_their_hosts, run};
 
@@ -113,8 +112,6 @@ fn vagrant_ssh(command: &Template) -> Result<Run, ManifestError> {
 /// the digest of what Vagrant applies to it only at boot (its Vagrantfile's, `guest` running in
 /// it).
 fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
-    let mut vm_names = super::machines::vm_names(env.names(), VM, DEFINE);
-    vm_names.retain(|p, _| providers::docker_vm_offers(*p));
     let boot_digest = crate::boot_digest::of(&crate::docker_vm::boot(env, guest)?)
         .remove(DEFINE)
         .ok_or_else(|| Error::NoBootDigest {
@@ -130,7 +127,8 @@ fn native(env: &Environment, guest: &GuestCompose) -> Result<Native> {
     let boxes = offered.flat_map(|p| choice.on(p).into_iter().map(move |b| (p, b))).collect();
     Ok(Native::Vagrant {
         vagrant: Name::parse(DEFINE)?,
-        vm_names,
+        // No VM name: it holds the copy's key, which only the Vagrantfile reads.
+        vm_names: std::collections::BTreeMap::new(),
         boot_digest: Some(boot_digest),
         boxes: super::listed(boxes)?,
     })

@@ -471,6 +471,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
     end
   end
 end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
+end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
 #   ({"<machine>": {"port": <n>, "password": "<8 characters>"}}); no console when it chose none.
@@ -771,28 +780,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "corp-ad-basics_"
+    v.default_prefix = "corp-ad-basics-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.40.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-dmz", libvirt__network_name: "isoloom-corp-ad-basics-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - isoloom-router"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - isoloom-router"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - isoloom-router"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -812,7 +821,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "corp-ad-basics-isoloom-router"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -826,17 +835,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "corp-ad-basics-isoloom-router"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "0215F43C5A08"], ["isoloom-corp-ad-basics-corp", "0215CC3B0C75"], ["isoloom-corp-ad-basics-access", "0215B424B763"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "0215F43C5A08"], ["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "0215CC3B0C75"], ["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", "0215B424B763"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -896,7 +905,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -933,17 +942,17 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "10.40.20.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - dc01"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - dc01"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
       if (console = IsoloomConsole.of("dc01"))
@@ -954,7 +963,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - dc01"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
@@ -1006,7 +1015,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "corp-ad-basics-dc01"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-dc01"
       v.guest_guestos = "windows2019srvnext-64"
       v.guest_numvcpus = 2
       v.guest_memsize = 4096
@@ -1022,17 +1031,17 @@ Vagrant.configure("2") do |config|
       v.graphics_autoport = "yes"
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "corp-ad-basics-dc01"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-dc01"
       v.cpus = 2
       v.memory = 4096
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-corp", "021588E46B79"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "021588E46B79"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1053,7 +1062,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.vm.provision "shell", name: "disk", inline: "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }"
     m.vm.provision "isoloom_project", name: "project"
@@ -1074,10 +1083,10 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "10.40.20.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - ws-01"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
@@ -1085,7 +1094,7 @@ Vagrant.configure("2") do |config|
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - ws-01"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
       if (console = IsoloomConsole.of("ws-01"))
@@ -1096,7 +1105,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - ws-01"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
@@ -1148,7 +1157,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "corp-ad-basics-ws-01"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-ws-01"
       v.guest_guestos = "windows11-64"
       v.guest_numvcpus = 2
       v.guest_memsize = 4096
@@ -1167,17 +1176,17 @@ Vagrant.configure("2") do |config|
       v.graphics_autoport = "yes"
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "corp-ad-basics-ws-01"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-ws-01"
       v.cpus = 2
       v.memory = 4096
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-corp", "0215080C2851"]]); IsoloomHyperV.tpm(machine, false) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "0215080C2851"]]); IsoloomHyperV.tpm(machine, false) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1198,7 +1207,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.vm.provision "shell", name: "disk", inline: "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }"
     m.vm.provision "isoloom_project", name: "project"
@@ -1220,10 +1229,10 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "10.40.20.22", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.22", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - ws-02"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
@@ -1231,7 +1240,7 @@ Vagrant.configure("2") do |config|
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - ws-02"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
       if (console = IsoloomConsole.of("ws-02"))
@@ -1242,7 +1251,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - ws-02"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
@@ -1294,7 +1303,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "corp-ad-basics-ws-02"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-ws-02"
       v.guest_guestos = "windows11-64"
       v.guest_numvcpus = 2
       v.guest_memsize = 4096
@@ -1313,17 +1322,17 @@ Vagrant.configure("2") do |config|
       v.graphics_autoport = "yes"
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "corp-ad-basics-ws-02"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-ws-02"
       v.cpus = 2
       v.memory = 4096
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-corp", "02150F45D202"]]); IsoloomHyperV.tpm(machine, false) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "02150F45D202"]]); IsoloomHyperV.tpm(machine, false) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1344,7 +1353,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.vm.provision "shell", name: "disk", inline: "$max = (Get-PartitionSupportedSize -DriveLetter C).SizeMax; if ((Get-Partition -DriveLetter C).Size -lt $max) { Resize-Partition -DriveLetter C -Size $max }"
     m.vm.provision "isoloom_project", name: "project"
@@ -1357,17 +1366,17 @@ Vagrant.configure("2") do |config|
   config.vm.define "web01" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web01"
-    m.vm.network "private_network", ip: "10.40.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-dmz", libvirt__network_name: "isoloom-corp-ad-basics-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - web01"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - web01"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web01"))
@@ -1378,7 +1387,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - web01"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1406,7 +1415,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2])
-      v.guest_name = "corp-ad-basics-web01"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-web01"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1424,17 +1433,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "corp-ad-basics-web01"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-web01"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "0215E8C63EFF"], ["isoloom-corp-ad-basics-corp", "0215A79BEBE4"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "0215E8C63EFF"], ["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "0215A79BEBE4"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1493,7 +1502,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1567,16 +1576,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.40.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - user"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - user"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("user"))
@@ -1587,7 +1596,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - user"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1624,7 +1633,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([3])
-      v.guest_name = "corp-ad-basics-user"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1642,17 +1651,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "corp-ad-basics-user"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-user"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-access", "02152716E54C"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", "02152716E54C"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1710,7 +1719,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
@@ -1779,22 +1788,22 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.40.10.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-dmz", libvirt__network_name: "isoloom-corp-ad-basics-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.20.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-corp", libvirt__network_name: "isoloom-corp-ad-basics-corp", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-access", libvirt__network_name: "isoloom-corp-ad-basics-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.10.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "corp-ad-basics - isoloom-controller"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "corp-ad-basics - isoloom-controller"
+      v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "corp-ad-basics - isoloom-controller"
+      v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -1815,7 +1824,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "corp-ad-basics-isoloom-controller"
+      v.guest_name = "corp-ad-basics-#{ISOLOOM_KEY}-isoloom-controller"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -1827,7 +1836,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.memory = 512
     end
     m.vm.provider "hyperv" do |v, o|
-      v.vmname = "corp-ad-basics-isoloom-controller"
+      v.vmname = "corp-ad-basics-#{ISOLOOM_KEY}-isoloom-controller"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
@@ -1836,10 +1845,10 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-dmz", "021566CAE359"], ["isoloom-corp-ad-basics-corp", "0215C087380A"], ["isoloom-corp-ad-basics-access", "0215C9E2E838"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "021566CAE359"], ["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "0215C087380A"], ["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", "0215C9E2E838"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1899,7 +1908,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-dmz", "isoloom-corp-ad-basics-corp", "isoloom-corp-ad-basics-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access"]) }
     end
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.40.20.5 dc01' '10.40.20.21 ws-01' '10.40.20.22 ws-02' '10.40.10.10 web01' '10.40.99.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "isoloom_project", name: "project"
@@ -2632,20 +2641,17 @@ echo "isoloom-check: END $passed passed, $failed failed"
     {
       "name": "dmz",
       "cidr": "10.40.10.0/24",
-      "internet": true,
-      "native": "isoloom-corp-ad-basics-dmz"
+      "internet": true
     },
     {
       "name": "corp",
       "cidr": "10.40.20.0/24",
-      "internet": true,
-      "native": "isoloom-corp-ad-basics-corp"
+      "internet": true
     },
     {
       "name": "access",
       "cidr": "10.40.99.0/24",
-      "internet": true,
-      "native": "isoloom-corp-ad-basics-access"
+      "internet": true
     }
   ],
   "machines": [
@@ -2663,16 +2669,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-router",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - isoloom-router",
-          "vmware_desktop": "corp-ad-basics - isoloom-router",
-          "hyperv": "corp-ad-basics-isoloom-router",
-          "parallels": "corp-ad-basics - isoloom-router",
-          "libvirt": "corp-ad-basics_isoloom-router",
-          "utm": "corp-ad-basics - isoloom-router",
-          "vmware_esxi": "corp-ad-basics-isoloom-router"
-        },
-        "boot_digest": "sha256:e2c0e53863f88a0381e63e5b6c260a7fa42ab988fdfaf8bb0b2cbc5d6da81245",
+        "vm_names": {},
+        "boot_digest": "sha256:847271917c3ad2755354b77d1a1ed6be69114f49764313b14b523849a3cc2d5c",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2722,16 +2720,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "dc01",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - dc01",
-          "vmware_desktop": "corp-ad-basics - dc01",
-          "hyperv": "corp-ad-basics-dc01",
-          "parallels": "corp-ad-basics - dc01",
-          "libvirt": "corp-ad-basics_dc01",
-          "utm": "corp-ad-basics - dc01",
-          "vmware_esxi": "corp-ad-basics-dc01"
-        },
-        "boot_digest": "sha256:509d0f582d719b103238040dbfd1b1f663eec2f1f56ff63c869c5191593b5592",
+        "vm_names": {},
+        "boot_digest": "sha256:e708f562c3ff046fd8f1f60cd603a20bf00641e41fe4df1aaf330c1429fa5c13",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -2874,16 +2864,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "ws-01",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - ws-01",
-          "vmware_desktop": "corp-ad-basics - ws-01",
-          "hyperv": "corp-ad-basics-ws-01",
-          "parallels": "corp-ad-basics - ws-01",
-          "libvirt": "corp-ad-basics_ws-01",
-          "utm": "corp-ad-basics - ws-01",
-          "vmware_esxi": "corp-ad-basics-ws-01"
-        },
-        "boot_digest": "sha256:21c7c9cb74ecdfe038c1f627d15f7ff33cbb89aca00c8002c0bf383b1fbd3318",
+        "vm_names": {},
+        "boot_digest": "sha256:23f83a96d4b4d1fea0c0c5ca91546095aa82d3cd5d33099d1dc4843cfd112be2",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3000,16 +2982,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "ws-02",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - ws-02",
-          "vmware_desktop": "corp-ad-basics - ws-02",
-          "hyperv": "corp-ad-basics-ws-02",
-          "parallels": "corp-ad-basics - ws-02",
-          "libvirt": "corp-ad-basics_ws-02",
-          "utm": "corp-ad-basics - ws-02",
-          "vmware_esxi": "corp-ad-basics-ws-02"
-        },
-        "boot_digest": "sha256:a7b302be826aaee4f043a2a71991aa23a5e34421393d17c492ccb198e3c79e09",
+        "vm_names": {},
+        "boot_digest": "sha256:7067b6eda4dfd0e1c4e39b1d76e019189c222fff7a6c61c39aca510ba2a4ad24",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3126,16 +3100,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "web01",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - web01",
-          "vmware_desktop": "corp-ad-basics - web01",
-          "hyperv": "corp-ad-basics-web01",
-          "parallels": "corp-ad-basics - web01",
-          "libvirt": "corp-ad-basics_web01",
-          "utm": "corp-ad-basics - web01",
-          "vmware_esxi": "corp-ad-basics-web01"
-        },
-        "boot_digest": "sha256:b2f9a4b40cb6527e5e92bff791195f92d8bd9cb2f8de4ab97506152e41ec9933",
+        "vm_names": {},
+        "boot_digest": "sha256:69b2e6d45843aa2861c2935150aaae82029616c2bdf33ba576a4db4fbcef1691",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3255,16 +3221,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       "on_demand": true,
       "native": {
         "vagrant": "user",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - user",
-          "vmware_desktop": "corp-ad-basics - user",
-          "hyperv": "corp-ad-basics-user",
-          "parallels": "corp-ad-basics - user",
-          "libvirt": "corp-ad-basics_user",
-          "utm": "corp-ad-basics - user",
-          "vmware_esxi": "corp-ad-basics-user"
-        },
-        "boot_digest": "sha256:cedde482fa838ffbb6b01c97c520f6913a0ac16bf27f23bbe43dbf58859687d0",
+        "vm_names": {},
+        "boot_digest": "sha256:e01de24ea3b7693e3a0d107a80c29f1c416e2e36f5528d5de612668012b985e5",
         "boxes": [
           {
             "provider": "virtualbox",
@@ -3375,16 +3333,8 @@ echo "isoloom-check: END $passed passed, $failed failed"
       },
       "native": {
         "vagrant": "isoloom-controller",
-        "vm_names": {
-          "virtualbox": "corp-ad-basics - isoloom-controller",
-          "vmware_desktop": "corp-ad-basics - isoloom-controller",
-          "hyperv": "corp-ad-basics-isoloom-controller",
-          "parallels": "corp-ad-basics - isoloom-controller",
-          "libvirt": "corp-ad-basics_isoloom-controller",
-          "utm": "corp-ad-basics - isoloom-controller",
-          "vmware_esxi": "corp-ad-basics-isoloom-controller"
-        },
-        "boot_digest": "sha256:bc14afafc0935ea8032d18b4989ea5a0772b48743cbc2bbdce9496ab19e7919a",
+        "vm_names": {},
+        "boot_digest": "sha256:d54d50c9baa57d733de41de013518c6bccbc36a751e0ebc58efb0303207aaa1d",
         "boxes": [
           {
             "provider": "virtualbox",
