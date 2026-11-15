@@ -1,5 +1,5 @@
 //! The names of the services this backend adds beside the machines', each built in one place so
-//! the run manifest tells them apart by the same rule.
+//! every file that names them tells them apart by the same rule.
 
 use isoloom_spec::model::Arch;
 

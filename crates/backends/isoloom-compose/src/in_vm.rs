@@ -7,8 +7,8 @@ use isoloom_render::container::{host_environment, host_folders};
 use isoloom_render::steps::PROJECT_DIR;
 use isoloom_spec::contract::{OUTPUT_DIR, PUBLISH_ADDRESS, PUBLISH_FIXED};
 
-use crate::error::Result;
 use crate::backend::ComposeTarget;
+use crate::error::Result;
 use crate::layout::DIR;
 use crate::render;
 
@@ -37,10 +37,11 @@ pub struct VmStart {
 /// [`crate::Error::Refused`] when `env` needs what Compose can't do.
 pub fn vm_start(env: &Environment) -> Result<VmStart> {
     let file = render::compose_file(ComposeTarget::Docker, env)?.file;
-    let folders: String = host_folders::of_containers(env)
+    let folders = host_folders::of_containers(env)
         .iter()
         .map(|f| format!("{}={} ", f.variable, f.in_vm))
-        .collect();
+        .collect::<Vec<_>>()
+        .concat();
     let compose = format!(
         "cd {PROJECT_DIR} && {}env {PUBLISH_ADDRESS}=0.0.0.0 {PUBLISH_FIXED}=1 {folders}docker compose --project-name {} --file {OUTPUT_DIR}/{DIR}/compose.yml",
         host_environment(env),

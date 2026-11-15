@@ -146,15 +146,15 @@ enum Sealed {
     AsMade(&'static str),
 }
 
-/// How `target` seals an `internet: false` network; `None` where the row means nothing (no
-/// machines of its own). A target added to the spec must say, so a ✓ can't go unexplained.
-fn sealed_by(target: Target) -> Option<Sealed> {
-    Some(match target {
+/// How `target` seals an `internet: false` network. A target added to the spec must say, so a ✓
+/// can't go unexplained.
+fn sealed_by(target: Target) -> Sealed {
+    match target {
         Target::Proxmox | Target::Esxi | Target::CloudVm => Sealed::ByTheModule,
         Target::Docker | Target::Hosted | Target::CloudDocker => Sealed::AsMade("an internal Compose network: the containers have no route out"),
         Target::Kubernetes => Sealed::AsMade("an egress network policy on the offline pods"),
         Target::Vagrant | Target::External => Sealed::AsMade("each machine's own egress step, at the end of its set-up"),
-    })
+    }
 }
 
 /// The matrix's ✓ for `networks.*.internet = false` is what the generators write: every column
@@ -176,7 +176,7 @@ fn every_target_the_matrix_says_takes_an_offline_network_seals_it() {
         if *cell != Cell::Supported {
             continue;
         }
-        let how = sealed_by(column.target).unwrap_or_else(|| panic!("{}: takes the row, but says nothing of a seal", column.id()));
+        let how = sealed_by(column.target);
         let lab = &labs.iter().find(|(t, _)| *t == column.target).unwrap().1;
         let files = crate::generate(lab, column.target).unwrap();
         // The column's own modules: a cloud's in its folder, every other target's in its own.
@@ -280,11 +280,19 @@ fn every_column_the_matrix_says_takes_a_check_writes_it() {
             assert!(!written.is_empty(), "{}: the row's lab has no check", row.name());
             let files = crate::generate(lab, column.target).unwrap();
             // The column's own files: its cloud's or provider's folder, when the target writes
-            // one, else the target's files but the resolved snapshot, which lists every check.
+            // one, with the target's shared check runners when that folder's files carry them
+            // to the machines; else the target's files but the resolved snapshot, which lists
+            // every check.
             let variant_dir = column.variant.map(|v| format!("{OUTPUT_DIR}/{}/{v}/", column.target.id()));
             let folder = variant_dir.filter(|dir| files.iter().any(|f| f.path.starts_with(dir.as_str())));
+            let shared = format!("{OUTPUT_DIR}/{}/checks/", column.target.id());
+            let carried = folder.as_ref().is_some_and(|dir| {
+                files
+                    .iter()
+                    .any(|f| f.path.starts_with(dir.as_str()) && f.contents.contains(shared.trim_end_matches('/')))
+            });
             let own = |f: &&isoloom_render::GeneratedFile| match &folder {
-                Some(dir) => f.path.starts_with(dir.as_str()),
+                Some(dir) => f.path.starts_with(dir.as_str()) || (carried && f.path.starts_with(shared.as_str())),
                 None => f.path != crate::resolved::PATH,
             };
             for name in &written {
@@ -362,6 +370,51 @@ const NO_FILE_CHANGE: &[(&str, &str, &str)] = &[
         "machines.*.hardware.nested_virtualization",
         "proxmox",
         "an amd64 VM always takes the server's CPU (cpu.type = host), which nests; an arm64 one is refused",
+    ),
+    (
+        "machines.*.command",
+        "vagrant",
+        "the row without a command only drops the base's image, which the VM form doesn't use",
+    ),
+    (
+        "machines.*.command",
+        "proxmox",
+        "the row without a command only drops the base's image, which the VM form doesn't use",
+    ),
+    (
+        "machines.*.command",
+        "esxi",
+        "the row without a command only drops the base's image, which the VM form doesn't use",
+    ),
+    (
+        "machines.*.command",
+        "cloud-vm",
+        "the row without a command only drops the base's image, which the VM form doesn't use",
+    ),
+    (
+        "machines.*.ports.*.protocol = udp",
+        "vagrant",
+        "a VM's port that isn't published needs nothing written: the machine listens on its network as it runs",
+    ),
+    (
+        "machines.*.ports.*.protocol = udp",
+        "proxmox",
+        "a VM's port that isn't published needs nothing written: the machine listens on its network as it runs",
+    ),
+    (
+        "machines.*.ports.*.protocol = udp",
+        "esxi",
+        "a VM's port that isn't published needs nothing written: the machine listens on its network as it runs",
+    ),
+    (
+        "machines.*.ports.*.protocol = udp",
+        "cloud-vm",
+        "a VM's port that isn't published needs nothing written: the machine listens on its network as it runs",
+    ),
+    (
+        "machines.*.hardware.boot.firmware = uefi",
+        "vagrant",
+        "a box boots through its own firmware: without a loader there is nothing to set (libvirt refuses it then, QEMU boots the box's disk as it is)",
     ),
 ];
 

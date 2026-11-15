@@ -96,8 +96,8 @@ pub enum GenerateError {
         #[source]
         source: isoloom_spec::instance::InstanceError,
     },
-    /// The backend failed, not the environment (a bug: a value the run manifest's types refused, a file
-    /// its writer couldn't write), with the error it failed with.
+    /// The backend failed, not the environment (a bug: a value its file's types refused, a file its
+    /// writer couldn't write), with the error it failed with.
     #[error("{}: {what}", target.id())]
     Internal {
         /// The target being generated.

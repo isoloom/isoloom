@@ -127,7 +127,7 @@ fn an_os_without_an_image_is_refused() -> Outcome {
 }
 
 /// With internet, DigitalOcean's and Linode's firewalls let nothing in from outside but SSH and
-/// the published ports from allowed_cidr: every other inbound rule is from the environment's own
+/// the published ports from `allowed_cidr`: every other inbound rule is from the environment's own
 /// networks, and none from anywhere (`0.0.0.0/0`, `::/0`).
 #[test]
 fn an_open_network_on_the_allow_only_clouds_lets_in_ssh_and_the_published_ports_alone() -> Outcome {

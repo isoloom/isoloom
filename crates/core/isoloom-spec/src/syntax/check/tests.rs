@@ -157,17 +157,13 @@ fn each_unresolved_placeholder_says_why() {
         why(&with_message("site", "{{ machines.web.addresses.wan }}")),
         ["`{{ machines.web.addresses.wan }}`: `web` isn't on a network named `wan`"]
     );
+    // The cloud-services target is gone: `cloud.` is no placeholder any more.
     assert_eq!(
         why(&with_message("site", "{{ cloud.outputs.site }}")),
-        ["`{{ cloud.outputs.site }}`: the spec has no `cloud:`"]
+        [
+            "`{{ cloud.outputs.site }}` isn't a placeholder Isoloom knows: the paths start with `machine.`, `machines.<m>.`, `version`, `os.`, `vars.`, `with.` or `item.`"
+        ]
     );
-    let cloud = |name: &str| {
-        let mut spec = parse("version: 1\nname: t\ncloud: { provider: aws, terraform: infra, outputs: { site: site_url } }\n").unwrap();
-        spec.message = Some(format!("{{{{ cloud.outputs.{name} }}}}"));
-        why(&spec)
-    };
-    assert_eq!(cloud("site"), Vec::<String>::new());
-    assert_eq!(cloud("db"), ["`{{ cloud.outputs.db }}`: `cloud.outputs` has no `db`"]);
 }
 
 #[test]

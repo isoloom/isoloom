@@ -202,7 +202,11 @@ mod tests {
     fn a_backend_file_written_twice_is_an_error() {
         let compose = GeneratedFile::new(".isoloom/docker/compose.yml", "a");
         // A configuration file the backend wrote already is the backend's, once.
-        let fine = assembled(Target::Docker, vec![compose.clone()], vec![GeneratedFile::new(".isoloom/docker/compose.yml", "b")]);
+        let fine = assembled(
+            Target::Docker,
+            vec![compose.clone()],
+            vec![GeneratedFile::new(".isoloom/docker/compose.yml", "b")],
+        );
         assert_eq!(fine.map(|f| f.len()).ok(), Some(1));
         let e = assembled(Target::Docker, vec![compose.clone(), compose], vec![])
             .err()

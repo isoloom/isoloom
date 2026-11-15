@@ -572,8 +572,7 @@ volumes:
       "kubernetes": "machine `aliases` (dotted DNS names) aren't Kubernetes Service names"
     },
     "not_possible": {
-      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host"
     },
     "clouds": {
       "cloud-docker": {

@@ -4,20 +4,20 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Error, GenerateError, Lab, generate};
 
-use crate::testing::{Outcome, generated as file, lab};
+use crate::testing::{Outcome, allowed, generated as file, lab};
 
 /// One machine with `hardware` set, as a container (an image) and as a VM (its OS and a step).
 fn spec(hardware: &str) -> Outcome<Lab> {
-    lab(&format!(
+    Ok(allowed(lab(&format!(
         "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lab: 10 }}, app: {{ image: nginx, steps: [{{ run: a.sh }}] }}, hardware: {{ {hardware} }} }}\n"
-    ))
+    ))?))
 }
 
 /// One machine with `hardware` set, its OS and a step (a VM on the VM targets).
 fn vm(hardware: &str) -> Outcome<Lab> {
-    lab(&format!(
+    Ok(allowed(lab(&format!(
         "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lab: 10 }}, app: {{ steps: [{{ run: a.sh }}] }}, hardware: {{ {hardware} }} }}\n"
-    ))
+    ))?))
 }
 
 /// Why `target` refuses the environment.
@@ -70,7 +70,7 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
         "\"--nested-hw-virt\", \"on\"",
         "v.vmx[\"vhv.enable\"] = \"TRUE\"",
         "v.nested = true",
-        "if machine.provider_name == :qemu",
+        "if %i[qemu utm].include?(machine.provider_name)",
     ] {
         assert!(v.contains(switch), "{switch}");
     }

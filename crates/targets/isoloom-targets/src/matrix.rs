@@ -142,7 +142,16 @@ fn lab(start: &Value, patch: &Value, hosts: bool) -> std::result::Result<Lab, St
     }
     let text = serde_yaml_ng::to_string(&v).map_err(|e| e.to_string())?;
     let images = isoloom_spec::images::Table::parse(RUNNER_IMAGES).map_err(|e| e.to_string())?;
-    isoloom_spec::parse(&text).map(|s| Lab::new(s).with_images(images)).map_err(|e| e.to_string())
+    isoloom_spec::parse(&text)
+        .map(|s| Lab::new(s).with_images(images).with_host_access(every_access()))
+        .map_err(|e| e.to_string())
+}
+
+/// Every access to the computer that runs an environment, allowed: the matrix says what each
+/// target can do with a field, so the consent a runner asks before a spec reaches its computer
+/// (`--allow-host`) is taken as given.
+pub(crate) fn every_access() -> isoloom_spec::host_access::Grants {
+    isoloom_spec::host_access::Grants::of(isoloom_spec::host_access::HostAccess::ALL)
 }
 
 /// The image table every row's environment is read with, as a runner gives one: it supplies the access

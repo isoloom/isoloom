@@ -720,8 +720,7 @@ volumes:
       "proxmox": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
       "esxi": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
       "cloud-vm": "machines.vios.app.appliance: an appliance's packaging exists only as a container",
-      "external": "overrides.external.machines.vios: the external target reaches machines that exist already, and `vios` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.vios: the external target reaches machines that exist already, and `vios` names no host"
     },
     "clouds": {
       "cloud-docker": {

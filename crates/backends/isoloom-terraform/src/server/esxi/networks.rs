@@ -8,7 +8,7 @@ use crate::module::{ident, resource};
 use crate::server::slotted;
 
 /// What network `net`'s vSwitch and port group are named after the environment's slot
-/// (`iso<slot><suffix>`): the module's names, and the run manifest's.
+/// (`iso<slot><suffix>`): the module's names.
 pub(super) fn suffix(net: &str) -> String {
     format!("-{net}")
 }

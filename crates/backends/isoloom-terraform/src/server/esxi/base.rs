@@ -35,7 +35,7 @@ fn oses(env: &Environment) -> Vec<&str> {
     all
 }
 
-/// The module's variables, the run manifest's params and slots among them.
+/// The module's variables, the values a runner passes at launch among them.
 pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     let mut out = vec![

@@ -28,7 +28,7 @@ fn carries_vlans(env: &Environment, name: &str) -> bool {
 /// Each VNet the environment's links travel on, with its id after `i<slot>`, in the order they
 /// are made: one per network that is no VLAN (`n<i>`, `i` its place among every network), then
 /// one per LAN that is only the frame around its VLANs (`l<j>`). The module gives each VNet
-/// its id, and the run manifest names each network's bridge after them.
+/// its id, and each network's bridge is named after them.
 pub(super) fn vnet_ids(env: &Environment) -> Vec<(&str, String)> {
     let mut out: Vec<(&str, String)> = env
         .networks

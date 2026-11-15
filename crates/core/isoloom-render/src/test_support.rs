@@ -6,7 +6,6 @@
     reason = "the tests' POSIX sh, which runs the generated scripts: test code, not an adapter"
 )]
 
-
 /// An office LAN split into VLAN 10 (offline) and VLAN 20 (online): `admin` and `nas` are on
 /// both, `staff` on one, `ops` on both and a network of its own, `win` is a Windows VM on both.
 /// The trunks' tests read it, a VM's and a container's alike.
@@ -112,4 +111,3 @@ pub fn planned(yaml: &str, target: isoloom_spec::model::Target) -> Result<isoloo
     let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).map_err(|e| e.to_string())?);
     lab.plan(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }
-

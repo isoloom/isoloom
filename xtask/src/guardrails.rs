@@ -44,7 +44,7 @@ const CHAINS: [(&str, usize, &str); 8] = [
     ),
     (
         "crates/core/isoloom-render/src/steps.rs",
-        12,
+        11,
         "the project unpack, sshd's AcceptEnv, the sysctl file, the state folder and the os-release reads are one-line steps or substitutions, each run as one `sh -c` whose status is the chain's",
     ),
     ("crates/core/isoloom-render/src/steps/disks.rs", 1, "awk's own `&&`, inside its program"),

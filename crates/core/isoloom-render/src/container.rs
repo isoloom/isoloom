@@ -70,8 +70,8 @@ pub fn exec_runner(machine: &str) -> String {
 pub(crate) const CHECK_RUNNER_PREFIX: &str = "isoloom-check";
 
 /// The check runner of a position: `isoloom-check` where a user stands (`default`),
-/// `isoloom-check-<position>` for the others. The one rule the Compose services, the resolved
-/// snapshot and the run manifest name them by.
+/// `isoloom-check-<position>` for the others. The one rule the Compose services and the resolved
+/// snapshot name them by.
 #[must_use]
 pub fn check_runner(pos: &Position, default: &Position) -> String {
     if pos == default {

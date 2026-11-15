@@ -28,7 +28,7 @@ use crate::module::{ident, resource};
 /// The controller's OS.
 pub(crate) const OS: &str = "debian-12";
 
-/// Its name: its host name, and its machine in a run manifest.
+/// Its name: its host name, and its machine in the module's outputs.
 pub(crate) const NAME: &str = isoloom_spec::contract::CONTROLLER;
 /// Where its key is uploaded before its set-up (then moved to `/etc/isoloom`).
 const KEY_UPLOAD: &str = "/tmp/isoloom-controller-key";

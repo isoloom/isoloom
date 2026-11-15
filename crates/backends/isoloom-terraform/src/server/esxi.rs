@@ -9,7 +9,7 @@
 //! - A router VM sits on the host's own port group (`uplink_port_group`, DHCP) and on every
 //!   network at its router address, as on Proxmox: it forwards between networks with the
 //!   `reach` rules (nftables), forwards the published ports, and gives the machines the
-//!   internet (NAT). Once the machines are set up, the run manifest's seal closes the internet
+//!   internet (NAT). Once the machines are set up, the module's seal closes the internet
 //!   to the `internet: false` networks at the router, as on Proxmox.
 //! - Each machine is a VM deployed from an OVA (`images`, Ubuntu's cloud OVAs by default). Its
 //!   addresses (matched by MAC) and its `isoloom` user come from cloud-init's VMware data
@@ -29,8 +29,7 @@
 //!   `checks` output says which runs where).
 //! - Terraform makes the environment, sets every machine up over SSH and, once they are, seals
 //!   the `internet: false` networks at the router (`crate::server::router::seal`): the apply ends
-//!   with the environment ready. The run manifest (`.isoloom/esxi/run.json`, see `manifest`) is
-//!   the servers' own.
+//!   with the environment ready. The module's files are the whole output: no run manifest.
 //! - A Linux machine's secrets and inputs as files come from the module's variables (sensitive
 //!   ones for the secrets), written by cloud-init from its guestinfo user data; Terraform keeps them in its state, as
 //!   it does every variable. A Windows machine's are refused (`super::secrets_refusal`).

@@ -214,7 +214,7 @@ machines:
         );
         assert!(!s.contains("isoloom run"), "nothing waits for the old runtime: {s}");
         assert!(
-            // An input's file is kept under the input's own name, the slot a run manifest gives it.
+            // An input's file is kept under the input's own name.
             s.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/DEMO_SECRET '/srv/secret'"),
             "{s}"
         );

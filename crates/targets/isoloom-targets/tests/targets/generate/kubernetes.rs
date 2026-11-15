@@ -4,7 +4,7 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
-use crate::testing::{Outcome, between, example, file, generated, lab};
+use crate::testing::{Outcome, allowed, between, example, file, generated, lab};
 
 #[test]
 fn kubernetes_turns_networks_and_reach_into_network_policies() -> Outcome {
@@ -140,9 +140,9 @@ fn kubernetes_pods_run_under_the_baseline_pod_security_level() -> Outcome {
 
 #[test]
 fn a_privileged_machine_stays_privileged_and_its_namespace_allows_it() -> Outcome {
-    let spec = lab(
+    let spec = allowed(lab(
         "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  box: { networks: { lan: 10 }, privileged: true, app: { image: alpine } }\n  web: { networks: { lan: 11 }, app: { image: nginx } }\n",
-    )?;
+    )?);
     let env = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
     assert!(env.contains("pod-security.kubernetes.io/enforce: privileged"), "{env}");
     let privileged = between(&env, "name: box\n", "---")?;

@@ -216,6 +216,7 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     steps.extend([every_machine(env), Step::Project]);
     steps.extend(isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()));
     let on_controller = &ctx.checks.controller;
+    let runner = (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller));
     define(r, CONTROLLER, Start::WithUp, |r| {
         main.render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
@@ -227,13 +228,13 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
         }
         steps_of(r, env, CONTROLLER, &steps);
         controller_steps(r, env, offline);
-        if !on_controller.is_empty() {
-            checks::installer(r, CONTROLLER);
+        if let Some(runner) = &runner {
+            checks::installer(r, CONTROLLER, &runner.contents);
             checks::provisioner(r, CONTROLLER, on_controller);
         }
         halt(r, env);
     });
-    (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller))
+    runner
 }
 
 /// How the controller reaches the VMs: the boxes' own `vagrant` account (password auth); WinRM

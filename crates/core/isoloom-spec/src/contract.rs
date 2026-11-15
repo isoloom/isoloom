@@ -57,8 +57,8 @@ pub const EXPIRES_WORD: &str = "isoloom-expires-";
 /// manifest's param.
 pub const ESXI_HOSTNAME: &str = "ESXI_HOSTNAME";
 
-/// The variable a Vagrantfile reads as the ESXi host's SSH port; a run manifest's param,
-/// [`ESXI_DEFAULT_SSH_PORT`] when unset.
+/// The variable a Vagrantfile reads as the ESXi host's SSH port, [`ESXI_DEFAULT_SSH_PORT`]
+/// when unset.
 pub const ESXI_HOSTPORT: &str = "ESXI_HOSTPORT";
 
 /// The ESXi host's SSH port when [`ESXI_HOSTPORT`] doesn't give one.

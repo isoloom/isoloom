@@ -342,8 +342,7 @@ volumes:
       "proxmox": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
       "esxi": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
       "cloud-vm": "machines.web.app.image: an image's filesystem can't be reproduced on a fresh VM",
-      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host"
     },
     "clouds": {}
   },

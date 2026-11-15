@@ -714,8 +714,7 @@ volumes:
     ],
     "refused": {},
     "not_possible": {
-      "external": "overrides.external.machines.dns: the external target reaches machines that exist already, and `dns` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.dns: the external target reaches machines that exist already, and `dns` names no host"
     },
     "clouds": {
       "cloud-docker": {

@@ -72,7 +72,7 @@ pub(crate) fn output(name: &str, value: Expression) -> Block {
 }
 
 /// The `published` output's entries, `"<machine>/<port>" = "<address>:<host port>"`, for each port
-/// `machines` publish (the plan's [`isoloom_plan::PublishedPort`]s, named as the run manifest and
+/// `machines` publish (the plan's [`isoloom_plan::PublishedPort`]s, named as the module's outputs and
 /// the message name them), `at` giving the expression of the address a machine is reached at:
 /// the one rule of the servers' and the clouds' `published` outputs.
 pub(crate) fn published_output_entries<'a>(

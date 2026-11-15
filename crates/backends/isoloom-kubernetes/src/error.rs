@@ -38,7 +38,7 @@ pub enum Error {
     },
     /// A script the pods run leads out of the project folder (through a link), or isn't there:
     /// it is never read.
-    #[error("{path} (copied into the Helm chart): {why}")]
+    #[error("{path} (copied into the Helm chart)")]
     Outside {
         /// The script, from the project folder.
         path: String,
@@ -47,7 +47,7 @@ pub enum Error {
         why: isoloom_spec::project_path::Escape,
     },
     /// A script the pods run exists in the project but can't be read.
-    #[error("{path} (copied into the Helm chart): {source}")]
+    #[error("{path} (copied into the Helm chart)")]
     Read {
         /// The script, from the project folder.
         path: String,

@@ -126,8 +126,7 @@ crash.*.log
       "hosted": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
       "cloud-docker": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
       "kubernetes": "machines.web.hardware.tpm: only a VM gives it: a container has no kernel or firmware of its own",
-      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host"
     },
     "clouds": {
       "cloud-vm": {

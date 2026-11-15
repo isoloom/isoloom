@@ -84,11 +84,13 @@ pub(crate) fn command() -> String {
 
 /// The provisioner installing a position's runner (`checks/<file>.sh`, read when Vagrant reads
 /// the Vagrantfile) at [`INSTALLED`] in the VM, at every provisioning, so the copy in the VM is
-/// the one generated last.
-pub(crate) fn installer(r: &mut Ruby, file: &str) {
-    let open = format!("umask 077\nmkdir -p {STATE_DIR}\ncat > {INSTALLED}.new <<'ISOLOOM_CHECKS'\n");
+/// the one generated last. `runner` is that file's text: the here-document's terminator is one
+/// none of its lines is ([`isoloom_spec::shell::here_tag`]), so a check's own line never ends it.
+pub(crate) fn installer(r: &mut Ruby, file: &str, runner: &str) {
+    let tag = isoloom_spec::shell::here_tag("ISOLOOM_CHECKS", runner);
+    let open = format!("umask 077\nmkdir -p {STATE_DIR}\ncat > {INSTALLED}.new <<'{tag}'\n");
     // A line break first: the heredoc ends on a line of its own whatever the runner ends with.
-    let close = format!("\nISOLOOM_CHECKS\nmv -f {INSTALLED}.new {INSTALLED}\n");
+    let close = format!("\n{tag}\nmv -f {INSTALLED}.new {INSTALLED}\n");
     // Each part on the provisioner's line, its line breaks written `\n`.
     let one_line = |text: &str| crate::ruby::quote(text).replace('\n', "\\n");
     let script = Value::raw(format!(
@@ -163,3 +165,25 @@ fn refreshed(path: &str) -> Value {
 /// here-document whose terminator is no line of the script (as `isoloom_spec::shell::here_tag`
 /// picks it, in Ruby: the script is read when the step runs).
 const REFRESH: &str = ".map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); \"mkdir -p #{folder} && cat > #{file} <<'#{tag}'\\n#{body}\\n#{tag}\\n\" }.join";
+
+#[cfg(test)]
+mod tests {
+    use super::installer;
+    use crate::ruby::Ruby;
+
+    /// The installer's provisioner, as the Vagrantfile has it.
+    fn installed(runner: &str) -> String {
+        let mut r = Ruby::new();
+        installer(&mut r, "web", runner);
+        r.finish()
+    }
+
+    #[test]
+    fn the_installer_ends_its_here_document_on_a_line_the_runner_does_not_have() {
+        let plain = installed("#!/bin/sh\necho ok\n");
+        assert!(plain.contains("<<'ISOLOOM_CHECKS'\\n") && plain.contains("\\nISOLOOM_CHECKS\\n"), "{plain}");
+        // A check whose own line is the usual terminator would end the document early.
+        let clash = installed("#!/bin/sh\necho start\nISOLOOM_CHECKS\necho rest\n");
+        assert!(clash.contains("<<'ISOLOOM_CHECKS_1'\\n") && clash.contains("\\nISOLOOM_CHECKS_1\\n"), "{clash}");
+    }
+}

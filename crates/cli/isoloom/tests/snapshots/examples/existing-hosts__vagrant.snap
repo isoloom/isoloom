@@ -168,8 +168,7 @@ crash.*.log
       "docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "hosted": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
       "cloud-docker": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
-      "kubernetes": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "kubernetes": "machines.web.command: its steps install services, but no `service` step or `command` runs one in a container"
     },
     "clouds": {
       "cloud-vm": {

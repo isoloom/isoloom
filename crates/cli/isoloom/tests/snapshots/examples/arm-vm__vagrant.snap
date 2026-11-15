@@ -126,8 +126,7 @@ crash.*.log
       "hosted": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
       "cloud-docker": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
       "kubernetes": "machines.box.command: its steps install services, but no `service` step or `command` runs one in a container",
-      "external": "overrides.external.machines.box: the external target reaches machines that exist already, and `box` names no host",
-      "cloud-services": "needs `cloud:` (cloud services instead of machines)"
+      "external": "overrides.external.machines.box: the external target reaches machines that exist already, and `box` names no host"
     },
     "clouds": {}
   },

@@ -1,6 +1,6 @@
 //! Generation across the backends, from the repository's examples and specs written in the
-//! tests: what each target writes, what it refuses and why, the resolved snapshot, its reports
-//! and the run manifests, the way the composition root puts them together.
+//! tests: what each target writes, what it refuses and why, the resolved snapshot, its reports,
+//! the way the composition root puts them together.
 
 #![expect(
     clippy::disallowed_methods,

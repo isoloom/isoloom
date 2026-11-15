@@ -229,7 +229,7 @@ pub(crate) struct MachineInput {
     /// or absolute; a writable one needs `writable-host-folders`, the container engine's socket
     /// `docker-socket`. Linux machines, on the
     /// targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each
-    /// provider's own shared folder: VirtualBox, VMware, Parallels, UTM's VirtFS, QEMU with
+    /// provider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with
     /// `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and
     /// QEMU a read-only one.
     /// VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable
