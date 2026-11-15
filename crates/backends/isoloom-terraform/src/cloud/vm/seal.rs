@@ -43,6 +43,49 @@ mod tests {
     use isoloom_spec::model::Target;
 
     use super::*;
+    use crate::cloud::Cloud;
+    use crate::cloud::vm::CloudVmModule;
+
+    /// The resource that closes the way out on each sealing cloud: its type, and the part of its
+    /// name every one has.
+    const CLOSING: [(Cloud, &str); 4] = [
+        (Cloud::Aws, "aws_network_acl"),
+        (Cloud::Azure, "azurerm_subnet_network_security_group_association"),
+        (Cloud::Gcp, "google_compute_firewall"),
+        (Cloud::Oci, "oci_core_route_table_attachment"),
+    ];
+
+    /// The `depends_on` of `block`, each reference as its text.
+    fn depends_on(block: &hcl::Body) -> Vec<String> {
+        match isoloom_test_support::hcl_attribute(block, "depends_on") {
+            Some(hcl::Expression::Array(refs)) => refs.iter().map(ToString::to_string).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    #[test]
+    fn every_sealing_cloud_closes_a_routed_network_without_internet_only_after_every_machines_set_up() {
+        let env = crate::testing::planned(
+            "version: 1\nname: e\nnetworks:\n  outside: { cidr: 10.70.0.0/24 }\n  lan: { cidr: 10.70.20.0/24, gateway: fw, internet: false }\nmachines:\n  fw: { os: debian@12, networks: { outside: 5, lan: 254 } }\n  cache: { os: debian@12, networks: { lan: 20 } }\n  user: { os: debian@12, networks: { outside: 10 } }\n",
+            Target::CloudVm,
+        );
+        let ready: Vec<String> = ["fw", "cache", "user"].iter().map(|m| format!("terraform_data.isoloom_ready_{m}")).collect();
+        for (cloud, kind) in CLOSING {
+            let tf = CloudVmModule::from(cloud).render(&env).unwrap_or_else(|e| panic!("{cloud:?}: {e}")).contents;
+            let body = isoloom_test_support::hcl_body(&tf);
+            let closing: Vec<&hcl::Block> = isoloom_test_support::hcl_blocks(&body, "resource", &[kind])
+                .into_iter()
+                .filter(|b| b.labels().get(1).is_some_and(|l| l.as_str().contains("sealed")))
+                .collect();
+            assert!(!closing.is_empty(), "{cloud:?} writes no {kind} that seals lan:\n{tf}");
+            for b in closing {
+                let waits = depends_on(b.body());
+                for r in &ready {
+                    assert!(waits.contains(r), "{cloud:?} {kind}.{:?} doesn't wait for {r}: {waits:?}", b.labels().get(1));
+                }
+            }
+        }
+    }
 
     #[test]
     fn a_cloud_whose_firewalls_only_allow_refuses_a_network_without_internet() {

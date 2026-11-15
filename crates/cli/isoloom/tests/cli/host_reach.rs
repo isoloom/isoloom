@@ -64,7 +64,10 @@ fn link(target: &str, at: &Path) -> Outcome {
 fn a_container_reaching_the_host_is_refused_until_each_access_is_allowed() -> Outcome {
     let home = scratch("host-reach-home")?;
     let dir = fixture("container-host-access")?;
-    link("/etc/hostname", &dir.join("conf.ini"))?;
+    // A file of this computer's outside the project, one every OS has: the test's own.
+    let outside = scratch("host-reach-outside")?;
+    std::fs::write(outside.join("conf.ini"), "")?;
+    link(&outside.join("conf.ini").to_string_lossy(), &dir.join("conf.ini"))?;
     let found = refused(&home, &dir, &[])?;
     for (at, access) in [
         ("machines.web.privileged", "privileged"),

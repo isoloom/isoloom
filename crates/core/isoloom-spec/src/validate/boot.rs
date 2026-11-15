@@ -96,15 +96,8 @@ fn template_id(s: &str) -> bool {
 
 /// The boot's fields: host paths are absolute, each part has what it hangs on.
 fn boot(at: &str, b: &Boot, problems: &mut Problems) {
-    let paths = [
-        ("kernel", &b.kernel),
-        ("initrd", &b.initrd),
-        ("dtb", &b.dtb),
-        ("loader", &b.loader),
-        ("nvram", &b.nvram),
-    ];
-    for (field, value) in paths {
-        if let Some(v) = value.as_ref().filter(|v| !v.starts_with('/')) {
+    for (field, value) in b.host_files() {
+        if let Some(v) = value.filter(|v| !v.starts_with('/')) {
             problems.add(format!("{at}.{field}"), format!("`{v}` must be an absolute path on the hypervisor's host"));
         }
     }

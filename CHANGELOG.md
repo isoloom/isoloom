@@ -364,7 +364,7 @@ stable spec format.
   is `vagrant box add <box> --provider <format>`, the format the provider boots: its own name, but
   `libvirt` for `qemu` (vagrant-qemu boots libvirt-format boxes). It said the provider, and a
   runner following it downloaded a QEMU environment's box twice (Isothrum/isothrum#71). The type's
-  doc, the committed schema and [the run manifest](docs/reference/run-manifest.md) say so; the
+  doc, the committed schema and [the run manifest](https://github.com/isoloom/isoloom/blob/v2.1.1/docs/reference/run-manifest.md) say so; the
   manifest itself is unchanged.
 
 ## [2.1.0] — 2026-11-11
@@ -680,7 +680,7 @@ stable spec format.
   and cloud Linux VMs say why they have none. `isoloom_manifest::{Console, ConsoleProtocol,
   ConsoleSource, ConsoleAccount}`, `Machine::console`, `Provider::id`,
   `contract::CONSOLES`, the errors `console_shape`, `console_twice` and `unknown_slot`, and the
-  matrix's "Graphical consoles" table ([run manifest](docs/reference/run-manifest.md#graphical-consoles)).
+  matrix's "Graphical consoles" table ([run manifest](https://github.com/isoloom/isoloom/blob/v2.0.0/docs/reference/run-manifest.md#graphical-consoles)).
 
 - **`isoloom defaults` takes `--images` and `-s`**, as the commands that read the lab do, so it
   shows the image table's and the command line's layers with their sources.

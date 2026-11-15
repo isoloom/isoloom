@@ -177,6 +177,12 @@ impl fmt::Display for Problem {
 /// The problems of a spec, in file order.
 pub type Problems = Vec<Problem>;
 
+/// `problems` on one line, each as its [`Problem::line`], separated by `; `.
+#[must_use]
+pub fn one_line(problems: &[Problem]) -> String {
+    problems.iter().map(Problem::line).collect::<Vec<_>>().join("; ")
+}
+
 /// The known name closest to `word`, when it is close (a typo).
 #[must_use]
 pub fn closest<'a>(word: &str, known: &[&'a str]) -> Option<&'a str> {

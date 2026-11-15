@@ -98,12 +98,7 @@ fn value_of(f: &SecretFile) -> Expression {
 /// and puts the files in place, now and at every boot (`isoloom_render::secrets::from_environment`).
 /// Nothing waits: the values are there. `None` when the machine gets no secret.
 pub(crate) fn secrets_step(mp: &MachinePlan) -> Option<Template> {
-    if mp.secrets.is_empty() {
-        return None;
-    }
-    let mut seen = std::collections::BTreeSet::new();
-    let unique: Vec<&SecretFile> = mp.secrets.iter().filter(|f| seen.insert(f.kept().to_owned())).collect();
-    let values: Vec<(String, String)> = unique.iter().map(|f| (f.kept().to_owned(), secret_variable(&f.name))).collect();
+    let (unique, values) = kept_values(mp)?;
     let script = isoloom_render::secrets::from_environment(&values, &mp.secrets);
     let mut t = Template::text("env");
     for (f, (_, var)) in unique.iter().zip(&values) {
