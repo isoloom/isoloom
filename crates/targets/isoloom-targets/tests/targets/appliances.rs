@@ -3,6 +3,8 @@
 use isoloom_spec::{Target, parse};
 use isoloom_targets::{GeneratedFile, Lab, generate, refusal};
 
+use isoloom_test_support::{yaml, yaml_at, yaml_keys_at, yaml_str, yaml_strs};
+
 use crate::testing::{Outcome, between, example, file, from};
 
 /// A spec's problems, found parsing it or after, one `path: reason` a line.
@@ -32,12 +34,16 @@ fn iol_gets_its_files_its_interfaces_in_order_and_its_addresses() -> Outcome {
     assert_eq!(file(&files, "appliances/r1/NETMAP")?, "1:0/0 513:0/0\n1:0/1 513:0/1\n1:0/2 513:0/2\n");
     assert!(file(&files, "appliances/r2/NETMAP")?.starts_with("2:0/0"), "each IOL its own instance number");
     assert!(file(&files, "appliances/r1/iouyap.ini")?.contains("[513:0/2]\neth_dev = eth2"));
+    // The project's files are mounted read-only, relabelled for SELinux (`ro,z`).
     // The management network first, then the machine's networks in order.
-    let r1 = from(&compose, "\n  r1:\n")?;
-    let (mgmt, a, wan) = (r1.find("isoloom-mgmt:").unwrap(), r1.find("site-a:").unwrap(), r1.find("wan:").unwrap());
-    assert!(mgmt < a && a < wan);
-    assert!(r1.contains("priority: 1000") && r1.contains("priority: 999") && r1.contains("priority: 998"));
-    assert!(r1.contains("../../configs/r1.cfg:/iol/own.txt:ro") && r1.contains("IOL_PID: '1'"));
+    let c = yaml(&compose);
+    let networks = yaml_keys_at(&c, "services.r1.networks");
+    let rank = |n: &str| networks.iter().position(|k| k == n).ok_or_else(|| format!("{n}: {networks:?}"));
+    assert!(rank("isoloom-mgmt")? < rank("site-a")? && rank("site-a")? < rank("wan")?, "{networks:?}");
+    let priority = |n: &str| yaml_str(&c, &format!("services.r1.networks.{n}.priority"));
+    assert_eq!([priority("isoloom-mgmt"), priority("site-a"), priority("wan")], ["1000", "999", "998"]);
+    assert!(yaml_strs(&c, "services.r1.volumes").contains(&"../../configs/r1.cfg:/iol/own.txt:ro,z".to_owned()));
+    assert_eq!(yaml_str(&c, "services.r1.environment.IOL_PID"), "1");
     assert!(
         compose.contains("ip addr flush dev eth1 && ip addr flush dev eth2"),
         "IOS owns the data addresses"
@@ -96,15 +102,17 @@ fn qemu_images_get_launch_py_their_startup_config_and_kvm() -> Outcome {
     let (c, files) = compose_of("cisco-qemu")?;
     assert!(file(&files, "appliances/vios/base.cfg")?.contains("interface GigabitEthernet0/1\n description site-a\n ip address 10.92.1.1"));
     assert!(file(&files, "appliances/csr/base.cfg")?.contains("interface GigabitEthernet2\n description site-b\n ip address 10.92.2.1"));
-    let csr = from(&c, "\n  csr:\n")?;
-    assert!(
-        csr.contains("privileged: true") && csr.contains("CLAB_INTFS: '2'") && csr.contains("CONNECTION_MODE: tc"),
-        "{csr}"
+    let y = yaml(&c);
+    let csr = |key: &str| yaml_str(&y, &format!("services.csr.{key}"));
+    assert_eq!(
+        [csr("privileged"), csr("environment.CLAB_INTFS"), csr("environment.CONNECTION_MODE")],
+        ["true", "2", "tc"]
     );
-    assert!(csr.contains("exec uv run /launch.py --username admin --password admin --hostname csr --connection-mode tc"));
-    assert!(csr.contains("../../configs/csr.cfg:/config/own.cfg:ro"));
-    let vios = from(&c, "\n  vios:\n")?;
-    assert!(vios.contains("CLAB_MGMT_PASSTHROUGH: 'true'"));
+    let launch = "exec uv run /launch.py --username admin --password admin --hostname csr --connection-mode tc";
+    let entrypoint = yaml_strs(&y, "services.csr.entrypoint");
+    assert!(entrypoint.last().is_some_and(|script| script.contains(launch)), "{entrypoint:?}");
+    assert!(yaml_strs(&y, "services.csr.volumes").contains(&"../../configs/csr.cfg:/config/own.cfg:ro,z".to_owned()));
+    assert_eq!(yaml_str(&y, "services.vios.environment.CLAB_MGMT_PASSTHROUGH"), "true");
     Ok(())
 }
 
@@ -112,11 +120,10 @@ fn qemu_images_get_launch_py_their_startup_config_and_kvm() -> Outcome {
 fn dynamips_builds_its_emulator_and_boots_the_firmware() -> Outcome {
     let (c, files) = compose_of("cisco-dynamips")?;
     let r1 = from(&c, "\n  r1:\n")?;
-    assert!(
-        r1.contains("build:\n      context: ./appliances/r1/build") && !r1.split("\n  isoloom-routes-r1:").next().unwrap().contains("image:"),
-        "{r1}"
-    );
-    assert!(r1.contains("../../images/c7200.bin:/firmware/ios.bin:ro"));
+    let y = yaml(&c);
+    assert_eq!(yaml_str(&y, "services.r1.build.context"), "./appliances/r1/build");
+    assert!(!yaml_keys_at(&y, "services.r1").contains(&"image".to_owned()), "it builds its own: {r1}");
+    assert!(yaml_strs(&y, "services.r1.volumes").contains(&"../../images/c7200.bin:/firmware/ios.bin:ro,z".to_owned()));
     assert!(r1.contains("-p 1:PA-2FE-TX -s 0:0:linux_eth:eth1 -s 1:0:linux_eth:eth2"), "{r1}");
     assert!(
         r1.contains("exec dynamips $$DYNAMIPS_ARGS /firmware/ios.bin"),
@@ -170,20 +177,28 @@ fn switch_ports(files: &[GeneratedFile]) -> Outcome {
 /// cisco-switch's Compose file: the switch's networks, and the machines around it.
 fn switch_service(c: &str) -> Outcome {
     // Compose: the VLAN networks at the controller address, then the trunk link, in order.
-    let sw = between(c, "\n  sw1:\n", "\n  isoloom-routes-sw1:\n")?;
-    assert!(
-        sw.contains("office-vlan10:\n        ipv4_address: 10.92.10.253\n        interface_name: eth1\n        priority: 999"),
-        "{sw}"
+    let y = yaml(c);
+    let net = |n: &str, k: &str| yaml_at(&y, &format!("services.sw1.networks.{n}.{k}")).map(|_| yaml_str(&y, &format!("services.sw1.networks.{n}.{k}")));
+    assert_eq!(
+        [
+            net("office-vlan10", "ipv4_address"),
+            net("office-vlan10", "interface_name"),
+            net("office-vlan10", "priority")
+        ],
+        [Some("10.92.10.253".into()), Some("eth1".into()), Some("999".into())]
     );
-    assert!(
-        sw.contains("office-vlan20:\n        ipv4_address: 10.92.20.253\n        interface_name: eth2"),
-        "{sw}"
+    assert_eq!(
+        [net("office-vlan20", "ipv4_address"), net("office-vlan20", "interface_name")],
+        [Some("10.92.20.253".into()), Some("eth2".into())]
     );
-    assert!(
-        sw.contains("isoloom-trunk-office-files:\n        interface_name: eth3\n        priority: 997"),
-        "{sw}"
+    assert_eq!(
+        [
+            net("isoloom-trunk-office-files", "interface_name"),
+            net("isoloom-trunk-office-files", "priority")
+        ],
+        [Some("eth3".into()), Some("997".into())]
     );
-    assert!(sw.contains("../../configs/sw1.cfg:/iol/own.txt:ro"));
+    assert!(yaml_strs(&y, "services.sw1.volumes").contains(&"../../configs/sw1.cfg:/iol/own.txt:ro,z".to_owned()));
     assert!(
         c.contains("ip addr flush dev eth1 && ip addr flush dev eth2 && ip addr flush dev eth3"),
         "IOS owns every data port"
@@ -191,10 +206,11 @@ fn switch_service(c: &str) -> Outcome {
     // The trunk machine's end is unchanged; its sidecar waits for the switch to start.
     let files_routes = between(c, "\n  isoloom-routes-files:\n", "\n  staff:\n")?;
     assert!(files_routes.contains("name office.10 type vlan id 10"), "{files_routes}");
-    assert!(files_routes.contains("      sw1:\n        condition: service_started"), "{files_routes}");
+    assert_eq!(yaml_str(&y, "services.isoloom-routes-files.depends_on.sw1.condition"), "service_started");
     // The switch has no address: no other machine resolves it.
-    let staff = from(c, "\n  staff:\n")?;
-    assert!(!staff.split("\n  guest:").next().unwrap_or_default().contains("sw1:"), "{staff}");
+    let hosts = yaml_strs(&y, "services.staff.extra_hosts");
+    assert!(hosts.iter().all(|h| !h.starts_with("sw1:")), "{hosts:?}");
+    assert!(!yaml_keys_at(&y, "services.staff.depends_on").contains(&"sw1".to_owned()));
     Ok(())
 }
 
