@@ -4,6 +4,8 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
+use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+
 use crate::testing::{Outcome, example};
 
 /// The GCP module of the example `name`, when it is generated.
@@ -12,27 +14,52 @@ fn gcp(name: &str) -> Outcome<Option<String>> {
     Ok(files.into_iter().find(|f| f.path.ends_with("cloud-vm/gcp/main.tf")).map(|f| f.contents))
 }
 
+/// The value of output `name`, as HCL writes it.
+fn output(body: &hcl::Body, name: &str) -> String {
+    hcl_blocks(body, "output", &[name])
+        .first()
+        .and_then(|o| hcl_attribute(o.body(), "value"))
+        .map(ToString::to_string)
+        .unwrap_or_default()
+}
+
 #[test]
 fn gcp_uses_the_google_provider_and_static_internal_ips() -> Outcome {
     let tf = gcp("hello-stack")?.expect("hello-stack has a gcp file");
+    let body = hcl_body(&tf);
+    let terraform = hcl_blocks(&body, "terraform", &[]);
+    let required = terraform.first().map(|t| hcl_nested(t.body(), "required_providers")).unwrap_or_default();
+    let google = required
+        .first()
+        .and_then(|r| hcl_attribute(r.body(), "google"))
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    assert!(google.contains("hashicorp/google") && google.contains("~> 8.5.0"), "{google}");
+    assert_eq!(hcl_names(&body, "resource", "google_compute_network"), ["app"]);
+    assert_ne!(hcl_names(&body, "resource", "google_compute_subnetwork"), Vec::<String>::new());
+    // Every address of the spec is kept: each machine at its octet, pinned on its NIC.
+    let pinned: Vec<String> = hcl_blocks(&body, "resource", &["google_compute_instance"])
+        .iter()
+        .flat_map(|i| hcl_nested(i.body(), "network_interface"))
+        .flat_map(|n| hcl_values(n.body(), "network_ip"))
+        .collect();
     assert!(
-        tf.contains("google = { source = \"hashicorp/google\", version = \"~> 8.5.0\" }"),
-        "google provider"
+        pinned.contains(&"10.60.0.10".to_owned()) && pinned.contains(&"10.60.0.20".to_owned()),
+        "{pinned:?}"
     );
-    assert!(tf.contains("resource \"google_compute_network\" \"app\""));
-    assert!(tf.contains("resource \"google_compute_subnetwork\""));
-    // Every address of the spec is kept: web sits at .10 on 10.60.0.0/24, pinned on its NIC.
-    assert!(tf.contains("network_ip = \"10.60.0.10\""), "static internal address");
-    assert!(tf.contains("network_ip = \"10.60.0.20\""));
     // The public address comes from the instance's access config.
-    assert!(tf.contains("network_interface[0].access_config[0].nat_ip"));
+    assert!(
+        output(&body, "ip").contains("network_interface[0].access_config[0].nat_ip"),
+        "{}",
+        output(&body, "ip")
+    );
     // The same outputs the AWS driver gives.
-    assert!(tf.contains("output \"ip\""));
-    assert!(tf.contains("output \"machines\""));
-    assert!(tf.contains("value = \"/var/lib/isoloom/ready\""));
+    let ready = hcl_blocks(&body, "output", &["ready_file"]);
+    assert_eq!(ready.first().map(|o| hcl_text(o.body(), "value")).as_deref(), Some("/var/lib/isoloom/ready"));
+    assert_ne!(output(&body, "machines"), "");
     // web publishes 8080: a firewall opening and a published output.
-    assert!(tf.contains("resource \"google_compute_firewall\" \"web_published\""));
-    assert!(tf.contains("output \"published\""));
+    assert!(hcl_names(&body, "resource", "google_compute_firewall").contains(&"web_published".to_owned()));
+    assert_ne!(output(&body, "published"), "");
     Ok(())
 }
 
@@ -40,18 +67,19 @@ fn gcp_uses_the_google_provider_and_static_internal_ips() -> Outcome {
 fn gcp_opens_reach_rules_across_networks() -> Outcome {
     // segmented has three networks and `reach` rules: a VPC network each, peered both ways.
     let tf = gcp("segmented")?.expect("segmented has a gcp file");
-    // front may reach back on 6379 only: a firewall on the cache, from front's range.
-    assert!(tf.contains("resource \"google_compute_firewall\" \"cache_reach_front\""));
-    assert!(tf.contains("ports    = [\"6379\"]"));
+    let body = hcl_body(&tf);
+    // front may reach back on 6379 only: a firewall on the cache, from front's range, in the
+    // cache's network's VPC.
+    let rule = hcl_one(&body, "google_compute_firewall", "cache_reach_front");
+    let allowed: std::collections::BTreeSet<String> = hcl_nested(rule, "allow").iter().flat_map(|a| hcl_values(a.body(), "ports")).collect();
+    assert_eq!(allowed.into_iter().collect::<Vec<_>>(), ["6379"], "TCP and UDP, that port alone");
+    assert_eq!(hcl_text(rule, "network"), "google_compute_network.back.id");
     // The subnetworks carry each network's exact range.
-    assert!(tf.contains("ip_cidr_range = \"10.61.20.0/24\""));
-    assert!(tf.contains("resource \"google_compute_network_peering\" \"front_back\""));
-    assert!(tf.contains("resource \"google_compute_network_peering\" \"back_front\""));
-    // The rule opening the cache to front is in the cache's network's VPC.
-    let rule = tf.split("resource \"google_compute_firewall\" \"cache_reach_front\"").nth(1).unwrap();
+    assert!(hcl_values(&body, "ip_cidr_range").contains(&"10.61.20.0/24".to_owned()));
+    let peerings = hcl_names(&body, "resource", "google_compute_network_peering");
     assert!(
-        rule.split("\n}\n").next().unwrap().contains("network       = google_compute_network.back.id"),
-        "{rule}"
+        peerings.contains(&"front_back".to_owned()) && peerings.contains(&"back_front".to_owned()),
+        "{peerings:?}"
     );
     Ok(())
 }
@@ -60,11 +88,14 @@ fn gcp_opens_reach_rules_across_networks() -> Outcome {
 fn gcp_puts_a_machine_on_several_networks_with_an_interface_in_each_vpc() -> Outcome {
     // vlan-office's admin is on several networks: an interface in each VPC, forwarding on.
     let tf = gcp("vlan-office")?.expect("vlan-office has a gcp file");
-    let admin = tf.split("resource \"google_compute_instance\" \"admin\"").nth(1).unwrap();
-    let admin = admin.split("\n}\n").next().unwrap();
-    assert!(admin.matches("network_interface {").count() > 1, "{admin}");
-    assert!(admin.contains("can_ip_forward = true"));
-    assert_eq!(admin.matches("access_config {").count(), 1, "the public address on the first only");
+    let body = hcl_body(&tf);
+    let admin = hcl_one(&body, "google_compute_instance", "admin");
+    let interfaces = hcl_nested(admin, "network_interface");
+    assert!(interfaces.len() > 1, "{tf}");
+    assert_eq!(hcl_text(admin, "can_ip_forward"), "true");
+    let public: Vec<usize> = interfaces.iter().map(|n| hcl_nested(n.body(), "access_config").len()).collect();
+    assert_eq!(public.first(), Some(&1), "the public address on the first");
+    assert_eq!(public.iter().sum::<usize>(), 1, "and only there: {public:?}");
     Ok(())
 }
 
