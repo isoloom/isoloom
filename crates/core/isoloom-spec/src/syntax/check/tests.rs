@@ -330,6 +330,7 @@ fn a_machines_own_address_outside_a_template_names_no_machine() {
         .unwrap_or_else(|p| panic!("{p:?}"));
     let found = placeholder_problems(&spec, None, "{{machine.addresses.lab}}", crate::syntax::placeholder::Place::Entry);
     assert_eq!(found.len(), 1, "{found:?}");
-    assert!(found[0].reason.contains("names the machine a template is for"), "{}", found[0].reason);
-    assert!(!found[0].reason.contains("``"), "no empty machine name: {}", found[0].reason);
+    assert!(matches!(found[0], Unresolved::Unknown(_)), "{found:?}");
+    assert!(found[0].reason().contains("names the machine a template is for"), "{}", found[0].reason());
+    assert!(!found[0].reason().contains("``"), "no empty machine name: {}", found[0].reason());
 }

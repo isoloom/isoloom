@@ -65,7 +65,6 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         tmpfs,
         hostname: Some(m.name.to_owned()),
         networks: networks::attachments(env, plan),
-        extra_hosts: networks::extra_hosts(env, m),
         environment: environment(env, plan),
         ports: plan.ports.iter().map(port).collect(),
         volumes: [storage::volume_mounts(plan), long_tmpfs, storage::host_folders(m.name, plan)].concat(),
@@ -78,6 +77,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         svc.image = Some(reference.clone());
         svc.build = build.as_ref().map(|b| build_of(env, m.name, b));
     }
+    resolve(env, m, &mut svc);
     dns(spec, &mut svc);
     // A stock image the runner supplies for the user to work from, or one the spec marks
     // `idle`: kept running idle (its own command may be a shell that exits at once).
@@ -123,6 +123,15 @@ pub(super) fn platform(plan: &isoloom_plan::MachinePlan) -> Option<String> {
 }
 
 /// The machine's DNS, when the spec sets it: its servers, options, search list and domain.
+/// How `m`'s service finds the machines it shares no network with: through the router's DNS, or
+/// its own `extra_hosts` ([`networks::Names`]).
+pub(crate) fn resolve(env: &Environment, m: Machine<'_>, svc: &mut Service) {
+    match networks::names(env, m) {
+        networks::Names::Router(at) => svc.dns = vec![at.to_string()],
+        networks::Names::Hosts(hosts) => svc.extra_hosts = hosts,
+    }
+}
+
 fn dns(spec: &model::Machine, svc: &mut Service) {
     if let Some(dns) = &spec.dns {
         svc.dns.clone_from(&dns.servers);
@@ -258,6 +267,17 @@ mod tests {
         serde_yaml_ng::to_string(value).unwrap()
     }
 
+    /// Each of `volumes` as Compose reads it: a short mount's text, a long one's YAML.
+    fn mounts(volumes: &[crate::file::Mount]) -> Vec<String> {
+        volumes
+            .iter()
+            .map(|m| match m {
+                crate::file::Mount::Short(short) => short.clone(),
+                long @ crate::file::Mount::Long(_) => yaml(long),
+            })
+            .collect()
+    }
+
     #[test]
     fn an_init_job_of_a_machine_that_builds_its_image_builds_it_too_so_no_pull_asks_a_registry_for_it() {
         let file = file_of(
@@ -283,7 +303,7 @@ mod tests {
         }
         assert_eq!(file.services["isoloom-probe"].entrypoint, ["/bin/cp", "/bin/busybox", "/probe/busybox"]);
         assert!(!file.services.keys().any(|s| s.starts_with("isoloom-probe-")), "{:?}", file.services.keys());
-        assert!(yaml(&file.services["web"].volumes).contains("isoloom-probe:/.isoloom-probe:ro"));
+        assert!(mounts(&file.services["web"].volumes).contains(&"isoloom-probe:/.isoloom-probe:ro".to_owned()));
     }
 
     #[test]
@@ -307,16 +327,13 @@ mod tests {
         ] {
             assert!(script.contains(wanted), "{wanted}: {script}");
         }
-        assert!(yaml(probe).contains("isoloom-probe:/isoloom-host-probe:ro"), "{}", yaml(probe));
-        assert!(
-            yaml(&probe.depends_on).contains("isoloom-probe"),
-            "after the host's probe: {}",
-            yaml(&probe.depends_on)
-        );
+        // Its own volume to fill, and the host's probe read-only, relabelled for SELinux.
+        assert_eq!(mounts(&probe.volumes), ["isoloom-probe-amd64:/probe", "isoloom-probe:/isoloom-host-probe:ro,z"]);
+        assert_eq!(probe.depends_on.keys().collect::<Vec<_>>(), ["isoloom-probe"], "after the host's probe");
         // The host's own probe is there for the pinned one to run, unpinned.
         assert_eq!(file.services["isoloom-probe"].platform, None);
         assert!(file.services["isoloom-probe-arm64"].entrypoint[3].contains("which machine api needs"));
-        assert!(yaml(&file.services["web"].volumes).contains("isoloom-probe-amd64:/.isoloom-probe:ro"));
+        assert!(mounts(&file.services["web"].volumes).contains(&"isoloom-probe-amd64:/.isoloom-probe:ro".to_owned()));
         let volumes: Vec<&String> = file.volumes.keys().collect();
         assert_eq!(volumes, ["isoloom-probe", "isoloom-probe-amd64", "isoloom-probe-arm64"]);
     }

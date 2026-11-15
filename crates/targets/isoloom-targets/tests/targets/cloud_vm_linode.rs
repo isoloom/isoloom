@@ -6,6 +6,8 @@
 use isoloom_spec::{Target, parse};
 use isoloom_targets::{Lab, generate};
 
+use isoloom_test_support::{hcl, hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
+
 use crate::testing::{Outcome, web_and_db};
 
 const LINODE: &str = ".isoloom/cloud-vm/linode/main.tf";
@@ -21,22 +23,27 @@ fn single_network_linux_lab_pins_each_machine_on_a_vpc_subnet() -> Outcome {
     let spec = parse(&web_and_db("ln-lab", "debian@12"))?;
 
     let tf = tf(&spec)?.expect("Linode generates a file for a single-network Linux lab");
+    let body = hcl_body(&tf);
     // One instance per machine.
-    assert!(tf.contains("resource \"linode_instance\" \"web\""), "{tf}");
-    assert!(tf.contains("resource \"linode_instance\" \"db\""));
+    assert_eq!(hcl_names(&body, "resource", "linode_instance"), ["web", "db"]);
     // The VPC subnet holds the network's exact range.
-    assert!(tf.contains("resource \"linode_vpc_subnet\" \"lab\""));
-    assert!(tf.contains("ipv4   = \"10.60.0.0/24\""));
+    assert_eq!(hcl_text(hcl_one(&body, "linode_vpc_subnet", "lab"), "ipv4"), "10.60.0.0/24");
     // Each machine pinned to its spec address on the VPC interface.
-    assert!(tf.contains("vpc = \"10.60.0.10\""), "{tf}");
-    assert!(tf.contains("vpc = \"10.60.0.11\""));
+    for (machine, address) in [("web", "10.60.0.10"), ("db", "10.60.0.11")] {
+        let vm = hcl_one(&body, "linode_instance", machine);
+        assert!(hcl_literals(vm).contains(&address.to_owned()), "{machine} at {address}: {tf}");
+    }
     // Each instance behind its own firewall.
-    assert!(tf.contains("resource \"linode_firewall\" \"web\""));
-    assert!(tf.contains("linodes = [linode_instance.web.id]"));
-    assert!(tf.contains("linodes = [linode_instance.db.id]"));
+    for machine in ["web", "db"] {
+        let firewall = hcl_one(&body, "linode_firewall", machine);
+        let linodes: Vec<String> = match hcl_attribute(firewall, "linodes") {
+            Some(hcl::Expression::Array(items)) => items.iter().map(ToString::to_string).collect(),
+            _ => Vec::new(),
+        };
+        assert_eq!(linodes, [format!("linode_instance.{machine}.id")]);
+    }
     // The expected outputs, shaped like the other clouds'.
-    assert!(tf.contains("output \"ip\""));
-    assert!(tf.contains("value = \"/var/lib/isoloom/ready\""));
+    crate::testing::assert_cloud_outputs(&body);
     Ok(())
 }
 
@@ -66,10 +73,14 @@ machines:
     )
     .expect("spec parses");
     let tf = tf(&spec)?.expect("Linode takes machines on different networks");
-    assert!(tf.contains("resource \"linode_vpc_subnet\" \"a\"") && tf.contains("resource \"linode_vpc_subnet\" \"b\""));
+    let body = hcl_body(&tf);
+    assert_eq!(hcl_names(&body, "resource", "linode_vpc_subnet"), ["a", "b"]);
     // web may go to b on 5432 only; db may not start anything toward a.
-    assert!(tf.contains("label    = \"reach-b-tcp\""), "{tf}");
-    assert!(tf.contains("label    = \"no-a-tcp\""));
+    let labels = hcl_values(&body, "label");
+    assert!(
+        labels.contains(&"reach-b-tcp".to_owned()) && labels.contains(&"no-a-tcp".to_owned()),
+        "{labels:?}"
+    );
     // Routes to the other subnet through the VPC, at every boot.
     assert!(tf.contains("sudo ip route replace 10.61.0.0/24 via 10.60.0.1"));
     Ok(())
@@ -107,8 +118,8 @@ fn a_plan_fits_the_disk_too_and_a_disk_beyond_the_largest_is_refused() -> Outcom
     };
     // 1 GB of memory fits the nanode; a 100 GB disk takes the 4 GB plan (80 GB is too small).
     let module = tf(&with("{ memory_mb: 1024, disk_gb: 100 }")?)?.ok_or("refused")?;
-    let web = module.split("resource \"linode_instance\" \"web\"").nth(1).ok_or("no web instance")?;
-    assert!(web.contains("type            = \"g6-standard-4\""), "{web}");
+    let body = hcl_body(&module);
+    assert_eq!(hcl_text(hcl_one(&body, "linode_instance", "web"), "type"), "g6-standard-4");
     let big = with("{ memory_mb: 1024, disk_gb: 400 }")?;
     assert!(tf(&big)?.is_none(), "a 400 GB disk is refused");
     let snapshot = isoloom_targets::resolved::resolve(&Lab::new(big));

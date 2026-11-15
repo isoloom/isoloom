@@ -122,16 +122,17 @@ fn join_namespace(env: &Environment, m: Machine<'_>, c: &mut Service, services: 
 
 /// An idle container at the access machine's addresses, for the check runner to stand in.
 fn stand_in(env: &Environment, m: Machine<'_>) -> Service {
-    Service {
+    let mut svc = Service {
         image: Some(env.images.pull(UTILITY_IMAGE)),
         hostname: Some(m.name.into()),
         networks: networks::attachments(env, m.plan),
-        extra_hosts: networks::extra_hosts(env, m),
         init: true,
         entrypoint: vec!["sleep".into(), "infinity".into()],
         profiles: vec![PROFILE.into()],
         ..Service::default()
-    }
+    };
+    crate::render::service::resolve(env, m, &mut svc);
+    svc
 }
 
 /// A runner standing on every network. On offline networks that aren't Docker-internal, it

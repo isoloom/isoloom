@@ -141,6 +141,42 @@ mod tests {
     }
 
     #[test]
+    fn a_crates_long_files_and_its_exceptions_are_counted_and_its_tests_file_and_build_folder_are_not() {
+        let root = tempfile::tempdir().unwrap();
+        let src = root.path().join("crates/a/src");
+        std::fs::create_dir_all(src.join("deep")).unwrap();
+        std::fs::create_dir_all(root.path().join("crates/a/target/x")).unwrap();
+        let long = "fn f() {}\n".repeat(MAX_CODE_LINES + 1);
+        std::fs::write(src.join("lib.rs"), "#[expect(dead_code, reason = \"r\")]\nfn a() {}\n").unwrap();
+        std::fs::write(src.join("deep/long.rs"), &long).unwrap();
+        std::fs::write(src.join("tests.rs"), &long).unwrap();
+        std::fs::write(root.path().join("crates/a/target/x/built.rs"), "#[expect(x)]\n").unwrap();
+        let crates = [Crate {
+            name: "a".into(),
+            dir: "crates/a".into(),
+        }];
+        let mut counts = Counts::new();
+        measure(root.path(), &crates, &mut counts).unwrap();
+        assert_eq!(counts["file/over-400-loc"]["a"], 1, "deep/long.rs, not tests.rs");
+        assert_eq!(counts["exception/expect"]["a"], 1, "lib.rs's, not the build folder's");
+    }
+
+    #[test]
+    fn the_crates_are_read_from_cargo_metadata() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("Cargo.toml"), "[workspace]\nmembers = [\"crates/a\"]\nresolver = \"2\"\n").unwrap();
+        std::fs::create_dir_all(root.path().join("crates/a/src")).unwrap();
+        std::fs::write(
+            root.path().join("crates/a/Cargo.toml"),
+            "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        )
+        .unwrap();
+        std::fs::write(root.path().join("crates/a/src/lib.rs"), "").unwrap();
+        let found: Vec<(String, String)> = crates(root.path()).unwrap().into_iter().map(|c| (c.name, c.dir)).collect();
+        assert_eq!(found, [("a".to_owned(), "crates/a".to_owned())]);
+    }
+
+    #[test]
     fn a_folder_that_cant_be_read_is_an_error_not_an_empty_crate() {
         let missing = std::env::temp_dir().join(format!("xtask-quality-none-{}", std::process::id()));
         assert!(rust_files(&missing).is_err());

@@ -21,13 +21,16 @@ indexmap.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 # The cloud-init carrier compresses a recipe's script for `write_files` (`encoding: gz+b64`).
-flate2.workspace = true
+# One deflate implementation whatever else is in the build (zip turns zlib-rs on in a workspace
+# build): the same cloud-init file gives the same compressed bytes from every binary.
+flate2 = { workspace = true, features = ["zlib-rs"] }
 
 [features]
 # Builders for the tests of the crates above (a dev-dependency turns it on): not a backend's API.
 test-support = []
 
 [dev-dependencies]
+isoloom-test-support.workspace = true
 proptest.workspace = true
 serde_yaml_ng.workspace = true
 insta.workspace = true

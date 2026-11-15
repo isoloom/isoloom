@@ -89,6 +89,9 @@ pub(crate) struct Guest<'a> {
     pub(crate) vm_name: isoloom_plan::HostName,
     /// Its size.
     pub(crate) size: Size,
+    /// How many of the environment's networks it is on: its adapters after the box's own, in the
+    /// order of its `private_network` lines.
+    pub(crate) networks: usize,
     /// The ESXi port group of each network it is on, in order, by its index in
     /// `ESXI_VIRTUAL_NETWORK` ([`super::port_groups`]).
     pub(crate) port_groups: Vec<usize>,
@@ -190,12 +193,16 @@ fn desktop(r: &mut Ruby, p: Provider, g: &Guest, more: impl FnOnce(&mut Ruby)) {
     });
 }
 
-/// VMware Workstation and Fusion: a display name, CPUs and memory, in the VM's `.vmx`.
+/// VMware Workstation and Fusion: a display name, CPUs and memory, in the VM's `.vmx`, and each
+/// adapter on the environment's networks at a PCI slot of its own ([`pci_slot`]).
 fn vmware(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::VmwareDesktop), "v", |r| {
         r.assign("v.vmx[\"displayName\"]", crate::vagrantfile::host_name(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
+        for n in 1..=g.networks {
+            r.assign(&format!("v.vmx[\"ethernet{n}.pcislotnumber\"]"), Value::str(&pci_slot(n).to_string()));
+        }
         if g.nested {
             nested::switch(r, Provider::VmwareDesktop);
         }
@@ -203,6 +210,17 @@ fn vmware(r: &mut Ruby, g: &Guest) {
             console::vmware(r, machine);
         }
     });
+}
+
+/// The PCI slot of VMware adapter `ethernet<n>` (`n` from 1: the box's own NAT adapter is
+/// `ethernet0`, left as the box has it). Without one, VMware picks a slot as the adapter is
+/// added, so attaching the second network's adapter (or a boot after a shutdown) moved the
+/// guest's interfaces under other names, and its SSH session closed. Each adapter takes the first
+/// function of a PCIe root port of its own (192, 224, 256), then the next functions of those
+/// ports: the slots VMware itself gives added adapters.
+pub(crate) fn pci_slot(n: usize) -> usize {
+    let i = n.saturating_sub(1);
+    192 + 32 * (i % 3) + i / 3
 }
 
 /// The CPU architecture as QEMU and libvirt name it.

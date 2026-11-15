@@ -38,6 +38,19 @@ fn a_line_quoting_an_expansion_gets_its_directive_and_others_none() {
     assert_eq!(indented, format!("  {DIRECTIVE}  pass '`id`'\n"));
 }
 
+#[test]
+fn a_quoted_value_over_several_lines_gets_one_directive_before_it_and_nothing_inside_it() {
+    // The spec's text, quoted, holds line breaks, a `$(…)` and a backticked word.
+    let lines = "if _retry 0 _req 200 'a\n$(id)\n`id`\nEOF' 'http://web/'; then pass 'n'; fi\npass 'plain'\n";
+    assert_eq!(with_directives(lines), format!("{DIRECTIVE}{lines}"));
+    // A line inside the value is never read as a statement of its own.
+    let two = "pass 'x\n$(a)'\npass 'y\n$(b)'\n";
+    assert_eq!(with_directives(two), format!("{DIRECTIVE}pass 'x\n$(a)'\n{DIRECTIVE}pass 'y\n$(b)'\n"));
+    // A comment's apostrophe opens no quote.
+    let commented = "# the check's own line\npass '$(c)'\n";
+    assert_eq!(with_directives(commented), format!("# the check's own line\n{DIRECTIVE}pass '$(c)'\n"));
+}
+
 /// The line before a check that single-quotes what looks like an expansion.
 const DIRECTIVE: &str = "# shellcheck disable=SC2016 # the check's own text, quoted as written\n";
 

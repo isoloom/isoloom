@@ -148,18 +148,38 @@ mod tests {
 
     #[test]
     fn a_vm_boots_its_utm_box_with_an_adapter_per_network_and_its_addresses() {
-        let out = rendered(
-            "version: 1\nname: t\nnetworks: { front: { cidr: 10.9.0.0/24 }, back: { cidr: 10.9.1.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { front: 10, back: 10 } }\n",
+        let spec = "version: 1\nname: t\nnetworks: { front: { cidr: 10.9.0.0/24 }, back: { cidr: 10.9.1.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { front: 10, back: 10 } }\n";
+        let out = rendered(spec);
+        // The MACs are seeded by the VM's name without the copy's key.
+        let seed = crate::testing::environment(spec).names().vm_name("web").unkeyed();
+        let r = isoloom_test_support::ruby_blocks(&out);
+        let provider = r.block("m.vm.provider \"utm\" do |v, o|");
+        for wanted in ["o.vm.box = \"utm/bookworm\"", "o.vm.box_architecture = :auto"] {
+            assert!(provider.statements.iter().any(|s| s == wanted), "{wanted}: {:?}", provider.statements);
+        }
+        // Before each boot, a card per network, in order, with the MACs the addresses look for.
+        let mac = |net: &str| hyperv::linux_mac_text(hyperv::mac(seed.as_str(), net));
+        let boot = r.block("m.trigger.before :\"VagrantPlugins::Utm::Action::Boot\", type: :action do |t|");
+        assert_eq!(
+            boot.statements,
+            [format!(
+                "t.ruby {{ |_, machine| IsoloomUtm.attach(machine, [[\"front\", \"{}\"], [\"back\", \"{}\"]]) }}",
+                mac("front"),
+                mac("back")
+            )]
         );
-        assert!(out.contains("m.vm.provider \"utm\" do |v, o|"), "{out}");
-        assert!(out.contains("o.vm.box = \"utm/bookworm\""), "{out}");
-        assert!(out.contains("o.vm.box_architecture = :auto"), "{out}");
-        assert!(out.contains(":\"VagrantPlugins::Utm::Action::Boot\", type: :action"), "{out}");
-        assert!(out.contains("IsoloomUtm.attach(machine, [[\"front\", \"02:15:"), "{out}");
-        assert!(out.contains("[\"back\", \"02:15:"), "{out}");
-        assert!(out.contains(":\"VagrantPlugins::Utm::Action::CheckGuestAdditions\", type: :action"), "{out}");
-        assert!(out.contains("IsoloomUtm.address(machine, "), "{out}");
-        assert!(out.contains("set_address ") && out.contains(" 10.9.0.10/24 "), "{out}");
+        // Once the guest answers, its address on each card, found by that MAC.
+        let answered = r.block("m.trigger.after :\"VagrantPlugins::Utm::Action::CheckGuestAdditions\", type: :action do |t|");
+        let script = answered.every_statement().join("\n");
+        let set: Vec<&str> = script.lines().map(str::trim).filter(|l| l.starts_with("set_address ")).collect();
+        assert_eq!(
+            set,
+            [
+                format!("set_address {} 10.9.0.10/24 || rc=1", mac("front")),
+                format!("set_address {} 10.9.1.10/24 || rc=1", mac("back"))
+            ],
+            "{script}"
+        );
     }
 
     #[test]

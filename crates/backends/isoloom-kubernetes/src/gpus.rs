@@ -103,8 +103,9 @@ mod tests {
     fn the_count_is_a_limit_and_the_capabilities_an_environment_variable() {
         let mut c = Container::new("a", crate::objects::Image::Tool("x".into()));
         apply(Some(&gpus("{ count: 2, capabilities: [compute, utility] }")), &mut c);
-        let yaml = serde_yaml_ng::to_string(&c).unwrap();
-        assert!(yaml.contains("env:\n- name: NVIDIA_DRIVER_CAPABILITIES\n  value: compute,utility\n"), "{yaml}");
-        assert!(yaml.contains("resources:\n  limits:\n    nvidia.com/gpu: '2'\n"), "{yaml}");
+        let yaml = serde_yaml_ng::to_value(&c).unwrap();
+        assert_eq!(yaml["env"][0]["name"].as_str(), Some("NVIDIA_DRIVER_CAPABILITIES"));
+        assert_eq!(yaml["env"][0]["value"].as_str(), Some("compute,utility"));
+        assert_eq!(yaml["resources"]["limits"]["nvidia.com/gpu"].as_str(), Some("2"));
     }
 }

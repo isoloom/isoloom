@@ -234,7 +234,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
+    - apk add --no-cache nftables dnsmasq >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$HOSTS" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo && exec sleep infinity
     hostname: isoloom-router
     networks:
       front:
@@ -257,10 +257,13 @@ services:
             ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64 icmpv6 type echo-request accept
           }
         }
+      HOSTS: |
+        10.67.20.10 web
+        10.67.10.10 user
     healthcheck:
       test:
       - CMD-SHELL
-      - nft list table inet isoloom >/dev/null 2>&1
+      - nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null
       interval: 3s
       timeout: 3s
       retries: 60
@@ -270,13 +273,13 @@ services:
     restart: unless-stopped
   web:
     image: nginx:1.27-alpine
+    dns:
+    - 10.67.20.254
     hostname: web
     networks:
       back:
         ipv4_address: 10.67.20.10
         ipv6_address: fd00:67:20::10
-    extra_hosts:
-    - user:10.67.10.10
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
@@ -328,6 +331,8 @@ services:
     image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
     profiles:
     - access
+    dns:
+    - 10.67.10.254
     init: true
     entrypoint:
     - sleep
@@ -337,8 +342,6 @@ services:
       front:
         ipv4_address: 10.67.10.10
         ipv6_address: fd00:67:10::10
-    extra_hosts:
-    - web:10.67.20.10
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dual-stack
@@ -375,6 +378,8 @@ services:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
+    dns:
+    - 10.67.10.254
     init: true
     entrypoint:
     - sleep
@@ -384,8 +389,6 @@ services:
       front:
         ipv4_address: 10.67.10.10
         ipv6_address: fd00:67:10::10
-    extra_hosts:
-    - web:10.67.20.10
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dual-stack

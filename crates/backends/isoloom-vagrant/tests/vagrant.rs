@@ -169,7 +169,7 @@ fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
 #[test]
 fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     let file = vagrantfile("solo-web")?;
-    let host = "ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)";
+    let host = "ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)).to_i";
     assert!(file.contains(&format!("forwarded_port\", guest: 80, host: {host},")), "the forward");
     assert!(file.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")), "the relay at start");
     assert!(file.contains(&format!("IsoloomHyperV.unports([[80, {host}]])")), "the relay gone with the VM");
@@ -179,12 +179,11 @@ fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     Ok(())
 }
 
-/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant that records what it says,
-/// then fires machine `ARGV[1]`'s Hyper-V triggers after `WaitForIPAddress` and `DeleteVM` on a
-/// VM at 192.0.2.10, Hyper-V's PowerShell recorded instead of run. Prints each forwarded port
-/// (`forward <guest> <host>`) and each PowerShell script (`ps <script>`). Vagrant's own Ruby is
-/// 3.x; macOS's `ruby` is 2.6, which lacks `filter_map`, so it gets one.
-const HYPERV_TRIGGERS_RB: &str = r#"
+/// A stand-in for Vagrant that records what a generated Vagrantfile (`ARGV[0]`) says, then loads
+/// it: each VM's forwarded ports (`$forwards`) and typed action triggers (`$triggers`, by VM, the
+/// action's name and when). Vagrant's own Ruby is 3.x; macOS's `ruby` is 2.6, which lacks
+/// `filter_map`, so it gets one.
+const VAGRANT_STAND_IN_RB: &str = r#"
 Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map)
 $forwards = []
 $triggers = {}
@@ -218,6 +217,13 @@ module Vagrant
   def self.user_data_path; "/nonexistent"; end
 end
 load ARGV[0]
+"#;
+
+/// After [`VAGRANT_STAND_IN_RB`]: fires machine `ARGV[1]`'s Hyper-V triggers after
+/// `WaitForIPAddress` and `DeleteVM` on a VM at 192.0.2.10, Hyper-V's PowerShell recorded instead
+/// of run. Prints each forwarded port (`forward <guest> <host>`) and each PowerShell script
+/// (`ps <script>`).
+const HYPERV_TRIGGERS_RB: &str = r#"
 IsoloomHyperV.define_singleton_method(:ps) { |script| $ps << script; "" }
 IsoloomHyperV.define_singleton_method(:address) { |*_| nil }
 ui = Object.new
@@ -281,7 +287,10 @@ fn ruby_runs() -> bool {
 fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Outcome<String> {
     let scratch = tempfile::Builder::new().prefix("isoloom-hyperv-ports-").tempdir()?;
     let (vagrantfile, mut ruby) = loadable(example, scratch.path())?;
-    ruby.arg("-e").arg(HYPERV_TRIGGERS_RB).arg(vagrantfile).arg(machine);
+    ruby.arg("-e")
+        .arg([VAGRANT_STAND_IN_RB, HYPERV_TRIGGERS_RB].concat())
+        .arg(vagrantfile)
+        .arg(machine);
     match hostports {
         Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
         None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
@@ -868,12 +877,15 @@ fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() 
 #[test]
 fn each_network_is_named_with_the_copy_key() -> Outcome {
     let env = plan("segmented")?;
-    let file = vagrantfile("segmented")?;
-    for name in env.networks.keys() {
-        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{name}", isoloom_spec::contract::RESERVED_PREFIX);
-        assert!(file.contains(&format!("virtualbox__intnet: \"{keyed}\"")), "{keyed}");
-        assert!(file.contains(&format!("libvirt__network_name: \"{keyed}\"")), "{keyed}");
+    let networks = libvirt_networks(&vagrantfile("segmented")?);
+    let keyed = |name: &str| format!("{}segmented-#{{ISOLOOM_KEY}}-{name}", isoloom_spec::contract::RESERVED_PREFIX);
+    // Every VM's every private network is named so, by both providers.
+    for (vm, kw) in &networks {
+        assert_eq!(field(kw, "virtualbox__intnet"), field(kw, "libvirt__network_name"), "{vm}: {kw:?}");
     }
+    let named: std::collections::BTreeSet<&str> = networks.iter().map(|(_, kw)| field(kw, "libvirt__network_name")).collect();
+    let wanted: std::collections::BTreeSet<String> = env.networks.keys().map(|n| keyed(n)).collect();
+    assert_eq!(named, wanted.iter().map(String::as_str).collect());
     Ok(())
 }
 
@@ -1119,6 +1131,364 @@ fn each_vm_with_checks_has_them_installed_for_vagrant_ssh() -> Outcome {
                 );
             }
         }
+    }
+    Ok(())
+}
+
+// Every libvirt network a VM joins exists when the VM starts: vagrant-libvirt creates it.
+// vagrant-libvirt (`create_networks.rb`, `handle_ip_option`) finds a private network that has an
+// `ip:` by its address block first, unless its forward mode is `veryisolated`, and only then by
+// its name. When the computer already has a network on the block under another name (another
+// copy of the environment, another environment on the same block, one left behind), it takes
+// that one, makes nothing, and the VM's interface still names the network the Vagrantfile gave:
+// `virDomainCreate` fails with "Network not found". The tests below read each VM's
+// `private_network` lines from the rendered Vagrantfile and follow vagrant-libvirt's lookup on a
+// computer that already holds every one of the environment's blocks under other names.
+
+/// A Ruby call's keyword arguments (`key: value`), each value's text as written: a string's
+/// contents (its `#{…}` left as it is), any other value as its literal.
+/// Keyword `key` of `kw`, empty when it has none.
+fn field<'k>(kw: &'k std::collections::BTreeMap<String, String>, key: &str) -> &'k str {
+    kw.get(key).map_or("", String::as_str)
+}
+
+fn keywords(call: &str) -> std::collections::BTreeMap<String, String> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut rest = call;
+    while let Some(after_comma) = rest.find(", ").and_then(|i| rest.get(i + 2..)) {
+        let Some((key, after)) = after_comma.split_once(": ") else { break };
+        if !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            rest = after_comma;
+            continue;
+        }
+        let (value, tail) = if let Some(quoted) = after.strip_prefix('"') {
+            string_literal(quoted)
+        } else {
+            let end = after.find(", ").unwrap_or(after.len());
+            (after.get(..end).unwrap_or(after).trim().to_owned(), after.get(end..).unwrap_or(""))
+        };
+        out.insert(key.to_owned(), value);
+        rest = tail;
+    }
+    out
+}
+
+/// The string literal starting at `s` (after its opening quote): its contents, and what follows
+/// its closing quote (the first `"` not escaped and not inside a `#{…}`).
+fn string_literal(s: &str) -> (String, &str) {
+    let (mut value, mut depth, mut escaped) = (String::new(), 0_u32, false);
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        match c {
+            _ if escaped => escaped = false,
+            '\\' => escaped = true,
+            '#' if chars.peek().is_some_and(|(_, n)| *n == '{') => depth += 1,
+            '}' if depth > 0 => depth -= 1,
+            '"' if depth == 0 => return (value, s.get(i + 1..).unwrap_or("")),
+            _ => {}
+        }
+        value.push(c);
+    }
+    (value, "")
+}
+
+/// Each VM's private networks as libvirt sees them: (VM, the network's keyword arguments).
+fn libvirt_networks(vagrantfile: &str) -> Vec<(String, std::collections::BTreeMap<String, String>)> {
+    let file = isoloom_test_support::ruby_blocks(vagrantfile);
+    let mut out = Vec::new();
+    for vm in file.find("config.vm.define ") {
+        let name = vm.head.split('"').nth(1).unwrap_or_default().to_owned();
+        for call in vm.statements("m.vm.network \"private_network\"") {
+            let kw = keywords(call);
+            if kw.contains_key("libvirt__network_name") {
+                out.push((name.clone(), kw));
+            }
+        }
+    }
+    out
+}
+
+/// The network vagrant-libvirt attaches the VM to (`Ok`), or why the VM won't start (`Err`), on a
+/// computer whose networks are `host` (name → block).
+fn attached(kw: &std::collections::BTreeMap<String, String>, host: &std::collections::BTreeMap<String, String>) -> Result<String, String> {
+    let name = field(kw, "libvirt__network_name");
+    let veryisolated = kw.get("libvirt__forward_mode").is_some_and(|m| m == "veryisolated");
+    if !veryisolated {
+        let block = block_of(field(kw, "ip"), field(kw, "netmask"));
+        if let Some((other, _)) = host.iter().find(|(other, b)| **b == block && other.as_str() != name) {
+            return Err(format!("{block} is already {other}'s: nothing makes `{name}`, which the VM's interface names"));
+        }
+    }
+    // Found by its name, or made under it.
+    Ok(name.to_owned())
+}
+
+/// The block `ip`/`netmask` is in, as `a.b.c.d/n`.
+fn block_of(ip: &str, netmask: &str) -> String {
+    // Unparsed, a block reads 0.0.0.0/0, which every crowded computer holds: the test fails.
+    let ip: std::net::Ipv4Addr = ip.parse().unwrap_or(std::net::Ipv4Addr::UNSPECIFIED);
+    let mask: std::net::Ipv4Addr = netmask.parse().unwrap_or(std::net::Ipv4Addr::UNSPECIFIED);
+    let bits = u32::from(mask);
+    format!("{}/{}", std::net::Ipv4Addr::from(u32::from(ip) & bits), bits.count_ones())
+}
+
+/// The computer as a run finds it: every block of `networks` already held by a network of
+/// another name.
+fn crowded(networks: &[(String, std::collections::BTreeMap<String, String>)]) -> std::collections::BTreeMap<String, String> {
+    networks
+        .iter()
+        .map(|(_, kw)| {
+            (
+                format!("{}-elsewhere", field(kw, "libvirt__network_name")),
+                block_of(field(kw, "ip"), field(kw, "netmask")),
+            )
+        })
+        .collect()
+}
+
+/// Every VM of `vagrantfile` starts on a computer that already holds its networks' blocks under
+/// other names: each joins the network the Vagrantfile names, made for it.
+fn every_network_is_made(vagrantfile: &str) {
+    let networks = libvirt_networks(vagrantfile);
+    assert!(!networks.is_empty(), "no libvirt network in:\n{vagrantfile}");
+    let host = crowded(&networks);
+    for (vm, kw) in &networks {
+        assert_eq!(attached(kw, &host).as_ref(), Ok(&field(kw, "libvirt__network_name").to_owned()), "{vm}: {kw:?}");
+    }
+}
+
+#[test]
+fn a_multi_machine_labs_network_is_made_even_where_another_network_holds_its_block() -> Outcome {
+    // supplier-portal-api and invoice-portal-api are both on 10.20.0.0/24.
+    every_network_is_made(&vagrantfile("supplier-portal-api")?);
+    every_network_is_made(&vagrantfile("segmented")?);
+    Ok(())
+}
+
+#[test]
+fn a_one_machine_labs_network_is_made_too() -> Outcome {
+    every_network_is_made(&vagrantfile("solo-web")?);
+    Ok(())
+}
+
+#[test]
+fn an_ipv6_network_is_made_by_its_name_with_its_block() -> Outcome {
+    let vagrantfile = vagrantfile("dual-stack")?;
+    every_network_is_made(&vagrantfile);
+    for (vm, kw) in libvirt_networks(&vagrantfile) {
+        assert!(kw.contains_key("libvirt__ipv6_address"), "{vm}: {kw:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_lookup_this_test_follows_fails_on_a_network_found_by_its_block() {
+    // The failure the run met: a network found by its block under another name.
+    let kw: std::collections::BTreeMap<String, String> = [("libvirt__network_name", "isoloom-a-lab"), ("ip", "10.20.0.31"), ("netmask", "255.255.255.0")]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
+    let host: std::collections::BTreeMap<String, String> = [("isoloom-b-lab".to_owned(), "10.20.0.0/24".to_owned())].into_iter().collect();
+    assert!(attached(&kw, &host).is_err());
+    let mut isolated = kw;
+    isolated.insert("libvirt__forward_mode".to_owned(), "veryisolated".to_owned());
+    assert_eq!(attached(&isolated, &host), Ok("isoloom-a-lab".to_owned()));
+}
+
+#[test]
+fn keywords_read_strings_with_interpolations_and_bare_values() {
+    let kw =
+        keywords("m.vm.network \"private_network\", ip: \"10.20.0.32\", virtualbox__intnet: \"isoloom-x-#{ISOLOOM_KEY}-lab\", libvirt__dhcp_enabled: false");
+    assert_eq!(field(&kw, "ip"), "10.20.0.32");
+    assert_eq!(field(&kw, "virtualbox__intnet"), "isoloom-x-#{ISOLOOM_KEY}-lab");
+    assert_eq!(field(&kw, "libvirt__dhcp_enabled"), "false");
+}
+
+/// After [`VAGRANT_STAND_IN_RB`]: fires every VM's UTM triggers: before `Boot` (the adapters, the `osascript` call recorded instead of run) and
+/// after `CheckGuestAdditions` (the guest's addresses, its script recorded). Prints each QEMU
+/// argument the adapters set (`arg <vm> <argument>`) and each address the guest sets
+/// (`address <vm> <mac> <address>`).
+const UTM_TRIGGERS_RB: &str = r#"
+require "open3"
+$vm = nil
+ok = Struct.new(:success?).new(true)
+Open3.define_singleton_method(:capture2e) do |*argv, stdin_data: nil|
+  # osascript - <vm id> <mark> <argument>...
+  argv.drop(4).each { |a| puts "arg #{$vm} #{a}" }
+  ["", ok]
+end
+IsoloomUtm.define_singleton_method(:address) do |_machine, script|
+  script.scan(/^set_address (\S+) (\S+)/) { |mac, ip| puts "address #{$vm} #{mac} #{ip}" }
+end
+$triggers.keys.map(&:first).uniq.each do |vm|
+  $vm = vm
+  machine = Struct.new(:name, :id).new(vm.to_sym, "id-#{vm}")
+  [["Boot", :before], ["CheckGuestAdditions", :after]].each do |action, at|
+    code = $triggers[[vm, action, at]] or next
+    code.call(nil, machine)
+  end
+end
+"#;
+
+/// What [`UTM_TRIGGERS_RB`] prints for `example`: each VM's adapters, as (VM, network id, MAC),
+/// and the addresses its guest sets, as (VM, MAC, address).
+/// A VM, a network id or MAC, and a MAC or address: one line of [`UTM_TRIGGERS_RB`].
+type Triple = (String, String, String);
+
+fn utm_adapters(example: &str) -> Outcome<(Vec<Triple>, Vec<Triple>)> {
+    let scratch = tempfile::Builder::new().prefix("isoloom-utm-nics-").tempdir()?;
+    let (vagrantfile, mut ruby) = loadable(example, scratch.path())?;
+    ruby.arg("-e").arg([VAGRANT_STAND_IN_RB, UTM_TRIGGERS_RB].concat()).arg(vagrantfile);
+    let out = printed(ruby)?;
+    // Each VM's netdevs (id → network id), then its cards (netdev, MAC).
+    let mut netdevs = std::collections::BTreeMap::new();
+    let (mut cards, mut addresses) = (Vec::new(), Vec::new());
+    for line in out.lines() {
+        let mut words = line.splitn(3, ' ');
+        let (kind, vm, rest) = (words.next(), words.next().unwrap_or_default().to_owned(), words.next().unwrap_or_default());
+        match kind {
+            Some("arg") => {
+                let (device, options) = rest.split_once(' ').ok_or("an argument without a value")?;
+                let opts: std::collections::BTreeMap<&str, &str> = options.split(',').filter_map(|o| o.split_once('=')).collect();
+                match device {
+                    "-netdev" => {
+                        assert!(options.starts_with("vmnet-host,"), "{vm}: {rest}");
+                        netdevs.insert(
+                            (vm.clone(), opts.get("id").ok_or("id missing")?.to_string()),
+                            opts.get("net-uuid").ok_or("net-uuid missing")?.to_string(),
+                        );
+                    }
+                    "-device" => {
+                        let uuid = netdevs
+                            .get(&(vm.clone(), opts.get("netdev").ok_or("netdev missing")?.to_string()))
+                            .ok_or("a card before its netdev")?;
+                        cards.push((vm, uuid.clone(), opts.get("mac").ok_or("mac missing")?.to_string()));
+                    }
+                    other => return Err(format!("unexpected argument {other}").into()),
+                }
+            }
+            Some("address") => {
+                let (mac, ip) = rest.split_once(' ').ok_or("an address without its MAC")?;
+                addresses.push((vm, mac.to_owned(), ip.to_owned()));
+            }
+            _ => {}
+        }
+    }
+    Ok((cards, addresses))
+}
+
+/// On UTM each network of the environment is a vmnet network of its own: every VM on it gets a card on the same
+/// network id, a network's VMs share none with another network, and each guest sets its address
+/// on the card with that MAC. Run on segmented (three networks and the router between them) and
+/// supplier-portal-api (three VMs on one network, the controller among them). The Ruby itself
+/// runs here when `ruby` is on the PATH (CI has it).
+#[test]
+fn every_vm_of_a_network_gets_a_card_on_the_same_vmnet_network_on_utm() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    for example in ["segmented", "supplier-portal-api"] {
+        let env = plan(example)?;
+        let (cards, addresses) = utm_adapters(example)?;
+        let mut ids: std::collections::BTreeMap<&str, std::collections::BTreeSet<&str>> = std::collections::BTreeMap::new();
+        for vm in env.vms() {
+            let label = vm.name;
+            for (net, ip) in &vm.plan.addresses {
+                // The card the guest sets this network's address on.
+                let at = format!("{ip}/{}", env.block(net).prefix());
+                let (_, mac, _) = addresses
+                    .iter()
+                    .find(|(v, _, a)| v == label && *a == at)
+                    .ok_or_else(|| format!("{example}: {label} sets no {at} ({net}): {addresses:?}"))?;
+                let (_, uuid, _) = cards
+                    .iter()
+                    .find(|(v, _, m)| v == label && m == mac)
+                    .ok_or_else(|| format!("{example}: {label} has no card with {mac} ({net}): {cards:?}"))?;
+                ids.entry(net.as_str()).or_default().insert(uuid.as_str());
+            }
+        }
+        assert_eq!(ids.len(), env.networks.len(), "{example}: a network no VM is on: {ids:?}");
+        for (net, uuids) in &ids {
+            assert_eq!(uuids.len(), 1, "{example}: network {net}'s VMs are on different vmnet networks: {uuids:?}");
+        }
+        let distinct: std::collections::BTreeSet<_> = ids.values().flatten().collect();
+        assert_eq!(distinct.len(), ids.len(), "{example}: two networks share a vmnet network: {ids:?}");
+    }
+    Ok(())
+}
+
+/// On VMware Desktop each adapter on the environment's networks is pinned to a PCI slot of its
+/// own (`ethernet<n>.pcislotnumber`, from 1: the box's NAT adapter keeps its own), one per
+/// `private_network` line of the VM: a slot VMware picked as the adapter was added moved the
+/// guest's interfaces under other names, and closed its SSH session.
+#[test]
+fn every_vmware_adapter_on_a_network_has_a_pci_slot_of_its_own() -> Outcome {
+    for example in ["segmented", "supplier-portal-api", "dmz-jump"] {
+        let file = vagrantfile(example)?;
+        let r = isoloom_test_support::ruby_blocks(&file);
+        for vm in r.find("config.vm.define ") {
+            let name = vm.head.split('"').nth(1).unwrap_or_default();
+            let networks = vm.statements("m.vm.network \"private_network\"").len();
+            let vmware = vm.find("m.vm.provider \"vmware_desktop\" do |");
+            let vmware = vmware.first().ok_or_else(|| format!("{example}: {name} has no VMware block"))?;
+            let slots: Vec<(String, String)> = vmware
+                .statements("v.vmx[\"ethernet")
+                .iter()
+                .filter_map(|s| s.strip_prefix("v.vmx[\"ethernet")?.split_once(".pcislotnumber\"] = "))
+                .map(|(n, slot)| (n.to_owned(), slot.trim_matches('"').to_owned()))
+                .collect();
+            let adapters: Vec<String> = slots.iter().map(|(n, _)| n.clone()).collect();
+            let wanted: Vec<String> = (1..=networks).map(|n| n.to_string()).collect();
+            assert_eq!(adapters, wanted, "{example}: {name}'s adapters");
+            let distinct: std::collections::BTreeSet<&str> = slots.iter().map(|(_, s)| s.as_str()).collect();
+            assert_eq!(distinct.len(), slots.len(), "{example}: {name}: {slots:?}");
+            assert!(
+                slots.iter().all(|(_, s)| s.parse::<u32>().is_ok_and(|n| n >= 160)),
+                "{example}: {name}: {slots:?}"
+            );
+        }
+    }
+    Ok(())
+}
+
+/// A port Isothrum keeps across operations comes back where it was: the forward (and Hyper-V's
+/// relay) read `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first, then the runner's choice for
+/// this run, then the published number, `auto_correct` kept.
+#[test]
+fn a_kept_host_port_wins_over_the_runs_choice_and_the_published_one() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let file = vagrantfile("solo-web")?;
+    let r = isoloom_test_support::ruby_blocks(&file);
+    let web = r.block("config.vm.define \"web\"");
+    let forwards = web.statements("m.vm.network \"forwarded_port\"");
+    assert!(
+        forwards
+            .iter()
+            .any(|f| f.contains("host: ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ") && f.ends_with("auto_correct: true")),
+        "{forwards:?}"
+    );
+    let scratch = tempfile::Builder::new().prefix("isoloom-kept-ports-").tempdir()?;
+    let chosen = r#"{"web/web": 28080}"#;
+    for (kept, run, wanted) in [(Some("18080"), Some(chosen), 18080), (None, Some(chosen), 28080), (None, None, 8080)] {
+        let (vagrantfile, mut ruby) = loadable("solo-web", scratch.path())?;
+        ruby.arg("-e")
+            .arg([VAGRANT_STAND_IN_RB, HYPERV_TRIGGERS_RB].concat())
+            .arg(vagrantfile)
+            .arg("web");
+        match kept {
+            Some(port) => ruby.env("ISOTHRUM_HOST_PORT_WEB_80_TCP", port),
+            None => ruby.env_remove("ISOTHRUM_HOST_PORT_WEB_80_TCP"),
+        };
+        match run {
+            Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
+            None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
+        };
+        let out = printed(ruby)?;
+        assert!(out.lines().any(|l| l == format!("forward 80 {wanted}")), "{kept:?} {run:?}: {out}");
     }
     Ok(())
 }

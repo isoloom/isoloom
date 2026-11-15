@@ -419,7 +419,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
+    - apk add --no-cache nftables dnsmasq >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$HOSTS" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo && exec sleep infinity
     hostname: isoloom-router
     networks:
       office-vlan10:
@@ -440,10 +440,15 @@ services:
             ip saddr 10.70.10.0/24 ip daddr 10.70.99.0/24 icmp type echo-request accept
           }
         }
+      HOSTS: |
+        10.70.99.10 intranet
+        10.70.10.10 staff
+        10.70.20.10 guest
+        10.70.10.50 admin
     healthcheck:
       test:
       - CMD-SHELL
-      - nft list table inet isoloom >/dev/null 2>&1
+      - nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null
       interval: 3s
       timeout: 3s
       retries: 60

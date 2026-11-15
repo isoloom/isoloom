@@ -35,6 +35,16 @@ fn lab(d: &Draft) -> Outcome<Lab> {
     Ok(Lab::new(spec(d)?).with_host_access(Grants::of(HostAccess::ALL)))
 }
 
+/// The scalar at `path` of the draft, read as YAML (`machines.web.hardware.gpus.count`).
+pub(crate) fn value_at(d: &Draft, path: &str) -> String {
+    isoloom_test_support::yaml_str(&isoloom_test_support::yaml(&d.yaml), path)
+}
+
+/// The list of scalars at `path` of the draft, read as YAML.
+pub(crate) fn values_at(d: &Draft, path: &str) -> Vec<String> {
+    isoloom_test_support::yaml_strs(&isoloom_test_support::yaml(&d.yaml), path)
+}
+
 /// What `isoloom validate --skip-files` shows for the draft: the files it names belong to a
 /// project the test doesn't have.
 pub(crate) fn validate(d: &Draft) -> Outcome<Vec<String>> {

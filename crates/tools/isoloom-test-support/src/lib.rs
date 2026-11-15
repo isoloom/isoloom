@@ -243,10 +243,14 @@ macro_rules! assert_every {
 }
 
 mod parsed_hcl;
+mod parsed_ini;
 mod parsed_ruby;
 mod parsed_yaml;
 
+/// The HCL crate the readers parse with, for tests that name its types.
+pub use hcl;
 pub use parsed_hcl::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_resource, hcl_text, hcl_values};
+pub use parsed_ini::ini_groups;
 pub use parsed_ruby::{RubyBlock, ruby_blocks};
 pub use parsed_yaml::{manifest, manifest_names, named, yaml, yaml_at, yaml_documents, yaml_keys_at, yaml_str, yaml_strs};
 

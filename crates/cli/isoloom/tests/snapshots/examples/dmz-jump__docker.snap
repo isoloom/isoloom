@@ -455,7 +455,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
+    - apk add --no-cache nftables dnsmasq >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$HOSTS" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo && exec sleep infinity
     hostname: isoloom-router
     networks:
       dmz:
@@ -477,10 +477,15 @@ services:
             ip saddr 10.30.10.0/24 ip daddr 10.30.20.0/24 icmp type echo-request accept
           }
         }
+      HOSTS: |
+        10.30.10.10 gateway
+        10.30.20.20 app
+        10.30.20.30 db
+        10.30.99.10 user
     healthcheck:
       test:
       - CMD-SHELL
-      - nft list table inet isoloom >/dev/null 2>&1
+      - nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null
       interval: 3s
       timeout: 3s
       retries: 60
@@ -495,14 +500,14 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: dmz-jump
     image: localhost/isoloom/dmz-jump-gateway
+    dns:
+    - 10.30.10.254
     hostname: gateway
     networks:
       dmz:
         ipv4_address: 10.30.10.10
       internal:
         ipv4_address: 10.30.20.10
-    extra_hosts:
-    - user:10.30.99.10
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
@@ -558,12 +563,12 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: dmz-jump
     image: localhost/isoloom/dmz-jump-app
+    dns:
+    - 10.30.20.254
     hostname: app
     networks:
       internal:
         ipv4_address: 10.30.20.20
-    extra_hosts:
-    - user:10.30.99.10
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
@@ -613,12 +618,12 @@ services:
     restart: unless-stopped
   db:
     image: postgres:16
+    dns:
+    - 10.30.20.254
     hostname: db
     networks:
       internal:
         ipv4_address: 10.30.20.30
-    extra_hosts:
-    - user:10.30.99.10
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
@@ -670,6 +675,8 @@ services:
     image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
     profiles:
     - access
+    dns:
+    - 10.30.99.254
     init: true
     entrypoint:
     - sleep
@@ -678,10 +685,6 @@ services:
     networks:
       access:
         ipv4_address: 10.30.99.10
-    extra_hosts:
-    - gateway:10.30.10.10
-    - app:10.30.20.20
-    - db:10.30.20.30
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dmz-jump
@@ -718,6 +721,8 @@ services:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
+    dns:
+    - 10.30.99.254
     init: true
     entrypoint:
     - sleep
@@ -726,10 +731,6 @@ services:
     networks:
       access:
         ipv4_address: 10.30.99.10
-    extra_hosts:
-    - gateway:10.30.10.10
-    - app:10.30.20.20
-    - db:10.30.20.30
     labels:
       isoloom.managed: 'true'
       isoloom.environment: dmz-jump

@@ -90,14 +90,19 @@ fn a_udp_service_is_published_as_udp_on_docker() -> Outcome {
     // a machine with only UDP services has none.
     let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&generated(&spec, Target::Docker, ".isoloom/docker/compose.yml")?).unwrap();
     let svc = |n: &str| compose["services"][n].clone();
-    let ports = serde_yaml_ng::to_string(&svc("dns")["ports"]).unwrap();
-    assert!(ports.contains("+10053}:53/udp"), "{ports}");
+    let ports = |n: &str| {
+        svc(n)["ports"]
+            .as_sequence()
+            .map(|p| p.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect::<Vec<_>>())
+            .unwrap_or_default()
+    };
+    assert!(ports("dns").iter().any(|p| p.ends_with("+10053}:53/udp")), "{:?}", ports("dns"));
     assert_eq!(svc("dns")["labels"]["isoloom.port.dns"].as_str(), Some("udp:53"));
     assert_eq!(svc("dns")["labels"]["isoloom.port.zone"].as_str(), Some("tcp:53"));
     let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
     assert!(probe.contains("127.0.0.1 53"), "{probe}");
     assert!(svc("syslog").get("healthcheck").is_none());
-    assert!(serde_yaml_ng::to_string(&svc("syslog")["ports"]).unwrap().contains(":514/udp"));
+    assert!(ports("syslog").iter().any(|p| p.ends_with(":514/udp")), "{:?}", ports("syslog"));
     Ok(())
 }
 
@@ -128,19 +133,38 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
     // Kubernetes: UDP container ports and Service ports, named apart from the TCP one; the
     // NetworkPolicy for `reach` already opens both protocols.
     let env = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
-    assert!(
-        env.contains("- containerPort: 53\n          protocol: UDP\n        - containerPort: 53\n"),
-        "{env}"
-    );
-    assert!(env.contains("name: p53-udp") && env.contains("name: p53\n"), "{env}");
-    assert!(env.contains("name: p10053-udp"), "{env}");
+    let docs = isoloom_test_support::yaml_documents(&env);
+    let dns = isoloom_test_support::manifest(&docs, "Deployment", "dns");
+    let container = &dns["spec"]["template"]["spec"]["containers"][0];
+    let declared: Vec<(u64, String)> = container["ports"]
+        .as_sequence()
+        .into_iter()
+        .flatten()
+        .map(|p| {
+            (
+                p["containerPort"].as_u64().unwrap_or_default(),
+                p["protocol"].as_str().unwrap_or("TCP").to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(declared, [(53, "UDP".to_owned()), (53, "TCP".to_owned())], "{env}");
+    let service_ports: Vec<String> = docs
+        .iter()
+        .filter(|d| d["kind"].as_str() == Some("Service"))
+        .flat_map(|d| d["spec"]["ports"].as_sequence().cloned().unwrap_or_default())
+        .filter_map(|p| p["name"].as_str().map(str::to_owned))
+        .collect();
+    for name in ["p53-udp", "p53", "p10053-udp"] {
+        assert!(service_ports.iter().any(|p| p == name), "{name}: {service_ports:?}");
+    }
     assert!(!env.contains("127.0.0.1 514"), "{env}");
 
     // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
     let vf = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
     assert!(
-        vf.contains("guest: 53, host: ISOLOOM_HOSTPORTS.fetch(")
-            && vf.contains(", 10053), host_ip: \"127.0.0.1\", protocol: \"udp\", auto_correct: true # not on libvirt"),
+        vf.contains("guest: 53, host: ENV.fetch(\"ISOTHRUM_HOST_PORT_")
+            && vf.contains("_53_UDP\", ISOLOOM_HOSTPORTS.fetch(")
+            && vf.contains(", 10053)).to_i, host_ip: \"127.0.0.1\", protocol: \"udp\", auto_correct: true # not on libvirt"),
         "{vf}"
     );
     assert!(!vf.contains("/dev/tcp/syslog/514"), "{vf}");
@@ -152,7 +176,16 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
 
     // The clouds: published as UDP.
     let aws = generated(&spec, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert!(aws.contains("from_port   = 1514\n    to_port     = 1514\n    protocol    = \"udp\""), "{aws}");
+    let body = isoloom_test_support::hcl_body(&aws);
+    let rules: Vec<(String, String, String)> = isoloom_test_support::hcl_blocks(&body, "resource", &["aws_security_group"])
+        .iter()
+        .flat_map(|g| isoloom_test_support::hcl_nested(g.body(), "ingress"))
+        .map(|r| {
+            let field = |k: &str| isoloom_test_support::hcl_values(r.body(), k).join(",");
+            (field("from_port"), field("to_port"), field("protocol"))
+        })
+        .collect();
+    assert!(rules.contains(&("1514".into(), "1514".into(), "udp".into())), "{rules:?}");
     Ok(())
 }
 

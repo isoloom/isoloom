@@ -8,7 +8,7 @@ mod hardware;
 mod init_jobs;
 mod process;
 mod secrets;
-mod service;
+pub(crate) mod service;
 
 pub(crate) use service::readiness;
 

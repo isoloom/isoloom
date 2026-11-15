@@ -96,6 +96,10 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
             if p == Provider::Qemu {
                 virtiofs_every_account(r);
             }
+            if p == Provider::VmwareDesktop {
+                // VMware's folders only, picked by Vagrant itself (no `type:`, see `synced_folder`).
+                r.assign("o.vm.allowed_synced_folder_types", Value::array([Value::sym("vmware")]));
+            }
             for s in shares {
                 r.call(synced_folder(p, how, s));
             }
@@ -119,12 +123,21 @@ const VIRTUALBOX_GROUP_WRITES: [&str; 2] = ["dmode=0775", "fmode=0664"];
 
 /// `o.vm.synced_folder <the folder>, <guest>, type: <kind>, create: true`, read-only as the
 /// provider's mount takes it; VirtualBox's read-write one group-writable.
+///
+/// VMware Desktop's carries no `type:`: Vagrant checks a folder of an explicit type with
+/// `usable?(machine, true)`, which vagrant-vmware-desktop (3.0.5) defines with one argument, so
+/// `vagrant up` stopped on an `ArgumentError`. A folder without a type is given the first usable
+/// one of `allowed_synced_folder_types` (VMware's alone, set in its block), asked with one argument.
 fn synced_folder(p: Provider, (kind, ro_option): (&str, &str), s: &Share) -> Call {
     let call = Call::new("o.vm.synced_folder")
         .arg(Value::raw(format!("File.expand_path({}, ROOT)", Value::str(&s.from))))
-        .arg(Value::str(&s.guest))
-        .kw("type", Value::str(kind))
-        .kw("create", true);
+        .arg(Value::str(&s.guest));
+    let call = if p == Provider::VmwareDesktop {
+        call
+    } else {
+        call.kw("type", Value::str(kind))
+    };
+    let call = call.kw("create", true);
     match (s.read_only, p) {
         (false, Provider::VirtualBox) => call.kw("mount_options", Value::array(VIRTUALBOX_GROUP_WRITES.map(Value::str))),
         (false, _) => call,
@@ -195,52 +208,69 @@ mod tests {
     /// (uid 1001) write, but vagrant-qemu's virtiofsd maps uid and gid 1000 alone, so its writes
     /// would fail with EPERM. QEMU's block sets the ids it maps and squashes every other one to
     /// this computer's user (`IsoloomQemu.virtiofs_squash`).
+    /// Provider `name`'s block of the rendered Ruby (`m.vm.provider "<name>" do |…|`).
+    fn provider<'r>(r: &'r isoloom_test_support::RubyBlock, name: &str) -> Option<&'r isoloom_test_support::RubyBlock> {
+        r.find(&format!("m.vm.provider \"{name}\" do |")).into_iter().next()
+    }
+
     #[test]
     fn qemus_share_lets_every_account_of_the_vm_write_as_the_others_do() {
         let out = ruby(&[share("shared", "/srv/shared", false)]);
-        let (_, from_qemu) = out.split_once("m.vm.provider \"qemu\" do |v, o|").expect("QEMU's block");
-        let (block, _) = from_qemu.split_once("\n  end\n").expect("its end");
+        let r = isoloom_test_support::ruby_blocks(&out);
+        let qemu = provider(&r, "qemu").expect("QEMU's block");
         for line in [
             "v.virtiofs_guest_uid = IsoloomQemu::GUEST_ID",
             "v.virtiofs_guest_gid = IsoloomQemu::GUEST_ID",
             "v.extra_virtiofsd_args = IsoloomQemu.virtiofs_squash",
-            "type: \"qemu_virtiofs\"",
+            "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"qemu_virtiofs\", create: true",
         ] {
-            assert!(block.contains(line), "{line}: {block}");
+            assert!(qemu.statements.iter().any(|s| s == line), "{line}: {:?}", qemu.statements);
         }
-        assert!(
-            !out.contains("m.vm.provider \"virtualbox\" do |v, o|"),
-            "only QEMU's block takes its config: {out}"
-        );
+        // Only QEMU's block takes its config: VirtualBox's has the folder alone.
+        let vbox = provider(&r, "virtualbox").expect("VirtualBox's block");
+        assert!(vbox.statements.iter().all(|s| !s.contains("virtiofs")), "{:?}", vbox.statements);
     }
 
     #[test]
     fn each_provider_shares_both_ways_with_its_own_kind_and_the_others_refuse() {
         let out = ruby(&[share("shared", "/srv/shared", false), share("~/notes", "/notes", false)]);
-        assert!(
-            out.contains(
-                "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"virtualbox\", create: true, mount_options: [\"dmode=0775\", \"fmode=0664\"]\n"
-            ),
-            "VirtualBox's read-write mount is group-writable: {out}"
+        let r = isoloom_test_support::ruby_blocks(&out);
+        let folders = |name: &str| provider(&r, name).map(|b| b.statements("o.vm.synced_folder ")).unwrap_or_default();
+        // VirtualBox's read-write mount is group-writable.
+        assert_eq!(
+            folders("virtualbox").first().copied(),
+            Some(
+                "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"virtualbox\", create: true, mount_options: [\"dmode=0775\", \"fmode=0664\"]"
+            )
         );
-        for (provider, kind) in [
-            ("vmware_desktop", "vmware"),
-            ("parallels", "parallels"),
-            ("utm", "utm"),
-            ("qemu", "qemu_virtiofs"),
-            ("libvirt", "virtiofs"),
-        ] {
-            assert!(out.contains(&format!("m.vm.provider \"{provider}\" do |")), "{provider}: {out}");
-            assert!(
-                out.contains(&format!(
-                    "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"{kind}\", create: true\n"
-                )),
-                "{provider}: {out}"
+        // VMware's folders carry no type (its plugin's `usable?` takes one argument, which Vagrant
+        // passes only to pick a type), VMware's the only one allowed.
+        let vmware = provider(&r, "vmware_desktop").expect("VMware's block");
+        assert_eq!(
+            vmware.statements,
+            [
+                "o.vm.allowed_synced_folder_types = [:vmware]",
+                "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", create: true",
+                "o.vm.synced_folder File.expand_path(\"~/notes\", ROOT), \"/notes\", create: true",
+            ]
+        );
+        for (name, kind) in [("parallels", "parallels"), ("utm", "utm"), ("qemu", "qemu_virtiofs"), ("libvirt", "virtiofs")] {
+            assert_eq!(
+                folders(name),
+                [
+                    format!("o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", type: \"{kind}\", create: true"),
+                    format!("o.vm.synced_folder File.expand_path(\"~/notes\", ROOT), \"/notes\", type: \"{kind}\", create: true"),
+                ],
+                "{name}"
             );
         }
-        assert!(out.contains("v.memorybacking :access, mode: \"shared\"\n"), "{out}");
-        assert!(out.contains("File.expand_path(\"~/notes\", ROOT)"), "{out}");
-        assert!(!out.contains("m.vm.provider \"hyperv\""), "{out}");
+        let libvirt = provider(&r, "libvirt").expect("libvirt's block");
+        assert!(
+            libvirt.statements.iter().any(|s| s == "v.memorybacking :access, mode: \"shared\""),
+            "{:?}",
+            libvirt.statements
+        );
+        assert!(provider(&r, "hyperv").is_none(), "{out}");
         assert!(
             out.contains(":hyperv => \"host folders (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB"),
             "{out}"
@@ -273,9 +303,17 @@ mod tests {
     #[test]
     fn a_read_only_folder_is_mounted_read_only_and_qemu_which_cannot_refuses() {
         let out = ruby(&[share("/srv/a", "/a", true)]);
-        assert!(out.contains("type: \"virtualbox\", create: true, mount_options: [\"ro\"]\n"), "{out}");
-        assert!(out.contains("type: \"virtiofs\", create: true, mount_opts: \"ro\"\n"), "{out}");
-        assert!(!out.contains("m.vm.provider \"qemu\""), "{out}");
+        let r = isoloom_test_support::ruby_blocks(&out);
+        let folders = |name: &str| provider(&r, name).map(|b| b.statements("o.vm.synced_folder ")).unwrap_or_default();
+        assert_eq!(
+            folders("virtualbox"),
+            ["o.vm.synced_folder File.expand_path(\"/srv/a\", ROOT), \"/a\", type: \"virtualbox\", create: true, mount_options: [\"ro\"]"]
+        );
+        assert_eq!(
+            folders("libvirt"),
+            ["o.vm.synced_folder File.expand_path(\"/srv/a\", ROOT), \"/a\", type: \"virtiofs\", create: true, mount_opts: \"ro\""]
+        );
+        assert!(provider(&r, "qemu").is_none(), "{out}");
         assert!(out.contains(":qemu => \"host folders (`host_folders`): one is read-only"), "{out}");
     }
 

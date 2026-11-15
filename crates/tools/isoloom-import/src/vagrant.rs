@@ -417,7 +417,10 @@ mod tests {
             {"name":"network","args":["private_network",{"ip":"10.9.0.10"}]}]}}}"#
             .parse()?;
         let d = draft(&recorded, "solo", "Vagrantfile")?;
-        assert!(d.yaml.contains("  default:\n    networks: { net: 10 }\n"), "{}", d.yaml);
+        let y = isoloom_test_support::yaml(&d.yaml);
+        assert_eq!(isoloom_test_support::yaml_keys_at(&y, "machines"), ["default"], "{}", d.yaml);
+        assert_eq!(isoloom_test_support::yaml_keys_at(&y, "machines.default.networks"), ["net"]);
+        assert_eq!(isoloom_test_support::yaml_str(&y, "machines.default.networks.net"), "10");
         Ok(())
     }
 
@@ -433,7 +436,12 @@ mod tests {
         let said: Vec<&str> = d.notes.iter().map(|n| n.text.as_str()).collect();
         assert!(said.iter().any(|t| t.starts_with("`fd00::10` isn't an IPv4 address")), "{said:?}");
         assert!(said.contains(&"10.9.3.10/16 isn't a /24 to /29; re-addressed to 10.9.3.0/24"), "{said:?}");
-        assert!(d.yaml.contains("cidr: 10.9.3.0/24"), "{}", d.yaml);
+        let y = isoloom_test_support::yaml(&d.yaml);
+        let blocks: Vec<String> = isoloom_test_support::yaml_keys_at(&y, "networks")
+            .iter()
+            .map(|n| isoloom_test_support::yaml_str(&y, &format!("networks.{n}.cidr")))
+            .collect();
+        assert_eq!(blocks, ["10.9.3.0/24"], "{}", d.yaml);
         Ok(())
     }
 
@@ -460,7 +468,12 @@ mod tests {
             {"name":"define","args":["web_1"]},{"name":"define","args":["web-1"]}]}}}"#
             .parse()?;
         let d = draft(&recorded, "lab", "Vagrantfile")?;
-        assert!(d.yaml.contains("\n  web-1:\n") && d.yaml.contains("\n  web-1-2:\n"), "{}", d.yaml);
+        assert_eq!(
+            isoloom_test_support::yaml_keys_at(&isoloom_test_support::yaml(&d.yaml), "machines"),
+            ["web-1", "web-1-2"],
+            "{}",
+            d.yaml
+        );
         Ok(())
     }
 }

@@ -249,7 +249,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
+    - apk add --no-cache nftables dnsmasq >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$HOSTS" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo && exec sleep infinity
     hostname: isoloom-router
     networks:
       servers:
@@ -268,10 +268,13 @@ services:
             ip saddr 10.66.20.0/24 ip daddr 10.66.10.0/24 icmp type echo-request accept
           }
         }
+      HOSTS: |
+        10.66.10.53 dns
+        10.66.20.10 client
     healthcheck:
       test:
       - CMD-SHELL
-      - nft list table inet isoloom >/dev/null 2>&1
+      - nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null
       interval: 3s
       timeout: 3s
       retries: 60
@@ -286,12 +289,12 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: udp-dns
     image: localhost/isoloom/udp-dns-dns
+    dns:
+    - 10.66.10.254
     hostname: dns
     networks:
       servers:
         ipv4_address: 10.66.10.53
-    extra_hosts:
-    - client:10.66.20.10
     ports:
     - ${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:${ISOLOOM_PUBLISH_FIXED:+10053}:53/udp
     volumes:
@@ -352,6 +355,8 @@ services:
     image: localhost/isoloom/udp-dns-client
     profiles:
     - access
+    dns:
+    - 10.66.20.254
     init: true
     entrypoint:
     - sleep
@@ -360,8 +365,6 @@ services:
     networks:
       users:
         ipv4_address: 10.66.20.10
-    extra_hosts:
-    - dns:10.66.10.53
     depends_on:
       dns:
         condition: service_healthy
@@ -403,6 +406,8 @@ services:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
+    dns:
+    - 10.66.20.254
     init: true
     entrypoint:
     - sleep
@@ -411,8 +416,6 @@ services:
     networks:
       users:
         ipv4_address: 10.66.20.10
-    extra_hosts:
-    - dns:10.66.10.53
     labels:
       isoloom.managed: 'true'
       isoloom.environment: udp-dns

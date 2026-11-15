@@ -127,7 +127,61 @@ fn target_block(listing: &str, id: &str) -> Outcome<String> {
 
 /// A file's contents as the snapshot shows them: its text, or a fingerprint of its bytes.
 fn shown(bytes: &[u8], dir: &Path, home: &Path) -> String {
-    std::str::from_utf8(bytes).map_or_else(|_| fingerprint(bytes), |text| normalize(text, dir, home))
+    std::str::from_utf8(bytes).map_or_else(|_| fingerprint(bytes), |text| decoded(&normalize(text, dir, home)))
+}
+
+/// `text` with each gzip-and-base64 value (a cloud-init file's `content`) written as what it
+/// holds: the value becomes `<gzip N>`, and value N's decoded text follows the file. A deflate
+/// library writes other bytes for the same payload from one version to the next; the snapshot
+/// follows the payload, and isoloom-render's own test pins the compressed bytes once.
+fn decoded(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut payloads = Vec::new();
+    let mut rest = text;
+    while let Some(at) = rest.find("\"H4sI") {
+        let (before, value) = rest.split_at(at + 1);
+        let end = value.find('"').unwrap_or(value.len());
+        let (encoded, after) = value.split_at(end);
+        out.push_str(before);
+        if let Some(payload) = gunzip_base64(encoded) {
+            payloads.push(payload);
+            out.push_str(&["<gzip ", &payloads.len().to_string(), ">"].concat());
+        } else {
+            out.push_str(encoded);
+        }
+        rest = after;
+    }
+    out.push_str(rest);
+    for (n, payload) in payloads.iter().enumerate() {
+        out.push_str(&["### <gzip ", &(n + 1).to_string(), "> decoded\n", payload].concat());
+        if !payload.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// The text gzip-compressed and base64-encoded in `encoded`, or `None` when it isn't that.
+fn gunzip_base64(encoded: &str) -> Option<String> {
+    use std::io::Read as _;
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let sextets: Option<Vec<u8>> = encoded
+        .trim_end_matches('=')
+        .bytes()
+        .map(|c| ALPHABET.iter().position(|a| *a == c).and_then(|i| u8::try_from(i).ok()))
+        .collect();
+    // Four sextets are three bytes; a last group of two or three sextets is one or two.
+    let bytes: Vec<u8> = sextets?
+        .chunks(4)
+        .flat_map(|g| {
+            let n = g.iter().fold(0_u32, |n, s| (n << 6) | u32::from(*s)) << (6 * (4 - g.len()));
+            let [_, a, b, c] = n.to_be_bytes();
+            [a, b, c].into_iter().take(g.len().saturating_sub(1))
+        })
+        .collect();
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(bytes.as_slice()).read_to_string(&mut text).ok()?;
+    Some(text)
 }
 
 /// A binary file as the snapshot shows it: its size and FNV-1a hash (stable, no dependency).
@@ -256,5 +310,19 @@ fn every_example_on_every_target() -> Outcome {
             }
         }
     });
+    // Every snapshot of the folder is one this test asserts: one left by a removed example or
+    // target would never fail again.
+    let asserted: std::collections::BTreeSet<String> = generated
+        .iter()
+        .flat_map(|e| e.snapshots.iter().map(move |(target, _)| format!("{}__{}.snap", e.name, target.id())))
+        .collect();
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots/examples");
+    let mut unreferenced: Vec<String> = std::fs::read_dir(&folder)?
+        .filter_map(Result::ok)
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|name| Path::new(name).extension().is_some_and(|x| x == "snap") && !asserted.contains(name))
+        .collect();
+    unreferenced.sort();
+    assert_eq!(unreferenced, Vec::<String>::new(), "snapshots no test asserts: remove them");
     Ok(())
 }

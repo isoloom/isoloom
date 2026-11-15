@@ -34,6 +34,9 @@ fn a_network_appliance_runs_alone_on_docker() {
     let project = "machines.r1.docker.config: a path in the project";
     assert_eq!(of(&format!("  r1: {{ {base}, config: /etc/r1.cfg }} }}\n")), [project]);
     assert_eq!(of(&format!("  r1: {{ {base}, config: ../r1.cfg }} }}\n")), [project]);
+    // What else leaves the project, as every project path is read: a drive, a `\\`.
+    assert_eq!(of(&format!("  r1: {{ {base}, config: 'C:/r1.cfg' }} }}\n")), [project]);
+    assert_eq!(of(&format!("  r1: {{ {base}, config: 'configs\\..\\..\\r1.cfg' }} }}\n")), [project]);
     assert_eq!(of(&format!("  r1: {{ {base}, config: configs/r1.cfg }} }}\n")), Vec::<String>::new());
 }
 

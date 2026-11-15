@@ -91,17 +91,17 @@ mod tests {
     fn gpus_by_id_name_them_and_their_driver() {
         let mut svc = Service::default();
         machine(&hardware("gpus: { ids: ['0', GPU-1], driver: cdi }"), &mut svc);
-        assert!(
-            yaml(&svc).contains("driver: cdi\n        device_ids:\n        - '0'\n        - GPU-1\n"),
-            "{}",
-            yaml(&svc)
-        );
+        let parsed = isoloom_test_support::yaml(&yaml(&svc));
+        let device = "deploy.resources.reservations.devices.0";
+        assert_eq!(isoloom_test_support::yaml_str(&parsed, &format!("{device}.driver")), "cdi");
+        assert_eq!(isoloom_test_support::yaml_strs(&parsed, &format!("{device}.device_ids")), ["0", "GPU-1"]);
     }
 
     #[test]
     fn gpus_without_a_count_or_ids_are_one() {
         let mut svc = Service::default();
         machine(&hardware("gpus: {}"), &mut svc);
-        assert!(yaml(&svc).contains("count: 1\n"));
+        let parsed = isoloom_test_support::yaml(&yaml(&svc));
+        assert_eq!(isoloom_test_support::yaml_str(&parsed, "deploy.resources.reservations.devices.0.count"), "1");
     }
 }

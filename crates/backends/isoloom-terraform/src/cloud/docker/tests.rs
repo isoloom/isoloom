@@ -51,13 +51,22 @@ fn module(cloud: Cloud) -> String {
 
 #[test]
 fn every_cloud_opens_ssh_and_the_published_ports() {
-    let aws = module(Cloud::Aws);
-    assert!(aws.contains("description = \"published 5353/udp\""), "{aws}");
-    assert!(module(Cloud::Azure).contains("destination_port_ranges    = [\"22\", \"8080\", \"15432\"]"));
-    assert!(module(Cloud::Gcp).contains("ports    = [\"5353\"]"));
-    assert_eq!(module(Cloud::DigitalOcean).matches("inbound_rule {").count(), 4);
-    assert!(module(Cloud::Linode).contains("ports    = \"22,8080,15432\""));
-    assert!(module(Cloud::Oci).contains("protocol = \"17\""));
+    let values = |cloud: Cloud, key: &str| isoloom_test_support::hcl_values(&isoloom_test_support::hcl_body(&module(cloud)), key);
+    assert!(values(Cloud::Aws, "description").contains(&"published 5353/udp".to_owned()));
+    assert!(
+        values(Cloud::Azure, "destination_port_ranges").windows(3).any(|w| w == ["22", "8080", "15432"]),
+        "{:?}",
+        values(Cloud::Azure, "destination_port_ranges")
+    );
+    assert!(values(Cloud::Gcp, "ports").contains(&"5353".to_owned()));
+    let droplet = isoloom_test_support::hcl_body(&module(Cloud::DigitalOcean));
+    let inbound: usize = isoloom_test_support::hcl_blocks(&droplet, "resource", &["digitalocean_firewall"])
+        .iter()
+        .map(|f| isoloom_test_support::hcl_nested(f.body(), "inbound_rule").len())
+        .sum();
+    assert_eq!(inbound, 4);
+    assert!(values(Cloud::Linode, "ports").contains(&"22,8080,15432".to_owned()));
+    assert!(values(Cloud::Oci, "protocol").contains(&"17".to_owned()), "UDP");
 }
 
 #[test]
@@ -79,8 +88,14 @@ fn the_host_sets_itself_up_and_the_module_waits_for_it() {
     }
     // The input is a sensitive variable of its own name, handed to the start in base64.
     let tf = module(Cloud::Aws);
-    assert!(tf.contains("variable \"TOKEN\""), "{tf}");
-    assert!(!tf.contains("var.inputs"), "{tf}");
+    let body = isoloom_test_support::hcl_body(&tf);
+    let token = isoloom_test_support::hcl_blocks(&body, "variable", &["TOKEN"]);
+    assert_eq!(
+        token.first().map(|v| isoloom_test_support::hcl_text(v.body(), "sensitive")).as_deref(),
+        Some("true"),
+        "{tf}"
+    );
+    assert!(isoloom_test_support::hcl_blocks(&body, "variable", &["inputs"]).is_empty(), "{tf}");
     let set_up = super::Host::set_up(&host(), &env(SPEC));
     let text: String = crate::machine::user_data::script(&set_up)
         .pieces()
@@ -153,8 +168,24 @@ fn one_container(memory_mb: u32, disk_gb: u32) -> Environment {
 fn a_cloud_whose_size_is_its_disk_too_sizes_the_host_by_its_table() {
     // 100 GB of containers (and Docker's own): past the 80 GB of the 4 GB droplet and plan.
     let tf = |cloud| cloud_module(cloud, &one_container(1024, 100), &host()).unwrap().contents;
-    assert!(tf(Cloud::DigitalOcean).contains("default = \"s-4vcpu-8gb\""), "{}", tf(Cloud::DigitalOcean));
-    assert!(tf(Cloud::Linode).contains("default = \"g6-standard-4\""), "{}", tf(Cloud::Linode));
+    let size = |cloud| {
+        let body = isoloom_test_support::hcl_body(&tf(cloud));
+        isoloom_test_support::hcl_blocks(&body, "variable", &[])
+            .iter()
+            .filter(|v| {
+                v.labels()
+                    .first()
+                    .is_some_and(|l| l.as_str().ends_with("size") || l.as_str() == "plan" || l.as_str() == "type")
+            })
+            .filter_map(|v| isoloom_test_support::hcl_attribute(v.body(), "default").map(ToString::to_string))
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        size(Cloud::DigitalOcean).contains(&"\"s-4vcpu-8gb\"".to_owned()),
+        "{:?}",
+        size(Cloud::DigitalOcean)
+    );
+    assert!(size(Cloud::Linode).contains(&"\"g6-standard-4\"".to_owned()), "{:?}", size(Cloud::Linode));
 }
 
 #[test]

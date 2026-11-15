@@ -12,6 +12,14 @@ stable spec format.
 
 ### Added
 
+- **A Vagrant environment's ports stay where they were across a park and a resume.** Each
+  forwarded port that isn't fixed reads `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first (the
+  machine's name upper-cased, every other character `_`; the guest port; `TCP` or `UDP`), the
+  host port the runner kept from an earlier operation, then the run's choice
+  (`ISOLOOM_HOSTPORTS`), then its published number, with `auto_correct` kept. Hyper-V's relay
+  takes the same number. qemu, UTM and VMware forward afresh at each start, so a resumed
+  environment's URLs no longer move.
+
 - **UTM runs an environment's VMs again, each on its networks (the `vagrant` target's `utm`
   provider).** vagrant_utm (0.2.0) makes no adapter for a private network and sets no address,
   so the Vagrantfile does both: each network is an isolated vmnet network (QEMU's `vmnet-host`
@@ -60,6 +68,11 @@ stable spec format.
 
 ### Changed
 
+- **`isoloom_spec::syntax::Unresolved` is an enum (breaking):** a placeholder that can't be read
+  is `Unresolved::Unclosed`, one that names nothing the spec has is `Unresolved::Unknown`, each
+  holding its reason; `reason()` and `code()` replace the `reason` and `unclosed` fields.
+- **`isoloom_spec::probe::Url::scheme` is a `Scheme` (breaking):** `Scheme::Http` or
+  `Scheme::Https`, with `as_str()`, in place of the `https: bool` field.
 - **Targets are presented by what they write and the validators that check it**, not by tiers of
   real runs: `isoloom targets` ends with each generated target's validators, and `isoloom matrix`
   and `docs/matrix.md` have a validators table (target, what it writes, validated by) in place of
@@ -131,6 +144,26 @@ stable spec format.
   consoles section, which the run manifests fed.
 
 ### Fixed
+
+- **On VMware Desktop, each adapter on the environment's networks has a fixed PCI slot (#284).**
+  Without `ethernet<n>.pcislotnumber`, VMware picked a slot as Vagrant added an adapter: the
+  guest's interfaces took other names when the second network's was attached, or at a boot after
+  a shutdown, and Vagrant's SSH session closed. Each adapter after the box's own now has a slot of
+  its own (192, 224, 256, then their next functions).
+- **VMware Desktop shares the computer's folders again (`host_folders`) with Vagrant 2.4.9.**
+  Vagrant checks a synced folder of an explicit type with `usable?(machine, true)`, which
+  vagrant-vmware-desktop 3.0.5 defines with one argument: `vagrant up` stopped on an
+  `ArgumentError`. VMware's folders now carry no type, with `allowed_synced_folder_types` set to
+  `[:vmware]`, so Vagrant picks VMware's own by the one-argument check.
+
+- **A VM on libvirt starts even where another network holds its network's block.** vagrant-libvirt
+  looks a private network with an address up by its block first: on a computer where another
+  network already had the block (another copy of the environment, another environment on the same
+  block, one a run left behind), it made no network of the Vagrantfile's name and the VM didn't
+  start ("Network not found"). Each network is now `veryisolated` (`libvirt__forward_mode`), looked
+  up and made by its name, the VMs on it alone, no address of the host on it and no way out through
+  it, as on VirtualBox and Hyper-V; a network that serves a network boot keeps the host's address
+  there for its DHCP and TFTP.
 
 - **Proxmox refuses `nested_virtualization` on an arm64 VM (#324),** whose CPU QEMU emulates, so it
   can't nest.

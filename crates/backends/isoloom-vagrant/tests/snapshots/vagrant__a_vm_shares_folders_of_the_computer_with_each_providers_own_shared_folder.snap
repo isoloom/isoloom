@@ -9,9 +9,10 @@ expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
       o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "virtualbox", create: true, mount_options: ["ro"]
     end
     m.vm.provider "vmware_desktop" do |_, o|
-      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "vmware", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", type: "vmware", create: true, mount_options: ["ro"]
-      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", type: "vmware", create: true, mount_options: ["ro"]
+      o.vm.allowed_synced_folder_types = [:vmware]
+      o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", create: true, mount_options: ["ro"]
+      o.vm.synced_folder File.expand_path("~/notes", ROOT), "/home/notes", create: true, mount_options: ["ro"]
+      o.vm.synced_folder File.expand_path("/srv/drop", ROOT), "/srv/drop", create: true, mount_options: ["ro"]
     end
     m.vm.provider "parallels" do |_, o|
       o.vm.synced_folder File.expand_path("shared", ROOT), "/srv/shared", type: "parallels", create: true, mount_options: ["ro"]

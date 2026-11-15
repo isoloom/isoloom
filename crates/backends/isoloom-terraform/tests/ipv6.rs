@@ -5,7 +5,14 @@ pub mod testing;
 
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_nested, hcl_one, hcl_text, hcl_values};
 use testing::{Outcome, plan, proxmox};
+
+/// The module's literal texts that are scripts (a machine's set-up, its user data): the ones
+/// with a line break.
+fn scripts(body: &hcl::Body) -> Vec<String> {
+    hcl_literals(body).into_iter().filter(|l| l.contains('\n')).collect()
+}
 
 const SPEC: &str = "version: 1
 name: v6
@@ -24,13 +31,33 @@ fn azure_writes_the_block_the_interfaces_and_the_rules() -> Outcome {
     let e = plan(SPEC, Target::CloudVm)?;
     assert_eq!(azure.refusal(&e), None);
     let tf = &azure.render(&e)?.contents;
-    assert!(tf.contains("\"10.67.20.0/24\", \"fd00:67:20::/64\""), "{tf}");
-    assert!(tf.contains("private_ip_address_version    = \"IPv6\""), "{tf}");
-    assert!(tf.contains("private_ip_address            = \"fd00:67:20::10\""), "{tf}");
-    assert!(tf.contains("name                       = \"reach-0-front-ipv6-80-tcp\""), "{tf}");
+    let body = hcl_body(tf);
+    let back = hcl_one(&body, "azurerm_subnet", "back");
+    assert_eq!(hcl_values(back, "address_prefixes"), ["10.67.20.0/24", "fd00:67:20::/64"]);
+    // Each machine's interface has an IPv6 configuration at its address.
+    let v6: Vec<(String, String)> = hcl_blocks(&body, "resource", &["azurerm_network_interface"])
+        .iter()
+        .flat_map(|nic| hcl_nested(nic.body(), "ip_configuration"))
+        .filter(|c| hcl_values(c.body(), "private_ip_address_version") == ["IPv6"])
+        .map(|c| (hcl_text(c.body(), "private_ip_address"), hcl_text(c.body(), "private_ip_address_allocation")))
+        .collect();
+    // web on back, user on front, each at its fixed address.
+    assert_eq!(
+        v6,
+        [
+            ("fd00:67:20::10".to_owned(), "Static".to_owned()),
+            ("fd00:67:10::10".to_owned(), "Static".to_owned())
+        ]
+    );
+    let rules = hcl_blocks(&body, "resource", &["azurerm_network_security_group"])
+        .iter()
+        .flat_map(|g| hcl_values(g.body(), "name"))
+        .collect::<Vec<_>>();
+    assert!(rules.iter().any(|r| r == "reach-0-front-ipv6-80-tcp"), "{rules:?}");
     // The virtual network routes between subnets: no route through a router that isn't there.
-    assert!(!tf.contains("ip -6 route"), "{tf}");
-    assert!(tf.contains("ip -6 addr replace fd00:67:20::10/64"), "{tf}");
+    let scripts = scripts(&body);
+    assert!(!scripts.iter().any(|s| s.contains("ip -6 route")), "{scripts:?}");
+    assert!(scripts.iter().any(|s| s.contains("ip -6 addr replace fd00:67:20::10/64")), "{scripts:?}");
     Ok(())
 }
 
@@ -60,28 +87,41 @@ fn oracle_cloud_writes_the_block_the_vnics_and_the_rules() -> Outcome {
     let oci = CloudVmModule::new(Cloud::Oci);
     assert_eq!(oci.refusal(&e), None);
     let tf = &oci.render(&e)?.contents;
+    let body = hcl_body(tf);
     // The spec's blocks alone: the VCN's private prefixes, no Oracle-allocated public one.
-    assert!(tf.contains("is_ipv6enabled                   = true"), "{tf}");
-    assert!(tf.contains("is_oracle_gua_allocation_enabled = false"), "{tf}");
-    assert!(
-        tf.contains("ipv6private_cidr_blocks          = [\"fd00:67:10::/64\", \"fd00:67:20::/64\"]"),
-        "{tf}"
-    );
-    assert!(tf.contains("ipv6cidr_block    = \"fd00:67:20::/64\""), "{tf}");
+    let vcn = hcl_blocks(&body, "resource", &["oci_core_vcn"]);
+    let vcn = vcn.first().ok_or("no VCN")?.body();
+    assert_eq!(hcl_text(vcn, "is_ipv6enabled"), "true");
+    assert_eq!(hcl_text(vcn, "is_oracle_gua_allocation_enabled"), "false");
+    assert_eq!(hcl_values(vcn, "ipv6private_cidr_blocks"), ["fd00:67:10::/64", "fd00:67:20::/64"]);
+    assert_eq!(hcl_values(hcl_one(&body, "oci_core_subnet", "back"), "ipv6cidr_block"), ["fd00:67:20::/64"]);
     // The VNIC takes the derived address, which the IPv6 step puts on the interface.
-    assert!(tf.contains("assign_ipv6ip          = true"), "{tf}");
-    assert!(
-        tf.contains("ipv6subnet_cidr = \"fd00:67:20::/64\"\n      ipv6address     = \"fd00:67:20::10\""),
-        "{tf}"
+    let details: Vec<(String, String)> = hcl_blocks(&body, "resource", &["oci_core_instance"])
+        .iter()
+        .flat_map(|i| hcl_nested(i.body(), "create_vnic_details"))
+        .filter(|v| hcl_values(v.body(), "assign_ipv6ip") == ["true"])
+        .flat_map(|v| hcl_nested(v.body(), "ipv6address_ipv6subnet_cidr_pair_details"))
+        .map(|p| (hcl_text(p.body(), "ipv6subnet_cidr"), hcl_text(p.body(), "ipv6address")))
+        .collect();
+    assert_eq!(
+        details,
+        [
+            ("fd00:67:20::/64".to_owned(), "fd00:67:20::10".to_owned()),
+            ("fd00:67:10::/64".to_owned(), "fd00:67:10::10".to_owned())
+        ]
     );
-    assert!(tf.contains("ip -6 addr replace fd00:67:20::10/64"), "{tf}");
+    let scripts = scripts(&body);
+    assert!(scripts.iter().any(|s| s.contains("ip -6 addr replace fd00:67:20::10/64")), "{scripts:?}");
+    assert!(!scripts.iter().any(|s| s.contains("ip -6 route")), "{scripts:?}");
     // The rules mirror the IPv4 ones: the reach rule on its port, ICMPv6's "packet too big".
-    assert!(
-        tf.contains("description = \"reach from front\"\n    source      = \"fd00:67:10::/64\"\n    protocol    = \"6\""),
-        "{tf}"
-    );
-    assert!(tf.contains("source      = \"::/0\"\n    protocol    = \"58\""), "{tf}");
-    assert!(!tf.contains("ip -6 route"), "{tf}");
+    let ingress: Vec<(String, String)> = hcl_blocks(&body, "resource", &["oci_core_security_list"])
+        .iter()
+        .flat_map(|l| hcl_nested(l.body(), "ingress_security_rules"))
+        .map(|r| (hcl_values(r.body(), "source").join(""), hcl_values(r.body(), "protocol").join("")))
+        .collect();
+    for wanted in [("fd00:67:10::/64", "6"), ("::/0", "58")] {
+        assert!(ingress.iter().any(|(s, p)| (s.as_str(), p.as_str()) == wanted), "{wanted:?}: {ingress:?}");
+    }
     Ok(())
 }
 

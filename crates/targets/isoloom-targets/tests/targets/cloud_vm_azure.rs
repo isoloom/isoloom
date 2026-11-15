@@ -4,6 +4,8 @@
 use isoloom_spec::{Spec, Target};
 use isoloom_targets::Lab;
 
+use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+
 use crate::testing::{Outcome, generated, source as example};
 
 /// The Azure module of `spec`.
@@ -11,70 +13,132 @@ fn azure(spec: &Spec) -> Outcome<String> {
     generated(&Lab::new(spec.clone()), Target::CloudVm, ".isoloom/cloud-vm/azure/main.tf")
 }
 
+/// The module's outputs, by name.
+fn outputs(body: &hcl::Body) -> Vec<String> {
+    body.blocks()
+        .filter(|b| b.identifier() == "output")
+        .filter_map(|b| b.labels().first().map(|l| l.as_str().to_owned()))
+        .collect()
+}
+
 #[test]
 fn azure_uses_azurerm_with_static_addresses() -> Outcome {
     let tf = azure(&example("hello-stack")?)?;
+    let body = hcl_body(&tf);
     // The azurerm provider and an Azure VM, not an AWS instance.
-    assert!(tf.contains("azurerm = { source = \"hashicorp/azurerm\", version = \"~> 5.8.0\" }"), "{tf}");
-    assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"web\""));
+    let terraform = hcl_blocks(&body, "terraform", &[]);
+    let required = terraform.first().map(|t| hcl_nested(t.body(), "required_providers")).unwrap_or_default();
+    let azurerm = required
+        .first()
+        .and_then(|r| hcl_attribute(r.body(), "azurerm"))
+        .map(ToString::to_string)
+        .unwrap_or_default();
+    assert!(azurerm.contains("hashicorp/azurerm") && azurerm.contains("~> 5.8.0"), "{azurerm}");
+    assert!(hcl_names(&body, "resource", "azurerm_linux_virtual_machine").contains(&"web".to_owned()));
+    assert!(hcl_names(&body, "resource", "aws_instance").is_empty(), "{tf}");
     // The module interface: a `region` var and ARM_SUBSCRIPTION_ID from the environment.
-    assert!(tf.contains("variable \"region\""), "{tf}");
-    assert!(tf.contains("subscription_id = var.subscription_id"), "{tf}");
-    assert!(tf.contains("location            = var.region"), "{tf}");
-    assert!(!tf.contains("var.location"), "{tf}");
+    assert_eq!(hcl_blocks(&body, "variable", &["region"]).len(), 1);
+    let provider = hcl_blocks(&body, "provider", &["azurerm"]);
+    assert_eq!(
+        provider.first().map(|p| hcl_text(p.body(), "subscription_id")).as_deref(),
+        Some("var.subscription_id")
+    );
+    let vm = hcl_one(&body, "azurerm_linux_virtual_machine", "web");
+    assert_eq!(hcl_text(vm, "location"), "var.region");
+    assert!(hcl_blocks(&body, "variable", &["location"]).is_empty(), "{tf}");
     // Every address of the spec is kept: a static private IP at the spec's octet.
-    assert!(tf.contains("private_ip_address_allocation = \"Static\""));
-    assert!(tf.contains("private_ip_address            = \"10.60.0.10\""), "{tf}");
+    let nic = hcl_one(&body, "azurerm_network_interface", "web_app");
+    let config = hcl_nested(nic, "ip_configuration");
+    let config = config.first().ok_or("no ip_configuration")?.body();
+    assert_eq!(
+        (hcl_text(config, "private_ip_address_allocation"), hcl_text(config, "private_ip_address")),
+        ("Static".into(), "10.60.0.10".into())
+    );
     // A static public IP it is reached on (the `ip` output).
-    assert!(tf.contains("resource \"azurerm_public_ip\" \"web\""));
-    assert!(tf.contains("allocation_method   = \"Static\""));
+    assert_eq!(hcl_text(hcl_one(&body, "azurerm_public_ip", "web"), "allocation_method"), "Static");
     Ok(())
 }
 
 #[test]
 fn azure_has_the_shared_outputs() -> Outcome {
     let tf = azure(&example("hello-stack")?)?;
+    let body = hcl_body(&tf);
     // The module outputs, identical in name and shape to AWS.
-    assert!(tf.contains("output \"machines\""));
-    assert!(tf.contains("output \"ssh_users\""));
-    assert!(tf.contains("output \"ip\""));
-    assert!(tf.contains("output \"ready_file\""));
-    assert!(tf.contains("value = \"/var/lib/isoloom/ready\""));
-    assert!(tf.contains("azurerm_public_ip.web.ip_address"));
+    let names = outputs(&body);
+    for wanted in ["machines", "ssh_users", "ip", "ready_file"] {
+        assert!(names.iter().any(|n| n == wanted), "{wanted}: {names:?}");
+    }
+    let value = |name: &str| {
+        hcl_blocks(&body, "output", &[name])
+            .first()
+            .and_then(|o| hcl_attribute(o.body(), "value"))
+            .map(ToString::to_string)
+            .unwrap_or_default()
+    };
+    let ready = hcl_blocks(&body, "output", &["ready_file"]);
+    assert_eq!(ready.first().map(|o| hcl_text(o.body(), "value")).as_deref(), Some("/var/lib/isoloom/ready"));
+    // Each machine by its public address.
+    assert!(value("machines").contains("web = azurerm_public_ip.web.ip_address"), "{}", value("machines"));
     Ok(())
 }
 
 #[test]
 fn azure_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
     let tf = azure(&example("dmz-jump")?)?;
+    let body = hcl_body(&tf);
     // The multi-homed gateway gets a NIC per network, forwarding on (AWS source/dest check off).
-    assert!(tf.contains("resource \"azurerm_network_interface\" \"gateway_dmz\""), "{tf}");
-    assert!(tf.contains("resource \"azurerm_network_interface\" \"gateway_internal\""));
-    assert!(tf.contains("ip_forwarding_enabled = true"));
+    for nic in ["gateway_dmz", "gateway_internal"] {
+        assert_eq!(
+            hcl_text(hcl_one(&body, "azurerm_network_interface", nic), "ip_forwarding_enabled"),
+            "true",
+            "{nic}"
+        );
+    }
     // Its extra interface is found by MAC: Azure reports it dash-separated and uppercase, so it
     // is lowered and colon-joined, and interpolated into the set-up (not left a literal). Inside
     // the interpolation the quotes are HCL's own, not escaped (terraform rejects `\"` there).
-    assert!(
-        tf.contains("${lower(replace(azurerm_network_interface.gateway_internal.mac_address, \"-\", \":\"))}"),
-        "{tf}"
-    );
-    assert!(!tf.contains("$${lower("));
+    let scripts: Vec<String> = hcl_literals(&body).into_iter().filter(|l| l.contains('\n')).collect();
+    let by_mac = "${lower(replace(azurerm_network_interface.gateway_internal.mac_address, \"-\", \":\"))}";
+    assert!(scripts.iter().any(|s| s.contains(by_mac)), "{tf}");
+    assert!(!scripts.iter().any(|s| s.contains("$${lower(")), "{tf}");
     Ok(())
 }
 
 #[test]
 fn azure_runs_windows_over_winrm_and_a_controller_runs_the_checks() -> Outcome {
     let tf = azure(&example("windows-hello")?)?;
+    let body = hcl_body(&tf);
     // A Windows VM with the generated password, WinRM over HTTP.
-    assert!(tf.contains("resource \"azurerm_windows_virtual_machine\" \"web01\""), "{tf}");
-    assert!(tf.contains("resource \"random_password\" \"windows\""));
-    assert!(tf.contains("protocol = \"Http\""));
-    assert!(tf.contains("type     = \"winrm\""));
+    let vm = hcl_one(&body, "azurerm_windows_virtual_machine", "web01");
+    assert_eq!(hcl_names(&body, "resource", "random_password"), ["windows"]);
+    assert_eq!(hcl_values(vm, "protocol"), ["Http"], "its WinRM listener");
+    let connections: Vec<String> = hcl_blocks(&body, "resource", &[])
+        .iter()
+        .flat_map(|r| hcl_nested(r.body(), "connection"))
+        .map(|c| hcl_text(c.body(), "type"))
+        .collect();
+    assert!(connections.iter().any(|t| t == "winrm"), "{connections:?}");
     // A Windows-only environment: a Debian controller runs the checks from its public IP.
-    assert!(tf.contains("resource \"azurerm_linux_virtual_machine\" \"isoloom_controller\""));
+    assert_eq!(hcl_names(&body, "resource", "azurerm_linux_virtual_machine"), ["isoloom_controller"]);
+    // Its checks run on the controller, reached on its public address.
+    let checks = hcl_blocks(&body, "output", &["checks"]);
+    let checks = checks.first().and_then(|o| hcl_attribute(o.body(), "value")).ok_or("no checks output")?;
+    let hcl::Expression::Array(runners) = checks else {
+        return Err(format!("checks: {checks}").into());
+    };
+    let on_controller: Vec<String> = runners
+        .iter()
+        .filter_map(|r| match r {
+            hcl::Expression::Object(o) => {
+                let field = |k: &str| o.iter().find(|(key, _)| key.to_string() == k).map(|(_, v)| v.to_string());
+                (field("machine").as_deref() == Some("\"isoloom-controller\"")).then(|| field("host").unwrap_or_default())
+            }
+            _ => None,
+        })
+        .collect();
     assert!(
-        tf.contains("machine  = \"isoloom-controller\"\n      host     = azurerm_public_ip.isoloom_controller.ip_address"),
-        "{tf}"
+        !on_controller.is_empty() && on_controller.iter().all(|h| h == "azurerm_public_ip.isoloom_controller.ip_address"),
+        "{on_controller:?}"
     );
     Ok(())
 }

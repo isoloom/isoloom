@@ -165,3 +165,12 @@ pub(crate) fn provisioners(vm: &isoloom_test_support::RubyBlock) -> Vec<String> 
         .filter_map(|s| s.split("name: \"").nth(1).and_then(|r| r.split('"').next()).map(str::to_owned))
         .collect()
 }
+
+/// The outputs every cloud's module has, shaped as AWS's are: `ip`, and `ready_file` at the
+/// machines' ready file.
+pub(crate) fn assert_cloud_outputs(body: &isoloom_test_support::hcl::Body) {
+    assert_eq!(isoloom_test_support::hcl_blocks(body, "output", &["ip"]).len(), 1);
+    let ready = isoloom_test_support::hcl_blocks(body, "output", &["ready_file"]);
+    let value = ready.first().map(|o| isoloom_test_support::hcl_text(o.body(), "value"));
+    assert_eq!(value.as_deref(), Some("/var/lib/isoloom/ready"));
+}

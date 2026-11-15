@@ -171,20 +171,57 @@ constraints:
   registries: { docker.io: registry.corp/hub }
 ";
 
+/// Every container's `image` in the manifests `yaml` (each document, init containers too), in
+/// order.
+fn images(yaml: &str) -> Vec<String> {
+    fn walk(v: &serde_yaml_ng::Value, out: &mut Vec<String>) {
+        match v {
+            serde_yaml_ng::Value::Mapping(m) => {
+                for (key, value) in m {
+                    match (key.as_str(), value.as_str()) {
+                        (Some("image"), Some(image)) => out.push(image.to_owned()),
+                        _ => walk(value, out),
+                    }
+                }
+            }
+            serde_yaml_ng::Value::Sequence(items) => items.iter().for_each(|i| walk(i, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for doc in isoloom_test_support::yaml_documents(yaml) {
+        walk(&doc, &mut out);
+    }
+    out
+}
+
 #[test]
 fn every_pulled_image_goes_through_the_mirrors_but_the_built_ones() -> Outcome {
     let files = KubernetesBackend.render(&parsed(MIRRORED)?)?;
     let env = file(&files, "kubernetes/environment.yaml")?;
-    assert!(env.contains("image: registry.corp/hub/library/nginx\n"), "{env}");
+    let pulled = images(env);
+    // Every image a container runs: the mirror's, but the built one, which is local.
     assert!(
-        env.contains(&format!("image: registry.corp/hub/library/{PROBE_IMAGE}\n")),
-        "Isoloom's probe too"
+        pulled.iter().all(|i| i.starts_with("registry.corp/hub/") || i == "localhost/isoloom/shop-db"),
+        "{pulled:?}"
     );
-    assert!(env.contains(&format!("image: registry.corp/hub/library/{UTILITY_IMAGE}\n")), "and its waits");
-    assert!(env.contains("image: localhost/isoloom/shop-db\n"), "a built image is local");
-    assert!(env.contains("#   docker build -t localhost/isoloom/shop-db db\n"), "{env}");
+    for wanted in [
+        "registry.corp/hub/library/nginx".to_owned(),
+        format!("registry.corp/hub/library/{PROBE_IMAGE}"),
+        format!("registry.corp/hub/library/{UTILITY_IMAGE}"),
+        "localhost/isoloom/shop-db".to_owned(),
+    ] {
+        assert!(pulled.contains(&wanted), "{wanted}: {pulled:?}");
+    }
+    // How to build the local image, said in the file's comment.
+    assert!(env.lines().any(|l| l == "#   docker build -t localhost/isoloom/shop-db db"), "{env}");
     let jobs = file(&files, "checks/job.yaml")?;
-    assert!(jobs.contains(&format!("image: registry.corp/hub/{CHECK_IMAGE}\n")), "{jobs}");
+    // A Job per position, each on the mirror's check image.
+    let checks = images(jobs);
+    assert!(
+        !checks.is_empty() && checks.iter().all(|i| *i == format!("registry.corp/hub/{CHECK_IMAGE}")),
+        "{checks:?}"
+    );
     Ok(())
 }
 

@@ -77,12 +77,22 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     runner
 }
 
-/// Machine `name`'s published ports, each with its host number ([`vagrantfile::chosen_host`]),
-/// written once here: its forward and Hyper-V's relay of it both take that one.
+/// Machine `name`'s published ports, each with its host number, written once here: its forward
+/// and Hyper-V's relay of it both take that one. A port the runner may move keeps the one it had
+/// when the runner says so ([`vagrantfile::kept_or_chosen_host`]); a fixed one is its own number
+/// or nothing ([`vagrantfile::chosen_host`]).
 fn published<'a>(name: &str, mp: &'a MachinePlan) -> Vec<(&'a PublishedPort, Value)> {
     mp.ports
         .iter()
-        .map(|p| (p, vagrantfile::chosen_host(&format!("{name}/{}", p.name), p.publish)))
+        .map(|p| {
+            let key = format!("{name}/{}", p.name);
+            let host = if p.fixed {
+                vagrantfile::chosen_host(&key, p.publish)
+            } else {
+                vagrantfile::kept_or_chosen_host(name, p.port, p.protocol, &key, p.publish)
+            };
+            (p, host)
+        })
         .collect()
 }
 
@@ -142,6 +152,14 @@ fn hostname(r: &mut Ruby, name: &str, os: Os) {
 /// LAN) or a libvirt network without DHCP, named after the environment. On an IPv6 network,
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
+///
+/// The libvirt network is `veryisolated` (between the VMs only, no IPv4 address of the host on
+/// it, no way out), unless it serves a network boot, whose DHCP and TFTP the host answers on it.
+/// vagrant-libvirt looks a network with an `ip:` up by its address block, and only a
+/// `veryisolated` one by its name: on a computer where another network already holds the block
+/// (another copy of the environment, another environment on the same block, one left behind) it
+/// would take that one and make none, while the VM's interface still names this one, so the VM
+/// wouldn't start ("Network not found").
 pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
     let netname = crate::vagrantfile::host_name(&env.names().network(net));
     let mut call = Call::new("m.vm.network")
@@ -152,7 +170,12 @@ pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ip
         .kw("libvirt__network_name", netname);
     // Every VM on the network carries its network boot: libvirt creates the network with the
     // options of the first VM that comes up on it.
-    call = boot::network(call, isoloom_plan::boot::network_boots(&env.machines).get(net));
+    let boots = isoloom_plan::boot::network_boots(&env.machines);
+    let served = boots.get(net);
+    if served.is_none() {
+        call = call.kw("libvirt__forward_mode", Value::str("veryisolated"));
+    }
+    call = boot::network(call, served);
     if let Some(v6) = env.networks.get(net).and_then(|n| n.ipv6.as_ref()) {
         call = call
             .kw("libvirt__guest_ipv6", Value::str("yes"))
@@ -191,6 +214,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         label: env.names().vm_label(name),
         vm_name: env.names().vm_name(name),
         size: Size::of(mp),
+        networks: mp.addresses.len(),
         port_groups: super::port_groups(env, mp.addresses.keys().map(String::as_str)),
         libvirt_box: image.libvirt.as_deref(),
         boot: mp.boot.as_ref(),

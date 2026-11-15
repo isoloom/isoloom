@@ -895,7 +895,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "database" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "database"
-    m.vm.network "private_network", ip: "10.20.0.32", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.20.0.32", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "invoice-portal-api-#{ISOLOOM_KEY} - database"
       v.linked_clone = true
@@ -907,6 +907,7 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "invoice-portal-api-#{ISOLOOM_KEY} - database"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("database"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1209,7 +1210,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.20.0.31", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.20.0.31", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/portal", 8080), host_ip: "127.0.0.1"
     m.vm.provider "virtualbox" do |v|
       v.name = "invoice-portal-api-#{ISOLOOM_KEY} - web"
@@ -1222,6 +1223,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "invoice-portal-api-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("web"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1466,7 +1468,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.20.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.20.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-invoice-portal-api-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "invoice-portal-api-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
@@ -1477,6 +1479,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "invoice-portal-api-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
     end
     m.vm.provider "parallels" do |v|
       v.name = "invoice-portal-api-#{ISOLOOM_KEY} - isoloom-controller"
