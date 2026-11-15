@@ -25,6 +25,7 @@ thiserror.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+isoloom-test-support.workspace = true
 proptest.workspace = true
 
 [lints]

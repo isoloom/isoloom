@@ -760,6 +760,7 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
+ "isoloom-test-support",
  "proptest",
  "serde",
  "serde_json",
