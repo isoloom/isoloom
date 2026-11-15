@@ -37,7 +37,7 @@ pub(crate) fn refusal(cloud: Cloud, env: &Environment) -> Option<String> {
         return None;
     }
     if !matches!(cloud, Cloud::Aws | Cloud::Azure | Cloud::Gcp) {
-        return Some(format!("{}'s managed services aren't rendered yet (`services:`)", cloud.name()));
+        return Some(format!("{}'s managed services aren't rendered (`services:`): only AWS's, Azure's and GCP's are", cloud.name()));
     }
     for (name, s) in services {
         if let Some(limit) = isoloom_spec::paas::cloud_limits(name, s).into_iter().find(|l| l.cloud == cloud.id()) {
