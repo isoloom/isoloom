@@ -53,7 +53,7 @@ what `reach` doesn't. Elsewhere it is a bug: please report it with the spec.
 - `allowed_cidr` is required.
 - A quota or a region without the instance type: change the region
   ([regions](targets/cloud.md#regions)) or the machine's `resources`.
-- Leftovers of an interrupted run: `isothrum reap <cloud>` finds them by their tags.
+- Leftovers of an interrupted run: each resource is tagged with the environment, and `isothrum reap` removes the recorded runs past their expiry.
 
 ## FAQ
 

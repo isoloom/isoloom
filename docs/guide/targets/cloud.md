@@ -219,8 +219,7 @@ Isoloom doesn't know your prices and bills nothing. What it gives you to keep co
 - **Expiry.** A runner gives a run an expiry (Isothrum: 240 minutes by default; `isothrum up
   --lifetime` changes it) and sets `expires_at`: every resource is tagged `isoloom-expires-at`, and the
   machines shut themselves down at that time (an AWS `cloud-vm` instance that shuts itself down is
-  terminated). A stopped machine stops most compute charges, not disks or addresses: `isothrum reap <cloud>` destroys the runs past their expiry and lists what
-  the cloud still holds past its expiry that no run records. Run it on a schedule. Applied by hand,
+  terminated). A stopped machine stops most compute charges, not disks or addresses: `isothrum reap` removes the recorded runs past their expiry. Run it on a schedule. Applied by hand,
   `expires_at` is empty: no end.
 - **Tags.** Every resource carries `managed-by = isoloom`, `isoloom-environment` and
   `isoloom-instance` (labels on Google Cloud), so a cost report can group by environment. The

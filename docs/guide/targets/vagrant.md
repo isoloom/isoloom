@@ -81,12 +81,11 @@ run on `isoloom-controller`, which halts once set up unless `controller.keep_run
 `vagrant up isoloom-controller --no-provision` boots it first. The comment at the top of the
 Vagrantfile lists these commands for your spec.
 
-A runner runs the same Vagrantfile, then the checks:
+A runner runs the same Vagrantfile (Isothrum takes the target's folder as it is); the checks run as above:
 
 ```sh
-isothrum up . --target vagrant --provider libvirt
-isothrum check . --target vagrant
-isothrum down . --target vagrant
+isothrum up .isoloom/vagrant --provider libvirt
+isothrum down .isoloom/vagrant
 ```
 
 

@@ -72,20 +72,16 @@ machine is set up, `terraform_data.isoloom_seal` seals the `internet: false` net
 router. So the apply ends with the environment ready. The environment's inputs are variables of
 their own names (`-var TOKEN=...`, or `TF_VAR_TOKEN`).
 
-Or with a runner, which also gives the module the environment's inputs and runs the checks (the
+Or with a runner, which also gives the module the environment's inputs (the
 machines take the project from their cloud-init; a Linux VM's secrets come from the module's
 `ISOLOOM_SECRET_<NAME>` variables in its cloud-init snippet, and Terraform stores sensitive values
 in its state, as it does for every variable; a Windows machine's or an LXC container's are
 refused):
 
 ```sh
-isothrum up . --target proxmox
-isothrum check . --target proxmox
-isothrum down . --target proxmox
+isothrum up .isoloom/proxmox
+isothrum down .isoloom/proxmox
 ```
-
-A runner whose machine can't route to the run's bridge goes through the node:
-`isothrum up --ssh-jump root@pve.example.internal`.
 
 ## Teardown
 
