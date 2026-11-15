@@ -16,10 +16,9 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
-/// The workspace's packages: each one's test targets, and its manifest relative to the root.
+/// The workspace's packages: each one's test targets.
 struct Workspace {
     tests: BTreeMap<String, BTreeSet<String>>,
-    manifests: BTreeMap<String, String>,
 }
 
 /// The workspace, from `cargo metadata`.
@@ -30,8 +29,7 @@ fn workspace() -> Outcome<Workspace> {
         .current_dir(root())
         .output()?;
     let meta: serde_json::Value = serde_json::from_slice(&out.stdout)?;
-    let root_dir = meta.get("workspace_root").and_then(serde_json::Value::as_str).unwrap_or_default().to_owned();
-    let (mut tests, mut manifests) = (BTreeMap::new(), BTreeMap::new());
+    let mut tests = BTreeMap::new();
     for p in meta.get("packages").and_then(serde_json::Value::as_array).into_iter().flatten() {
         let name = p["name"].as_str().unwrap_or_default().to_owned();
         let targets = p["targets"]
@@ -41,16 +39,9 @@ fn workspace() -> Outcome<Workspace> {
             .filter(|t| t["kind"].as_array().is_some_and(|k| k.iter().any(|k| k == "test")))
             .filter_map(|t| t["name"].as_str().map(str::to_owned))
             .collect();
-        let manifest = p["manifest_path"].as_str().unwrap_or_default();
-        let relative = manifest
-            .strip_prefix(&root_dir)
-            .unwrap_or(manifest)
-            .trim_start_matches(['/', '\\'])
-            .replace('\\', "/");
-        tests.insert(name.clone(), targets);
-        manifests.insert(name, relative);
+        tests.insert(name, targets);
     }
-    Ok(Workspace { tests, manifests })
+    Ok(Workspace { tests })
 }
 
 /// The command lines of `ci.yml`: every line but comments, each as its words.
@@ -127,29 +118,6 @@ fn every_isoloom_subcommand_it_calls_exists() -> Outcome {
 }
 
 #[test]
-fn the_api_jobs_crates_are_the_workspaces_in_their_group_folders() -> Outcome {
-    let ws = workspace()?;
-    let text = std::fs::read_to_string(root().join(".github/workflows/ci.yml"))?;
-    assert!(
-        !text.contains("crates/$1/"),
-        "crates sit in group folders (crates/core/, ...), not under crates/ directly"
-    );
-    let lists: Vec<&str> = text.lines().filter_map(|l| l.trim().strip_prefix("for crate in ")).collect();
-    assert_ne!(lists, Vec::<&str>::new(), "the API job lists its crates");
-    for list in lists {
-        for name in list.trim_end_matches("; do").split_whitespace() {
-            let manifest = ws.manifests.get(name).ok_or_else(|| format!("no crate `{name}` in the workspace"))?;
-            let parts: Vec<&str> = manifest.split('/').collect();
-            assert!(
-                matches!(parts.as_slice(), ["crates", _, crate_dir, "Cargo.toml"] if *crate_dir == name),
-                "`{name}` is at {manifest}, not crates/<group>/{name}/Cargo.toml"
-            );
-        }
-    }
-    Ok(())
-}
-
-#[test]
 fn no_generation_is_let_fail_quietly() -> Outcome {
     for words in lines()? {
         let generates = words
@@ -163,21 +131,25 @@ fn no_generation_is_let_fail_quietly() -> Outcome {
 
 #[test]
 fn ci_runs_every_gate_the_release_gate_runs() -> Outcome {
-    // CONTRIBUTING: every gate runs locally and in CI. gate.yml (the release path) is the list;
-    // ci.yml's `check` job runs each of its commands too (`--locked` aside).
-    let commands = |file: &str| -> Outcome<Vec<String>> {
+    // CONTRIBUTING: every gate runs locally and in CI, as steps of `cargo xtask check`. gate.yml
+    // (the release path) names the steps it runs; ci.yml's jobs run each of them too (rustfmt
+    // runs `cargo fmt` itself there: a job with nothing to build).
+    let steps = |file: &str| -> Outcome<BTreeSet<String>> {
         let text = std::fs::read_to_string(root().join(".github/workflows").join(file))?;
         Ok(text
             .lines()
-            .filter_map(|l| l.trim().strip_prefix("- run: "))
-            .map(|c| c.replace(" --locked", ""))
+            .filter_map(|l| l.trim().strip_prefix("- run: cargo run -q -p xtask --locked -- check --only "))
+            .flat_map(|list| list.split(','))
+            .map(str::to_owned)
             .collect())
     };
-    let ci = commands("ci.yml")?;
-    let gate = commands("gate.yml")?;
-    assert!(gate.iter().any(|c| c.contains("xtask -- quality")), "{gate:?}");
-    for c in gate {
-        assert!(ci.contains(&c), "ci.yml doesn't run the gate `{c}`");
+    let ci = steps("ci.yml")?;
+    let gate = steps("gate.yml")?;
+    for step in ["fmt", "clippy", "test", "quality"] {
+        assert!(gate.contains(step), "the release gate runs `{step}`: {gate:?}");
+    }
+    for step in &gate {
+        assert!(ci.contains(step) || step == "fmt", "ci.yml doesn't run the gate's step `{step}`: {ci:?}");
     }
     Ok(())
 }

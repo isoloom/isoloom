@@ -4,7 +4,14 @@ name: CI
 # Windows, the quality ratchet, the API docs, the supply chain (cargo-deny, unused dependencies),
 # spelling, the links between the docs, SemVer against the last release, the declared minimum
 # Rust, deterministic generation, the generated Terraform validated and its modules' tests, and
-# every target's generated files checked by their validators (never run). The release gate (gate.yml) runs the core of it again on the tag.
+# every target's generated files checked by their validators (never run). The release gate
+# (gate.yml) runs the core of it again on the tag.
+#
+# The checks are the steps of `cargo xtask check` (xtask/src/check.rs), the command a contributor
+# runs locally: each job here installs a step's tools and runs it with `--only`, so the two can't
+# drift. `cargo run -p xtask --locked` rather than the `cargo xtask` alias, so a stale Cargo.lock
+# fails rather than being rewritten before the lockfile step reads it. The jobs with nothing to
+# build (rustfmt, deny, machete, typos, links, hooks) call their tools directly.
 on:
   push:
     branches: [main]
@@ -50,8 +57,10 @@ jobs:
         with:
           # Only main writes the cache, so a pull request can't seed what main builds with.
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest@0.9.148
+      - run: cargo run -q -p xtask --locked -- check --only lockfile,clippy,test
 
   # The engineering-standard ratchet (clean-code counts per crate against xtask/baselines/quality-baseline.json),
   # the fuzz targets' build, the API docs, and every example validating.
@@ -70,25 +79,10 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-machete@0.9.2
-      - run: cargo run -p xtask --locked -- quality
-      # The generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are
-      # current; a stale one fails naming the command that regenerates them.
-      - run: .githooks/regenerate --check
-      # The fuzz targets (a workspace of their own, outside the others' builds) still build
-      # against the crates' public items, formatted and lint-clean.
-      - run: cargo run -p xtask --locked -- fuzz --check
-      # The API docs build without a warning (broken intra-doc links, bare URLs).
-      - run: cargo doc --workspace --no-deps --locked
-        env:
-          RUSTDOCFLAGS: -D warnings
-      - name: Every example validates
-        run: |
-          set -euo pipefail
-          cargo build -q --locked -p isoloom
-          for e in examples/*/; do
-            target/debug/isoloom validate "$e" --skip-files
-            target/debug/isoloom targets "$e"
-          done
+      # The ratchet; the generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md,
+      # schemas/) current; the fuzz targets (a workspace of their own) formatted and lint-clean;
+      # the API docs without a warning; every example validating.
+      - run: cargo run -q -p xtask --locked -- check --only quality,regenerate,fuzz,doc,examples
 
   # The locked dependencies (deny.toml): known vulnerabilities (RustSec), licences on the
   # allow-list, banned crates, and crates.io as the only source.
@@ -189,28 +183,8 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-semver-checks@0.51.0
-      - name: Release type
-        id: release
-        run: |
-          set -euo pipefail
-          published="$(curl -fsS -A "isoloom-ci (https://github.com/isoloom/isoloom)" \
-            https://crates.io/api/v1/crates/isoloom-spec | jq -r .crate.max_stable_version)"
-          echo "Latest isoloom-spec on crates.io: ${published}"
-          case "$published" in
-            1.*) echo "args=--release-type major" >> "$GITHUB_OUTPUT" ;;
-            *) echo "args=" >> "$GITHUB_OUTPUT" ;;
-          esac
-      - name: cargo semver-checks
-        env:
-          RELEASE_ARGS: ${{ steps.release.outputs.args }}
-        run: |
-          set -euo pipefail
-          packages=()
-          for crate in isoloom-spec isoloom-targets; do
-            packages+=(-p "$crate")
-          done
-          # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
-          cargo semver-checks "${packages[@]}" $RELEASE_ARGS
+      # The release type comes from crates.io's latest isoloom-spec (xtask/src/check.rs).
+      - run: cargo run -q -p xtask --locked -- check --only semver
 
   # The published crates build with their declared rust-version (1.89, Cargo.toml). `+1.89`
   # overrides the rust-toolchain.toml pin for this check only (without it the pinned toolchain
@@ -227,7 +201,8 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo +1.89 check --workspace --exclude xtask --exclude xtask-quality --all-targets --locked
+      # The toolchain the workspace's rust-version names (installed above: keep the two equal).
+      - run: cargo run -q -p xtask --locked -- check --only msrv
 
   # Generation is deterministic: every example rendered twice in one process (the test), then
   # generated twice by the command line in the same folder, gives the same files.
@@ -243,20 +218,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo test --locked -p isoloom-targets --test targets determinism
-      - name: The command line, twice
-        run: |
-          set -euo pipefail
-          cargo build -q --locked -p isoloom
-          for e in examples/*/; do
-            n=$(basename "$e")
-            for run in 1 2; do
-              rm -rf "$e.isoloom"
-              target/debug/isoloom generate "$e" > /dev/null
-              mkdir -p "$RUNNER_TEMP/$run/$n"
-              cp -R "$e.isoloom" "$RUNNER_TEMP/$run/$n/"
-            done
-          done
-          diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
+      - run: cargo run -q -p xtask --locked -- check --only determinism
 
   # The topology editor's engine (isoloom-wasm) builds for the browser, and its exports work as
   # JavaScript calls them.
@@ -286,9 +248,8 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: wasm-pack@0.13.1,wasm-bindgen@${{ steps.bindgen.outputs.version }}
-      - run: cargo run -p xtask --locked -- wasm
-      # The exports as JavaScript calls them (wasm-bindgen-test, on Node).
-      - run: wasm-pack test --node crates/frontends/isoloom-wasm
+      # The build, then the exports as JavaScript calls them (wasm-bindgen-test, on Node).
+      - run: cargo run -q -p xtask --locked -- check --only wasm,wasm-test
 
   # The generated Terraform (Proxmox, ESXi, cloud-docker, cloud-vm) is valid for its providers,
   # with the latest Terraform.
@@ -306,23 +267,8 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Generate every example (the targets each can be generated for)
-        run: |
-          set -euo pipefail
-          cargo build -q --locked -p isoloom
-          for e in examples/*/; do target/debug/isoloom generate "$e" > /dev/null; done
-      - name: Validate
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          validate() {
-            echo "== $1"
-            terraform -chdir="$1" init -backend=false -input=false >/dev/null
-            terraform -chdir="$1" validate
-          }
-          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
-            validate "$d"
-          done
+      # Every example generated, then each module's providers installed and validated.
+      - run: cargo run -q -p xtask --locked -- check --only terraform
 
   # The cloud and server modules' logic proven without a cloud (`cargo xtask tf-test`): every
   # provider mocked, every run a plan, in the pinned validator image. Its expectations
@@ -338,7 +284,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo run -p xtask --locked -- tf-test
+      - run: cargo run -q -p xtask --locked -- check --only tf-test
 
   # The Windows executable as the release builds it (release.yml: the C runtime linked in) needs no
   # Visual C++ runtime DLL, so a Windows without the redistributable starts it. GitHub's runners

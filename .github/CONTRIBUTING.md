@@ -4,23 +4,48 @@ Everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability 
 
 ## Gates
 
-Every change passes these, locally and in CI. CI runs every one of them on each pull request.
+One command runs every check a change must pass, the same one CI runs (each CI job runs some of
+its steps with `--only`):
 
 ```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings   # as CI runs it: any warning fails
-cargo xtask quality                            # the ratchet: no per-crate count may go up
-cargo xtask test                               # the tests under cargo-nextest, then the doctests; fails if they leave anything in the temporary folder
-cargo deny check                               # advisories, licenses, bans, sources
-RUSTDOCFLAGS=-Dwarnings cargo doc --workspace --no-deps
-cargo machete                                  # no unused dependencies
-typos                                          # spelling; legitimate words go in .typos.toml
-lychee --offline README.md CHANGELOG.md ARCHITECTURE.md '.github/*.md' 'docs/**/*.md'   # links
-
-# The generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are current;
-# a stale one fails naming the command, `.githooks/regenerate`, which rewrites them all:
-.githooks/regenerate --check
+cargo xtask check          # every step; the summary names each one's outcome, any red one fails it
+cargo xtask check --fast   # the short list, before every push: lockfile, fmt, clippy, test, windows-gnu
+cargo xtask check --list   # the steps, and what each proves
+cargo xtask check --only terraform,tf-test   # some steps; --skip leaves some out
 ```
+
+The steps ([`xtask/src/check.rs`](../xtask/src/check.rs)):
+
+| Step | What it proves |
+|---|---|
+| `lockfile` | `Cargo.lock` is current |
+| `fmt` | `cargo fmt --all --check` |
+| `typos` | spelling; legitimate words go in `.typos.toml` |
+| `links` | every link between the Markdown pages reaches a file (lychee, offline) |
+| `deny` | advisories, licences, bans, sources (`deny.toml`) |
+| `machete` | no unused dependency |
+| `hooks` | shellcheck over the Git hooks, then their test |
+| `clippy` | `cargo clippy --workspace --all-targets -- -D warnings`: any warning fails |
+| `test` | `cargo xtask test`: the tests under cargo-nextest, then the doctests; fails if they leave anything in the temporary folder |
+| `doc` | the API docs build without a warning |
+| `quality` | `cargo xtask quality`, the ratchet: no per-crate count may go up |
+| `regenerate` | the generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are current; a stale one names `.githooks/regenerate`, which rewrites them all |
+| `fuzz` | `cargo xtask fuzz --check`: the fuzz crate formatted and lint-clean |
+| `examples` | every example validates and lists its targets |
+| `determinism` | every example generated twice by the command line gives the same files |
+| `msrv` | the published crates build with the workspace's `rust-version` |
+| `windows-gnu` | clippy for `x86_64-pc-windows-gnu`: the `cfg(windows)` code, from any OS |
+| `semver` | the supported library API against its latest release on crates.io |
+| `wasm`, `wasm-test` | the topology editor's engine builds for the browser, and its exports work from JavaScript |
+| `tf-test` | `cargo xtask tf-test`: the modules' logic with mocked providers, in the pinned image (Docker) |
+| `terraform` | every generated Terraform module passes `terraform validate` |
+
+A step whose tool is missing is red and names it; nothing is skipped quietly. The tools:
+cargo-nextest, cargo-deny, cargo-machete, cargo-semver-checks, typos, lychee, shellcheck,
+gitleaks, wasm-pack (with the `wasm32-unknown-unknown` target), terraform, Docker, nightly (for
+`fuzz`), the toolchain of the workspace's `rust-version` (`rustup toolchain install 1.89
+--profile minimal`), and the `x86_64-pc-windows-gnu` target with a MinGW C compiler
+(`x86_64-w64-mingw32-gcc`) on `PATH`.
 
 Clippy runs with `-D warnings`, as CI does: any lint that warns fails it. A lint silenced where
 the fix reads worse is an `#[expect(lint, reason = "…")]`, and `xtask/baselines/quality-baseline.json` counts

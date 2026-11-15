@@ -1,6 +1,7 @@
 //! Isoloom's development tasks, run as `cargo xtask <task>` (the alias is in
 //! `.cargo/config.toml`), the same way on macOS, Linux and Windows:
 //!
+//! - `check`: every check a change must pass (`--fast` for the short list), locally and in CI;
 //! - `verify`: the official validators on every generated file, in the pinned image;
 //! - `tf-test`: the cloud and server modules' logic, `terraform test` with mocked providers;
 //! - `generate-all`: every example generated into one tree, for `verify`;
@@ -37,6 +38,7 @@
 
 mod bench;
 mod catalogue;
+mod check;
 mod conformance;
 #[cfg(test)]
 mod deps;
@@ -72,6 +74,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Task {
+    /// Every check a change must pass, the same locally and in CI (xtask/src/check.rs);
+    /// `--fast` runs the short list (lockfile, fmt, clippy, test, windows-gnu), `--list` names
+    /// the steps; exits 1 when one is red.
+    Check(check::Args),
     /// The official validators on generated files, in the pinned image (xtask/src/verify),
     /// against the baseline (xtask/src/verify/baseline.json); exits 1 on a failure the baseline
     /// doesn't know.
@@ -132,6 +138,7 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Res<ExitCode> {
     match cli.task {
+        Task::Check(a) => check::run(&a),
         Task::Verify(a) => Ok(verify::run(&a)),
         Task::TfTest(a) => Ok(tf_test::run(&a)),
         Task::GenerateAll(a) => generate_all::run(&a),
