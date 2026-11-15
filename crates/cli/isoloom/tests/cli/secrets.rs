@@ -30,7 +30,7 @@ machines:
       - { path: /srv/demo/secret, input: DEMO_SECRET_LAB, mode: 0444 }
 ";
 
-/// VMs, one of them a container on hybrid.
+/// VMs: `app` has a container form too (its image), which the VM targets give as a VM.
 const VMS: &str = "
 version: 1
 name: secret-vms
