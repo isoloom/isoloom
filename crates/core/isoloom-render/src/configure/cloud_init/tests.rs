@@ -54,3 +54,16 @@ fn gzip_is_deterministic_and_is_standard_base64() {
     );
     assert_eq!(once.len() % 4, 0, "{once}");
 }
+
+/// The same script gives the same compressed bytes whatever else is in the build: the deflate
+/// implementation is pinned (zlib-rs), so a binary built alone and one built in the workspace write
+/// the same cloud-init file. The bytes are zlib-rs's at the best level, with no time or name in the
+/// header.
+#[test]
+fn gzip_gives_the_same_bytes_from_every_build() {
+    let script = "#!/bin/sh\nset -e\n".repeat(50) + "echo done\n";
+    assert_eq!(super::base64(&gzip(&script)), EXPECTED_GZIP);
+}
+
+/// What [`gzip_gives_the_same_bytes_from_every_build`] compresses to.
+const EXPECTED_GZIP: &str = "H4sIAAAAAAAC/1NW1E/KzNMvzuAqTi1R0E3lUh4VGBUYFSBfIDU5I18hJT8vlQsAEDUs6lwDAAA=";
