@@ -167,8 +167,8 @@ fn a_copy_leaves_out_the_outputs_but_those_it_keeps_and_the_tools_state_everywhe
 #[test]
 fn the_copy_rules_are_lines_of_the_files_syntax() {
     assert_eq!(
-        copy_rules(&[".isoloom/hybrid/compose.yml"]),
-        "/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n.terraform/\n*.tfstate\n*.tfstate.*\n.terraform.tfstate.lock.info\ncrash.log\ncrash.*.log\n.vagrant/\n"
+        copy_rules(&[".isoloom/docker/compose.yml"]),
+        "/.isoloom*\n!/.isoloom/docker/compose.yml\n.git/\n.terraform/\n*.tfstate\n*.tfstate.*\n.terraform.tfstate.lock.info\ncrash.log\ncrash.*.log\n.vagrant/\n"
     );
 }
 

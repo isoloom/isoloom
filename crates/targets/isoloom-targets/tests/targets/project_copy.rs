@@ -82,7 +82,7 @@ fn tricky_project(dir: &Path) -> Outcome<(PathBuf, String)> {
         "vendor/goat",
         "empty",
         ".git",
-        ".isoloom/hybrid",
+        ".isoloom/kubernetes",
         ".isoloom/vagrant/.vagrant",
         "sub/.vagrant",
         ".isoloom/docker/checks",
@@ -94,7 +94,7 @@ fn tricky_project(dir: &Path) -> Outcome<(PathBuf, String)> {
     std::fs::write(root.join("run.sh"), "#!/bin/sh\necho hi\n")?;
     std::fs::set_permissions(root.join("run.sh"), std::fs::Permissions::from_mode(0o755))?;
     std::fs::write(root.join(".git/HEAD"), "ref")?;
-    std::fs::write(root.join(".isoloom/hybrid/compose.yml"), "services: {}\n")?;
+    std::fs::write(root.join(".isoloom/kubernetes/kustomization.yaml"), "resources: []\n")?;
     std::fs::write(root.join(".isoloom/vagrant/Vagrantfile"), "")?;
     std::fs::write(root.join(".isoloom/docker/checks/web.sh"), "true\n")?;
     std::fs::write(root.join(".isoloom/configure/lib/configure.sh"), "true\n")?;
@@ -125,14 +125,14 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
     let (root, long) = tricky_project(dir)?;
     let run = |outputs: &[&str], out: &str| archive(dir, &root, outputs, out);
 
-    let list = run(&[".isoloom/hybrid/compose.yml"], "project.tgz")?;
+    let list = run(&[".isoloom/kubernetes/kustomization.yaml"], "project.tgz")?;
     let has = |l: &str, entry: &str| l.lines().any(|x| x.ends_with(entry));
     assert!(has(&list, "vendor/goat/self -> ."), "{list}");
     assert!(has(&list, "loop1 -> loop2"), "{list}");
     assert!(has(&list, "empty/"), "{list}");
     assert!(has(&list, &long), "{list}");
     assert!(list.lines().any(|x| x.starts_with("-rwx") && x.ends_with(" run.sh")), "{list}");
-    assert!(has(&list, ".isoloom/hybrid/compose.yml"), "{list}");
+    assert!(has(&list, ".isoloom/kubernetes/kustomization.yaml"), "{list}");
     for gone in [".git/", "HEAD", "private_key", ".isoloom/vagrant/", ".isoloom/docker/", "tfstate"] {
         assert!(!list.contains(gone), "{gone} went in: {list}");
     }
@@ -140,7 +140,7 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
     let compose = run(&[".isoloom/docker", ".isoloom/configure"], "compose.tgz")?;
     assert!(has(&compose, ".isoloom/docker/checks/web.sh"), "{compose}");
     assert!(has(&compose, ".isoloom/configure/lib/configure.sh"), "{compose}");
-    for gone in [".isoloom/vagrant/", ".isoloom/hybrid/", ".isoloom/cloud-vm/", "tfstate", "private_key"] {
+    for gone in [".isoloom/vagrant/", ".isoloom/kubernetes/", ".isoloom/cloud-vm/", "tfstate", "private_key"] {
         assert!(!compose.contains(gone), "{gone} went in: {compose}");
     }
     unpacks_as_packed(dir, &long)?;
