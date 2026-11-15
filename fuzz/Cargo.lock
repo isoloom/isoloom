@@ -321,7 +321,6 @@ dependencies = [
  "isoloom-plan",
  "isoloom-render",
  "isoloom-spec",
- "sha2",
  "thiserror",
 ]
 
