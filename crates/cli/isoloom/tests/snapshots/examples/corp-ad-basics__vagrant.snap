@@ -1383,6 +1383,9 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
+      v.vmx["ethernet2.pcislotnumber"] = "224"
+      v.vmx["ethernet3.pcislotnumber"] = "256"
     end
     m.vm.provider "parallels" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
@@ -1607,6 +1610,7 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("dc01"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1776,6 +1780,7 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("ws-01"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1949,6 +1954,7 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("ws-02"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -2112,6 +2118,8 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
+      v.vmx["ethernet2.pcislotnumber"] = "224"
       if (console = IsoloomConsole.of("web01"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -2398,6 +2406,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("user"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -2680,6 +2689,9 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
+      v.vmx["ethernet2.pcislotnumber"] = "224"
+      v.vmx["ethernet3.pcislotnumber"] = "256"
     end
     m.vm.provider "parallels" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"

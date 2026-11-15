@@ -96,6 +96,10 @@ pub(crate) fn render(r: &mut Ruby, scope: &str, shares: &[Share]) {
             if p == Provider::Qemu {
                 virtiofs_every_account(r);
             }
+            if p == Provider::VmwareDesktop {
+                // VMware's folders only, picked by Vagrant itself (no `type:`, see `synced_folder`).
+                r.assign("o.vm.allowed_synced_folder_types", Value::array([Value::sym("vmware")]));
+            }
             for s in shares {
                 r.call(synced_folder(p, how, s));
             }
@@ -119,12 +123,21 @@ const VIRTUALBOX_GROUP_WRITES: [&str; 2] = ["dmode=0775", "fmode=0664"];
 
 /// `o.vm.synced_folder <the folder>, <guest>, type: <kind>, create: true`, read-only as the
 /// provider's mount takes it; VirtualBox's read-write one group-writable.
+///
+/// VMware Desktop's carries no `type:`: Vagrant checks a folder of an explicit type with
+/// `usable?(machine, true)`, which vagrant-vmware-desktop (3.0.5) defines with one argument, so
+/// `vagrant up` stopped on an `ArgumentError`. A folder without a type is given the first usable
+/// one of `allowed_synced_folder_types` (VMware's alone, set in its block), asked with one argument.
 fn synced_folder(p: Provider, (kind, ro_option): (&str, &str), s: &Share) -> Call {
     let call = Call::new("o.vm.synced_folder")
         .arg(Value::raw(format!("File.expand_path({}, ROOT)", Value::str(&s.from))))
-        .arg(Value::str(&s.guest))
-        .kw("type", Value::str(kind))
-        .kw("create", true);
+        .arg(Value::str(&s.guest));
+    let call = if p == Provider::VmwareDesktop {
+        call
+    } else {
+        call.kw("type", Value::str(kind))
+    };
+    let call = call.kw("create", true);
     match (s.read_only, p) {
         (false, Provider::VirtualBox) => call.kw("mount_options", Value::array(VIRTUALBOX_GROUP_WRITES.map(Value::str))),
         (false, _) => call,
@@ -223,13 +236,19 @@ mod tests {
             ),
             "VirtualBox's read-write mount is group-writable: {out}"
         );
-        for (provider, kind) in [
-            ("vmware_desktop", "vmware"),
-            ("parallels", "parallels"),
-            ("utm", "utm"),
-            ("qemu", "qemu_virtiofs"),
-            ("libvirt", "virtiofs"),
-        ] {
+        // VMware's folders carry no type (its plugin's `usable?` takes one argument, which Vagrant
+        // passes only to pick a type), VMware's the only one allowed.
+        let vmware = isoloom_test_support::ruby_blocks(&out);
+        let vmware = vmware.block("m.vm.provider \"vmware_desktop\" do |_, o|");
+        assert_eq!(
+            vmware.statements,
+            [
+                "o.vm.allowed_synced_folder_types = [:vmware]",
+                "o.vm.synced_folder File.expand_path(\"shared\", ROOT), \"/srv/shared\", create: true",
+                "o.vm.synced_folder File.expand_path(\"~/notes\", ROOT), \"/notes\", create: true",
+            ]
+        );
+        for (provider, kind) in [("parallels", "parallels"), ("utm", "utm"), ("qemu", "qemu_virtiofs"), ("libvirt", "virtiofs")] {
             assert!(out.contains(&format!("m.vm.provider \"{provider}\" do |")), "{provider}: {out}");
             assert!(
                 out.contains(&format!(

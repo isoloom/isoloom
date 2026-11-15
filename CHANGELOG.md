@@ -132,6 +132,17 @@ stable spec format.
 
 ### Fixed
 
+- **On VMware Desktop, each adapter on the environment's networks has a fixed PCI slot (#284).**
+  Without `ethernet<n>.pcislotnumber`, VMware picked a slot as Vagrant added an adapter: the
+  guest's interfaces took other names when the second network's was attached, or at a boot after
+  a shutdown, and Vagrant's SSH session closed. Each adapter after the box's own now has a slot of
+  its own (192, 224, 256, then their next functions).
+- **VMware Desktop shares the computer's folders again (`host_folders`) with Vagrant 2.4.9.**
+  Vagrant checks a synced folder of an explicit type with `usable?(machine, true)`, which
+  vagrant-vmware-desktop 3.0.5 defines with one argument: `vagrant up` stopped on an
+  `ArgumentError`. VMware's folders now carry no type, with `allowed_synced_folder_types` set to
+  `[:vmware]`, so Vagrant picks VMware's own by the one-argument check.
+
 - **A VM on libvirt starts even where another network holds its network's block.** vagrant-libvirt
   looks a private network with an address up by its block first: on a computer where another
   network already had the block (another copy of the environment, another environment on the same

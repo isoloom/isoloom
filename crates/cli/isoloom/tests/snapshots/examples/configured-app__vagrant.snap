@@ -902,6 +902,7 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "configured-app-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("web"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1545,6 +1546,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "configured-app-#{ISOLOOM_KEY} - api"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("api"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -2040,6 +2042,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "configured-app-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
     end
     m.vm.provider "parallels" do |v|
       v.name = "configured-app-#{ISOLOOM_KEY} - isoloom-controller"

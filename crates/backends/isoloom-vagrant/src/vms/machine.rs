@@ -204,6 +204,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         label: env.names().vm_label(name),
         vm_name: env.names().vm_name(name),
         size: Size::of(mp),
+        networks: mp.addresses.len(),
         port_groups: super::port_groups(env, mp.addresses.keys().map(String::as_str)),
         libvirt_box: image.libvirt.as_deref(),
         boot: mp.boot.as_ref(),

@@ -897,6 +897,9 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
+      v.vmx["ethernet2.pcislotnumber"] = "224"
+      v.vmx["ethernet3.pcislotnumber"] = "256"
     end
     m.vm.provider "parallels" do |v|
       v.name = "dmz-jump-#{ISOLOOM_KEY} - isoloom-router"
@@ -1113,6 +1116,8 @@ Vagrant.configure("2") do |config|
       v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - gateway"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
+      v.vmx["ethernet2.pcislotnumber"] = "224"
       if (console = IsoloomConsole.of("gateway"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1399,6 +1404,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - app"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("app"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -1729,6 +1735,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - db"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("db"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
@@ -2059,6 +2066,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.vmx["displayName"] = "dmz-jump-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
+      v.vmx["ethernet1.pcislotnumber"] = "192"
       if (console = IsoloomConsole.of("user"))
         v.vmx["RemoteDisplay.vnc.enabled"] = "TRUE"
         v.vmx["RemoteDisplay.vnc.ip"] = "127.0.0.1"
