@@ -14,12 +14,13 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
 }
 
-/// The examples' names, sorted.
+/// The examples' names, sorted: the folders with their isoloom.yml (examples/paas groups its own,
+/// out of this list).
 fn names() -> std::io::Result<Vec<String>> {
     let mut out = Vec::new();
     for entry in std::fs::read_dir(root())? {
         let path = entry?.path();
-        if path.is_dir()
+        if path.join("isoloom.yml").is_file()
             && let Some(name) = path.file_name()
         {
             out.push(name.to_string_lossy().into_owned());

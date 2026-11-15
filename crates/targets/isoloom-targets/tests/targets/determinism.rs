@@ -12,7 +12,8 @@ fn render(lab: &isoloom_targets::Lab) -> Vec<(String, String)> {
 #[test]
 fn every_example_renders_the_same_twice() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
-    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();
+    // An example is a folder with its isoloom.yml (examples/paas groups its own, out of this list).
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).unwrap().map(|e| e.unwrap().path()).filter(|p| p.join("isoloom.yml").is_file()).collect();
     dirs.sort();
     let mut rendered = 0;
     for dir in dirs {
