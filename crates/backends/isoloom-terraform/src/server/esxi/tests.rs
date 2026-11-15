@@ -49,42 +49,73 @@ fn the_password_comes_from_the_environment_never_a_command_line() {
 
 #[test]
 fn a_vswitch_and_a_port_group_per_network() {
-    let tf = module(PAIR);
-    for net in ["front", "back"] {
-        assert!(tf.contains(&format!("resource \"esxi_vswitch\" \"{net}\"")), "{net}");
-        assert!(tf.contains(&format!("resource \"esxi_portgroup\" \"{net}\"")), "{net}");
-    }
-    assert!(tf.contains("vswitch = esxi_vswitch.back.name"));
+    let body = isoloom_test_support::hcl_body(&module(PAIR));
+    assert_eq!(isoloom_test_support::hcl_names(&body, "resource", "esxi_vswitch"), ["front", "back"]);
+    assert_eq!(isoloom_test_support::hcl_names(&body, "resource", "esxi_portgroup"), ["front", "back"]);
+    assert_eq!(
+        isoloom_test_support::hcl_text(isoloom_test_support::hcl_one(&body, "esxi_portgroup", "back"), "vswitch"),
+        "esxi_vswitch.back.name"
+    );
 }
 
 #[test]
 fn a_vm_per_machine_set_up_through_the_router() {
     let tf = module(PAIR);
-    for vm in ["isoloom_router", "web", "db"] {
-        assert!(tf.contains(&format!("resource \"esxi_guest\" \"{vm}\"")), "{vm}");
-    }
-    assert!(tf.contains("resource \"terraform_data\" \"web\""));
-    assert!(tf.contains("bastion_host        = local.router_address"));
-    assert!(tf.contains("router_address = esxi_guest.isoloom_router.ip_address"));
+    let body = isoloom_test_support::hcl_body(&tf);
+    let mut guests = isoloom_test_support::hcl_names(&body, "resource", "esxi_guest");
+    guests.sort();
+    assert_eq!(guests, ["db", "isoloom_router", "web"]);
+    // web's set-up goes through the router.
+    let web = isoloom_test_support::hcl_one(&body, "terraform_data", "web");
+    let bastions: Vec<String> = isoloom_test_support::hcl_nested(web, "connection")
+        .iter()
+        .map(|c| isoloom_test_support::hcl_text(c.body(), "bastion_host"))
+        .collect();
+    assert!(!bastions.is_empty() && bastions.iter().all(|b| b == "local.router_address"), "{bastions:?}");
+    let locals = isoloom_test_support::hcl_blocks(&body, "locals", &[]);
+    let router = locals
+        .iter()
+        .find_map(|l| isoloom_test_support::hcl_attribute(l.body(), "router_address"))
+        .map(ToString::to_string);
+    assert_eq!(router.as_deref(), Some("esxi_guest.isoloom_router.ip_address"));
     // Debian has no default OVA: the variable says it must be given.
-    assert!(tf.contains("images needs an OVA for each of: debian-12, ubuntu-24.04."));
-    assert!(tf.contains("noble-server-cloudimg-amd64.ova"));
+    let images = isoloom_test_support::hcl_blocks(&body, "variable", &["images"]);
+    let images = images.first().expect("the images variable").body();
+    assert!(
+        isoloom_test_support::hcl_literals(images)
+            .iter()
+            .any(|l| l.contains("images needs an OVA for each of: debian-12, ubuntu-24.04.")),
+        "{tf}"
+    );
+    assert!(
+        isoloom_test_support::hcl_literals(images)
+            .iter()
+            .any(|l| l.ends_with("noble-server-cloudimg-amd64.ova")),
+        "{tf}"
+    );
 }
 
 #[test]
 fn windows_and_ipv6_are_hosted_within_limits() {
     let windows = PAIR.replace("os: debian@12", "os: windows-server@2022").replace("db.sh", "db.ps1");
     assert_eq!(EsxiBackend.refusal(&env(&windows)), None);
-    let tf = module(&windows);
-    assert!(tf.contains("guestos        = \"windows2019srvnext-64\""), "{tf}");
-    assert!(tf.contains("resource \"random_password\" \"windows\""));
-    assert!(!tf.contains("resource \"terraform_data\" \"db\""), "cloudbase-init sets it up");
+    let body = isoloom_test_support::hcl_body(&module(&windows));
+    assert_eq!(
+        isoloom_test_support::hcl_text(isoloom_test_support::hcl_one(&body, "esxi_guest", "db"), "guestos"),
+        "windows2019srvnext-64"
+    );
+    assert_eq!(isoloom_test_support::hcl_names(&body, "resource", "random_password"), ["windows"]);
+    assert!(
+        !isoloom_test_support::hcl_names(&body, "resource", "terraform_data").contains(&"db".to_owned()),
+        "cloudbase-init sets it up"
+    );
     let shell = PAIR.replace("os: debian@12", "os: windows-server@2022");
     let why = EsxiBackend.refusal(&unchecked(&shell)).unwrap();
     assert!(why.contains("PowerShell scripts"), "{why}");
     let v6 = PAIR.replace("back: { cidr: 10.20.2.0/24 }", "back: { cidr: 10.20.2.0/24, ipv6: { cidr: \"fd00:20::/64\" } }");
     assert_eq!(EsxiBackend.refusal(&env(&v6)), None);
-    assert!(module(&v6).contains("\"10.20.2.254/24\", \"fd00:20::254/64\""), "the router's IPv6 address");
+    let router_addresses = isoloom_test_support::hcl_literals(&isoloom_test_support::hcl_body(&module(&v6)));
+    assert!(router_addresses.iter().any(|l| l == "fd00:20::254/64"), "the router's IPv6 address");
     let kali = PAIR.replace("os: debian@12", "os: kali");
     let no_image = EsxiBackend.refusal(&env(&kali)).unwrap();
     assert!(no_image.contains("no ESXi image for `kali`"), "{no_image}");
