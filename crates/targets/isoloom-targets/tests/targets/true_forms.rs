@@ -93,11 +93,17 @@ fn proxmox_runs_a_container_form_as_lxc_only_where_the_spec_asks() -> Outcome {
     let lxc = one("os: debian@12, app: { image: nginx, steps: [{ run: s.sh }] }")?;
     assert_eq!(forms(&lxc, Target::Proxmox)?, [("m".to_owned(), MachineShape::Vm)]);
     let asked = lab(
-        "version: 1\nname: forms\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  m: { networks: { lan: 10 }, os: debian@12, app: { image: 'nginx:1.27', steps: [{ run: s.sh }] } }\noverrides:\n  proxmox: { machines: { m: { lxc: true } } }\n",
+        "version: 1\nname: forms\nnetworks: { lan: { cidr: 10.30.0.0/24 } }\nmachines:\n  m: { networks: { lan: 10 }, app: { image: 'nginx:1.27' } }\noverrides:\n  proxmox: { machines: { m: { lxc: true } } }\n",
     )?;
+    // An image alone has no VM form: only Proxmox's container form takes it, where asked.
+    assert_eq!(refusal(&asked, Target::Proxmox)?, None);
     assert_eq!(forms(&asked, Target::Proxmox)?, [("m".to_owned(), MachineShape::Container)]);
     let tf = generated(&asked, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    assert!(tf.contains("resource \"proxmox_virtual_environment_container\""), "{tf}");
+    let module = isoloom_test_support::hcl_body(&tf);
+    assert_eq!(
+        isoloom_test_support::hcl_names(&module, "resource", "proxmox_virtual_environment_container"),
+        ["m"]
+    );
     Ok(())
 }
 

@@ -17,20 +17,23 @@ fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
     // The access machine is a real container now, kept running idle under the engine's init, not
     // the check stand-in. It is on demand: its image is the runner-overridable `ISOLOOM_ACCESS_IMAGE`
     // (its table image the fallback) and it sits in the `access` profile, so the initial `up` skips it.
-    assert!(
-        compose
-            .contains("  user:\n    image: ${ISOLOOM_ACCESS_IMAGE:-registry.example.com/workstation:1}\n    profiles:\n    - access\n    init: true\n    entrypoint:\n    - sleep\n    - infinity\n"),
-        "{compose}"
-    );
+    let c = isoloom_test_support::yaml(&compose);
+    let at = |key: &str| isoloom_test_support::yaml_str(&c, &format!("services.user.{key}"));
+    assert_eq!(at("image"), "${ISOLOOM_ACCESS_IMAGE:-registry.example.com/workstation:1}");
+    assert_eq!(isoloom_test_support::yaml_strs(&c, "services.user.profiles"), ["access"]);
+    assert_eq!(at("init"), "true");
+    assert_eq!(isoloom_test_support::yaml_strs(&c, "services.user.entrypoint"), ["sleep", "infinity"]);
     // A check that runs from its position can't depend on it (it is on demand, in the `access`
     // profile), so the check-profile stand-in `isoloom-access` stands in at its addresses; the
     // access box keeps its own `user` service above and is never collapsed into the stand-in.
-    assert!(compose.contains("\n  isoloom-access:\n"), "{compose}");
+    assert!(isoloom_test_support::yaml_keys_at(&c, "services").contains(&"isoloom-access".to_owned()));
     // Its VM too: defined but not started by `up` (`autostart: false`), its box overridable.
-    let vagrant = generated(&applied, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(
-        vagrant.contains("config.vm.define \"user\", autostart: false do |m|\n    m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"bento/ubuntu-24.04\")"),
-        "{vagrant}"
+    let vagrant = crate::testing::vagrantfile(&applied)?;
+    let user = crate::testing::define(&vagrant, "user");
+    assert!(user.head.starts_with("config.vm.define \"user\", autostart: false do"), "{}", user.head);
+    assert_eq!(
+        user.statements.first().map(String::as_str),
+        Some("m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"bento/ubuntu-24.04\")")
     );
     // An access machine with its own `os` is the spec's, which wins over the table.
     let spec = example("segmented")?;
