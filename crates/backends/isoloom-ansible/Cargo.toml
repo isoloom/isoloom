@@ -23,6 +23,7 @@ thiserror.workspace = true
 [dev-dependencies]
 isoloom-render = { workspace = true, features = ["test-support"] }
 insta.workspace = true
+isoloom-test-support.workspace = true
 proptest.workspace = true
 serde_yaml_ng.workspace = true
 
