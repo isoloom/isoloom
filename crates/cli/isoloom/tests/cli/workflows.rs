@@ -67,6 +67,7 @@ fn after<'a>(words: &'a [String], flag: &str) -> Option<&'a str> {
 }
 
 #[test]
+#[ignore = "needs cargo: reads the workspace with `cargo metadata` (a player's machine has no toolchain); `cargo xtask test` runs it"]
 fn every_cargo_command_names_a_package_and_a_test_target_it_has() -> Outcome {
     let ws = workspace()?;
     for words in lines()? {
