@@ -134,7 +134,7 @@ fn postgres(at: &FieldPath, p: &Postgres, out: &mut Problems) {
                 Problem::new(
                     Code::InvalidValue,
                     at.key("clients").key(machine).key("access"),
-                    "a database login is the spec's secret on every platform for now",
+                    "a database login is the spec's secret on every platform",
                 )
                 .fix("`access: keys`"),
             );
