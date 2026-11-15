@@ -23,7 +23,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - apk add --no-cache nftables >/dev/null && printf '%s' "$$RULES" | nft -f - && exec sleep infinity
+    - apk add --no-cache nftables dnsmasq >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$HOSTS" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo && exec sleep infinity
     hostname: isoloom-router
     networks:
       front:
@@ -45,10 +45,14 @@ services:
             ip saddr 10.61.10.0/24 ip daddr 10.61.20.0/24 icmp type echo-request accept
           }
         }
+      HOSTS: |
+        10.61.20.20 cache
+        10.61.10.10 web
+        10.61.99.10 user
     healthcheck:
       test:
       - CMD-SHELL
-      - nft list table inet isoloom >/dev/null 2>&1
+      - nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null
       interval: 3s
       timeout: 3s
       retries: 60
@@ -58,13 +62,12 @@ services:
     restart: unless-stopped
   cache:
     image: redis:7-alpine
+    dns:
+    - 10.61.20.254
     hostname: cache
     networks:
       back:
         ipv4_address: 10.61.20.20
-    extra_hosts:
-    - web:10.61.10.10
-    - user:10.61.99.10
     volumes:
     - cache-data:/data
     - isoloom-probe:/.isoloom-probe:ro
@@ -125,13 +128,12 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: segmented
     image: localhost/isoloom/segmented-web
+    dns:
+    - 10.61.10.254
     hostname: web
     networks:
       front:
         ipv4_address: 10.61.10.10
-    extra_hosts:
-    - cache:10.61.20.20
-    - user:10.61.99.10
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
@@ -188,6 +190,8 @@ services:
     image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
     profiles:
     - access
+    dns:
+    - 10.61.99.254
     init: true
     entrypoint:
     - sleep
@@ -196,9 +200,6 @@ services:
     networks:
       access:
         ipv4_address: 10.61.99.10
-    extra_hosts:
-    - cache:10.61.20.20
-    - web:10.61.10.10
     labels:
       isoloom.managed: 'true'
       isoloom.environment: segmented
@@ -235,6 +236,8 @@ services:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
+    dns:
+    - 10.61.99.254
     init: true
     entrypoint:
     - sleep
@@ -243,9 +246,6 @@ services:
     networks:
       access:
         ipv4_address: 10.61.99.10
-    extra_hosts:
-    - cache:10.61.20.20
-    - web:10.61.10.10
     labels:
       isoloom.managed: 'true'
       isoloom.environment: segmented

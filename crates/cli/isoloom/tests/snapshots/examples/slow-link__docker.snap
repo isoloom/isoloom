@@ -145,7 +145,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - apk add --no-cache nftables iproute2 >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$TC" | sh && exec sleep infinity
+    - apk add --no-cache nftables dnsmasq iproute2 >/dev/null && printf '%s' "$$RULES" | nft -f - && printf '%s' "$$TC" | sh && printf '%s' "$$HOSTS" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo && exec sleep infinity
     hostname: isoloom-router
     networks:
       branch:
@@ -164,12 +164,15 @@ services:
             ip saddr 10.75.1.0/24 ip daddr 10.75.2.0/24 icmp type echo-request accept
           }
         }
+      HOSTS: |
+        10.75.2.10 web
+        10.75.1.10 user
       TC: |
         IF=$$(ip -o -4 addr show | awk '$$4 ~ /^10\.75\.2\.254\//{print $$2}' | head -n 1); [ -n "$$IF" ] && tc qdisc replace dev "$$IF" root netem delay 80ms 10ms loss 1% rate 10mbit
     healthcheck:
       test:
       - CMD-SHELL
-      - nft list table inet isoloom >/dev/null 2>&1
+      - nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null
       interval: 3s
       timeout: 3s
       retries: 60
@@ -187,12 +190,12 @@ services:
         isoloom.managed: 'true'
         isoloom.environment: slow-link
     image: localhost/isoloom/slow-link-web
+    dns:
+    - 10.75.2.254
     hostname: web
     networks:
       far:
         ipv4_address: 10.75.2.10
-    extra_hosts:
-    - user:10.75.1.10
     volumes:
     - isoloom-probe:/.isoloom-probe:ro
     healthcheck:
@@ -244,6 +247,8 @@ services:
     image: ${ISOLOOM_ACCESS_IMAGE:-debian:12@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858}
     profiles:
     - access
+    dns:
+    - 10.75.1.254
     init: true
     entrypoint:
     - sleep
@@ -252,8 +257,6 @@ services:
     networks:
       branch:
         ipv4_address: 10.75.1.10
-    extra_hosts:
-    - web:10.75.2.10
     labels:
       isoloom.managed: 'true'
       isoloom.environment: slow-link
@@ -290,6 +293,8 @@ services:
     image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles:
     - check
+    dns:
+    - 10.75.1.254
     init: true
     entrypoint:
     - sleep
@@ -298,8 +303,6 @@ services:
     networks:
       branch:
         ipv4_address: 10.75.1.10
-    extra_hosts:
-    - web:10.75.2.10
     labels:
       isoloom.managed: 'true'
       isoloom.environment: slow-link

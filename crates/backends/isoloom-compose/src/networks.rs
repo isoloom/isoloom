@@ -91,6 +91,49 @@ pub(crate) fn attachments(env: &Environment, plan: &MachinePlan) -> IndexMap<Str
         .collect()
 }
 
+/// How a service finds the machines it shares no network with (Compose's DNS resolves only the
+/// machines of the networks it is on).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Names {
+    /// Isoloom's router answers them, at its address on one of the service's networks: the
+    /// service's definition names no other machine, so one joining or leaving the environment
+    /// changes it in nothing, and Compose recreates nothing for it.
+    Router(Ipv4Addr),
+    /// Each in the service's own `extra_hosts`: where no router serves the service's networks (a
+    /// gateway machine routes them), a trunk carries one of its networks, or the machine sets
+    /// its own DNS servers.
+    Hosts(Vec<String>),
+}
+
+/// How machine `m`'s service finds the machines it shares no network with ([`Names`]).
+pub(crate) fn names(env: &Environment, m: Machine<'_>) -> Names {
+    let own_dns = m.spec.dns.as_ref().is_some_and(|d| !d.servers.is_empty());
+    let trunked = !trunks::containers(env.spec()).is_empty();
+    let router = env
+        .router
+        .as_ref()
+        .filter(|_| !own_dns && !trunked)
+        .and_then(|r| m.plan.addresses.keys().find_map(|n| r.get(n)));
+    match router {
+        Some(at) => Names::Router(*at),
+        None => Names::Hosts(extra_hosts(env, m)),
+    }
+}
+
+/// Every machine's names at the address the others reach it at when they share no network with
+/// it (its first), one hosts-file line each: what the router's DNS answers ([`Names::Router`]).
+pub(crate) fn hosts_file(env: &Environment) -> String {
+    env.machines
+        .iter()
+        .filter_map(|(name, mp)| {
+            let first = mp.addresses.values().next()?;
+            let names = if mp.names.is_empty() { name.clone() } else { mp.names.join(" ") };
+            Some(format!("{first} {names}\n"))
+        })
+        .collect::<Vec<_>>()
+        .concat()
+}
+
 /// Names of machines that share no network with `m` (Compose DNS only resolves machines on
 /// shared networks, and not across a network a trunk carries); they're reached through the
 /// router. A LAN's switch has no address on the environment's networks: no name to resolve.

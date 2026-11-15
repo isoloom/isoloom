@@ -65,7 +65,6 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         tmpfs,
         hostname: Some(m.name.to_owned()),
         networks: networks::attachments(env, plan),
-        extra_hosts: networks::extra_hosts(env, m),
         environment: environment(env, plan),
         ports: plan.ports.iter().map(port).collect(),
         volumes: [storage::volume_mounts(plan), long_tmpfs, storage::host_folders(m.name, plan)].concat(),
@@ -78,6 +77,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         svc.image = Some(reference.clone());
         svc.build = build.as_ref().map(|b| build_of(env, m.name, b));
     }
+    resolve(env, m, &mut svc);
     dns(spec, &mut svc);
     // A stock image the runner supplies for the user to work from, or one the spec marks
     // `idle`: kept running idle (its own command may be a shell that exits at once).
@@ -123,6 +123,15 @@ pub(super) fn platform(plan: &isoloom_plan::MachinePlan) -> Option<String> {
 }
 
 /// The machine's DNS, when the spec sets it: its servers, options, search list and domain.
+/// How `m`'s service finds the machines it shares no network with: through the router's DNS, or
+/// its own `extra_hosts` ([`networks::Names`]).
+pub(crate) fn resolve(env: &Environment, m: Machine<'_>, svc: &mut Service) {
+    match networks::names(env, m) {
+        networks::Names::Router(at) => svc.dns = vec![at.to_string()],
+        networks::Names::Hosts(hosts) => svc.extra_hosts = hosts,
+    }
+}
+
 fn dns(spec: &model::Machine, svc: &mut Service) {
     if let Some(dns) = &spec.dns {
         svc.dns.clone_from(&dns.servers);

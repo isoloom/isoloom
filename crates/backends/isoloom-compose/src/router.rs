@@ -16,6 +16,10 @@ use crate::interpolation::literal;
 use crate::ipv6;
 use crate::trunks;
 
+/// The router's DNS: the machines' names from `HOSTS`, every other name from Docker's own DNS
+/// in its namespace, on each network it routes (not its loopback, where Docker's DNS listens).
+const DNS: &str = "printf '%s' \"$$HOSTS\" > /etc/isoloom-hosts && dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts --no-resolv --server=127.0.0.11 --bind-interfaces --except-interface=lo";
+
 /// The router's service when the environment has one, then each switch's.
 pub(crate) fn services(env: &Environment, ts: &[trunks::Trunk], services: &mut IndexMap<String, Service>) {
     if let Some(addresses) = &env.router {
@@ -31,19 +35,27 @@ pub(crate) fn services(env: &Environment, ts: &[trunks::Trunk], services: &mut I
 }
 
 /// The router: on every network it routes at its last address, forwarding with the `reach`
-/// rules (`$$` keeps Compose from interpolating the shell's variables).
+/// rules (`$$` keeps Compose from interpolating the shell's variables), and answering the
+/// machines' names for the services on its networks (`dnsmasq` over its `HOSTS`, every other
+/// name asked of Docker's own DNS): a machine joining or leaving changes the router's
+/// definition, not theirs.
 fn router_service(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> Service {
     let spec = env.spec();
-    let mut environment = IndexMap::from([("RULES".to_owned(), router::nftables(spec))]);
+    let mut environment = IndexMap::from([
+        ("RULES".to_owned(), router::nftables(spec)),
+        ("HOSTS".to_owned(), crate::networks::hosts_file(env)),
+    ]);
     let tc = router::tc_script(spec);
     if let Some(t) = &tc {
         environment.insert("TC".into(), literal(t));
     }
     // With `tc`, iproute2 (for tc) and the netem commands after the rules.
     let start = if tc.is_some() {
-        "apk add --no-cache nftables iproute2 >/dev/null && printf '%s' \"$$RULES\" | nft -f - && printf '%s' \"$$TC\" | sh && exec sleep infinity"
+        format!(
+            "apk add --no-cache nftables dnsmasq iproute2 >/dev/null && printf '%s' \"$$RULES\" | nft -f - && printf '%s' \"$$TC\" | sh && {DNS} && exec sleep infinity"
+        )
     } else {
-        "apk add --no-cache nftables >/dev/null && printf '%s' \"$$RULES\" | nft -f - && exec sleep infinity"
+        format!("apk add --no-cache nftables dnsmasq >/dev/null && printf '%s' \"$$RULES\" | nft -f - && {DNS} && exec sleep infinity")
     };
     Service {
         image: Some(env.images.pull(UTILITY_IMAGE)),
@@ -53,8 +65,12 @@ fn router_service(env: &Environment, addresses: &IndexMap<String, Ipv4Addr>) -> 
         networks: addresses.iter().map(|(n, a)| (n.clone(), Some(ipv6::router_attachment(env, n, *a)))).collect(),
         environment: Some(environment),
         init: true,
-        entrypoint: vec!["/bin/sh".into(), "-c".into(), start.into()],
-        healthcheck: Some(Healthcheck::shell("nft list table inet isoloom >/dev/null 2>&1", Seconds(3), 60)),
+        entrypoint: vec!["/bin/sh".into(), "-c".into(), start],
+        healthcheck: Some(Healthcheck::shell(
+            "nft list table inet isoloom >/dev/null 2>&1 && pidof dnsmasq >/dev/null",
+            Seconds(3),
+            60,
+        )),
         restart: Some(Restart::UnlessStopped),
         ..Service::default()
     }

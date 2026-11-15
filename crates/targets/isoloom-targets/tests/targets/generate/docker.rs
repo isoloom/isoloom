@@ -138,7 +138,10 @@ fn reach_rules_add_a_router_with_matching_rules() -> Outcome {
     // Names across networks, and checks from the access machine's position. The access box is on
     // demand (the `access` profile), so a check in the `check` profile can't share its namespace:
     // it runs from the stand-in at the box's addresses (`isoloom-access`), not the box itself.
-    assert!(yaml_strs(&c, "services.web.extra_hosts").contains(&"cache:10.61.20.20".to_owned()));
+    let resolver = yaml_str(&c, "services.isoloom-router.networks.front.ipv4_address");
+    assert_eq!(yaml_strs(&c, "services.web.dns"), [resolver]);
+    let hosts = yaml_str(&c, "services.isoloom-router.environment.HOSTS");
+    assert!(hosts.lines().any(|l| l == "10.61.20.20 cache"), "{hosts}");
     assert_eq!(yaml_str(&c, "services.isoloom-check.network_mode"), "service:isoloom-access");
     Ok(())
 }
@@ -273,5 +276,51 @@ machines:
     // Nothing left over: the one command it always was.
     let (_, plain) = compose(&example("hello-stack")?)?;
     assert!(plain.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{plain}");
+    Ok(())
+}
+
+/// Two networks a router joins, with a machine on each (`base`), and the same with `extra` (YAML
+/// lines under `machines:`) joined.
+fn routed(extra: &str) -> Outcome<Lab> {
+    lab(&format!(
+        "version: 1\nname: join\nnetworks:\n  front: {{ cidr: 10.80.1.0/24 }}\n  back: {{ cidr: 10.80.2.0/24 }}\nreach: [{{ from: front, to: back, ports: [5432] }}]\nmachines:\n  web: {{ networks: {{ front: 10 }}, ports: {{ web: 80 }}, app: {{ image: nginx }} }}\n  db: {{ networks: {{ back: 10 }}, ports: {{ db: 5432 }}, app: {{ image: postgres }} }}\n{extra}"
+    ))
+}
+
+/// A machine joining or leaving a running environment (the launcher's attack box) restarts
+/// nothing else: the services' definitions name no machine across networks (the router's DNS
+/// answers those), so `up` finds every other service as it was and recreates none of them.
+#[test]
+fn a_machine_joining_or_leaving_changes_no_other_machines_service() -> Outcome {
+    let (before, _) = compose(&routed("")?)?;
+    let (after, _) = compose(&routed("  box: { os: alpine, networks: { front: 20 } }\n")?)?;
+    // The machines of the environment as it was, and their sidecars, defined as they were.
+    let theirs = |name: &str| ["web", "db"].iter().any(|m| name == *m || name.ends_with(&format!("-{m}")));
+    let kept: Vec<String> = yaml_keys_at(&before, "services")
+        .into_iter()
+        .filter(|s| theirs(s) && !s.starts_with("isoloom-check"))
+        .collect();
+    assert!(kept.len() >= 2, "{kept:?}");
+    for service in &kept {
+        let path = format!("services.`{service}`");
+        assert_eq!(yaml_at(&before, &path), yaml_at(&after, &path), "{service} changed when `box` joined");
+    }
+    // Each asks the router for the names across networks; the router knows the newcomer.
+    let router_front = yaml_str(&before, "services.isoloom-router.networks.front.ipv4_address");
+    assert_eq!(yaml_strs(&before, "services.web.dns"), std::slice::from_ref(&router_front));
+    assert_eq!(yaml_strs(&before, "services.web.extra_hosts"), Vec::<String>::new());
+    let hosts = yaml_str(&after, "services.isoloom-router.environment.HOSTS");
+    assert!(hosts.lines().any(|l| l == "10.80.1.20 box"), "{hosts}");
+    assert!(script(&after, "isoloom-router").contains("dnsmasq --no-hosts --addn-hosts=/etc/isoloom-hosts"));
+    Ok(())
+}
+
+/// Where a gateway machine routes the networks there is no router to ask: each service keeps
+/// the names it can't resolve in its own `extra_hosts`.
+#[test]
+fn behind_a_gateway_the_names_across_networks_stay_in_extra_hosts() -> Outcome {
+    let (c, _) = compose(&example("edge-firewall")?)?;
+    assert_ne!(yaml_strs(&c, "services.web.extra_hosts").len(), 0);
+    assert_eq!(yaml_strs(&c, "services.web.dns"), Vec::<String>::new());
     Ok(())
 }
