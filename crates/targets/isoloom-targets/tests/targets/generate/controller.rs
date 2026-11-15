@@ -4,19 +4,34 @@
 use isoloom_spec::{Target, parse};
 use isoloom_targets::Lab;
 
+use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
+
 use crate::testing::{Outcome, example, from, generated, lab, problems, source};
 
 #[test]
 fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
     let tf = generated(&Lab::new(source("dmz-jump")?), Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert!(tf.contains("resource \"aws_network_interface\" \"gateway_dmz\""), "{tf}");
-    assert!(tf.contains("resource \"aws_network_interface\" \"gateway_internal\""));
-    assert!(tf.contains("source_dest_check = false"));
-    assert!(tf.contains("resource \"aws_network_interface_attachment\" \"gateway_internal\""));
-    assert!(tf.contains("resource \"aws_eip\" \"gateway\""));
+    let body = hcl_body(&tf);
+    let nics = hcl_names(&body, "resource", "aws_network_interface");
+    assert!(
+        nics.contains(&"gateway_dmz".to_owned()) && nics.contains(&"gateway_internal".to_owned()),
+        "{nics:?}"
+    );
+    // It forwards between them: no source/destination check on either.
+    for nic in ["gateway_dmz", "gateway_internal"] {
+        assert_eq!(hcl_text(hcl_one(&body, "aws_network_interface", nic), "source_dest_check"), "false", "{nic}");
+    }
+    assert_eq!(hcl_names(&body, "resource", "aws_network_interface_attachment"), ["gateway_internal"]);
+    assert!(hcl_names(&body, "resource", "aws_eip").contains(&"gateway".to_owned()));
     // The set-up finds the extra interface by its MAC address: interpolated, not a literal.
-    assert!(tf.contains("\\\"${lower(aws_network_interface.gateway_internal.mac_address)}\\\""), "{tf}");
-    assert!(!tf.contains("$${lower("));
+    let scripts: Vec<String> = hcl_literals(&body).into_iter().filter(|l| l.contains('\n')).collect();
+    assert!(
+        scripts
+            .iter()
+            .any(|s| s.contains("${lower(aws_network_interface.gateway_internal.mac_address)}")),
+        "{tf}"
+    );
+    assert!(!scripts.iter().any(|s| s.contains("$${lower(")), "{tf}");
     Ok(())
 }
 
@@ -25,9 +40,19 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() -> Outcome {
     let spec = example("ansible-pair")?;
     let tf = generated(&spec, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
     // A key of its own, authorized on every machine; the controller at the controller address.
-    assert!(tf.contains("resource \"tls_private_key\" \"controller\""));
-    assert!(tf.contains("${trimspace(tls_private_key.controller.public_key_openssh)}"), "{tf}");
-    assert!(tf.contains("private_ips       = [\"10.63.0.253\"]"));
+    let body = hcl_body(&tf);
+    assert_eq!(hcl_names(&body, "resource", "tls_private_key"), ["controller"]);
+    let literals = hcl_literals(&body);
+    assert!(
+        literals
+            .iter()
+            .any(|l| l.contains("${trimspace(tls_private_key.controller.public_key_openssh)}")),
+        "{tf}"
+    );
+    assert!(
+        hcl_values(&body, "private_ips").contains(&"10.63.0.253".to_owned()),
+        "the controller at the controller address"
+    );
     // Once every machine's own set-up is done (its ready file, over SSH with the controller's
     // key), it runs the playbook with the groups and vars.
     let (web, cache) = (
