@@ -7,7 +7,7 @@
 use std::process::Command;
 
 use xtask_quality::process::{describe, output, program, quiet};
-use xtask_quality::repo::slashed;
+use xtask_quality::repo::{remove, slashed};
 
 fn sh(script: &str) -> Command {
     let mut cmd = Command::new("sh");
@@ -45,4 +45,19 @@ fn a_program_is_its_own_name_off_windows() {
 #[test]
 fn a_path_is_written_with_forward_slashes() {
     assert_eq!(slashed(std::path::Path::new("a/b/c.rs")), "a/b/c.rs");
+}
+
+#[test]
+fn removing_takes_a_file_or_a_folder_and_what_isnt_there_is_no_error() -> std::io::Result<()> {
+    let root = tempfile::tempdir()?;
+    let folder = root.path().join("f");
+    std::fs::create_dir_all(folder.join("inner"))?;
+    std::fs::write(folder.join("inner/x"), "")?;
+    let file = root.path().join("file");
+    std::fs::write(&file, "")?;
+    remove(&folder)?;
+    remove(&file)?;
+    remove(&root.path().join("absent"))?;
+    assert!(!folder.exists() && !file.exists());
+    Ok(())
 }
