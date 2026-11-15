@@ -4,6 +4,8 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Error, GenerateError, Lab, generate};
 
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_nested, hcl_one, hcl_values, manifest, yaml_documents};
+
 use crate::testing::{Outcome, allowed, generated as file, lab};
 
 /// One machine with `hardware` set, as a container (an image) and as a VM (its OS and a step).
@@ -50,8 +52,16 @@ fn a_container_gets_the_hosts_gpus_and_devices_on_docker_only() -> Outcome {
 fn kubernetes_asks_the_device_plugin_for_a_count() -> Outcome {
     let s = spec("gpus: { count: 1, capabilities: [compute, utility] }")?;
     let manifests = file(&s, Target::Kubernetes, "kubernetes/environment.yaml")?;
-    assert!(manifests.contains("nvidia.com/gpu: '1'"), "{manifests}");
-    assert!(manifests.contains("- name: NVIDIA_DRIVER_CAPABILITIES\n"), "{manifests}");
+    let docs = yaml_documents(&manifests);
+    let container = &manifest(&docs, "Deployment", "a")["spec"]["template"]["spec"]["containers"][0];
+    assert_eq!(container["resources"]["limits"]["nvidia.com/gpu"].as_str(), Some("1"), "{manifests}");
+    let env: Vec<&str> = container["env"]
+        .as_sequence()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e["name"].as_str())
+        .collect();
+    assert!(env.contains(&"NVIDIA_DRIVER_CAPABILITIES"), "{env:?}");
     assert!(refusal(&spec("gpus: all")?, Target::Kubernetes)?.contains("`gpus: all` has no Kubernetes form"));
     Ok(())
 }
@@ -74,12 +84,20 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
     ] {
         assert!(v.contains(switch), "{switch}");
     }
-    assert!(file(&nested, Target::Proxmox, "proxmox/main.tf")?.contains("type  = \"host\""));
+    let values = |tf: &str, key: &str| hcl_values(&hcl_body(tf), key);
+    let proxmox = hcl_body(&file(&nested, Target::Proxmox, "proxmox/main.tf")?);
+    let cpu = hcl_nested(hcl_one(&proxmox, "proxmox_virtual_environment_vm", "a"), "cpu");
+    assert_eq!(
+        cpu.first().map(|c| hcl_values(c.body(), "type")),
+        Some(vec!["host".to_owned()]),
+        "the VM's CPU is the host's"
+    );
     let module = |cloud: &str| cloud_module(&nested, cloud);
     let aws = module("aws")?.unwrap();
-    assert!(aws.contains("\"m8i.large\"") && aws.contains("nested_virtualization = \"enabled\""), "{aws}");
-    assert!(module("gcp")?.unwrap().contains("enable_nested_virtualization = true"));
-    assert!(module("oci")?.unwrap().contains("are_virtual_instructions_enabled = true"));
+    assert!(hcl_literals(&hcl_body(&aws)).contains(&"m8i.large".to_owned()), "{aws}");
+    assert_eq!(values(&aws, "nested_virtualization"), ["enabled"]);
+    assert_eq!(values(&module("gcp")?.unwrap(), "enable_nested_virtualization"), ["true"]);
+    assert_eq!(values(&module("oci")?.unwrap(), "are_virtual_instructions_enabled"), ["true"]);
     assert!(module("azure")?.is_none() && module("linode")?.is_none());
     assert_eq!(
         refusal(&spec("nested_virtualization: true")?, Target::Docker)?,
@@ -92,15 +110,21 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
 fn vms_get_gpus_on_proxmox_and_the_clouds() -> Outcome {
     let pinned = vm("gpus: { ids: ['0000:01:00.0'] }")?;
     let tf = file(&pinned, Target::Proxmox, "proxmox/main.tf")?;
-    assert!(tf.contains("machine   = \"q35\"") || tf.contains("machine = \"q35\""), "{tf}");
-    assert!(tf.contains("id     = \"0000:01:00.0\""), "{tf}");
+    let body = hcl_body(&tf);
+    assert_eq!(hcl_values(&body, "machine"), ["q35"], "{tf}");
+    let devices: Vec<String> = hcl_blocks(&body, "resource", &["proxmox_virtual_environment_vm"])
+        .iter()
+        .flat_map(|vm| hcl_nested(vm.body(), "hostpci"))
+        .flat_map(|h| hcl_values(h.body(), "id"))
+        .collect();
+    assert_eq!(devices, ["0000:01:00.0"], "{tf}");
     assert!(refusal(&pinned, Target::Vagrant)?.contains("which this target doesn't pass to a VM"));
     assert!(refusal(&pinned, Target::CloudVm)?.contains("give `gpus` as a count"));
 
     let counted = vm("gpus: 4")?;
     assert!(refusal(&counted, Target::Proxmox)?.contains("list them in `gpus.ids`"));
     let module = |cloud: &str| cloud_module(&counted, cloud);
-    assert!(module("aws")?.unwrap().contains("\"g4dn.12xlarge\""));
+    assert!(hcl_literals(&hcl_body(&module("aws")?.unwrap())).contains(&"g4dn.12xlarge".to_owned()));
     let gcp = module("gcp")?.unwrap();
     assert!(
         gcp.contains("\"g2-standard-48\"") && gcp.contains("on_host_maintenance = \"TERMINATE\""),
