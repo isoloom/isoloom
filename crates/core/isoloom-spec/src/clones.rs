@@ -40,9 +40,9 @@ type Clones = IndexMap<String, Vec<String>>;
 ///
 /// # Errors
 ///
-/// An `invalid-value` [`Problem`] at the field: a `count` that isn't 2 to [`MAX`], a count on
-/// the access machine, or a network's `gateway` or `switch` naming a counted machine.
-pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Problem> {
+/// Every `invalid-value` [`Problem`], each at its field: a `count` that isn't 2 to [`MAX`], a
+/// count on the access machine, or a network's `gateway` or `switch` naming a counted machine.
+pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Vec<Problem>> {
     let Value::Mapping(top) = doc else { return Ok(Clones::new()) };
     let Some(Value::Mapping(machines)) = top.get(key("machines")).cloned() else {
         return Ok(Clones::new());
@@ -54,23 +54,39 @@ pub(crate) fn expand(doc: &mut Value) -> Result<Clones, Problem> {
     top.insert(key("machines"), Value::Mapping(expanded));
     expand_members(top, &clones);
     expand_checks(top, &clones);
-    one_machine_fields(top, &clones)?;
-    Ok(clones)
+    let refused = one_machine_fields(top, &clones);
+    if refused.is_empty() { Ok(clones) } else { Err(refused) }
 }
 
 /// The machines with each counted one replaced by its clones, and the clones of each.
-fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Problem> {
+fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Vec<Problem>> {
     let mut clones = Clones::new();
     let mut expanded = Mapping::new();
+    let mut refused = Vec::new();
     for (k, v) in machines {
         let (Some(base), Value::Mapping(m)) = (k.as_str(), v) else {
             expanded.insert(k.clone(), v.clone());
             continue;
         };
-        let Some(count) = count_of(base, m)? else {
-            expanded.insert(k.clone(), v.clone());
-            continue;
+        let count = match count_of(base, m) {
+            Ok(Some(count)) => count,
+            Ok(None) => {
+                expanded.insert(k.clone(), v.clone());
+                continue;
+            }
+            Err(problem) => {
+                refused.push(problem);
+                continue;
+            }
         };
+        if let Some(past) = past_the_last_octet(base, m, count) {
+            refused.push(past);
+            continue;
+        }
+        if let Some(same) = one_host_port_for_all(base, m, count) {
+            refused.push(same);
+            continue;
+        }
         let mut names = Vec::new();
         for i in 1..=count {
             let n = name(base, i);
@@ -79,7 +95,7 @@ fn expand_machines(machines: &Mapping) -> Result<(Mapping, Clones), Problem> {
         }
         clones.insert(base.to_owned(), names);
     }
-    Ok((expanded, clones))
+    if refused.is_empty() { Ok((expanded, clones)) } else { Err(refused) }
 }
 
 /// A machine's `count` (None without one), checked.
@@ -98,6 +114,50 @@ fn count_of(base: &str, m: &Mapping) -> Result<Option<u8>, Problem> {
         return Err(refused("the access machine is one machine; leave `count` out".to_owned()));
     }
     Ok(Some(count))
+}
+
+/// The problem when `count` clones of machine `base`, one address further each, run past an
+/// address's last octet (.255) on a network, with the last address it would take.
+fn past_the_last_octet(base: &str, m: &Mapping, count: u8) -> Option<Problem> {
+    let Some(Value::Mapping(nets)) = m.get(key("networks")) else { return None };
+    nets.iter().find_map(|(net, octets)| {
+        let first = match octets {
+            Value::Sequence(list) => list.iter().filter_map(Value::as_u64).max(),
+            one => one.as_u64(),
+        }?;
+        let last = first + u64::from(count) - 1;
+        (last > 255).then(|| {
+            Problem::new(
+                Code::InvalidValue,
+                FieldPath::new("machines").key(base).key("networks").key(net.as_str().unwrap_or_default()),
+                format!("{count} machines from .{first} run past .255 (the last would be .{last}): start lower or count fewer"),
+            )
+        })
+    })
+}
+
+/// The problem when counted machine `base` publishes a port on a host port of its own number
+/// (`publish: 8080`, `{ host: 8080 }`): every clone would ask for that one port. One problem, on
+/// the machine as written, rather than one per clone; `publish: true` gives each a free one.
+fn one_host_port_for_all(base: &str, m: &Mapping, count: u8) -> Option<Problem> {
+    let Some(Value::Mapping(ports)) = m.get(key("ports")) else { return None };
+    ports.iter().find_map(|(name, port)| {
+        let Value::Mapping(port) = port else { return None };
+        let host = match port.get(key("publish"))? {
+            Value::Number(n) => n.as_u64()?,
+            Value::Mapping(h) => h.get(key("host"))?.as_u64()?,
+            _ => return None,
+        };
+        Some(Problem::new(
+            Code::InvalidValue,
+            FieldPath::new("machines")
+                .key(base)
+                .key("ports")
+                .key(name.as_str().unwrap_or_default())
+                .key("publish"),
+            format!("its {count} clones (`count`) can't all have host port {host}: `publish: true` gives each a free host port"),
+        ))
+    })
 }
 
 /// Clone `i` (from 1) of machine `m`: no `count`, each address `i - 1` further along.
@@ -192,30 +252,31 @@ fn expand_checks(top: &mut Mapping, clones: &Clones) {
     *checks = out;
 }
 
-/// A gateway, or a LAN's switch, is one machine.
-fn one_machine_fields(top: &Mapping, clones: &Clones) -> Result<(), Problem> {
+/// A gateway, or a LAN's switch, is one machine: every network's field that names a counted one.
+fn one_machine_fields(top: &Mapping, clones: &Clones) -> Vec<Problem> {
     let Some(Value::Mapping(nets)) = top.get(key("networks")) else {
-        return Ok(());
+        return Vec::new();
     };
+    let mut refused = Vec::new();
     for (n, net) in nets {
+        let (Some(n), Value::Mapping(net)) = (n.as_str(), net) else { continue };
         for field in ["gateway", "switch"] {
-            if let Value::Mapping(net) = net
-                && let Some(m) = net.get(key(field)).and_then(Value::as_str)
+            if let Some(m) = net.get(key(field)).and_then(Value::as_str)
                 && clones.contains_key(m)
             {
-                let at = FieldPath::new("networks").key(n.as_str().unwrap_or_default()).key(field);
-                return Err(Problem::new(Code::InvalidValue, at, format!("`{m}` has a count; a {field} is one machine")));
+                let at = FieldPath::new("networks").key(n).key(field);
+                refused.push(Problem::new(Code::InvalidValue, at, format!("`{m}` has a count; a {field} is one machine")));
             }
         }
     }
-    Ok(())
+    refused
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn expanded(yaml: &str) -> (Value, Result<Clones, Problem>) {
+    fn expanded(yaml: &str) -> (Value, Result<Clones, Vec<Problem>>) {
         let mut doc: Value = serde_yaml_ng::from_str(yaml).unwrap();
         let clones = expand(&mut doc);
         (doc, clones)
@@ -266,7 +327,7 @@ mod tests {
     fn a_gateway_or_a_switch_is_one_machine() {
         for field in ["gateway", "switch"] {
             let (_, refused) = expanded(&format!("networks:\n  lan: {{ {field}: rt }}\nmachines:\n  rt: {{ count: 2 }}\n"));
-            let p = refused.unwrap_err();
+            let [p] = &refused.unwrap_err()[..] else { panic!("one problem") };
             assert_eq!((p.code, p.path.as_str()), (Code::InvalidValue, format!("networks.lan.{field}").as_str()));
             assert_eq!(p.reason, format!("`rt` has a count; a {field} is one machine"));
         }
@@ -275,8 +336,43 @@ mod tests {
     }
 
     #[test]
+    fn every_network_naming_a_counted_machine_is_reported() {
+        let (_, refused) = expanded("networks:\n  a: { gateway: rt, switch: sw }\n  b: { gateway: rt }\nmachines:\n  rt: { count: 2 }\n  sw: { count: 2 }\n");
+        let paths: Vec<String> = refused.unwrap_err().iter().map(|p| p.path.to_string()).collect();
+        assert_eq!(paths, ["networks.a.gateway", "networks.a.switch", "networks.b.gateway"]);
+    }
+
+    #[test]
+    fn clones_running_past_the_last_octet_are_one_problem_at_the_network() {
+        let (_, refused) = expanded("machines:\n  ws: { count: 10, networks: { lan: 250 } }\n  db: { count: 3, networks: { lan: 20, mgmt: [200, 254] } }\n");
+        let problems: Vec<(String, String)> = refused.unwrap_err().iter().map(|p| (p.path.to_string(), p.reason.clone())).collect();
+        assert_eq!(
+            problems,
+            [
+                (
+                    "machines.ws.networks.lan".to_owned(),
+                    "10 machines from .250 run past .255 (the last would be .259): start lower or count fewer".to_owned()
+                ),
+                (
+                    "machines.db.networks.mgmt".to_owned(),
+                    "3 machines from .254 run past .255 (the last would be .256): start lower or count fewer".to_owned()
+                ),
+            ]
+        );
+        let (_, fine) = expanded("machines:\n  ws: { count: 6, networks: { lan: 250 } }\n");
+        assert_eq!(fine.unwrap()["ws"].len(), 6, "up to .255 is for the address checks to judge");
+    }
+
+    #[test]
+    fn every_wrong_count_is_reported() {
+        let (_, refused) = expanded("machines:\n  ws: { count: 1 }\n  db: { count: two }\n  me: { count: 2, access: true }\n");
+        let paths: Vec<String> = refused.unwrap_err().iter().map(|p| p.path.to_string()).collect();
+        assert_eq!(paths, ["machines.ws.count", "machines.db.count", "machines.me.count"]);
+    }
+
+    #[test]
     fn a_count_is_2_to_99_on_a_machine_that_isnt_the_access_one() {
-        let refused = |yaml: &str| expanded(yaml).1.unwrap_err().reason;
+        let refused = |yaml: &str| expanded(yaml).1.unwrap_err().remove(0).reason;
         assert_eq!(refused("machines:\n  ws: { count: 1 }\n"), "2 to 99 (one machine needs no count)");
         assert_eq!(refused("machines:\n  ws: { count: 100 }\n"), "2 to 99 (one machine needs no count)");
         assert_eq!(refused("machines:\n  ws: { count: two }\n"), "a number of machines, 2 to 99");

@@ -1,6 +1,0 @@
-# The self-hosted runners' labels (docs/dev/ci-real-hosts.md), so actionlint knows them.
-self-hosted-runner:
-  labels:
-    - virtualbox
-    - libvirt
-    - proxmox

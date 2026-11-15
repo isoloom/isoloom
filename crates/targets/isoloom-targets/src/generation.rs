@@ -1,12 +1,11 @@
 //! An environment's files for a target: lowered for the target, planned, rendered by the target's
-//! backend, with its run manifest and the resolved snapshot beside them.
+//! backend, with the resolved snapshot beside them.
 
 use std::path::Path;
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::Placed;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::{Spec, Target};
 
 use crate::registry::backend;
@@ -51,8 +50,8 @@ pub fn generate_instance(lab: &Lab, target: Target, n: u8) -> Result<Vec<Generat
         .collect())
 }
 
-/// Every target the environment allows: the files (each once: `docker-vm` runs the `docker` target's
-/// Compose file), and why each target left out wasn't generated. A caller that writes or checks
+/// Every target the environment allows: the files (each once: `cloud-docker` runs the `docker`
+/// target's Compose file), and why each target left out wasn't generated. A caller that writes or checks
 /// the files fails on any that isn't a refusal ([`GenerateError::is_refusal`]): a failed backend
 /// leaves its target's files out, which would otherwise read as a target the environment can't use.
 #[must_use]
@@ -60,26 +59,28 @@ pub fn generate_all(lab: &Lab) -> (Vec<GeneratedFile>, Vec<GenerateError>) {
     let mut files: Vec<GeneratedFile> = Vec::new();
     let mut skipped = Vec::new();
     for target in lab.possible() {
-        match target_files(lab, target, None).and_then(|own| added(&mut files, target, own)) {
-            // The resolved snapshot (it asks each target whether it refuses the lab) and the
-            // .gitignore are the same for every target: written once, after the first target's
-            // files.
-            Ok(true) => {
-                files.push(resolved::file(lab));
-                files.push(gitignore::file());
+        let first = files.is_empty();
+        match target_files(lab, target, None).and_then(|own| unwritten(&files, target, own)) {
+            Ok(new) => {
+                files.extend(new);
+                // The resolved snapshot (it asks each target whether it refuses the lab) and the
+                // .gitignore are the same for every target: written once, after the first
+                // target's files.
+                if first {
+                    files.push(resolved::file(lab));
+                    files.push(gitignore::file());
+                }
             }
-            Ok(false) => {}
             Err(e) => skipped.push(e),
         }
     }
     (files, skipped)
 }
 
-/// Adds `target`'s files (`own`) to the earlier targets' (`files`), each path once (a file an
-/// earlier target wrote the same is theirs), and says whether they are the first target's. A
-/// file at an earlier target's path with other contents would replace it, a bug of one of the two
-/// backends: an error, and none of `own` is added.
-fn added(files: &mut Vec<GeneratedFile>, target: Target, own: Vec<GeneratedFile>) -> std::result::Result<bool, GenerateError> {
+/// Of `target`'s files (`own`), the ones the earlier targets' (`files`) don't hold yet, each path
+/// once (a file an earlier target wrote the same is theirs). A file at an earlier target's path
+/// with other contents would replace it, a bug of one of the two backends: an error.
+fn unwritten(files: &[GeneratedFile], target: Target, own: Vec<GeneratedFile>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
     if let Some(clash) = own.iter().find(|f| files.iter().any(|x| x.path == f.path && x.contents != f.contents)) {
         return Err(GenerateError::Internal {
             target,
@@ -87,13 +88,13 @@ fn added(files: &mut Vec<GeneratedFile>, target: Target, own: Vec<GeneratedFile>
             source: std::sync::Arc::new(WrittenTwice),
         });
     }
-    let first = files.is_empty();
+    let mut new: Vec<GeneratedFile> = Vec::new();
     for file in own {
-        if !files.iter().any(|x| x.path == file.path) {
-            files.push(file);
+        if !files.iter().chain(&new).any(|x| x.path == file.path) {
+            new.push(file);
         }
     }
-    Ok(first)
+    Ok(new)
 }
 
 /// The project's own files the generated ones copy, read from the project folder `dir`: when
@@ -115,7 +116,7 @@ pub fn project_copies(lab: &Lab, files: &[GeneratedFile], dir: &Path) -> Result<
 
 /// `spec`, the environment as `target` runs it (as instance `instance`), planned. An environment that lowered
 /// clean always plans: one that doesn't is a failure, not a refusal.
-fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std::result::Result<Environment, GenerateError> {
+pub(crate) fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std::result::Result<Environment, GenerateError> {
     lab.plan(spec, target, instance).map_err(|e| GenerateError::Internal {
         target,
         what: "the lab couldn't be planned".to_owned(),
@@ -127,11 +128,7 @@ fn planned(lab: &Lab, spec: &Spec, target: Target, instance: Option<u8>) -> std:
 fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Spec, GenerateError> {
     let spec = lab.for_target(target);
     match instance {
-        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|e| GenerateError::Instance {
-            target,
-            number: n,
-            source: std::sync::Arc::new(e),
-        }),
+        Some(n) => isoloom_spec::instance::apply(&spec, n).map_err(|source| GenerateError::Instance { target, number: n, source }),
         None => Ok(spec),
     }
 }
@@ -140,6 +137,14 @@ fn lowered(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Resu
 /// refuse the environment, so it can't be part of what a backend renders): the plan for the target,
 /// rendered by its backend.
 fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
+    let problems = lab.problems();
+    if !problems.is_empty() {
+        // The generators assume a checked spec: a spec that parses but is wrong stops here,
+        // whoever calls, as the CLI stops it.
+        return Err(GenerateError::Invalid {
+            problems: problems.iter().map(isoloom_spec::syntax::Problem::line).collect(),
+        });
+    }
     if let Some(refused) = lab.refusal(target) {
         return Err(GenerateError::Unsupported { target, what: refused.line() });
     }
@@ -150,27 +155,16 @@ fn target_files(lab: &Lab, target: Target, instance: Option<u8>) -> std::result:
     let spec = lowered(lab, target, instance)?;
     let env = planned(lab, &spec, target, instance)?;
     let rendered = backend.render(&env)?;
-    let manifests = backend
-        .run_manifests(&env)?
-        .into_iter()
-        .map(|placed| run_manifest(lab, instance, target, placed))
-        .collect::<Result<Vec<_>, _>>()?;
-    assembled(target, rendered, isoloom_render::configure::files(&env), manifests)
+    assembled(target, rendered, isoloom_render::configure::files(&env))
 }
 
 /// A target's files: its backend's, then the configuration renderers' own (the libraries a VM's
 /// set-up embeds, a container's runner and templates; once each, since a backend may have
-/// written some already), then its run manifests. Two at one path, the second of which would
-/// replace the first, is a bug of the backend: an error.
-fn assembled(
-    target: Target,
-    mut files: Vec<GeneratedFile>,
-    configure: Vec<GeneratedFile>,
-    manifests: Vec<GeneratedFile>,
-) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
+/// written some already). Two at one path, the second of which would replace the first, is a
+/// bug of the backend: an error.
+fn assembled(target: Target, mut files: Vec<GeneratedFile>, configure: Vec<GeneratedFile>) -> std::result::Result<Vec<GeneratedFile>, GenerateError> {
     let own: Vec<GeneratedFile> = configure.into_iter().filter(|f| !files.iter().any(|x| x.path == f.path)).collect();
     files.extend(own);
-    files.extend(manifests);
     match written_twice(&files) {
         Some(path) => Err(GenerateError::Internal {
             target,
@@ -193,28 +187,6 @@ fn written_twice(files: &[GeneratedFile]) -> Option<&str> {
     files.iter().map(|f| f.path.as_str()).find(|p| !seen.insert(*p))
 }
 
-/// A backend's run manifest as the file it is written to (`.isoloom/<target>/[<sub>/]run.json`),
-/// its message filled from the resolved snapshot, checked across its fields.
-fn run_manifest(lab: &Lab, instance: Option<u8>, target: Target, placed: Placed) -> std::result::Result<GeneratedFile, GenerateError> {
-    let refused = |e: isoloom_manifest::Error| GenerateError::Internal {
-        target,
-        what: "the run manifest refused a value of this backend".to_owned(),
-        source: std::sync::Arc::new(e),
-    };
-    let mut manifest = placed.manifest;
-    manifest.environment.message = resolved::manifest_message(lab, instance, target).map_err(|e| GenerateError::Internal {
-        target,
-        what: "the run manifest's message couldn't be filled in".to_owned(),
-        source: std::sync::Arc::new(e),
-    })?;
-    manifest.validate().map_err(refused)?;
-    let folder = placed.sub.map_or_else(|| target.id().to_owned(), |sub| format!("{}/{sub}", target.id()));
-    Ok(GeneratedFile {
-        path: format!("{OUTPUT_DIR}/{folder}/run.json"),
-        contents: isoloom_manifest::to_json(&manifest).map_err(refused)?,
-    })
-}
-
 /// Each cloud's id and the region its modules default to when the person's defaults set none
 /// (`isoloom defaults --system`), in the order the modules are written.
 #[must_use]
@@ -227,55 +199,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_run_manifest_or_a_backend_file_written_twice_is_an_error() {
+    fn a_backend_file_written_twice_is_an_error() {
         let compose = GeneratedFile::new(".isoloom/docker/compose.yml", "a");
-        let manifest = GeneratedFile::new(".isoloom/docker/run.json", "{}");
         // A configuration file the backend wrote already is the backend's, once.
         let fine = assembled(
             Target::Docker,
             vec![compose.clone()],
             vec![GeneratedFile::new(".isoloom/docker/compose.yml", "b")],
-            vec![manifest.clone()],
         );
-        assert_eq!(fine.map(|f| f.len()).ok(), Some(2));
-        // A run manifest at a path the backend wrote is caught, as two of the backend's are.
-        for (rendered, manifests) in [
-            (
-                vec![compose.clone(), GeneratedFile::new(".isoloom/docker/run.json", "x")],
-                vec![manifest.clone()],
-            ),
-            (vec![compose.clone(), compose.clone()], vec![]),
-        ] {
-            let e = assembled(Target::Docker, rendered, vec![], manifests)
-                .err()
-                .map(|e| e.to_string())
-                .unwrap_or_default();
-            assert!(e.contains("twice"), "{e}");
-        }
+        assert_eq!(fine.map(|f| f.len()).ok(), Some(1));
+        let e = assembled(Target::Docker, vec![compose.clone(), compose], vec![])
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_default();
+        assert!(e.contains("twice"), "{e}");
     }
 
     #[test]
     fn a_path_two_targets_write_is_theirs_once_or_an_error() {
-        let mut files = Vec::new();
-        assert!(matches!(
-            added(&mut files, Target::Docker, vec![GeneratedFile::new(".isoloom/docker/compose.yml", "a")]),
-            Ok(true)
-        ));
-        // The same file again (docker-vm runs the docker target's Compose file): kept once.
+        let mut files = unwritten(&[], Target::Docker, vec![GeneratedFile::new(".isoloom/docker/compose.yml", "a")]).unwrap();
+        assert_eq!(files.len(), 1);
+        // The same file again (cloud-docker runs the docker target's Compose file): kept once.
         let same = vec![
             GeneratedFile::new(".isoloom/docker/compose.yml", "a"),
-            GeneratedFile::new(".isoloom/docker-vm/Vagrantfile", "v"),
+            GeneratedFile::new(".isoloom/cloud-docker/aws/main.tf", "v"),
         ];
-        assert!(matches!(added(&mut files, Target::DockerVm, same), Ok(false)));
+        files.extend(unwritten(&files, Target::CloudDocker, same).unwrap());
         assert_eq!(files.len(), 2);
         // Other contents at that path would replace it: an error, and nothing of the target added.
         let other = vec![
-            GeneratedFile::new(".isoloom/hybrid/Vagrantfile", "h"),
+            GeneratedFile::new(".isoloom/kubernetes/manifest.yaml", "h"),
             GeneratedFile::new(".isoloom/docker/compose.yml", "b"),
         ];
-        let e = added(&mut files, Target::Hybrid, other).err().map(|e| e.to_string()).unwrap_or_default();
+        let e = unwritten(&files, Target::Kubernetes, other).err().map(|e| e.to_string()).unwrap_or_default();
         assert!(e.contains("`.isoloom/docker/compose.yml` is an earlier target's file"), "{e}");
-        assert_eq!(files.len(), 2);
     }
 
     fn at(path: &str) -> GeneratedFile {

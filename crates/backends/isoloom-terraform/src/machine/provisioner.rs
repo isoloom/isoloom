@@ -123,7 +123,7 @@ fn ssh(host: &Expression, user: &str, bastion: Option<&Expression>) -> BlockBuil
     b.add_attribute(("timeout", string("10m")))
 }
 
-fn connection(c: &Connection) -> Block {
+pub(crate) fn connection(c: &Connection) -> Block {
     let b = Block::builder("connection");
     match c {
         Connection::Ssh { host, user } => ssh(host, user, None),
@@ -143,7 +143,7 @@ fn connection(c: &Connection) -> Block {
 }
 
 /// The provisioners of one upload: the project is archived on the host first.
-fn upload(u: Upload) -> Vec<Block> {
+pub(crate) fn upload(u: Upload) -> Vec<Block> {
     match u {
         Upload::Project { id, destination } => {
             let archive = format!("/.isoloom-project-{id}.tgz");

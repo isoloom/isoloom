@@ -5,7 +5,7 @@
 //! network sends every other network through its own gateway, so traffic crosses the gateway
 //! both ways.
 //!
-//! The machines keep their own public addresses (the runner reaches them there over SSH, Terraform
+//! The machines keep their own public addresses (Terraform and the operator reach them there over SSH, Terraform
 //! a Windows one over WinRM), so a routed network still goes out to the internet directly rather
 //! than through its gateway.
 
@@ -19,7 +19,7 @@ use crate::module::{ident, resource};
 
 /// With a machine routing a network: each network's route table, its routes through the
 /// gateways and its association with the network's subnet.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     if routed(env).is_empty() {
         return;
     }
@@ -28,15 +28,15 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         let id = ident(net);
         let table = placed("azurerm_route_table", &id, name_with(&format!("-{net}"))).build();
         if std::mem::take(&mut first) {
-            m.commented("A route table per network: the networks a machine routes go through its address.", table);
+            module.commented("A route table per network: the networks a machine routes go through its address.", table);
         } else {
-            m.block(table);
+            module.block(table);
         }
         for hop in through(env, net) {
             // The gateway's address toward `net` (one virtual network: any of its interfaces is
             // reachable from every subnet).
             let next_hop = toward(hop.machine, net).map(|(_, a)| a.to_string()).unwrap_or_default();
-            m.block(
+            module.block(
                 resource("azurerm_route", &format!("{id}_{}", ident(hop.network)))
                     .add_attribute(("name", string(format!("to-{}", hop.network))))
                     .add_attribute(("resource_group_name", reference("azurerm_resource_group.env.name")))
@@ -47,7 +47,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
                     .build(),
             );
         }
-        m.block(
+        module.block(
             resource("azurerm_subnet_route_table_association", &id)
                 .add_attribute(("subnet_id", reference(&format!("azurerm_subnet.{id}.id"))))
                 .add_attribute(("route_table_id", reference(&format!("azurerm_route_table.{id}.id"))))

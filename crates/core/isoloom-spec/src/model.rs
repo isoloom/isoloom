@@ -5,7 +5,6 @@
 mod boot;
 mod bridged;
 mod checks;
-mod cloud;
 mod configuration;
 mod constraints;
 mod hardware;
@@ -25,17 +24,14 @@ mod virtiofs;
 
 pub use boot::{Boot, BootDevice, Firmware, FirmwareFormat, NetworkBoot};
 pub use checks::{Check, Declared, Expect};
-pub use cloud::{CloudProvider, CloudServices};
 pub use configuration::Configuration;
 pub use constraints::{Constraints, Mirrors, Proxy, resolvers};
 pub use hardware::{DEFAULT_GPU_DRIVER, Device, DeviceFull, DeviceInput, GpuCount, Gpus, GpusFull, GpusInput};
 pub use host_folder::{HostFolder, HostPath};
-pub use implementation::{
-    Appliance, BaseImage, Controller, Dns, DockerImpl, Generated, KNOWN_OS, OwnProcess, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot,
-};
+pub use implementation::{Appliance, BaseImage, Controller, Dns, DockerImpl, Generated, OwnProcess, Provision, REBOOT_STEP, VmImage, VmImpl, Winrm, is_reboot};
 pub use ipv6::{Ipv6, Ipv6Addresses};
 pub(crate) use machine::scalars;
-pub use machine::{Arch, Machine, Octets, Port, Protocol, Resources, ScalarSchema, Seal};
+pub use machine::{Arch, Login, Machine, Octets, Port, Protocol, Resources, ScalarSchema, Seal};
 pub use machine_file::MachineFile;
 pub use network::{Bridged, Network, NetworkDocker, Reach, Tc, Vlan};
 pub use private_dns::EnvironmentDns;
@@ -61,7 +57,7 @@ pub struct Spec {
     /// The version of the `isoloom.yml` format the file is written in: `1`, the only one so far.
     pub version: u32,
     /// The environment's id, in kebab case (`supplier-portal`): it names its containers, VMs,
-    /// networks and cloud resources, and the environment in the run manifest.
+    /// networks and cloud resources.
     pub name: String,
     /// The environment's networks, by name: each an address block the machines on it share.
     #[serde(default)]
@@ -87,11 +83,6 @@ pub struct Spec {
     /// `depends_on`).
     #[serde(default)]
     pub machines: IndexMap<String, Machine>,
-    /// An environment of cloud services rather than machines (IAM users and roles, functions,
-    /// buckets, queues...): a Terraform module in the project, applied into the user's own cloud
-    /// account. A spec has either `cloud:` or machines.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cloud: Option<CloudServices>,
     /// Volumes shared between machines: a machine volume with one of these names is this
     /// volume, wherever it mounts it. One declared here can also outlive the runner's `down`
     /// (`persistent: true`) or be one that exists already (`external: <name>`).
@@ -215,7 +206,6 @@ impl Spec {
             inputs: Vec::new(),
             secrets: IndexMap::new(),
             machines: IndexMap::new(),
-            cloud: None,
             volumes: IndexMap::new(),
             constraints: None,
             common: None,

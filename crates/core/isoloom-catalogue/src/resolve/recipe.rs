@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::syntax::{OsRef, ProjectPath, Step};
 use serde_json::{Map, Value};
 
@@ -34,8 +34,9 @@ pub(crate) struct StepError {
 }
 
 impl Context<'_> {
-    /// Phase `phase`'s steps, resolved, its templates' texts added to `files`.
-    pub(crate) fn phase(&self, phase: &'static str, steps: &[EntryStep], files: &mut BTreeMap<ProjectPath, String>) -> Result<Vec<Step>, StepError> {
+    /// Phase `phase`'s steps, resolved, each with its form as a spec writes it, its templates'
+    /// texts added to `files`.
+    pub(crate) fn phase(&self, phase: &'static str, steps: &[EntryStep], files: &mut BTreeMap<ProjectPath, String>) -> Result<Vec<(Step, Value)>, StepError> {
         let mut out = Vec::new();
         for (index, step) in steps.iter().enumerate() {
             let fail = |reason: String| StepError { phase, index, reason };
@@ -53,7 +54,7 @@ impl Context<'_> {
                 let body = self.pinned(body).map_err(fail)?;
                 let label = item.map(|_| n + 1);
                 let body = self.rendered(body, &values, label, files).map_err(fail)?;
-                out.push(serde_json::from_value::<Step>(body).map_err(|e| fail(e.to_string()))?);
+                out.push((serde_json::from_value::<Step>(body.clone()).map_err(|e| fail(e.to_string()))?, body));
             }
         }
         Ok(out)
@@ -61,12 +62,13 @@ impl Context<'_> {
 
     /// Whether every condition of `w` holds here.
     pub(crate) fn holds(&self, w: &When) -> bool {
-        let os = self.os.os();
-        w.family.as_ref().is_none_or(|f| f.iter().any(|f| f.as_str() == os.family))
-            && w.os.as_ref().is_none_or(|l| l.contains(&self.os))
-            && w.release.as_ref().is_none_or(|l| l.iter().any(|word| self.release.is(word)))
+        w.holds_on(self.os, self.release)
             && w.set.as_ref().is_none_or(|s| self.settings.is_set(s.as_str()))
             && w.unset.as_ref().is_none_or(|s| !self.settings.is_set(s.as_str()))
+            && w.is.as_ref().is_none_or(|m| {
+                m.iter()
+                    .all(|(s, v)| matches!(self.settings.get(s.as_str()), Some(SettingValue::Text(t)) if t == v))
+            })
     }
 
     /// The items `step` repeats for: one pass without an item, unless it has `for_each`.
@@ -96,7 +98,9 @@ impl Context<'_> {
     /// A key given by its fingerprint, its SHA-256 written from `lock.yml`.
     fn key(&self, key: &mut Map<String, Value>) -> Result<(), String> {
         let Some(fingerprint) = key.shift_remove("fingerprint") else { return Ok(()) };
-        let url = key.get("url").and_then(Value::as_str).unwrap_or_default().to_owned();
+        let Some(url) = key.get("url").and_then(Value::as_str).map(str::to_owned) else {
+            return Err(format!("a key given by its fingerprint ({fingerprint}) also gives its `url`"));
+        };
         let locked = self.entry.lock().keys.iter().find(|(u, _)| u.as_str() == url).map(|(_, k)| k);
         match locked {
             Some(k) if k.fingerprint.as_deref() == fingerprint.as_str() => {

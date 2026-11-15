@@ -32,6 +32,7 @@ variables {
   project              = "tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "the_zone_is_private_to_the_network_s_vpc" {

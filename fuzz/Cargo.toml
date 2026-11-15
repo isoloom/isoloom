@@ -3,7 +3,7 @@
 # don't. Each crash a run finds becomes a regression test in the crate it belongs to.
 [package]
 name = "isoloom-fuzz"
-description = "Isoloom's fuzz targets: the spec parser, the spec pipeline (lowering and validation), the run manifest parser and the quoting helpers."
+description = "Isoloom's fuzz targets: the spec parser, the spec pipeline (lowering and validation), the quoting helpers and the topology compiler's drawing reader."
 version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"
@@ -16,8 +16,8 @@ cargo-fuzz = true
 [package.metadata.seeds]
 spec_syntax = ["../crates/core/isoloom-plan/tests/spec-examples", "../examples"]
 spec_model = ["../crates/core/isoloom-plan/tests/spec-examples", "../examples"]
-manifest = ["../crates/core/isoloom-manifest/fixtures", "seeds/manifest"]
 quoting = []
+drawing = ["../crates/frontends/isoloom-topology/tests/fixtures", "seeds/drawing"]
 
 [dependencies]
 libfuzzer-sys = "0.4"
@@ -26,7 +26,9 @@ isoloom-plan = { path = "../crates/core/isoloom-plan" }
 isoloom-render = { path = "../crates/core/isoloom-render" }
 isoloom-terraform = { path = "../crates/backends/isoloom-terraform" }
 isoloom-vagrant = { path = "../crates/backends/isoloom-vagrant" }
-isoloom-manifest = { path = "../crates/core/isoloom-manifest" }
+isoloom-topology = { path = "../crates/frontends/isoloom-topology" }
+# The drawing target reads its input as the editor sends it: JSON.
+serde_json = "1"
 
 [lints.rust]
 missing_docs = "deny"
@@ -51,15 +53,15 @@ doc = false
 bench = false
 
 [[bin]]
-name = "manifest"
-path = "fuzz_targets/manifest.rs"
+name = "quoting"
+path = "fuzz_targets/quoting.rs"
 test = false
 doc = false
 bench = false
 
 [[bin]]
-name = "quoting"
-path = "fuzz_targets/quoting.rs"
+name = "drawing"
+path = "fuzz_targets/drawing.rs"
 test = false
 doc = false
 bench = false

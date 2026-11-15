@@ -32,7 +32,7 @@ impl OsRef {
     /// Whether it is a Windows OS (no container form).
     #[must_use]
     pub fn is_windows(self) -> bool {
-        crate::images::is_windows(self.0.name)
+        self.0.kind.is_windows()
     }
 }
 

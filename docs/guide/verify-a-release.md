@@ -12,7 +12,7 @@ the archives:
 
 Every file listed in `SHA256SUMS` also has a build provenance attestation on GitHub. The release
 workflow is [`.github/workflows/release.yml`](../../.github/workflows/release.yml); it runs only
-on a version tag, after the test gate, and installs the published release before it finishes.
+on a version tag, once the tests pass, and installs the published release before it finishes.
 
 Targets: `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl` (static Linux binaries),
 `x86_64-apple-darwin`, `aarch64-apple-darwin` and `x86_64-pc-windows-msvc`.

@@ -1,8 +1,7 @@
 //! The top level of the spec: `version`, `name`, the declared `inputs` and the `tags` (the
 //! `message`'s placeholders are the placeholder grammar's, [`crate::syntax::placeholder`]).
 
-use isoloom_manifest::contract::RESERVED_PREFIX;
-use isoloom_manifest::is_kebab;
+use crate::contract::is_kebab;
 
 use super::{Problems, is_variable};
 use crate::model::Spec;
@@ -10,47 +9,47 @@ use crate::tags;
 
 /// The longest environment name: it becomes the Kubernetes namespace `isoloom-<name>`, a
 /// 63-character DNS label.
-pub(crate) const NAME_MAX: usize = super::DNS_LABEL_MAX - RESERVED_PREFIX.len();
+pub(crate) const NAME_MAX: usize = super::PREFIXED_NAME_MAX;
 
 /// The format version this isoloom reads, and a name every target can carry: its length is
 /// checked before its characters, so a long name is told its limit.
-pub(super) fn version_and_name(spec: &Spec, p: &mut Problems) {
+pub(super) fn version_and_name(spec: &Spec, problems: &mut Problems) {
     if spec.version != 1 {
-        p.add("version", format!("unsupported version {}; this isoloom reads version 1", spec.version));
+        problems.add("version", format!("unsupported version {}; this isoloom reads version 1", spec.version));
     }
     if spec.name.len() > NAME_MAX {
-        p.add(
+        problems.add(
             "name",
             format!("at most {NAME_MAX} characters: it becomes the Kubernetes namespace `isoloom-<name>`"),
         );
     } else if !is_kebab(&spec.name) {
-        p.add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)");
+        problems.add("name", "use kebab-case: lowercase letters, digits and dashes (e.g. supplier-portal-api)");
     }
 }
 
 /// The tags every cloud takes, by the strictest cloud's rules ([`tags::key_refusal`],
 /// [`tags::value_refusal`]), none clashing with another where a cloud carries them
 /// ([`tags::clash`]).
-pub(super) fn tags(spec: &Spec, p: &mut Problems) {
+pub(super) fn tags(spec: &Spec, problems: &mut Problems) {
     for (key, value) in &spec.tags {
         let at = format!("tags.{key}");
         if let Some(why) = tags::key_refusal(key) {
-            p.add(at.clone(), why);
+            problems.add(at.clone(), why);
         }
         if let Some(why) = tags::value_refusal(key, value) {
-            p.add(at, why);
+            problems.add(at, why);
         }
     }
     if let Some(c) = tags::clash(&spec.tags) {
-        p.add(format!("tags.{}", c.key), format!("{}: name them apart", c.why));
+        problems.add(format!("tags.{}", c.key), format!("{}: name them apart", c.why));
     }
 }
 
 /// Inputs are environment variables: their names must be ones a shell accepts.
-pub(super) fn inputs(spec: &Spec, p: &mut Problems) {
+pub(super) fn inputs(spec: &Spec, problems: &mut Problems) {
     for (i, input) in spec.inputs.iter().map(|i| &i.name).enumerate() {
         if !is_variable(input) {
-            p.add(
+            problems.add(
                 format!("inputs[{i}]"),
                 format!("`{input}`: inputs are environment variable names (letters, digits and `_`, not starting with a digit)"),
             );

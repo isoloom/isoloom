@@ -33,17 +33,7 @@ fn example(name: &str) -> Result<Lab, String> {
     isoloom_spec::load(&root().join(name)).map(Lab::new).map_err(|e| format!("{name}: {e}"))
 }
 
-const ALL: [&str; 9] = [
-    "docker",
-    "hosted",
-    "docker-vm",
-    "cloud-docker",
-    "kubernetes",
-    "vagrant",
-    "proxmox",
-    "esxi",
-    "cloud-vm",
-];
+const ALL: [&str; 8] = ["docker", "hosted", "cloud-docker", "kubernetes", "vagrant", "proxmox", "esxi", "cloud-vm"];
 
 #[test]
 fn every_example_is_valid() {
@@ -63,7 +53,7 @@ fn every_example_lowers_as_snapshotted() {
 
 #[test]
 fn a_lab_with_both_forms_on_every_machine_runs_everywhere() {
-    for name in ["supplier-portal-api", "dmz-jump", "edge-firewall"] {
+    for name in ["supplier-portal-api", "invoice-portal-api", "dmz-jump", "edge-firewall"] {
         assert_eq!(ids(example(name).unwrap().possible()), ALL, "{name}");
     }
 }
@@ -71,8 +61,8 @@ fn a_lab_with_both_forms_on_every_machine_runs_everywhere() {
 #[test]
 fn a_windows_domain_is_vm_only_even_with_one_container_ready_machine() {
     let lab = example("corp-ad-basics").unwrap();
-    // web01 could be a container, but dc01 and ws01 can't: VMs, or hybrid with web01 a container.
-    assert_eq!(ids(lab.possible()), ["hybrid", "vagrant", "proxmox", "esxi", "cloud-vm"]);
+    // web01 could be a container, but dc01 and ws01 can't: VMs.
+    assert_eq!(ids(lab.possible()), ["vagrant", "proxmox", "esxi", "cloud-vm"]);
     let t = isoloom_spec::totals(&lab.spec());
     // dc01 and the two workstations (`count: 2`) at 4 GB, web01 and the access machine at 1 GB.
     assert_eq!((t.machines, t.memory_mb), (5, 4096 * 3 + 1024 * 2));

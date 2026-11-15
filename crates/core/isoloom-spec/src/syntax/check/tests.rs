@@ -157,17 +157,13 @@ fn each_unresolved_placeholder_says_why() {
         why(&with_message("site", "{{ machines.web.addresses.wan }}")),
         ["`{{ machines.web.addresses.wan }}`: `web` isn't on a network named `wan`"]
     );
+    // The cloud-services target is gone: `cloud.` is no placeholder any more.
     assert_eq!(
         why(&with_message("site", "{{ cloud.outputs.site }}")),
-        ["`{{ cloud.outputs.site }}`: the spec has no `cloud:`"]
+        [
+            "`{{ cloud.outputs.site }}` isn't a placeholder Isoloom knows: the paths start with `machine.`, `machines.<m>.`, `version`, `os.`, `vars.`, `with.` or `item.`"
+        ]
     );
-    let cloud = |name: &str| {
-        let mut spec = parse("version: 1\nname: t\ncloud: { provider: aws, terraform: infra, outputs: { site: site_url } }\n").unwrap();
-        spec.message = Some(format!("{{{{ cloud.outputs.{name} }}}}"));
-        why(&spec)
-    };
-    assert_eq!(cloud("site"), Vec::<String>::new());
-    assert_eq!(cloud("db"), ["`{{ cloud.outputs.db }}`: `cloud.outputs` has no `db`"]);
 }
 
 #[test]
@@ -326,4 +322,14 @@ fn a_linux_account_is_named_as_useradd_takes_it() {
 fn packages_on_windows_are_its_features() {
     let found = problems("machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ packages: [Web-Server] }] }\n");
     assert_eq!(found, []);
+}
+
+#[test]
+fn a_machines_own_address_outside_a_template_names_no_machine() {
+    let spec = parse("version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web: { os: ubuntu@24.04, networks: { lab: 10 } }\n")
+        .unwrap_or_else(|p| panic!("{p:?}"));
+    let found = placeholder_problems(&spec, None, "{{machine.addresses.lab}}", crate::syntax::placeholder::Place::Entry);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].reason.contains("names the machine a template is for"), "{}", found[0].reason);
+    assert!(!found[0].reason.contains("``"), "no empty machine name: {}", found[0].reason);
 }

@@ -12,43 +12,43 @@ fn url(v: &str) -> bool {
 }
 
 /// The environment's constraints: proxy, registry mirrors, package mirrors, NTP and resolvers.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
     let Some(c) = &spec.constraints else { return };
-    proxy(c, p);
-    registries(c, p);
+    proxy(c, problems);
+    registries(c, problems);
     if let Some(m) = &c.mirrors {
         for (k, v) in [("debian", &m.debian), ("ubuntu", &m.ubuntu), ("pypi", &m.pypi), ("npm", &m.npm)] {
             if let Some(v) = v.as_deref().filter(|v| !url(v)) {
-                p.add(format!("constraints.mirrors.{k}"), format!("`{v}`: a URL, e.g. http://mirror.corp/{k}"));
+                problems.add(format!("constraints.mirrors.{k}"), format!("`{v}`: a URL, e.g. http://mirror.corp/{k}"));
             }
         }
     }
     for (i, v) in c.ntp.iter().enumerate() {
         if v.trim().is_empty() || v.contains(char::is_whitespace) {
-            p.add(format!("constraints.ntp[{i}]"), format!("`{v}`: a time server's name or address"));
+            problems.add(format!("constraints.ntp[{i}]"), format!("`{v}`: a time server's name or address"));
         }
     }
     for (i, v) in c.dns.iter().enumerate() {
         if v.parse::<std::net::IpAddr>().is_err() {
-            p.add(format!("constraints.dns[{i}]"), format!("`{v}`: a resolver's IP address, e.g. 10.0.0.53"));
+            problems.add(format!("constraints.dns[{i}]"), format!("`{v}`: a resolver's IP address, e.g. 10.0.0.53"));
         }
     }
 }
 
 /// `constraints.proxy`: an http(s) proxy URL, and `no_proxy` entries one per item.
-fn proxy(c: &Constraints, p: &mut Problems) {
+fn proxy(c: &Constraints, problems: &mut Problems) {
     let Some(px) = &c.proxy else { return };
     if px.http.is_none() && px.https.is_none() {
-        p.add("constraints.proxy", "give `http` (and `https` when it differs), e.g. http://proxy.corp:3128");
+        problems.add("constraints.proxy", "give `http` (and `https` when it differs), e.g. http://proxy.corp:3128");
     }
     for (k, v) in [("http", &px.http), ("https", &px.https)] {
         if let Some(v) = v.as_deref().filter(|v| !url(v)) {
-            p.add(format!("constraints.proxy.{k}"), format!("`{v}`: a URL, e.g. http://proxy.corp:3128"));
+            problems.add(format!("constraints.proxy.{k}"), format!("`{v}`: a URL, e.g. http://proxy.corp:3128"));
         }
     }
     for (i, v) in px.no_proxy.iter().enumerate() {
         if v.trim().is_empty() || v.contains(char::is_whitespace) || v.contains(',') {
-            p.add(
+            problems.add(
                 format!("constraints.proxy.no_proxy[{i}]"),
                 format!("`{v}`: one name, domain (.corp) or block per entry"),
             );
@@ -57,16 +57,16 @@ fn proxy(c: &Constraints, p: &mut Problems) {
 }
 
 /// `constraints.registries`: a registry host, mapped to a mirror written as an image prefix.
-fn registries(c: &Constraints, p: &mut Problems) {
+fn registries(c: &Constraints, problems: &mut Problems) {
     for (registry, mirror) in &c.registries {
         if registry.is_empty() || registry.contains('/') || registry.contains("://") {
-            p.add(
+            problems.add(
                 format!("constraints.registries.{registry}"),
                 "the key is a registry's host, e.g. docker.io or ghcr.io",
             );
         }
         if mirror.contains("://") || mirror.trim().is_empty() || mirror.contains(char::is_whitespace) || mirror.starts_with('/') {
-            p.add(
+            problems.add(
                 format!("constraints.registries.{registry}"),
                 format!("`{mirror}`: the mirror as an image prefix, host and path without a scheme, e.g. registry.corp/dockerhub"),
             );

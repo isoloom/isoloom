@@ -2,12 +2,11 @@
 //! ([`proxmox`]) and a standalone ESXi host ([`esxi`]). Both put the environment behind a router
 //! VM of their own ([`router`]), boot a machine's disk through the hypervisor's firmware
 //! ([`boot`]), name what they create after the environment's `slot` on the server
-//! ([`slotted`]), and write the same run manifest ([`manifest`]), which seals their `internet:
-//! false` networks at the router.
+//! ([`slotted`]), and seal their `internet: false` networks at the router once the machines are
+//! set up (`crate::seal`).
 
 pub(crate) mod boot;
 pub(crate) mod esxi;
-pub(crate) mod manifest;
 pub(crate) mod proxmox;
 pub(crate) mod router;
 
@@ -95,17 +94,29 @@ impl Parts {
 }
 
 /// A server module's start: the `terraform` block requiring the server's providers (`own`, and
-/// `random` for the Windows machines' password), the server's `variables` (its run manifest's
-/// params and slots too), the `inputs` variable, then its `provider`.
-pub(crate) fn head(env: &Environment, m: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
+/// `random` for the Windows machines' password), the server's `variables` (the values a runner
+/// passes at launch too), the values given at launch (`inputs`), then its `provider`.
+pub(crate) fn head(env: &Environment, module: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
     let mut required = own.to_vec();
     if windows::any(env) {
         required.push(providers::RANDOM);
     }
-    m.block(providers::terraform(&required));
-    m.blocks(variables.into_iter().map(Variable::block));
-    m.blocks(inputs::variable(env));
-    m.block(provider);
+    module.block(providers::terraform(&required));
+    module.blocks(variables.into_iter().map(Variable::block));
+    module.blocks(inputs::variables(env));
+    module.block(provider);
+}
+
+/// Why a server can't give a machine of `env` its secrets, if it can't: a Linux VM gets them from
+/// the module's variables (cloud-init: its snippet on Proxmox, its guestinfo user data on ESXi), but a
+/// Windows machine's set-up (cloudbase-init, the controller over WinRM) and a container's (an LXC
+/// container on Proxmox) have no step that takes them.
+pub(crate) fn secrets_refusal(env: &Environment) -> Option<String> {
+    env.machines.iter().find_map(|(name, mp)| {
+        let linux_vm = mp.shape == isoloom_plan::MachineShape::Vm && !mp.is_windows();
+        (!mp.secrets.is_empty() && !linux_vm)
+            .then(|| format!("machine `{name}` gets `secrets` (a secret's or an input's value as a file), which a server writes into a Linux VM only"))
+    })
 }
 
 /// A base OS image pinned to a dated release, with the checksum that verifies the download.
@@ -151,15 +162,22 @@ pub(crate) fn without_image(env: &Environment, has: impl Fn(&str, &MachinePlan) 
         .find_map(|vm| (!is_windows(vm.os) && !has(vm.os, vm.plan)).then_some((vm.name, vm.os)))
 }
 
+/// Machine `name`'s own DNS settings (`dns:` in its spec), when it has them.
+pub(crate) fn dns_of<'e>(env: &'e Environment, name: &str) -> Option<&'e isoloom_spec::model::Dns> {
+    env.spec().machines.get(name)?.dns.as_ref()
+}
+
+/// Machine `name`'s own search domain (`dns.domain`), when it has one.
+pub(crate) fn domain_of<'e>(env: &'e Environment, name: &str) -> Option<&'e str> {
+    dns_of(env, name)?.domain.as_deref()
+}
+
 /// The resolvers machine `name` asks: its own (`dns.servers`; an AD member points at its domain
 /// controller), else the site's (`constraints.dns`, else a public one), so it can still install
 /// software. `None` asks for the site's alone: Isoloom's own VMs' (the router's, the
 /// controller's).
 pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
-    let own = name
-        .and_then(|n| env.spec().machines.get(n))
-        .and_then(|m| m.dns.as_ref())
-        .filter(|d| !d.servers.is_empty());
+    let own = name.and_then(|n| dns_of(env, n)).filter(|d| !d.servers.is_empty());
     match own {
         Some(d) => d.servers.clone(),
         None => isoloom_spec::model::resolvers(env.constraints.as_ref())
@@ -173,8 +191,7 @@ pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
 pub(crate) const ISO: &str = "iso";
 
 /// A name unique per environment on the server: `prefix`, the run's slot, `suffix`. The module
-/// writes it with the slot as `var.slot` ([`SlotName::hcl`]), the run manifest with the slot as
-/// `${run.slot}` ([`SlotName::manifest`]), so the names a runner reads are the module's.
+/// writes it with the slot as `var.slot` ([`SlotName::hcl`]).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SlotName<'a> {
     prefix: &'a str,
@@ -193,16 +210,6 @@ impl SlotName<'_> {
             .with_expr(reference("var.slot"))
             .with_text(self.suffix)
             .into_expression()
-    }
-
-    /// The name in the run manifest, after `${run.slot}`.
-    pub(crate) fn manifest(self) -> isoloom_manifest::Template {
-        use isoloom_manifest::{Part, Placeholder, RunVar};
-        isoloom_manifest::Template::from_parts([
-            Part::Text(self.prefix.into()),
-            Part::Placeholder(Placeholder::Run(RunVar::Slot)),
-            Part::Text(self.suffix.into()),
-        ])
     }
 }
 

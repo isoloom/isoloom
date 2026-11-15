@@ -31,11 +31,6 @@ fn with_web_and(extra: &str) -> String {
     format!("{}{extra}", with_machines(&[&format!("web: {WEB}")]))
 }
 
-/// A cloud-services spec with these fields under `cloud:` (besides the provider).
-fn cloud(fields: &str) -> String {
-    format!("version: 1\nname: t\ncloud:\n  provider: aws\n{fields}")
-}
-
 /// `NET` (with `web`) with a declared check.
 fn with_check(check: &str) -> String {
     with_web_and(&format!("checks:\n  - {check}\n"))
@@ -75,50 +70,6 @@ fn no_machine() {
 fn input_not_an_env_var_name() {
     assert_problem(&with_web_and("inputs: [1TOKEN]\n"), "inputs[0]", "named like an environment variable");
 }
-
-// Cloud services.
-
-#[test]
-fn cloud_with_machines() {
-    let yaml = format!("{}machines:\n  m: {WEB}\n", cloud("  terraform: tf\n"));
-    assert_problem(&yaml, "cloud", "not both");
-}
-
-#[test]
-fn cloud_without_module() {
-    assert_problem(&cloud("  terraform: ' '\n"), "cloud.terraform", "Terraform module's folder");
-}
-
-#[test]
-fn cloud_var_not_a_terraform_name() {
-    assert_problem(
-        &cloud("  terraform: tf\n  vars: { '1x': a }\n"),
-        "cloud.vars.1x",
-        "isn't a Terraform variable name",
-    );
-}
-
-#[test]
-fn cloud_output_not_a_name() {
-    assert_problem(
-        &cloud("  terraform: tf\n  outputs: { site: 'a b' }\n"),
-        "cloud.outputs.site",
-        "the module output it reads",
-    );
-}
-
-#[test]
-fn cloud_var_from_undeclared_input() {
-    let yaml = cloud("  terraform: tf\n  vars: { cidr: '{{ inputs.CIDR }}' }\n");
-    assert_problem(&yaml, "cloud.vars.cidr", "`CIDR` isn't declared");
-}
-
-#[test]
-fn cloud_hourly_cost_out_of_range() {
-    assert_problem(&cloud("  terraform: tf\n  hourly_usd: 5000\n"), "cloud.hourly_usd", "0 to 1000");
-}
-
-// Networks.
 
 #[test]
 fn network_name_not_kebab_case() {
@@ -312,7 +263,7 @@ fn aliases_on_clones() {
 #[test]
 fn machines_no_target_takes_together_leave_no_target() {
     // A VM-only machine beside a container-only access machine: no container target takes the
-    // VM, no VM target the container, and `hybrid` wants a container among the machines proper.
+    // VM, and no VM target the container.
     let yaml = with_machines(&[
         "a: { networks: { lab: 5 }, os: windows-server@2022, app: { steps: [{ run: a.ps1 }] } }",
         "b: { networks: { lab: 6 }, access: true, app: { image: nginx } }",
@@ -606,15 +557,19 @@ fn file_problems(yaml: &str, dir: &Path) -> Vec<String> {
 fn path_outside_the_project() {
     let dir = project("outside").unwrap();
     let found = file_problems(&with_machine("{ networks: { lab: 5 }, app: { build: ../web } }"), &dir);
-    assert_eq!(found, ["machines.m.app.build: `../web` must be a path inside the project folder"]);
+    assert_eq!(
+        found,
+        ["machines.m.app.build: `../web` must be a path inside the project folder: it goes up a folder (`..`)"]
+    );
 }
 
 #[test]
-fn cloud_module_without_tf_files() {
-    let dir = project("no-tf").unwrap();
-    std::fs::create_dir_all(dir.join("tf")).unwrap();
-    let found = file_problems(&cloud("  terraform: tf\n"), &dir);
-    assert_eq!(found, ["cloud.terraform: `tf` holds no .tf file: it must be a Terraform root module"]);
+fn a_spec_with_cloud_services_is_refused() {
+    assert_problem(
+        "version: 1\nname: t\ncloud: { provider: aws, terraform: tf }\n",
+        "cloud",
+        "cloud-services is not supported in Isoloom 3.0",
+    );
 }
 
 #[test]

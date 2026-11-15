@@ -42,7 +42,9 @@ fn arm64_is_refused_by_the_clouds() {
         )
         .unwrap(),
     );
-    let e = Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None).expect("the spec plans");
+    let e = lab
+        .plan(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None)
+        .expect("the spec plans");
     let why = backend(Target::CloudDocker).refusal(&e).unwrap();
     assert_eq!(
         why,
@@ -60,7 +62,8 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
             ))
             .unwrap(),
         );
-        Environment::build(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None).expect("the spec plans")
+        lab.plan(&lab.for_target(Target::CloudDocker), Target::CloudDocker, None)
+            .expect("the spec plans")
     };
     // 512 MB + 14 GB + Docker's 1 GB: 15.5 GB fits the 16 GB host.
     assert_eq!(backend(Target::CloudDocker).refusal(&env(14336)), None);
@@ -75,43 +78,16 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
     assert!(backend(Target::CloudDocker).render(&env(16384)).unwrap_err().to_string().ends_with(&why));
 }
 
-/// Every command a manifest runs over SSH, with the user it logs in as.
-fn ssh_commands(json: &serde_json::Value) -> Vec<(String, String)> {
-    let text = |v: &serde_json::Value| v.as_str().unwrap_or_default().to_owned();
-    let mut out = Vec::new();
-    let mut stack = vec![json];
-    while let Some(v) = stack.pop() {
-        match v {
-            serde_json::Value::Object(o) => {
-                if o.get("action").and_then(|a| a.as_str()) == Some("ssh.run") {
-                    let with = &o["with"];
-                    out.push((text(&with["user"]), text(&with["command"])));
-                }
-                stack.extend(o.values());
-            }
-            serde_json::Value::Array(a) => stack.extend(a),
-            _ => {}
-        }
-    }
-    out
-}
-
 #[test]
-fn linodes_root_host_runs_every_command_without_sudo_the_others_through_it() -> Outcome {
-    let manifests = backend(Target::CloudDocker).run_manifests(&env("configured-app")?).unwrap();
-    let of = |cloud: &str| {
-        let placed = manifests.iter().find(|p| p.sub == Some(cloud)).expect(cloud);
-        ssh_commands(&serde_json::to_value(&placed.manifest).unwrap())
-    };
-    let linode = of("linode");
-    assert!(linode.len() > 4, "{linode:?}");
-    for (user, command) in &linode {
-        assert_eq!(user, "root");
-        // Linode's Debian has no `sudo`: root runs each command as it is.
-        assert!(!command.contains("sudo"), "{command}");
-    }
-    let aws = of("aws");
-    assert!(aws.iter().all(|(user, _)| user != "root"), "{aws:?}");
-    assert!(aws.iter().any(|(_, c)| c.starts_with("sudo sh -c 'rm -rf /opt/isoloom")), "{aws:?}");
+fn linodes_root_host_brings_the_project_in_without_sudo_the_others_through_it() -> Outcome {
+    // The module brings the project in the same way: as root on Linode, through `sudo` elsewhere.
+    let files = backend(Target::CloudDocker).render(&env("configured-app")?).unwrap();
+    let module = |cloud: &str| crate::testing::file(&files, &format!("cloud-docker/{cloud}/main.tf")).map(str::to_owned);
+    assert!(module("aws")?.contains("sudo sh -c 'rm -rf /opt/isoloom"));
+    let linode_module = module("linode")?;
+    assert!(
+        linode_module.contains("\"sh -c 'rm -rf /opt/isoloom") && !linode_module.contains("sudo "),
+        "{linode_module}"
+    );
     Ok(())
 }

@@ -234,3 +234,24 @@ fn the_library_and_a_script_parse_as_sh() {
         .expect("sh runs");
     assert!(status.success());
 }
+
+/// The library's apt pin names the repository's host alone, as the Ansible role's does: a port
+/// or a user in the URL would pin an origin apt never matches.
+#[cfg(unix)]
+#[test]
+fn the_library_url_host_leaves_out_a_user_and_a_port() {
+    for (url, host) in [
+        ("https://repo.example.com/deb", "repo.example.com"),
+        ("https://repo.example.com:8443/deb", "repo.example.com"),
+        ("https://user@repo.example.com/deb", "repo.example.com"),
+        ("https://user:pw@repo.example.com:8443/deb?x", "repo.example.com"),
+        ("https://[fd00::1]:8443/deb", "[fd00::1]"),
+    ] {
+        let out = std::process::Command::new("sh")
+            .args(["-c", &format!("{LIBRARY}\nisoloom_url_host \"$1\""), "sh", url])
+            .output()
+            .expect("sh runs");
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(String::from_utf8_lossy(&out.stdout), format!("{host}\n"), "{url}");
+    }
+}

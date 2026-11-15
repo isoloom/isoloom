@@ -1,7 +1,6 @@
 //! The `vagrant` target as a backend: what Vagrant can run, why it refuses an environment, and
 //! its files.
 
-use isoloom_manifest::Manifest;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
@@ -26,11 +25,6 @@ impl Backend for VagrantBackend {
         Ok(vms::render(env)?)
     }
 
-    /// The run manifest of the Vagrantfile `render` writes: every provider's, one file.
-    fn run_manifest(&self, env: &Environment) -> Result<Option<Manifest>, RenderError> {
-        Ok(Some(crate::manifest::vagrant(env)?))
-    }
-
     /// The plan's requirements against the capabilities, then the machines Vagrant can't build,
     /// without rendering.
     fn refusal(&self, env: &Environment) -> Option<String> {
@@ -50,6 +44,8 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::ExecWithoutContainer,
         Feature::Gateways,
         Feature::MachineAliases,
+        // Each tool a VM of its own on every network.
+        Feature::Tools,
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,
@@ -72,5 +68,8 @@ pub(crate) fn capabilities() -> Capabilities {
         Feature::TmpfsModes,
         // Each provider's own shared folder; `provider_refusal` refuses the ones with none.
         Feature::HostFolders,
+        // A forward that isn't `fixed` moves to a free host port when its own is taken
+        // (`auto_correct`), so machines may ask for one.
+        Feature::FreeHostPorts,
     ])
 }

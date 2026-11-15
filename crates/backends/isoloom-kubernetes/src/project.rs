@@ -21,12 +21,15 @@ use crate::render::project_scripts;
 ///
 /// # Errors
 ///
-/// [`Error::Read`] when a script can't be read, a missing one included: the chart and the
-/// kustomization would name a file they don't hold.
+/// [`Error::Outside`] when a script isn't there or leads out of the project folder (through a
+/// link: what it leads to is never read), [`Error::Read`] when it can't be read: the chart and
+/// the kustomization would name a file they don't hold.
 pub fn project_copies(env: &Environment, dir: &Path) -> Result<Vec<GeneratedFile>> {
     let mut out = Vec::new();
     for path in project_scripts(&Machine::all(env), &checks::plan(env)) {
-        let contents = std::fs::read_to_string(dir.join(&path)).map_err(|source| Error::Read { path: path.clone(), source })?;
+        // Read where the path really leads, links followed, and only inside the project folder.
+        let real = isoloom_spec::project_path::inside(dir, &path).map_err(|why| Error::Outside { path: path.clone(), why })?;
+        let contents = std::fs::read_to_string(&real).map_err(|source| Error::Read { path: path.clone(), source })?;
         out.push(GeneratedFile {
             path: output(&format!("{PROJECT_COPIES}/{path}")),
             contents,

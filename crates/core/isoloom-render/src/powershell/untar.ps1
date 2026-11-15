@@ -106,6 +106,12 @@
     }
   }
   $in.Close()
+  # A machine's command runs from the project folder: stopped first, Windows refuses to remove a
+  # folder a process works in (its step starts it again). Before Windows 8 and Server 2012 there
+  # is no ScheduledTasks module, and so no such task.
+  if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {
+    Get-ScheduledTask -TaskName 'isoloom-*' -ErrorAction SilentlyContinue | Stop-ScheduledTask -ErrorAction SilentlyContinue
+  }
   if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
   Move-Item $new $dest
   Remove-Item $archive -Force

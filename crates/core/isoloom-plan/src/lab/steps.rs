@@ -5,6 +5,7 @@
 use std::io::ErrorKind;
 use std::path::Path;
 
+use isoloom_spec::project_path;
 use isoloom_spec::syntax::placeholder::Place;
 use isoloom_spec::syntax::{self, Code, FieldPath, Problem, Step};
 
@@ -17,14 +18,18 @@ pub(super) fn step_files(source: &syntax::Spec, dir: &Path) -> Vec<Problem> {
         for (i, step) in app.steps.iter().enumerate() {
             let at = FieldPath::new("machines").key(name).key("app").key("steps").index(i);
             match step {
-                Step::Copy(c) if !dir.join(c.from.as_str()).exists() => out.push(missing(at.key("copy").key("from"), c.from.as_str())),
-                Step::Template(t) => out.extend(template(
-                    source,
-                    name,
-                    &at.key("template").key("from"),
-                    &dir.join(t.from.as_str()),
-                    t.from.as_str(),
-                )),
+                Step::Copy(c) => {
+                    if let Err(why) = project_path::inside(dir, c.from.as_str()) {
+                        out.push(escaped(at.key("copy").key("from"), c.from.as_str(), &why));
+                    }
+                }
+                Step::Template(t) => {
+                    let at = at.key("template").key("from");
+                    match project_path::inside(dir, t.from.as_str()) {
+                        Ok(file) => out.extend(template(source, name, &at, &file, t.from.as_str())),
+                        Err(why) => out.push(escaped(at, t.from.as_str(), &why)),
+                    }
+                }
                 _ => {}
             }
         }
@@ -42,25 +47,27 @@ pub(super) fn setting_files(source: &syntax::Spec, catalogue: &isoloom_catalogue
             let (isoloom_catalogue::SettingValue::Folder(path) | isoloom_catalogue::SettingValue::File(path)) = value else {
                 continue;
             };
-            if !dir.join(path.as_str()).exists() {
-                out.push(missing(FieldPath::new("machines").key(name).key("with").key(setting.as_str()), path.as_str()));
+            if let Err(why) = project_path::inside(dir, path.as_str()) {
+                out.push(escaped(
+                    FieldPath::new("machines").key(name).key("with").key(setting.as_str()),
+                    path.as_str(),
+                    &why,
+                ));
             }
         }
     }
     out
 }
 
-/// A project file the spec names that isn't there.
-fn missing(at: FieldPath, path: &str) -> Problem {
-    Problem::new(Code::InvalidValue, at, format!("`{path}` doesn't exist in the project folder"))
+/// A project file the spec names that isn't there, or isn't inside the project once its links are
+/// followed.
+fn escaped(at: FieldPath, path: &str, why: &project_path::Escape) -> Problem {
+    Problem::new(Code::InvalidValue, at, why.about(path))
 }
 
-/// Template `file` (`from`, as written) of machine `machine`: present, readable, text, and each of its
+/// Template `file` (`from`, as written, found inside the project) of machine `machine`: present, readable, text, and each of its
 /// placeholders one a template may name and the spec has.
 fn template(source: &syntax::Spec, machine: &str, at: &FieldPath, file: &Path, from: &str) -> Vec<Problem> {
-    if !file.exists() {
-        return vec![missing(at.clone(), from)];
-    }
     let text = match std::fs::read_to_string(file) {
         Ok(text) => text,
         Err(e) if e.kind() == ErrorKind::InvalidData => {

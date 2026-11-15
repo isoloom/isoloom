@@ -90,9 +90,8 @@ fn sets_override_the_spec_before_it_is_parsed() -> Outcome {
     Ok(())
 }
 
-/// The default of `cloud-vm/<cloud>/main.tf`'s `region` variable, and of its run manifest's
-/// `region` param (what a runner gives Terraform when nobody sets it).
-fn regions(files: &[isoloom_targets::GeneratedFile], cloud: &str) -> Outcome<(String, String)> {
+/// The default of `cloud-vm/<cloud>/main.tf`'s `region` variable.
+fn region(files: &[isoloom_targets::GeneratedFile], cloud: &str) -> Outcome<String> {
     let module = crate::testing::file(files, &format!("cloud-vm/{cloud}/main.tf"))?;
     let block = module
         .split("variable \"region\"")
@@ -100,36 +99,24 @@ fn regions(files: &[isoloom_targets::GeneratedFile], cloud: &str) -> Outcome<(St
         .and_then(|b| b.split("\n}").next())
         .unwrap_or_default();
     let variable = block.split("default").nth(1).and_then(|d| d.split('"').nth(1)).unwrap_or_default();
-    let manifest = isoloom_manifest::parse(crate::testing::file(files, &format!("cloud-vm/{cloud}/run.json"))?)?;
-    let param = manifest
-        .params
-        .iter()
-        .find(|p| p.name.as_str() == "region")
-        .and_then(|p| p.default.clone())
-        .unwrap_or_default();
-    Ok((variable.to_owned(), param))
+    Ok(variable.to_owned())
 }
 
 #[test]
-fn a_defaults_region_reaches_the_module_and_the_run_manifest_alike() -> Outcome {
+fn a_defaults_region_reaches_the_module() -> Outcome {
     let lab = Lab::new(load(&crate::testing::examples().join("solo-web"))?);
     let files = generate(&lab, Target::CloudVm)?;
-    for (cloud, region) in isoloom_targets::default_regions() {
-        assert_eq!(regions(&files, cloud)?, (region.to_owned(), region.to_owned()), "{cloud}");
+    for (cloud, default) in isoloom_targets::default_regions() {
+        assert_eq!(region(&files, cloud)?, default, "{cloud}");
     }
-    // The person's region, from their defaults: the run manifest's param defaulted to the
-    // built-in one, which the runner gave Terraform, undoing it.
+    // The person's region, from their defaults.
     let r = resolve(&[Layer {
         source: "t".into(),
         value: yaml("cloud: { aws: { region: eu-west-1 } }\n")?,
     }])?;
     let mine = generate(&lab.clone().with_regions(r.defaults.regions()), Target::CloudVm)?;
-    assert_eq!(regions(&mine, "aws")?, ("eu-west-1".to_owned(), "eu-west-1".to_owned()));
-    assert_eq!(
-        regions(&files, "azure")?,
-        ("swedencentral".to_owned(), "swedencentral".to_owned()),
-        "other clouds keep theirs"
-    );
+    assert_eq!(region(&mine, "aws")?, "eu-west-1");
+    assert_eq!(region(&files, "azure")?, "swedencentral", "other clouds keep theirs");
     let docker = generate(&lab, Target::CloudDocker)?;
     assert!(crate::testing::file(&docker, "cloud-docker/aws/main.tf")?.contains("default = \"eu-west-3\""));
     Ok(())

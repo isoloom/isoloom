@@ -4,7 +4,7 @@
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 
-use super::{Cloud, module as cloud_module, modules, refusal};
+use super::{Cloud, Host, module as cloud_module, refusal};
 use crate::testing::environment;
 
 /// Two containers, publishing TCP and UDP ports.
@@ -31,8 +31,22 @@ pub(crate) fn env(yaml: &str) -> Environment {
     environment(yaml, Target::CloudDocker)
 }
 
+/// What the `docker` target gives the host for [`SPEC`]: its Compose file's folder, its start,
+/// and the input its containers read.
+fn host() -> Host {
+    Host {
+        outputs: vec![".isoloom/docker".into()],
+        start: vec!["cd /opt/isoloom && docker compose --file .isoloom/docker/compose.yml up -d --wait".into()],
+        values: vec!["TOKEN".into()],
+    }
+}
+
+fn modules(e: &Environment) -> crate::Result<isoloom_render::backend::Files> {
+    super::modules(e, &host())
+}
+
 fn module(cloud: Cloud) -> String {
-    cloud_module(cloud, &env(SPEC)).unwrap().contents
+    cloud_module(cloud, &env(SPEC), &host()).unwrap().contents
 }
 
 #[test]
@@ -47,44 +61,43 @@ fn every_cloud_opens_ssh_and_the_published_ports() {
 }
 
 #[test]
-fn the_module_is_infrastructure_only_and_the_host_installs_docker_from_its_setup_script() {
-    // Terraform makes only the VM: the runner pipes the shared setup.sh into the host over SSH to
-    // install Docker, then delivers the project and starts the Compose file (the run manifest's
-    // own steps). Nothing in the module reaches the guest.
-    let files = super::setup(&env(SPEC)).unwrap();
-    let setup = &files
-        .iter()
-        .find(|f| f.path.ends_with("cloud-docker/aws/setup.sh"))
-        .expect("a setup.sh")
-        .contents;
-    // The apt family installs from Docker's own repository with the signing key pinned by SHA-256
-    // and the engine resolved from the repo; get.docker.com is only the RPM fallback (the `else`
-    // branch), once. Compose is pinned either way.
-    assert!(setup.contains("signed-by=/etc/apt/keyrings/docker.asc"), "{setup}");
-    assert!(
-        setup.contains("apt-cache madison docker-ce") && setup.contains("docker-compose-plugin"),
-        "{setup}"
-    );
-    assert_eq!(setup.matches("get.docker.com").count(), 1, "{setup}");
-    assert!(
-        setup.find("get.docker.com") > setup.find("apt-cache madison docker-ce"),
-        "get.docker.com is the RPM fallback: {setup}"
-    );
+fn the_host_sets_itself_up_and_the_module_waits_for_it() {
     for cloud in Cloud::ALL {
         let tf = module(cloud);
-        for gone in [
-            "terraform_data\" \"environment\"",
-            "remote-exec",
-            "local-exec",
-            "ssh_private_key_file",
-            "local_file",
+        // Terraform brings the project and the Compose file's folder in, then waits for the set-up.
+        for part in [
+            "resource \"terraform_data\" \"isoloom_ready_docker_host\"",
+            "local_file\" \"isoloom_project\"",
+            "/.isoloom-outputs-docker_host.tgz",
+            "tar -xzf /tmp/isoloom-outputs.tgz -C /opt/isoloom",
+            "cloud-init status --wait",
+            "variable \"ssh_private_key_file\"",
         ] {
-            assert!(!tf.contains(gone), "{cloud:?} still has {gone}");
+            assert!(tf.contains(part), "{cloud:?} lacks {part}: {tf}");
         }
+        assert!(tf.contains(".isoloom/docker"), "{cloud:?}: {tf}");
     }
-    // The secret input never travels in the user data; the module takes none in a file either.
+    // The input is a sensitive variable of its own name, handed to the start in base64.
     let tf = module(Cloud::Aws);
-    assert!(!tf.contains("lookup(var.inputs, \"TOKEN\""), "{tf}");
+    assert!(tf.contains("variable \"TOKEN\""), "{tf}");
+    assert!(!tf.contains("var.inputs"), "{tf}");
+    let set_up = super::Host::set_up(&host(), &env(SPEC));
+    let text: String = crate::machine::user_data::script(&set_up)
+        .pieces()
+        .map(|p| match p {
+            crate::hcl_builder::Piece::Text(t) => t.to_owned(),
+            crate::hcl_builder::Piece::Expr(_) => "<expr>".to_owned(),
+        })
+        .collect();
+    let docker = text.find("running: Docker").unwrap();
+    let start = text
+        .find("TOKEN=\"$(printf %s '<expr>' | base64 -d)\" sh -c 'cd /opt/isoloom && docker compose")
+        .unwrap();
+    assert!(text.find("project-delivered").unwrap() < docker && docker < start, "{text}");
+    assert!(
+        text.contains("signed-by=/etc/apt/keyrings/docker.asc"),
+        "Docker from its pinned repository: {text}"
+    );
 }
 
 #[test]
@@ -139,7 +152,7 @@ fn one_container(memory_mb: u32, disk_gb: u32) -> Environment {
 #[test]
 fn a_cloud_whose_size_is_its_disk_too_sizes_the_host_by_its_table() {
     // 100 GB of containers (and Docker's own): past the 80 GB of the 4 GB droplet and plan.
-    let tf = |cloud| cloud_module(cloud, &one_container(1024, 100)).unwrap().contents;
+    let tf = |cloud| cloud_module(cloud, &one_container(1024, 100), &host()).unwrap().contents;
     assert!(tf(Cloud::DigitalOcean).contains("default = \"s-4vcpu-8gb\""), "{}", tf(Cloud::DigitalOcean));
     assert!(tf(Cloud::Linode).contains("default = \"g6-standard-4\""), "{}", tf(Cloud::Linode));
 }

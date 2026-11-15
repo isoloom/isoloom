@@ -4,4 +4,4 @@ expression: "rendered(&spec(\"machines:\\n  web:\\n    networks: { lab: 10 }\\n 
 ---
 error[unknown-reference] overrides.vagrant.machines.web  (isoloom.yml:12:7)
   `web` has no VM form (`app.build`), so Vagrant never runs it this way
-  fix: remove it, or add `os` and `app.steps`, or use `docker`, `docker-vm` or `cloud-docker`
+  fix: remove it, or generate from the project folder (its Dockerfile is translated into a VM form), or add `os` and `app.steps`

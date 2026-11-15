@@ -132,8 +132,8 @@ mod tests {
 
     #[test]
     fn a_leaked_secret_value_is_caught_and_a_hashed_one_is_not() {
-        let value = "P6FUZZ-SENTINEL-deadbeef".to_owned();
-        let leaked = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: P6FUZZ-SENTINEL-deadbeef")];
+        let value = "ISOLOOM-FUZZ-SENTINEL-deadbeef".to_owned();
+        let leaked = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: ISOLOOM-FUZZ-SENTINEL-deadbeef")];
         assert!(secret_leak(&leaked, std::slice::from_ref(&value)).is_some());
         let safe = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: $6$rounds$abc")];
         assert!(secret_leak(&safe, std::slice::from_ref(&value)).is_none());
@@ -164,7 +164,7 @@ mod tests {
     fn target_folders_are_counted_once_each() {
         let files = [
             GeneratedFile::new(".isoloom/docker/compose.yaml", ""),
-            GeneratedFile::new(".isoloom/docker/run.json", ""),
+            GeneratedFile::new(".isoloom/docker/configure/run.sh", ""),
             GeneratedFile::new(".isoloom/vagrant/Vagrantfile", ""),
             GeneratedFile::new(".isoloom/resolved.json", ""),
         ];

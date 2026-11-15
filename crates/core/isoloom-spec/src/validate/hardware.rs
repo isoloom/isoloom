@@ -7,23 +7,23 @@ use super::Problems;
 use crate::model::{Device, GpuCount, Gpus, Machine, Seal, Spec};
 
 /// The machine's hardware fields, each checked in turn.
-pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
+pub(super) fn machine(name: &str, m: &Machine, problems: &mut Problems) {
     let at = format!("machines.{name}");
     if m.nested_virtualization && m.vm.is_none() {
-        p.add(
+        problems.add(
             format!("{at}.nested_virtualization"),
             "VMs run inside a VM, not a container: run it on a VM target",
         );
     }
     if let Some(g) = &m.gpus {
-        gpus(&format!("{at}.gpus"), g, p);
+        gpus(&format!("{at}.gpus"), g, problems);
     }
     let mut guests = HashSet::new();
     for (i, d) in m.devices.iter().enumerate() {
         let at = format!("{at}.devices[{i}]");
-        device(&at, d, p);
+        device(&at, d, problems);
         if !guests.insert(d.guest()) {
-            p.add(at, format!("`{}` is already given to the machine: one device per path inside it", d.guest()));
+            problems.add(at, format!("`{}` is already given to the machine: one device per path inside it", d.guest()));
         }
     }
 }
@@ -35,12 +35,12 @@ pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
 /// acknowledges the seal is advisory for it; otherwise it must drop `privileged` or sit on a
 /// network with internet. A VM is sealed at the hypervisor or router, out of its own reach, so
 /// this is for containers only.
-pub(super) fn offline_privilege(spec: &Spec, name: &str, m: &Machine, p: &mut Problems) {
+pub(super) fn offline_privilege(spec: &Spec, name: &str, m: &Machine, problems: &mut Problems) {
     if m.vm.is_some() || !m.privileged || m.seal == Seal::BestEffort {
         return;
     }
     if let Some(net) = m.networks.keys().find(|net| spec.networks.get(*net).is_some_and(|n| !n.internet)) {
-        p.add(
+        problems.add(
             format!("machines.{name}.privileged"),
             format!(
                 "a privileged container can lift the seal of `{net}` (an `internet: false` network) from inside: drop `privileged`, put the machine on a network with internet, or set `seal: best-effort` to accept that the seal is advisory for it"
@@ -54,52 +54,52 @@ fn word(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-'))
 }
 
-fn gpus(at: &str, g: &Gpus, p: &mut Problems) {
+fn gpus(at: &str, g: &Gpus, problems: &mut Problems) {
     if g.count == Some(GpuCount::Count(0)) {
-        p.add(format!("{at}.count"), "at least 1 (leave `gpus` out for none)");
+        problems.add(format!("{at}.count"), "at least 1 (leave `gpus` out for none)");
     }
     if g.count.is_some() && !g.ids.is_empty() {
-        p.add(at, "give `count` or `ids`, not both: the ids say how many");
+        problems.add(at, "give `count` or `ids`, not both: the ids say how many");
     }
     let mut seen = HashSet::new();
     for (i, id) in g.ids.iter().enumerate() {
         if id.trim().is_empty() || id.contains(char::is_whitespace) {
-            p.add(
+            problems.add(
                 format!("{at}.ids[{i}]"),
                 "a GPU's id on the host: an index (`0`), a UUID, or a PCI address (`0000:01:00.0`)",
             );
         } else if !seen.insert(id) {
-            p.add(format!("{at}.ids[{i}]"), format!("`{id}` is listed twice"));
+            problems.add(format!("{at}.ids[{i}]"), format!("`{id}` is listed twice"));
         }
     }
     if g.driver.as_deref().is_some_and(|d| !word(d)) {
-        p.add(format!("{at}.driver"), "a driver's name, e.g. nvidia, amd or intel");
+        problems.add(format!("{at}.driver"), "a driver's name, e.g. nvidia, amd or intel");
     }
     for (i, c) in g.capabilities.iter().enumerate() {
         if !word(c) {
-            p.add(
+            problems.add(
                 format!("{at}.capabilities[{i}]"),
                 "a capability's name, e.g. compute, utility, video or graphics",
             );
         }
     }
     for k in g.options.keys().filter(|k| k.trim().is_empty()) {
-        p.add(format!("{at}.options"), format!("`{k}`: an option needs a name"));
+        problems.add(format!("{at}.options"), format!("`{k}`: an option needs a name"));
     }
 }
 
-fn device(at: &str, d: &Device, p: &mut Problems) {
+fn device(at: &str, d: &Device, problems: &mut Problems) {
     let path = |s: &str| s.starts_with('/') && !s.contains(char::is_whitespace) && !s.contains(':');
     if !path(&d.host) {
-        p.add(format!("{at}.host"), "the device's absolute path on the host, e.g. /dev/fuse");
+        problems.add(format!("{at}.host"), "the device's absolute path on the host, e.g. /dev/fuse");
     }
     if d.guest.as_deref().is_some_and(|g| !path(g)) {
-        p.add(format!("{at}.guest"), "an absolute path inside the machine, e.g. /dev/fuse");
+        problems.add(format!("{at}.guest"), "an absolute path inside the machine, e.g. /dev/fuse");
     }
     if let Some(perms) = &d.permissions {
         let mut seen = HashSet::new();
         if perms.is_empty() || !perms.chars().all(|c| matches!(c, 'r' | 'w' | 'm') && seen.insert(c)) {
-            p.add(
+            problems.add(
                 format!("{at}.permissions"),
                 "`r` (read), `w` (write) and `m` (create the device node), each at most once, e.g. rw",
             );

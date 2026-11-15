@@ -81,7 +81,7 @@ list is the [CHANGELOG](../../CHANGELOG.md).
   matches `member` instead.
 
 - **`manifest_version` is 1**, frozen with a compatibility policy
-  ([the run manifest](../reference/run-manifest.md#versions-and-compatibility)). A runner built
+  (the run manifest reference of 2.x). A runner built
   for version 0 refuses 2.0's manifests.
 - Values Isoloom never wrote are gone from the schema, and a manifest holding one is refused: the
   `vagrant_ssh` and `winrm` guest-delivery transports, the `dotenv` state-file format, the

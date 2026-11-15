@@ -8,6 +8,11 @@ use std::process::Command;
 
 use crate::Res;
 
+/// `cargo`, the one running the ratchet (`$CARGO`, so the same toolchain), else the one on `PATH`.
+pub(crate) fn cargo() -> Command {
+    Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+}
+
 /// The command as one line, for messages and logs.
 #[must_use]
 pub fn describe(cmd: &Command) -> String {

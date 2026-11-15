@@ -1,6 +1,6 @@
 [package]
 name = "isoloom-vagrant"
-description = "The Vagrant backends of Isoloom (vagrant, docker-vm, hybrid)."
+description = "The Vagrant backend of Isoloom (vagrant)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,14 +16,13 @@ publish = true
 [dependencies]
 isoloom-spec.workspace = true
 isoloom-plan.workspace = true
-isoloom-manifest.workspace = true
 isoloom-render.workspace = true
 indexmap.workspace = true
-sha2.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 isoloom-render = { workspace = true, features = ["test-support"] }
+isoloom-test-support.workspace = true
 insta.workspace = true
 proptest.workspace = true
 tempfile.workspace = true

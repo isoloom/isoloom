@@ -1,0 +1,206 @@
+os: debian@12
+app:
+  steps:
+  - command: |
+      set -e
+      mkdir -p /var/lib/isoloom/dockerfile
+      if command -v systemctl >/dev/null; then
+        systemctl list-unit-files --state=enabled --type=service --no-legend | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-before
+      elif command -v rc-update >/dev/null; then
+        rc-update show default | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-before
+      fi
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/001
+    creates: /var/lib/isoloom/dockerfile/001
+  - command: |
+      set -e
+      d=/usr/local/lib/isoloom/shims
+      mkdir -p "$d"
+      cat > "$d/useradd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -u ] || [ "${prev:-}" = --uid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent passwd "$id" >/dev/null; then exec /usr/sbin/useradd -o "$@"; fi
+      exec /usr/sbin/useradd "$@"
+      SHIM
+      cat > "$d/groupadd" <<'SHIM'
+      #!/bin/sh
+      for a; do [ "${prev:-}" = -g ] || [ "${prev:-}" = --gid ] && id="$a"; prev="$a"; done
+      if [ -n "${id:-}" ] && getent group "$id" >/dev/null; then exec /usr/sbin/groupadd -o "$@"; fi
+      exec /usr/sbin/groupadd "$@"
+      SHIM
+      chmod 755 "$d/useradd" "$d/groupadd"
+      if command -v apk >/dev/null; then
+        for tool in adduser addgroup; do
+          cat > "$d/$tool" <<SHIM
+      #!/bin/sh
+      flag=-u; [ $tool = addgroup ] && flag=-g
+      db=passwd; [ $tool = addgroup ] && db=group
+      out=; skip=
+      for a; do
+        if [ -n "\$skip" ]; then skip=; getent "\$db" "\$a" >/dev/null || out="\$out \$flag \$a"; continue; fi
+        if [ "\$a" = "\$flag" ]; then skip=1; continue; fi
+        out="\$out \$a"
+      done
+      exec /bin/busybox $tool \$out
+      SHIM
+          chmod 755 "$d/$tool"
+        done
+      fi
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
+    creates: /var/lib/isoloom/dockerfile/002
+  - packages:
+    - ca-certificates
+  - repository:
+      name: sury-php
+      url: https://packages.sury.org/php
+      key:
+        url: https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x15058500A0235D97F5D10063B188E2B695BD4743
+        sha256: 023b08fdf09fcf0a123ebef0b247765bad2481327bbdee3599bf7bbae3ae2061
+      priority: 900
+  - packages:
+    - name: php8.5-cli
+      version: 8.5.12-3+0~deb.sury.org.1+debian12
+    - name: php8.5-common
+      version: 8.5.12-3+0~deb.sury.org.1+debian12
+  - packages:
+    - apache2
+  - packages:
+    - name: libapache2-mod-php8.5
+      version: 8.5.12-3+0~deb.sury.org.1+debian12
+  - file:
+      path: /usr/local/etc/php/conf.d
+      state: directory
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/php.ini
+      to: /usr/local/etc/php/php.ini
+      mode: '0644'
+  - command: sh -c 'for f in development production; do cp /usr/lib/php/8.5/php.ini-$f /usr/local/etc/php/ 2>/dev/null || true; done; for s in cli apache2 fpm; do [ -d /etc/php/8.5/$s ] && ln -sf /usr/local/etc/php/php.ini /etc/php/8.5/$s/php.ini; done; true'
+    creates: /usr/local/etc/php/php.ini-production
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-ext-install
+      to: /usr/local/bin/docker-php-ext-install
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-ext-enable
+      to: /usr/local/bin/docker-php-ext-enable
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-ext-configure
+      to: /usr/local/bin/docker-php-ext-configure
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-source
+      to: /usr/local/bin/docker-php-source
+      mode: '0755'
+  - command: sh -c 'a2dismod -q mpm_event || true; a2enmod -q mpm_prefork php8.5 && rm -f /var/www/html/index.html'
+    creates: /etc/apache2/mods-enabled/php8.5.load
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/apache2-foreground
+      to: /usr/local/bin/apache2-foreground
+      mode: '0755'
+  - file:
+      path: /var/www/html
+      state: directory
+      owner: www-data
+      group: www-data
+      mode: '0755'
+  - service:
+      name: apache2
+      run:
+      - /usr/local/bin/apache2-foreground
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PHP_INI_DIR=/usr/local/etc/php
+      export DB_SERVER=db
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /var/www/html && cd /var/www/html
+      mkdir -p /var/www/html
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/003
+    creates: /var/lib/isoloom/dockerfile/003
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PHP_INI_DIR=/usr/local/etc/php
+      export DB_SERVER=db
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /var/www/html && cd /var/www/html
+      apt-get update  && export DEBIAN_FRONTEND=noninteractive  && apt-get install -y zlib1g-dev libpng-dev libjpeg-dev libfreetype6-dev iputils-ping  && apt-get clean -y && rm -rf /var/lib/apt/lists/*  && docker-php-ext-configure gd --with-jpeg --with-freetype  && docker-php-ext-install gd mysqli pdo pdo_mysql
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/004
+    creates: /var/lib/isoloom/dockerfile/004
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PHP_INI_DIR=/usr/local/etc/php
+      export DB_SERVER=db
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /var/www/html && cd /var/www/html
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/var/www/html
+      for s in /opt/isoloom/build/php-apache/app; do isoloom_copy_into "$s" "$dest"; done
+      chown -R www-data:www-data "$dest"
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/005
+    creates: /var/lib/isoloom/dockerfile/005
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PHP_INI_DIR=/usr/local/etc/php
+      export DB_SERVER=db
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /var/www/html && cd /var/www/html
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/var/www/html/config/config.inc.php
+      for s in /opt/isoloom/build/php-apache/app/config/config.inc.php.dist; do isoloom_copy_to "$s" "$dest"; done
+      chown -R www-data:www-data "$dest"
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/006
+    creates: /var/lib/isoloom/dockerfile/006
+  - command: |
+      set -e
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export PHP_INI_DIR=/usr/local/etc/php
+      export DB_SERVER=db
+      export PATH="/usr/local/lib/isoloom/shims:$PATH"
+      mkdir -p /var/www/html && cd /var/www/html
+      isoloom_copy_into() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2/${1##*/}" ] && return 0; mkdir -p "$2"; if [ -d "$1" ]; then cp -a "$1"/. "$2"/; else cp -a "$1" "$2"/; fi; }
+      isoloom_copy_to() { [ -e "$1" ] || { echo "missing: $1" >&2; exit 1; }; [ "$1" -ef "$2" ] && return 0; if [ -d "$1" ]; then mkdir -p "$2"; cp -a "$1"/. "$2"/; else mkdir -p "$(dirname "$2")"; cp -a "$1" "$2"; fi; }
+      isoloom_untar() { mkdir -p "$2"; tar -xf "$1" -C "$2"; }
+      isoloom_fetch() { command -v curl >/dev/null || { apt-get update && apt-get install -y curl; } || apk add curl || dnf install -y curl; mkdir -p "$(dirname "$2")"; curl -fsSL "$1" -o "$2"; }
+      dest=/usr/local/bin/dvwa-setup-db
+      for s in /opt/isoloom/build/php-apache/setup-db.sh; do isoloom_copy_to "$s" "$dest"; done
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/007
+    creates: /var/lib/isoloom/dockerfile/007
+  - command: |
+      set -e
+      keep='^(ssh|sshd|systemd-|getty|serial-getty|cloud-|qemu-guest-agent|vbox|open-vm-tools|vmtoolsd|networking|rsyslog|cron|chrony|isoloom)'
+      if command -v systemctl >/dev/null; then
+        systemctl list-unit-files --state=enabled --type=service --no-legend | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-after
+        for u in $(comm -13 /var/lib/isoloom/dockerfile/units-before /var/lib/isoloom/dockerfile/units-after | grep -Ev "$keep" || true); do
+          systemctl disable --now "$u" || true
+        done
+      elif command -v rc-update >/dev/null; then
+        rc-update show default | awk '{print $1}' | sort > /var/lib/isoloom/dockerfile/units-after
+        for u in $(comm -13 /var/lib/isoloom/dockerfile/units-before /var/lib/isoloom/dockerfile/units-after | grep -Ev "$keep" || true); do
+          rc-service "$u" stop || true
+          rc-update del "$u" default || true
+        done
+      fi
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/008
+    creates: /var/lib/isoloom/dockerfile/008
+  - command: |
+      set -e
+      mkdir -p /usr/local/lib/isoloom
+      printf %s IyEvYmluL3NoCmV4cG9ydCBQQVRIPS91c3IvbG9jYWwvc2JpbjovdXNyL2xvY2FsL2JpbjovdXNyL3NiaW46L3Vzci9iaW46L3NiaW46L2JpbgpleHBvcnQgUEhQX0lOSV9ESVI9L3Vzci9sb2NhbC9ldGMvcGhwCmV4cG9ydCBEQl9TRVJWRVI9ZGIKY2QgL3Zhci93d3cvaHRtbApleGVjIHNoIC1jICdzaCAvdXNyL2xvY2FsL2Jpbi9kdndhLXNldHVwLWRiICYgZXhlYyBhcGFjaGUyLWZvcmVncm91bmQnCg== | base64 -d > /usr/local/lib/isoloom/app-start
+      chmod 755 /usr/local/lib/isoloom/app-start
+      mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/009
+    creates: /var/lib/isoloom/dockerfile/009
+  - service:
+      name: isoloom-app
+      run:
+      - /usr/local/lib/isoloom/app-start
+      cwd: /var/www/html

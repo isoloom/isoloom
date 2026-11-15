@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use super::machines::Subject;
 use super::volumes::safe_path;
-use isoloom_manifest::is_kebab;
+use crate::contract::is_kebab;
 
 use super::Problems;
 use crate::model::{Disk, Filesystem};
@@ -20,14 +20,14 @@ const MAX_DISK_NAME: usize = 12;
 
 /// The machine's tmpfs mounts and data disks. `volume_paths` are its volumes' paths, which a disk
 /// can't take.
-pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, p: &mut Problems) {
+pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, problems: &mut Problems) {
     for (i, t) in s.m.tmpfs.iter().enumerate() {
         let at = format!("{}.tmpfs[{i}]", s.at);
         if !safe_path(t.path()) {
-            p.add(&at, format!("`{}` isn't a safe absolute path inside the machine, like /run", t.path()));
+            problems.add(&at, format!("`{}` isn't a safe absolute path inside the machine, like /run", t.path()));
         }
         if let Some(size) = t.size().filter(|z| !size_ok(z)) {
-            p.add(
+            problems.add(
                 format!("{at}.size"),
                 format!("`{size}` isn't a size: bytes, or a number with k, m or g, like 64m"),
             );
@@ -37,19 +37,29 @@ pub(super) fn of_machine(s: &Subject, volume_paths: &BTreeSet<&str>, p: &mut Pro
     for (name, d) in &s.m.disks {
         let at = format!("{}.disks.{name}", s.at);
         if let Some(why) = disk_name_problem(s, name) {
-            p.add(&at, why);
+            problems.add(&at, why);
         }
         if d.size_gb == 0 || d.size_gb > MAX_DISK_GB {
-            p.add(format!("{at}.size_gb"), format!("a data disk is 1 to {MAX_DISK_GB} GB"));
+            problems.add(format!("{at}.size_gb"), format!("a data disk is 1 to {MAX_DISK_GB} GB"));
         }
         let os = s.m.vm.as_ref().map_or(Kind::Linux, |vm| Kind::of(&vm.os));
-        filesystem(d, os, &at, p);
+        filesystem(d, os, &at, problems);
         if let Some(m) = &d.mount {
-            mount(m, os, &at, p);
-            if volume_paths.contains(m.trim_end_matches('/')) || !mounts.insert(m.trim_end_matches('/').to_ascii_uppercase()) {
-                p.add(format!("{at}.mount"), format!("`{m}` is already a volume or a disk of this machine"));
+            mount(m, os, &at, problems);
+            if volume_paths.contains(m.trim_end_matches('/')) || !mounts.insert(mount_key(m, os)) {
+                problems.add(format!("{at}.mount"), format!("`{m}` is already a volume or a disk of this machine"));
             }
         }
+    }
+}
+
+/// The mount point `m` as `os` compares two: Windows' drive letters regardless of case, Linux's
+/// paths as written (`/data` and `/DATA` are two), a trailing `/` ignored on both.
+fn mount_key(m: &str, os: Kind) -> String {
+    let m = m.trim_end_matches('/');
+    match os {
+        Kind::Windows => m.to_ascii_uppercase(),
+        Kind::Linux => m.to_owned(),
     }
 }
 
@@ -71,32 +81,34 @@ fn disk_name_problem(s: &Subject, name: &str) -> Option<String> {
 }
 
 /// A filesystem the machine's OS formats: ext4 or XFS on Linux, NTFS on Windows, or none.
-fn filesystem(d: &Disk, os: Kind, at: &str, p: &mut Problems) {
+fn filesystem(d: &Disk, os: Kind, at: &str, problems: &mut Problems) {
     match (d.fs, os) {
-        (Some(Filesystem::Ntfs), Kind::Linux) => p.add(format!("{at}.fs"), "NTFS is a Windows machine's: use ext4 or xfs"),
-        (Some(Filesystem::Ext4 | Filesystem::Xfs), Kind::Windows) => p.add(format!("{at}.fs"), "a Windows machine formats NTFS: use ntfs, or leave it out"),
+        (Some(Filesystem::Ntfs), Kind::Linux) => problems.add(format!("{at}.fs"), "NTFS is a Windows machine's: use ext4 or xfs"),
+        (Some(Filesystem::Ext4 | Filesystem::Xfs), Kind::Windows) => {
+            problems.add(format!("{at}.fs"), "a Windows machine formats NTFS: use ntfs, or leave it out");
+        }
         _ => {}
     }
     match (d.fs == Some(Filesystem::Raw), d.mount.is_some()) {
-        (true, true) => p.add(format!("{at}.mount"), "a raw disk has no filesystem to mount: leave `mount` out"),
-        (false, false) => p.add(format!("{at}.mount"), "say where the disk is mounted, like /data (or make it `fs: raw`)"),
+        (true, true) => problems.add(format!("{at}.mount"), "a raw disk has no filesystem to mount: leave `mount` out"),
+        (false, false) => problems.add(format!("{at}.mount"), "say where the disk is mounted, like /data (or make it `fs: raw`)"),
         _ => {}
     }
 }
 
 /// A mount point: a safe absolute path on Linux, a drive letter other than the system's on
 /// Windows.
-fn mount(m: &str, os: Kind, at: &str, p: &mut Problems) {
+fn mount(m: &str, os: Kind, at: &str, problems: &mut Problems) {
     if os.is_windows() {
         let drive_letter = matches!(m.as_bytes(), [letter, b':'] if (b'D'..=b'Z').contains(&letter.to_ascii_uppercase()));
         if !drive_letter {
-            p.add(
+            problems.add(
                 format!("{at}.mount"),
                 format!("`{m}` isn't a drive letter: a Windows disk mounts at one, D: to Z:"),
             );
         }
     } else if !safe_path(m) {
-        p.add(
+        problems.add(
             format!("{at}.mount"),
             format!("`{m}` isn't a safe absolute path inside the machine, like /data"),
         );
@@ -255,6 +267,11 @@ mod tests {
         let taken = |what: &str| [format!("machines.web.disks.b.mount: `{what}` is already a volume or a disk of this machine")];
         assert_eq!(linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /data/ } }"), taken("/data/"));
         assert_eq!(windows("{ a: { size_gb: 1, mount: 'E:' }, b: { size_gb: 1, mount: 'e:' } }"), taken("e:"));
+        // Regression: Linux paths are case-sensitive, so two disks may mount at `/data` and `/DATA`.
+        assert_eq!(
+            linux("{ a: { size_gb: 1, mount: /data }, b: { size_gb: 1, mount: /DATA } }"),
+            Vec::<String>::new()
+        );
         assert_eq!(
             named(
                 "web",

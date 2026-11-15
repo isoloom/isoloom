@@ -1,6 +1,7 @@
 //! One module per subcommand: its arguments (`Args`) and what it does (`run`), writing to the
 //! console and giving its verdict, or the error that stopped it.
 
+pub(crate) mod bases;
 pub(crate) mod check;
 pub(crate) mod defaults;
 pub(crate) mod docs;
@@ -78,6 +79,7 @@ pub(crate) fn run(command: Command, profile: &Profile, console: &mut Console) ->
         Command::Profiles(a) => profiles::run(&a, console),
         Command::Schema(a) => schema::run(&a, console),
         Command::Import(i) => import::run(i, console),
+        Command::Bases(b) => bases::run(b, profile, console),
         Command::Docs(a) => docs::run(&a, console),
         Command::Matrix(a) => matrix::run(&a, console),
     }
@@ -106,7 +108,7 @@ mod tests {
         ));
         let failed = GenerateError::Internal {
             target: Target::Vagrant,
-            what: "the run manifest refused a value of this backend".to_owned(),
+            what: "the module couldn't be written".to_owned(),
             source: Arc::new(std::io::Error::other("bad name")),
         };
         let stopped = refusals(vec![refused, failed]);
@@ -123,7 +125,7 @@ mod tests {
         if let Err(e) = &stopped {
             let rendered = crate::diagnostic::render(e);
             assert!(
-                rendered.contains("error: vagrant: the run manifest refused a value of this backend\n  caused by: bad name"),
+                rendered.contains("error: vagrant: the module couldn't be written\n  caused by: bad name"),
                 "{rendered}"
             );
         }
@@ -133,17 +135,15 @@ mod tests {
     fn every_failed_backend_is_reported() {
         let failed = |target| GenerateError::Internal {
             target,
-            what: "the run manifest refused a value of this backend".to_owned(),
+            what: "the module couldn't be written".to_owned(),
             source: Arc::new(std::io::Error::other("bad name")),
         };
-        let stopped = refusals(vec![failed(Target::Vagrant), failed(Target::DockerVm)]);
+        let stopped = refusals(vec![failed(Target::Vagrant), failed(Target::CloudDocker)]);
         let Err(e) = &stopped else { panic!("{stopped:?}") };
         let rendered = crate::diagnostic::render(e);
-        for target in ["vagrant", "docker-vm"] {
+        for target in ["vagrant", "cloud-docker"] {
             assert!(
-                rendered.contains(&format!(
-                    "error: {target}: the run manifest refused a value of this backend\n  caused by: bad name"
-                )),
+                rendered.contains(&format!("error: {target}: the module couldn't be written\n  caused by: bad name")),
                 "{rendered}"
             );
         }

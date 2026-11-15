@@ -28,7 +28,7 @@ const DEEP: u64 = 10_000;
 #[cfg(test)]
 const FAST: u64 = 150;
 
-/// Seeds found to fail once, replayed by the fast test forever after. Empty while none has.
+/// Seeds found to fail once, replayed first by the fast test forever after.
 #[cfg(test)]
 const REGRESSION_SEEDS: &[u64] = &[];
 
@@ -141,26 +141,28 @@ fn report(a: &Args, totals: &Totals, failures: &[(u64, String)]) -> Res<ExitCode
 mod tests {
     use super::*;
 
-    /// The fast run: a few hundred random specs through the whole pipeline in the normal gate. A
-    /// panic here fails the test (so "no panic, no unwrap/expect fires" is a gate), and an invar-
-    /// iant that breaks names the seed, which reproduces the spec.
+    /// The fast run: every seed once found to fail, then a few hundred random specs, through the
+    /// whole pipeline in the normal gate. A panic here fails the test (so "no panic, no
+    /// unwrap/expect fires" is a gate), and an invariant that breaks names the seed, which
+    /// reproduces the spec.
     #[test]
     fn many_random_specs_generate_cleanly_and_deterministically() {
-        for seed in 0..FAST {
+        for seed in REGRESSION_SEEDS.iter().copied().chain(0..FAST) {
             if let Err(reason) = run_seed(seed) {
                 panic!("seed {seed} broke an invariant: {reason}\n\nspec:\n{}", generator::spec(seed).yaml);
             }
         }
     }
 
-    /// Every seed once found to fail is checked again, forever.
+    /// Why the generator keeps a Windows machine away from container-only forms: a lab that one
+    /// form alone can run (a Windows VM beside a machine built from a Dockerfile Isoloom hasn't
+    /// read) is refused as a whole, not split across targets.
     #[test]
-    fn the_regression_seeds_pass() {
-        for &seed in REGRESSION_SEEDS {
-            if let Err(reason) = run_seed(seed) {
-                panic!("regression seed {seed} failed again: {reason}");
-            }
-        }
+    fn a_windows_vm_beside_a_container_only_machine_is_refused_not_split() {
+        let yaml = "version: 1\nname: mix\nnetworks:\n  n0: { cidr: 10.46.0.0/24 }\nmachines:\n  m0:\n    os: alpine@3.19\n    networks: { n0: 10 }\n    app: { build: build/m0 }\n  m1:\n    os: windows-server@2019\n    networks: { n0: 11 }\n";
+        let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).expect("the spec parses"));
+        let problems: Vec<String> = lab.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
+        assert!(problems.iter().any(|p| p.contains("no target is possible")), "{problems:?}");
     }
 
     /// The generator is deterministic: a seed always yields the same spec, so a failing seed

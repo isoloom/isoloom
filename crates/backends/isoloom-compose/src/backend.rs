@@ -1,12 +1,9 @@
 //! The Compose backend: what Compose can render, on the user's Docker host and on a VM that runs
 //! the Compose file.
 
-use isoloom_manifest::Manifest;
 use isoloom_plan::{Capabilities, Environment, Feature};
 use isoloom_render::Error as RenderError;
 use isoloom_render::backend::{Backend, Files};
-use isoloom_render::run_manifest::guest::GuestCompose;
-use isoloom_render::steps::AsRoot;
 use isoloom_spec::model::Target;
 
 use crate::render;
@@ -18,8 +15,6 @@ pub(crate) enum ComposeTarget {
     Docker,
     /// `hosted`: a hosting service runs the same Compose file.
     Hosted,
-    /// `hybrid`: the containers' file, run on the Docker host VM beside the environment's VMs.
-    Hybrid,
 }
 
 impl ComposeTarget {
@@ -28,7 +23,6 @@ impl ComposeTarget {
         match self {
             ComposeTarget::Docker => Target::Docker,
             ComposeTarget::Hosted => Target::Hosted,
-            ComposeTarget::Hybrid => Target::Hybrid,
         }
     }
 }
@@ -57,29 +51,6 @@ impl Backend for ComposeBackend {
     fn render(&self, env: &Environment) -> Result<Files, RenderError> {
         Ok(render::render(self.0, env)?)
     }
-
-    /// The `docker` target's manifest; a hosting service runs the file its own way.
-    fn run_manifest(&self, env: &Environment) -> Result<Option<Manifest>, RenderError> {
-        if self.0 != ComposeTarget::Docker {
-            return Ok(None);
-        }
-        let file = render::compose_file(ComposeTarget::Docker, env)?.file;
-        Ok(Some(crate::manifest::docker(env, &file)?))
-    }
-}
-
-/// What runs inside a Docker host VM (`docker-vm`, `cloud-docker`) for `env` (planned for the
-/// `docker` target): the `docker` target's Compose file, its containers, and the commands that
-/// start, check and read them there, as root as the way in gets it (`as_root`: the backend that
-/// makes the VM runs them through its own way in).
-///
-/// # Errors
-///
-/// [`crate::Error::Refused`] when `env` needs what Compose can't do; a manifest error for a name
-/// the run manifest refuses (a bug: the spec checks them).
-pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> {
-    let file = render::compose_file(ComposeTarget::Docker, env)?.file;
-    crate::manifest::guest(env, &file, as_root)
 }
 
 /// What Compose can render: network appliances (wired the way Docker attaches networks), aliases,
@@ -92,12 +63,14 @@ pub fn guest(env: &Environment, as_root: AsRoot) -> crate::Result<GuestCompose> 
 /// (`external`). Data disks are named volumes, a tmpfs takes a mode, and a volume can be kept
 /// past `down` or exist already; no raw disk (a container gets no block device). Only on the
 /// `docker` target, folders of the computer that runs the environment: its containers run there (a
-/// hosting service's and the hybrid VM's don't).
+/// hosting service's don't).
 pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
     let caps = Capabilities::of([
         Feature::NetworkAppliances,
         Feature::Gateways,
         Feature::MachineAliases,
+        // Each tool a service of its own on every network.
+        Feature::Tools,
         Feature::Ulimits,
         Feature::TrafficControl,
         Feature::Ipv6,
@@ -118,13 +91,15 @@ pub(crate) fn capabilities(target: ComposeTarget) -> Capabilities {
         Feature::ExternalVolumes,
     ]);
     if target == ComposeTarget::Docker {
-        caps.with(Feature::HostFolders)
+        // Docker picks each published port's free host port on the user's own host (unless
+        // `ISOLOOM_PUBLISH_FIXED` pins them, which only a cloud VM's forward does).
+        caps.with(Feature::HostFolders).with(Feature::FreeHostPorts)
     } else {
         caps
     }
 }
 
-/// What a Compose file run on a VM can render (`docker-vm`, `cloud-docker`): Compose's, but
+/// What a Compose file run on a VM can render (`cloud-docker`): Compose's, but
 /// existing networks, which a fresh Docker host VM has none of, and the host's GPUs and
 /// devices, which a VM Isoloom creates doesn't have, and volumes kept past `down` or existing
 /// already (the storage goes with the VM). Secrets reach the VM over its own
@@ -158,7 +133,7 @@ mod tests {
 
     #[test]
     fn only_the_docker_targets_containers_run_on_the_computer_whose_folders_they_mount() {
-        let with: Vec<ComposeTarget> = [ComposeTarget::Docker, ComposeTarget::Hosted, ComposeTarget::Hybrid]
+        let with: Vec<ComposeTarget> = [ComposeTarget::Docker, ComposeTarget::Hosted]
             .into_iter()
             .filter(|t| capabilities(*t).has(Feature::HostFolders))
             .collect();

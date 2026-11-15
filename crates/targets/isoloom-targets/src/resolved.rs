@@ -7,7 +7,6 @@
 //! Isoloom read this instead of parsing a Vagrantfile.
 
 mod checks;
-mod cloud;
 mod machines;
 mod message;
 mod networks;
@@ -21,13 +20,10 @@ use serde_json::{Map, Value, json};
 
 use crate::{Error, Result};
 
-pub(crate) use message::manifest_message;
 pub use message::{fill, lookup, render_message, render_message_on};
 
-/// The format of the snapshot; bumped when a field changes meaning or goes away (3: a machine's
-/// `ports` keyed by name, each with its `protocol`, `published` and `url`; 4: a machine's
-/// `resources` keyed by form, `docker` and `vm`, each its size in that form; 5: an environment machine's
-/// `role` is `member`, as in the run manifest).
+/// The format of the snapshot; bumped when a field changes meaning or goes away (the changelog
+/// says what each version changed).
 pub const RESOLVED_VERSION: u32 = 5;
 
 /// Where the snapshot is written, relative to the project folder.
@@ -112,11 +108,7 @@ fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     out.insert("published".into(), ports::published(spec).into());
     out.insert("targets".into(), targets::section(lab));
     out.insert("checks".into(), checks::section(spec));
-    if let Some(c) = &spec.cloud {
-        out.insert("cloud".into(), cloud::section(c));
-    }
-    // The message, with its placeholders filled from everything above (a cloud output stays as
-    // written: it is known only once the module is applied).
+    // The message, with its placeholders filled from everything above.
     let mut snapshot = Value::Object(out);
     if let Some(m) = &spec.message {
         let filled = fill(m, &snapshot).ok();

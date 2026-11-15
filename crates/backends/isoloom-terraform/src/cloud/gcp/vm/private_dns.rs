@@ -11,9 +11,9 @@ use crate::module::{ident, resource};
 
 /// The zone and its records, when the environment has one; the API enabled when the project is
 /// the module's own (`own_project`).
-pub(super) fn write(env: &Environment, own_project: Expression, m: &mut Module) {
+pub(super) fn write(env: &Environment, own_project: Expression, module: &mut Module) {
     let Some(zone) = &env.private_dns else { return };
-    m.block(
+    module.block(
         resource("google_project_service", "dns")
             .add_attribute(("count", own_project))
             .add_attribute(("project", reference("local.project")))
@@ -27,7 +27,7 @@ pub(super) fn write(env: &Environment, own_project: Expression, m: &mut Module) 
             .add_attribute(("network_url", reference(&format!("google_compute_network.{}.id", ident(n)))))
             .build()
     });
-    m.commented(
+    module.commented(
         "The environment's names, served by Cloud DNS inside the VPC networks (`dns.private`).",
         resource("google_dns_managed_zone", "private")
             .add_attribute(("project", reference("local.project")))
@@ -40,7 +40,7 @@ pub(super) fn write(env: &Environment, own_project: Expression, m: &mut Module) 
             .build(),
     );
     for (id, r) in records(zone) {
-        m.block(
+        module.block(
             resource("google_dns_record_set", &id)
                 .add_attribute(("project", reference("local.project")))
                 .add_attribute(("managed_zone", reference("google_dns_managed_zone.private.name")))

@@ -6,13 +6,13 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Protocol;
 
 use super::{Action, Way, rule, vm};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::tag_list;
-use crate::docker_host::{published, tcp_ports};
+use crate::docker_host::{container_ports, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::LINODE,
     size: Some(SizeVariable {
@@ -20,12 +20,13 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::Table(super::vm::PLANS),
     }),
     resources,
+    instance: "linode_instance",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
 /// by cloud-init); the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(
         resource("linode_instance")
             .add_attribute(("region", reference("var.region")))
             .add_attribute(("type", reference("var.type")))
@@ -36,7 +37,7 @@ fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expres
             .add_block(super::set_up_once())
             .build(),
     );
-    m.block(firewall(env));
+    module.block(firewall(env));
     call("one", [reference("linode_instance.env.ipv4")])
 }
 
@@ -59,7 +60,7 @@ fn inbound(label: &str, protocol: &str, ports: &[u16]) -> Block {
 
 /// SSH and the published ports in from `allowed_cidr`, the rest dropped; everything out.
 fn firewall(env: &Environment) -> Block {
-    let udp = published(env, Protocol::Udp);
+    let udp = container_ports(env, Protocol::Udp);
     let mut b = resource("linode_firewall")
         .add_attribute(("tags", tag_list(env)))
         .add_attribute(("inbound_policy", string("DROP")))

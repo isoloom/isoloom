@@ -21,7 +21,6 @@ for each item of a list.
 - [`overrides`](#overrides)
 - [`tools`](#tools)
 - [`constraints`](#constraints)
-- [`cloud`](#cloud)
 
 ## Top level
 
@@ -111,7 +110,7 @@ A machine of the environment that routes this network (an edge firewall): it tak
 The VLANs this LAN is split into, by id (1-4094), each with its own block inside the LAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming the LAN covers all of its VLANs. Each VLAN becomes a network of its own, `<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.
 
 - **Type:** map of name to mapping
-- **Limits:** names match `^[1-9][0-9]{0,3}$`
+- **Limits:** names match `^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$`
 
 ### `networks.*.vlans.*.cidr`
 
@@ -191,7 +190,7 @@ IPv6 only: the network carries no IPv4. Its `cidr` still numbers the machines (t
 
 ### `networks.*.bridged`
 
-Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed addresses in `cidr`, or DHCP from the LAN).
+Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed addresses in `cidr`, or DHCP from the LAN). Only when whoever runs the environment allows `host-network`.
 
 - **Type:** mapping
 
@@ -338,7 +337,7 @@ The environment's machines, by name, started in the order written (after their `
 The OS, as `<family>@<version>` (`debian@12`, `windows-server@2022`), or the family alone for its pinned default. Required, except for a machine whose only recipe is `app.image`, `app.build` or `app.appliance`, and an `access` machine the runner's image table supplies. Windows has no container form.
 
 - **Type:** string
-- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.19`, `alpine@3.24`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
+- **Allowed:** `debian`, `debian@11`, `debian@12`, `debian@13`, `ubuntu`, `ubuntu@14.04`, `ubuntu@16.04`, `ubuntu@18.04`, `ubuntu@20.04`, `ubuntu@22.04`, `ubuntu@24.04`, `rocky`, `rocky@9`, `alma`, `alma@9`, `alpine`, `alpine@3.7`, `alpine@3.19`, `alpine@3.24`, `kali`, `kali@rolling`, `fedora`, `fedora@42`, `centos`, `centos@7`, `windows`, `windows@10`, `windows@11`, `windows-server`, `windows-server@2008r2`, `windows-server@2012r2`, `windows-server@2016`, `windows-server@2019`, `windows-server@2022`, `windows-server@2025`
 
 ### `machines.*.service`
 
@@ -366,7 +365,7 @@ A published image, by tag or digest (`example/clamd:1.4`): the container form. W
 
 ### `machines.*.app.build`
 
-The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form; translating it to a VM is never attempted, so add `os` and `steps` for a VM form. With `image`, the build is tagged as that published name.
+The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form, and on a VM target the VM form it translates to (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as that published name.
 
 - **Type:** string or mapping
 
@@ -405,7 +404,7 @@ Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's of
 A project script (`.sh`; `.ps1` on Windows), run as root from the project folder.
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].creates`
 
@@ -431,7 +430,7 @@ A project file or folder copied into the machine.
 A file or folder of the project (a folder ends with `/`).
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].copy.to`
 
@@ -479,7 +478,7 @@ Its exact version, as the family's package manager writes it (`1.30.6-1~bookworm
 An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`).
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].repository`
 
@@ -616,7 +615,7 @@ A project file with its `{{ path }}` placeholders filled in, placed in the machi
 A file of the project holding `{{ path }}` placeholders: `{{ machine.name }}`, `{{ machine.addresses.<network> }}`, `{{ machines.<m>.addresses.<network> }}` and `{{ machines.<m>.ports.<name>.port }}`. Filled in when Isoloom generates; no logic.
 
 - **Type:** string
-- **Limits:** matches `^(?![/\\]|[A-Za-z]:[/\\])(?!(.*[/\\])?\.\.([/\\]|$))[^\n]+$`
+- **Limits:** matches `^(?!/|[A-Za-z]:)(?!(.*/)?\.\.(/|$))[^\n\\]+$`
 
 ### `machines.*.app.steps[].template.to`
 
@@ -842,7 +841,7 @@ The machine the user lands on (at most one). Without `os` (and nothing to run), 
 
 ### `machines.*.ports`
 
-Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
+Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish, dormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and `.port`, `.url`); a check names the machine and the port's number (`web:80`).
 
 - **Type:** map of name to integer or mapping
 
@@ -892,6 +891,24 @@ Only answers once something wakes it: nothing waits for it.
 
 - **Type:** boolean
 - **Default:** `false`
+
+### `machines.*.ports.*.login`
+
+The account its service ships with, `{ user, password }`: shown to the user beside the port so they can sign in. For a training environment's published sign-in only, never a secret (a secret is an input).
+
+- **Type:** mapping
+
+### `machines.*.ports.*.login.user`
+
+The account's name.
+
+- **Type:** string
+
+### `machines.*.ports.*.login.password`
+
+Its password.
+
+- **Type:** string
 
 ### `machines.*.command`
 
@@ -1103,13 +1120,13 @@ Where it is mounted: an absolute path on Linux and in containers, a drive letter
 
 ### `machines.*.host_folders`
 
-Folders of the computer that runs the environment, mounted in the machine both ways (what it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`, libvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound; UTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
+Folders of the computer that runs the environment, mounted in the machine (read-only unless `read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when whoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`) or absolute; a writable one needs `writable-host-folders`, the container engine's socket `docker-socket`. Linux machines, on the targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each provider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one. VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable whatever its mode on the computer, so another account of the VM writes there once in that group.
 
 - **Type:** list of mappings
 
 ### `machines.*.host_folders[].from`
 
-The folder on the computer that runs the environment: relative to the project folder (`shared`, `../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist; a home or absolute one is the running computer's (the environment may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
+The folder on the computer that runs the environment: in the project folder (`shared`), or, when whoever runs the environment allows a folder outside it (`host-folders`, see `crate::host_access`), beside it (`../notes`), in the home folder of the user running it (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist and stay in the project once its links are followed; a home or absolute one is the running computer's (the environment may run on another computer than the one generating it), so it isn't checked, and it is created when missing.
 
 - **Type:** string
 
@@ -1121,7 +1138,7 @@ The absolute path in the machine (Linux machines), not inside Isoloom's own fold
 
 ### `machines.*.host_folders[].read_only`
 
-The machine only reads it (it can't write there). Off by default.
+The machine only reads it (it can't write there). On by default: a folder the machine writes in (`read_only: false`) is one whoever runs the environment allows (`writable-host-folders`, see `crate::host_access`).
 
 - **Type:** boolean
 
@@ -1238,7 +1255,7 @@ Options for the container runtime's GPU driver (Compose only).
 
 ### `machines.*.hardware.devices`
 
-The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest, permissions }`). A container only.
+The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest, permissions }`). A container only, and only when whoever runs the environment allows `devices`.
 
 - **Type:** list of strings or mappings
 
@@ -1275,7 +1292,7 @@ How it boots, when not the way its image does: its own kernel, firmware, boot or
 
 ### `machines.*.hardware.boot.kernel`
 
-A kernel to boot directly, instead of the image's boot loader.
+A kernel to boot directly, instead of the image's boot loader. Like every file of the hypervisor's host a boot names (`initrd`, `dtb`, `loader`, `nvram`, `network.tftp_root`), only when whoever runs the environment allows `boot-files`.
 
 - **Type:** string
 
@@ -1389,7 +1406,7 @@ Resolver options, as resolv.conf's `options` line writes them: `name` or `name:v
 
 ### `machines.*.privileged`
 
-Kernel-level access (nested containers, kernel modules, raw devices).
+Kernel-level access (nested containers, kernel modules, raw devices). A privileged container reaches the host's kernel: refused unless whoever runs the environment allows `privileged`.
 
 - **Type:** boolean
 - **Default:** `false`
@@ -1632,7 +1649,7 @@ Per-target facts with no portable meaning, by target (`docker`, `vagrant`, `prox
 
 ### `overrides.docker`
 
-Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.
+Every target that runs the Compose file: `docker`, `hosted`, `cloud-docker`.
 
 - **Type:** mapping
 
@@ -1687,7 +1704,7 @@ Its name on the platform (a Docker volume, a Kubernetes claim in the environment
 
 ### `overrides.vagrant`
 
-The `vagrant` target, and the VMs of `hybrid`.
+The `vagrant` target.
 
 - **Type:** mapping
 
@@ -1736,6 +1753,12 @@ The box the QEMU provider boots (libvirt format).
 ### `overrides.vagrant.machines.*.boxes.hyperv`
 
 The box the Hyper-V provider boots.
+
+- **Type:** string
+
+### `overrides.vagrant.machines.*.boxes.utm`
+
+The box the UTM provider (`vagrant_utm`) boots: a UTM-format box.
 
 - **Type:** string
 
@@ -2140,71 +2163,5 @@ The resolvers (IP addresses) Isoloom's own machines and a VM naming none of its 
 ### `constraints.ca_certificates`
 
 Certificate authorities every machine trusts beside the public ones (PEM files in the project, one certificate each): a TLS-inspecting proxy's, an internal registry's. Each Linux VM adds them to its trust store (`update-ca-certificates`, `update-ca-trust`) once the project is in, Isoloom's own too (the containers' Docker host before it installs Docker, the controller and the router before their packages), each Windows VM to its root store, each image Isoloom builds at build time, and each container has them at `/usr/local/share/ca-certificates/isoloom-<n>.crt`.
-
-- **Type:** list of strings
-
-## `cloud`
-
-### `cloud`
-
-An environment of cloud services rather than machines: a Terraform module applied into the user's own cloud account.
-
-- **Type:** mapping
-
-### `cloud.provider`
-
-The cloud the module deploys into (its credentials come from the environment, as Terraform expects).
-
-- **Type:** string
-- **Allowed:**
-  - `aws`: Amazon Web Services.
-  - `azure`: Microsoft Azure.
-  - `gcp`: Google Cloud.
-
-### `cloud.terraform`
-
-A Terraform root module in the project (a folder holding `.tf` files), used as is.
-
-- **Type:** string
-
-### `cloud.vars`
-
-The module's variables: any value (a string, number, boolean, list or map). A string holding `{{ inputs.NAME }}`, at any depth (`["{{ inputs.OPERATOR_IP }}/32"]`), takes the launch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list: required when a runner brings the environment up, kept for taking it down.
-
-- **Type:** mapping
-
-### `cloud.outputs`
-
-What the environment exposes, by name: a module output each. Checks and the message use them as `{{ cloud.outputs.<name> }}`.
-
-- **Type:** map of name to string
-
-### `cloud.hourly_usd`
-
-About what the environment costs per hour while it exists, in US dollars: the author's estimate, for whoever runs it. A runner can say it before applying, and the resolved snapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a budget. Isoloom doesn't bill or stop anything by it.
-
-- **Type:** number
-
-### `cloud.before`
-
-Steps run on this machine before Terraform applies the module (a key pair the module reads, a build): scripts in the project, run in order from the module's copy, with the spec's inputs and `env` in their environment. They run every time a runner brings the environment up: make them idempotent.
-
-- **Type:** list of strings
-
-### `cloud.env`
-
-Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`). Not for credentials: those come from the user's own environment.
-
-- **Type:** map of name to string
-
-### `cloud.apply_retries`
-
-How many times to apply again when an apply fails (a module that only converges on a second apply), 0 to 5. 0 by default.
-
-- **Type:** integer
-
-### `cloud.requires`
-
-What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`) that must be on the PATH, or a shell command that must succeed (`python3 -c 'import boto3'`). A runner checks them before applying.
 
 - **Type:** list of strings

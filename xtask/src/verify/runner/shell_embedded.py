@@ -53,7 +53,7 @@ def batch(ctx: Ctx, shown: Path, shell: str, by_file: dict[str, Script]) -> list
 
 def vagrantfile(ctx: Ctx, path: Path) -> list[Result]:
     """A Vagrantfile's shell provisioners."""
-    return check(ctx, path, shell_find.vagrantfile(path.read_text(encoding="utf-8")))
+    return check(ctx, path, shell_find.vagrantfile(path.read_text(encoding="utf-8"), path.parent))
 
 
 def module(ctx: Ctx, path: Path) -> list[Result]:

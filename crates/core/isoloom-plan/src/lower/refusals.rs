@@ -16,31 +16,21 @@ use crate::configure::{self, DaemonTable};
 /// The machines `target` has no form for, in machine order (`services`: the environment's catalogue
 /// services, resolved).
 pub(super) fn forms(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
-    if source.cloud.is_some() {
-        return Vec::new();
-    }
-    source
-        .machines
-        .iter()
-        .filter_map(|(name, m)| form(source, name, m, services.get(name), target))
-        .collect()
+    source.machines.iter().filter_map(|(name, m)| form(source, name, m, services, target)).collect()
 }
 
 /// Everything `target` refuses in `source`, in machine order.
 pub(super) fn of(source: &syntax::Spec, services: &Services, target: Target) -> Vec<Problem> {
-    if source.cloud.is_some() {
-        return Vec::new();
-    }
     let mut out = Vec::new();
     for (name, m) in &source.machines {
         let service = services.get(name);
-        out.extend(form(source, name, m, service, target));
+        out.extend(form(source, name, m, services, target));
         let windows = m.os.is_some_and(|os| configure::Family::from(os) == configure::Family::Windows);
-        if runs_as_vm(source, name, m, service, target) {
+        if runs_as_vm(source, name, m, services, target) {
             let host = if target.needs() == Shape::External { Host::Existing } else { Host::New };
-            out.extend(vm_steps(name, m, host));
+            out.extend(vm_steps(name, m, host, services.daemons()));
             out.extend(service_steps(name, service, Carrier::Vm(host), windows));
-        } else if let Some(carrier) = built(source, name, m, service, target) {
+        } else if let Some(carrier) = built(source, name, m, services, target) {
             out.extend(service_steps(name, service, carrier, windows));
         }
     }
@@ -80,19 +70,17 @@ fn service_steps(name: &str, service: Service<'_>, carrier: Carrier, windows: bo
     })
 }
 
-/// The form `target` needs that the machine lacks, if it lacks it.
-fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, target: Target) -> Option<Problem> {
-    let container = forms::container(m, service);
+/// The form `target` needs that the machine lacks, if it lacks it (`services`: the environment's
+/// catalogue services, resolved).
+fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, services: &Services, target: Target) -> Option<Problem> {
+    let service = services.get(name);
+    let container = forms::container(m, service, services.daemons());
     let vm = forms::vm(m, service);
     match target.needs() {
         Shape::Docker => container.err().map(|no| no.refusal(name)),
         Shape::Vm => vm.err().map(|no| no.refusal(name)),
         Shape::VmOrLxc if overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)) => container.err().map(|no| no.refusal(name)),
         Shape::VmOrLxc => vm.err().map(|no| no.refusal(name)),
-        Shape::Either => match (container, vm) {
-            (Err(_), Err(no)) => Some(no.refusal(name)),
-            _ => None,
-        },
         Shape::External => (overrides::external(source, name).is_none() && !(m.access && m.os.is_none())).then(|| {
             Problem::new(
                 Code::Refused,
@@ -103,44 +91,43 @@ fn form(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service
                 "`overrides: {{ external: {{ machines: {{ {name}: {{ ssh: {{ address: <host> }} }} }} }} }}`"
             ))
         }),
-        Shape::Cloud => None,
     }
 }
 
 /// Whether `target` runs machine `name` as a VM.
-fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, target: Target) -> bool {
+fn runs_as_vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, services: &Services, target: Target) -> bool {
+    let service = services.get(name);
     let vm = matches!(forms::vm(m, service), Ok(Vm::Os(_)));
     match target.needs() {
         Shape::Vm | Shape::External => vm,
         Shape::VmOrLxc => vm && !overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Either => vm && forms::container(m, service).is_err(),
-        Shape::Docker | Shape::Cloud => false,
+        Shape::Docker => false,
     }
 }
 
 /// How `target` builds machine `name`'s container from a recipe, when it does: from the OS's
 /// image (its steps, or its entry's recipe), or over its entry's official image.
-fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, target: Target) -> Option<Carrier> {
-    let carrier = match forms::container(m, service) {
+fn built(source: &syntax::Spec, name: &str, m: &syntax::Machine, services: &Services, target: Target) -> Option<Carrier> {
+    let carrier = match forms::container(m, services.get(name), services.daemons()) {
         Ok(Container::Steps { .. }) => Carrier::Built,
         Ok(Container::Entry { .. }) => Carrier::Image,
         _ => return None,
     };
     let container = match target.needs() {
-        Shape::Docker | Shape::Either => true,
+        Shape::Docker => true,
         Shape::VmOrLxc => overrides::lxc(source, name, super::Scope::Target(Target::Proxmox)),
-        Shape::Vm | Shape::External | Shape::Cloud => false,
+        Shape::Vm | Shape::External => false,
     };
     container.then_some(carrier)
 }
 
 /// The steps machine `name`'s VM on `host` can't run: those its family can't carry at all, then
 /// (on hosts that already exist) those the configuration renderers don't reach there.
-fn vm_steps(name: &str, m: &syntax::Machine, host: Host) -> Vec<Problem> {
+fn vm_steps(name: &str, m: &syntax::Machine, host: Host, daemons: &DaemonTable) -> Vec<Problem> {
     let Some(os) = m.os else { return Vec::new() };
     let windows = configure::Family::from(os) == configure::Family::Windows;
     let at = |i: usize| FieldPath::new("machines").key(name).key("app").key("steps").index(i);
-    let unportable = configure::recipe(os, m, &DaemonTable::common()).err().unwrap_or_default();
+    let unportable = configure::recipe(os, m, daemons).err().unwrap_or_default();
     let mut later = carry::vm_refusals(name, m, host, windows);
     let steps = m.app().map(|a| a.steps.as_slice()).unwrap_or_default();
     // In step order, each step once: what its family can't carry at all says it best.
@@ -211,20 +198,6 @@ overrides:
     }
 
     #[test]
-    fn hybrid_refuses_only_a_machine_with_neither_form_and_runs_a_vm_only_where_it_must() {
-        let l = testing::lab(
-            "version: 1\nname: t\nmachines:\n  web: { app: { image: nginx } }\n  db: { os: windows-server@2022, app: { steps: [{ packages: [x] }] } }\n  svc: { os: debian@12, service: no-such-service }\n",
-        );
-        let found: Vec<String> = on(&l, Target::Hybrid).iter().map(|p| p.path.to_string()).collect();
-        assert_eq!(found, ["machines.svc.service"], "a service with no catalogue entry is refused at its `service`");
-        assert_eq!(
-            refused_on(Target::Hybrid),
-            Vec::<String>::new(),
-            "both has a container form: no VM steps to refuse"
-        );
-    }
-
-    #[test]
     fn external_needs_a_host_for_every_machine_but_the_supplied_one() {
         let found = on(&testing::lab(LAB), Target::External);
         let paths: Vec<&str> = found.iter().map(|p| p.path.as_str()).collect();
@@ -238,12 +211,5 @@ overrides:
             "a Linux existing host's steps now run through Ansible, so only the missing hosts are refused"
         );
         assert!(found.iter().all(|p| p.code == Code::Refused));
-    }
-
-    #[test]
-    fn a_cloud_services_lab_refuses_nothing() {
-        let l = testing::lab("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n");
-        assert_eq!(on(&l, Target::CloudServices), []);
-        assert_eq!(forms(l.source(), &Services::default(), Target::Vagrant), []);
     }
 }

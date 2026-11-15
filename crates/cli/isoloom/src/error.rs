@@ -37,7 +37,7 @@ pub(crate) enum CliError {
         /// The instance's number.
         number: u8,
         /// Why it can't be made.
-        error: isoloom_spec::Error,
+        error: isoloom_spec::instance::InstanceError,
     },
     /// No target has this id.
     #[error("unknown target `{0}`")]
@@ -165,6 +165,13 @@ impl From<isoloom_import::Error> for CliError {
 impl From<isoloom_targets::Error> for CliError {
     fn from(e: isoloom_targets::Error) -> CliError {
         CliError::Targets(e)
+    }
+}
+
+impl From<isoloom_targets::GenerateError> for CliError {
+    /// A target that refuses the environment or fails, as the targets' error.
+    fn from(e: isoloom_targets::GenerateError) -> CliError {
+        CliError::Targets(e.into())
     }
 }
 

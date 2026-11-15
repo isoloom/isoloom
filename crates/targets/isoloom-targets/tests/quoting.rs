@@ -4,6 +4,14 @@
 //! properties, `isoloom-terraform`'s `hcl_builder/tests.rs`). The decoders (`quoting/literals.rs`,
 //! which the fuzz target shares) follow each language's own rules for that kind of literal.
 
+#![cfg_attr(
+    not(windows),
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+    )
+)]
+
 use isoloom_render::powershell;
 use isoloom_spec::shell::quote;
 use isoloom_vagrant::ruby_quote;

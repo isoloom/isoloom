@@ -48,7 +48,7 @@ fn iol_gets_its_files_its_interfaces_in_order_and_its_addresses() -> Outcome {
 #[test]
 fn appliances_are_docker_only_and_checked() -> Outcome {
     let spec = example("cisco-iol")?;
-    assert!(refusal(&spec, Target::Kubernetes).unwrap().contains("network appliance"));
+    assert!(refusal(&spec, Target::Kubernetes).unwrap().unwrap().contains("network appliance"));
     let base = "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n";
     // Steps would be its VM form, which an appliance hasn't.
     let steps = problems(&format!(
@@ -261,6 +261,6 @@ fn a_lans_switch_is_checked() -> Outcome {
     assert!(counted.contains("networks.office.switch: `sw` has a count"), "{counted}");
     // Docker targets only, like every appliance.
     let s = Lab::new(parse(&spec(&format!("switch: sw, {vlans}"), good))?);
-    assert!(refusal(&s, Target::Kubernetes).unwrap().contains("network appliance"));
+    assert!(refusal(&s, Target::Kubernetes).unwrap().unwrap().contains("network appliance"));
     Ok(())
 }

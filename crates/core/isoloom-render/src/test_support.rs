@@ -1,7 +1,10 @@
 //! What tests of the crates above this one build their cases from, behind the `test-support`
 //! feature (a dev-dependency's): never part of the API a backend renders with.
 
-use crate::run_manifest::guest::{GuestCommand, GuestCompose};
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests' POSIX sh, which runs the generated scripts: test code, not an adapter"
+)]
 
 /// An office LAN split into VLAN 10 (offline) and VLAN 20 (online): `admin` and `nas` are on
 /// both, `staff` on one, `ops` on both and a network of its own, `win` is a Windows VM on both.
@@ -24,23 +27,6 @@ machines:
   ops: { os: debian@12, networks: { office.vlan10: 70, office.vlan20: 70, servers: 70 } }
   win: { os: windows-server@2022, networks: { office.vlan10: 80, office.vlan20: 80 } }
 ";
-
-/// A guest with nothing in it but `status`: no machines, slots, steps or checks.
-#[must_use]
-pub fn empty_guest(status: GuestCommand) -> GuestCompose {
-    GuestCompose {
-        machines: Vec::new(),
-        networks: Vec::new(),
-        slots: Vec::new(),
-        params: Vec::new(),
-        start: Vec::new(),
-        ready: Vec::new(),
-        check_setup: Vec::new(),
-        check_teardown: Vec::new(),
-        runners: Vec::new(),
-        status,
-    }
-}
 
 /// A POSIX `sh` to run a generated script with: the system's on Unix; on Windows the one on
 /// `PATH` (Git's `bin` has one), else `None`, and the test that asked passes without running it,
@@ -72,7 +58,7 @@ networks:
   lab: { cidr: 10.9.0.0/24 }
   back: { cidr: 10.8.0.0/24 }
 groups:
-  servers: { members: [web, dc, box] }
+  servers: { members: [web, dc] }
 machines:
   web:
     networks: { back: 10, lab: 10 }
@@ -80,12 +66,9 @@ machines:
   dc:
     networks: { lab: 20 }
     os: windows-server@2022
-  box:
-    networks: { lab: 30 }
-    app: { image: alpine }
 provision:
   - ansible: site.yml
-    groups: { dcs: [dc], boxes: [box] }
+    groups: { dcs: [dc], boxes: [] }
     host_vars:
       web: { code: '10', quote: it's, n: 3, on: true, none: null, l: [x, 1], m: { k: v } }
 overrides:
@@ -116,7 +99,7 @@ pub fn example(name: &str, target: isoloom_spec::model::Target) -> Result<isoloo
     if !problems.is_empty() {
         return Err(format!("{name} isn't valid: {problems:?}"));
     }
-    isoloom_plan::Environment::build(&lab.for_target(target), target, None).map_err(|e| e.to_string())
+    lab.plan(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }
 
 /// The plan of `yaml` for `target`.
@@ -126,28 +109,5 @@ pub fn example(name: &str, target: isoloom_spec::model::Target) -> Result<isoloo
 /// Why the spec doesn't parse, or can't be planned.
 pub fn planned(yaml: &str, target: isoloom_spec::model::Target) -> Result<isoloom_plan::Environment, String> {
     let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).map_err(|e| e.to_string())?);
-    isoloom_plan::Environment::build(&lab.for_target(target), target, None).map_err(|e| e.to_string())
-}
-
-/// A sensitive input slot `name` delivered to every step as the environment variable `var`.
-///
-/// # Errors
-///
-/// A name or variable the manifest refuses.
-pub fn slot(name: &str, var: &str) -> Result<isoloom_manifest::SecretSlot, isoloom_manifest::Error> {
-    use isoloom_manifest::{Delivery, EnvName, Identifier, NonEmpty, SecretSlot, SlotKind, StepSelection};
-    Ok(SecretSlot {
-        name: Identifier::parse(name)?,
-        kind: SlotKind::Input,
-        required: false,
-        sensitive: true,
-        machines: Vec::new(),
-        providers: std::collections::BTreeSet::new(),
-        source: None,
-        default: None,
-        deliver: NonEmpty::one(Delivery::Env {
-            var: EnvName::parse(var)?,
-            steps: StepSelection::Every,
-        }),
-    })
+    lab.plan(&lab.for_target(target), target, None).map_err(|e| e.to_string())
 }

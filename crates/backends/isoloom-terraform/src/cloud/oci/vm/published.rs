@@ -3,6 +3,7 @@
 
 use crate::hcl_builder::{Block, Expression, Module, number, reference, string};
 use isoloom_plan::MachinePlan;
+use isoloom_spec::model::Protocol;
 
 use crate::cloud::instance::name_with;
 use crate::cloud::oci::owned;
@@ -12,12 +13,12 @@ use crate::module::{ident, resource};
 /// A machine's own network security group, with a rule per port it publishes, so a port opens
 /// on the machine that publishes it and no other. Returns the group's id, or `None` when the
 /// machine publishes nothing.
-pub(super) fn group(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expression> {
+pub(super) fn group(name: &str, mp: &MachinePlan, module: &mut Module) -> Option<Expression> {
     if mp.ports.is_empty() {
         return None;
     }
     let id = ident(name);
-    m.commented(
+    module.commented(
         &format!("The ports `{name}` publishes, from allowed_cidr: on its VNIC only."),
         owned(resource("oci_core_network_security_group", &id))
             .add_attribute(("vcn_id", reference("oci_core_vcn.env.id")))
@@ -25,14 +26,18 @@ pub(super) fn group(name: &str, mp: &MachinePlan, m: &mut Module) -> Option<Expr
             .build(),
     );
     for (protocol, port) in published::ports(mp) {
-        m.block(published_rule(&id, protocol.is_tcp(), port));
+        module.block(published_rule(&id, protocol, port));
     }
     Some(reference(&format!("oci_core_network_security_group.{id}.id")))
 }
 
 /// The rule opening one published port (TCP is 6, UDP 17) of group `id`.
-fn published_rule(id: &str, tcp: bool, port: u16) -> Block {
-    let (protocol, options, label) = if tcp { ("6", "tcp_options", "tcp") } else { ("17", "udp_options", "udp") };
+fn published_rule(id: &str, protocol: Protocol, port: u16) -> Block {
+    let (protocol_number, options) = match protocol {
+        Protocol::Tcp => ("6", "tcp_options"),
+        Protocol::Udp => ("17", "udp_options"),
+    };
+    let label = protocol.id();
     let range = Block::builder("destination_port_range")
         .add_attribute(("min", number(u64::from(port))))
         .add_attribute(("max", number(u64::from(port))))
@@ -41,7 +46,7 @@ fn published_rule(id: &str, tcp: bool, port: u16) -> Block {
         .add_attribute(("network_security_group_id", reference(&format!("oci_core_network_security_group.{id}.id"))))
         .add_attribute(("description", string("published")))
         .add_attribute(("direction", string("INGRESS")))
-        .add_attribute(("protocol", string(protocol)))
+        .add_attribute(("protocol", string(protocol_number)))
         .add_attribute(("source", reference("var.allowed_cidr")))
         .add_attribute(("source_type", string("CIDR_BLOCK")))
         .add_block(Block::builder(options).add_block(range).build())

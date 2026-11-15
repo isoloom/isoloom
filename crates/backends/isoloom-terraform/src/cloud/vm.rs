@@ -12,7 +12,7 @@
 //! lacks, its GPU types, nesting, MTU, volumes and images), its machines' set-up hooks, their
 //! interfaces after the first, their data disks, their own images, the networks routed through
 //! a machine, the private DNS zone's records, the `reach` rules, the Windows limits, the outputs,
-//! and a module's frame around a cloud's own part (its [`Driver`]: its first lines, its
+//! and a module's frame around a cloud's own part (its [`VmDriver`]: its first lines, its
 //! providers, its credentials).
 
 pub(crate) mod console;
@@ -22,7 +22,6 @@ pub(crate) mod gateways;
 pub(crate) mod gpus;
 pub(crate) mod hooks;
 pub(crate) mod interfaces;
-pub(crate) mod manifest;
 pub(crate) mod nested;
 pub(crate) mod outputs;
 pub(crate) mod own_image;
@@ -31,6 +30,7 @@ pub(crate) mod published;
 pub(crate) mod reach;
 pub(crate) mod rules;
 pub(crate) mod seal;
+pub(crate) mod sizes;
 pub(crate) mod windows;
 
 use std::net::Ipv4Addr;
@@ -39,12 +39,12 @@ use crate::hcl_builder::{Expression, Module};
 use isoloom_plan::{Capabilities, Environment, Feature, Vm};
 use isoloom_render::Error as RenderError;
 use isoloom_render::GeneratedFile;
-use isoloom_render::backend::{Backend, Files, Placed};
+use isoloom_render::backend::{Backend, Files};
 use isoloom_spec::model::Target;
 
 use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
 use crate::machine::{self, controller};
-use crate::module::providers::{self, Provider, TLS};
+use crate::module::providers::{self, LOCAL, Provider, TLS};
 use crate::module::variable::Variable;
 use crate::module::{self, ProjectCopy};
 use crate::{Result, checks, target};
@@ -53,7 +53,7 @@ use crate::{Result, checks, target};
 /// its folder, its first lines, the `terraform` block, the module's head (`cloud::head`), the
 /// file.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Driver {
+pub(crate) struct VmDriver {
     /// What the cloud's modules share with its `cloud-docker` module: the usage, the variables,
     /// the provider, the images' users.
     pub(crate) base: Base,
@@ -66,28 +66,26 @@ pub(crate) struct Driver {
     pub(crate) write: fn(&Environment, &mut Module) -> Result<()>,
 }
 
-/// The providers a cloud's module requires: `base` (the cloud's own), TLS for the controller's
-/// key, and `windows` for the Windows machines (their password, the project's file list).
+/// The providers a cloud's module requires: `base` (the cloud's own), `local` for the project's
+/// archive (its exclusion list, `crate::ready`), TLS for the controller's key, and `windows`
+/// for the Windows machines (their password).
 fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<Provider> {
     let mut p = base.to_vec();
+    p.push(LOCAL);
     if controller::needed(env) {
         p.push(TLS);
     }
     if machine::windows::any(env) {
-        p.extend_from_slice(windows);
+        p.extend(windows.iter().filter(|w| **w != LOCAL).copied());
     }
     p
 }
 
-/// A cloud's own variables for `env`: the driver's, then the seal's switch when a machine has
-/// anything to seal.
-pub(crate) fn own_variables(env: &Environment, driver: &Driver) -> Vec<Variable> {
+/// A cloud's own variables for `env`: the driver's, then the launch-time inputs.
+pub(crate) fn own_variables(env: &Environment, driver: &VmDriver) -> Vec<Variable> {
     let mut v = driver.base.variables(env);
-    v.extend(seal::variable(env));
-    // cloud-vm reads the launch-time inputs in its machines' user data (the plain ones); the
-    // cloud-docker host never does (its containers get them over SSH), so only cloud-vm declares
-    // the `inputs` variable.
-    v.extend(crate::module::inputs::variable_of(env));
+    // The values given at launch, each its own variable, read in the machines' user data.
+    v.extend(crate::module::inputs::variables_of(env));
     v
 }
 
@@ -110,6 +108,8 @@ pub(crate) struct Machines {
     pub(crate) windows: Option<WriteWindows>,
     /// The controller's resources and set-up.
     pub(crate) controller: fn(&Environment, &mut Module) -> Result<()>,
+    /// The kind of a Linux VM's instance (`aws_instance`): its id makes its readiness wait again.
+    pub(crate) instance: &'static str,
 }
 
 impl Machines {
@@ -118,16 +118,16 @@ impl Machines {
     /// # Errors
     ///
     /// The first machine that can't be written ([`crate::Error::Refused`]).
-    pub(crate) fn write(&self, env: &Environment, m: &mut Module) -> Result<()> {
+    pub(crate) fn write(&self, env: &Environment, module: &mut Module) -> Result<()> {
         for vm in env.vms() {
             match (vm.plan.is_windows(), self.windows) {
-                (true, Some(windows)) => windows(env, vm, m),
+                (true, Some(windows)) => windows(env, vm, module),
                 (true, None) => {}
-                (false, _) => (self.linux)(env, vm, m)?,
+                (false, _) => (self.linux)(env, vm, module)?,
             }
         }
         if controller::needed(env) {
-            (self.controller)(env, m)?;
+            (self.controller)(env, module)?;
         }
         Ok(())
     }
@@ -143,11 +143,11 @@ impl Machines {
         env: &Environment,
         user: fn(&str) -> &'static str,
         public_ip: fn(&str) -> Expression,
-        m: &mut Module,
+        module: &mut Module,
     ) -> Result<()> {
-        crate::machine::credentials(env, m);
-        self.write(env, m)?;
-        outputs::write_named(env, user, public_ip, m);
+        crate::machine::credentials(env, module);
+        self.write(env, module)?;
+        outputs::write_named(env, user, public_ip, self.instance, module);
         Ok(())
     }
 }
@@ -195,7 +195,7 @@ impl CloudVmModule {
     }
 
     /// Its cloud's own part.
-    const fn driver(self) -> Driver {
+    const fn driver(self) -> VmDriver {
         match self.0 {
             Cloud::Aws => aws::vm::DRIVER,
             Cloud::Azure => azure::vm::DRIVER,
@@ -242,14 +242,10 @@ impl CloudVmModule {
         let mut m = module::start(&(driver.base.usage)(&folder));
         let (base, windows) = driver.requires;
         m.block(providers::terraform(&required(env, base, windows)));
-        // Only Terraform's WinRM set-up of a Windows machine still uploads the project (an
-        // archive it reads from `local.root`); otherwise the runner delivers it and no local is
-        // read.
-        let copy = if machine::windows::any(env) {
-            ProjectCopy::Archive
-        } else {
-            ProjectCopy::Runner
-        };
+        // Terraform brings the project in: over SSH to each Linux machine before it waits for its
+        // set-up (`crate::ready`), over WinRM to a Windows machine it sets up itself; an archive
+        // made from `local.root` either way.
+        let copy = ProjectCopy::Archive;
         super::head(env, &mut m, own_variables(env, &driver), driver.base.provider, copy);
         (driver.write)(env, &mut m)?;
         module::file(Target::CloudVm, &folder, m, copy)
@@ -285,34 +281,9 @@ impl CloudVmBackend {
     }
 }
 
-impl CloudVmModule {
-    /// Its run manifest, `.isoloom/cloud-vm/<cloud>/run.json` (its message left to the caller).
-    ///
-    /// # Errors
-    ///
-    /// [`crate::Error::Manifest`] for a value the manifest's types refuse (a bug of this backend).
-    fn run_manifest(self, env: &Environment) -> Result<isoloom_manifest::Manifest> {
-        manifest::manifest(env, self.0, &self.driver()).map_err(|source| crate::Error::Manifest {
-            target: Target::CloudVm,
-            source,
-        })
-    }
-}
-
 impl Backend for CloudVmBackend {
     fn target(&self) -> Target {
         Target::CloudVm
-    }
-
-    /// A run manifest per cloud that takes the environment, beside its module.
-    fn run_manifests(&self, env: &Environment) -> std::result::Result<Vec<Placed>, RenderError> {
-        let mut out = Vec::new();
-        for (cloud, why) in self.refusals(env) {
-            if why.is_none() {
-                out.push(Placed::under(cloud.id(), CloudVmModule(cloud).run_manifest(env)?));
-            }
-        }
-        Ok(out)
     }
 
     fn capabilities(&self) -> Capabilities {

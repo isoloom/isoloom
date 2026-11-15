@@ -6,24 +6,33 @@ use serde::{Deserialize, Serialize};
 
 /// A folder of the computer that runs the environment, mounted in the machine both ways: what the machine
 /// writes there lands on that computer, and what is put there shows in the machine. Only the
-/// targets whose machines run on that computer mount one (`docker`, `docker-vm` on a local
-/// provider, `vagrant`); the others refuse a spec that asks for one.
+/// targets whose machines run on that computer mount one (`docker`, `vagrant`); the others refuse
+/// a spec that asks for one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HostFolder {
-    /// The folder on the computer that runs the environment: relative to the project folder (`shared`,
-    /// `../notes`), in the home folder of the user running it (`~/work`), or absolute
-    /// (`/srv/share`, `C:\share`). A project folder must exist; a home or absolute one is the
-    /// running computer's (the environment may run on another computer than the one generating it), so
-    /// it isn't checked, and it is created when missing.
+    /// The folder on the computer that runs the environment: in the project folder (`shared`),
+    /// or, when whoever runs the environment allows a folder outside it (`host-folders`, see
+    /// [`crate::host_access`]), beside it (`../notes`), in the home folder of the user running it
+    /// (`~/work`), or absolute (`/srv/share`, `C:\share`). A project folder must exist and stay in
+    /// the project once its links are followed; a home or absolute one is the running computer's
+    /// (the environment may run on another computer than the one generating it), so it isn't
+    /// checked, and it is created when missing.
     pub from: String,
     /// The absolute path in the machine (Linux machines), not inside Isoloom's own folders
     /// (`/opt/isoloom`, `/var/lib/isoloom`, `/etc/isoloom`) or the kernel's (`/proc`, `/sys`,
     /// `/dev`), nor one of its volumes, disks or tmpfs mounts.
     pub path: String,
-    /// The machine only reads it (it can't write there). Off by default.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// The machine only reads it (it can't write there). On by default: a folder the machine
+    /// writes in (`read_only: false`) is one whoever runs the environment allows
+    /// (`writable-host-folders`, see [`crate::host_access`]).
+    #[serde(default = "read_only_by_default", skip_serializing_if = "Clone::clone")]
     pub read_only: bool,
+}
+
+/// A host folder is read-only unless the spec says otherwise.
+fn read_only_by_default() -> bool {
+    true
 }
 
 /// Where a host folder is on the computer that runs the environment, as `from` writes it.
@@ -69,10 +78,10 @@ mod tests {
         for from in ["shared", "../notes", "~", "~/notes", "/srv/share", "C:\\share", "D:/data", "~other"] {
             let f: HostFolder = serde_yaml_ng::from_str(&format!("{{ from: '{from}', path: /mnt/x }}"))?;
             assert_eq!(f.host(), host(from), "{from}");
-            assert!(!f.read_only);
+            assert!(f.read_only, "read-only by default");
         }
-        let ro: HostFolder = serde_yaml_ng::from_str("{ from: x, path: /x, read_only: true }")?;
-        assert!(ro.read_only);
+        let rw: HostFolder = serde_yaml_ng::from_str("{ from: x, path: /x, read_only: false }")?;
+        assert!(!rw.read_only);
         assert!(serde_yaml_ng::from_str::<HostFolder>("{ from: x, path: /x, ro: true }").is_err());
         Ok(())
     }

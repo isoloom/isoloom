@@ -3,8 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use crate::boxes::{self, MainBox, ProviderBox, VagrantBox};
-use isoloom_manifest as manifest;
+use crate::boxes::{self, MainBox, VagrantBox};
 use isoloom_plan::checks::Position;
 use isoloom_plan::{Environment, MachinePlan, PublishedPort, Vm};
 use isoloom_render::GeneratedFile;
@@ -14,9 +13,10 @@ use super::hyperv::{HyperV, Nic};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{self, Os};
+use super::utm::Utm;
 use super::{Ctx, boot, checks, windows};
 use crate::host_folders::Share;
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Ruby, Start, Value};
 use crate::vagrantfile;
 
 /// Whether environment machine `name` is a VM with a Vagrant box: one the Vagrantfile defines.
@@ -34,10 +34,12 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     let os = Os::of(mp);
     let link = ctx.links.get(name).unwrap_or(&Link::None);
     let group = ctx.checks.of_machine(name).filter(|_| os == Os::Linux);
-    // The access machine is defined but not started by `vagrant up`: the runner hot-adds it,
-    // overriding its box with one it is given.
+    let runner = group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g));
+    // The access machine is defined but not started by `vagrant up`: `vagrant up <name>` starts
+    // it, its box overridable (`ISOLOOM_ACCESS_BOX`).
     let access = mp.is_access();
-    define(r, name, access, |r| {
+    let start = if access { Start::OnDemand } else { Start::WithUp };
+    define(r, name, start, |r| {
         boxed(r, &image, mp.arch, access);
         hostname(r, name, os);
         boot::source(r, mp.vm_image.as_ref());
@@ -50,7 +52,9 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         super::bridged::networks(r, env, mp);
         let published = published(name, mp);
         for (p, host) in &published {
-            r.call(vagrantfile::forwarded_port("m", p.port, host.clone(), p.protocol));
+            let forward = vagrantfile::forwarded_port("m", p.port, host.clone(), p.protocol);
+            // Not `fixed`: a free host port when this one is taken (another machine's, a clone's).
+            r.call(if p.fixed { forward } else { forward.kw("auto_correct", true) });
         }
         let mut guest = guest(env, planned, &image, link);
         guest.hyperv.published = relays(&published);
@@ -60,13 +64,17 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
             super::addresses::provisioner(r, &addresses);
         }
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
-        crate::host_folders::render(r, "m", &shares, crate::host_folders::LibvirtMemory::WithShares);
-        transport::provisioners(r, env, name, os);
-        if let Some(g) = group {
-            checks::provisioner(r, name, g);
-        }
+        crate::host_folders::render(r, "m", &shares);
+        // Its checks installed (and their on-demand provisioner) before the readiness check,
+        // the last provisioner.
+        transport::provisioners(r, env, name, os, |r| {
+            if let (Some(g), Some(runner)) = (group, &runner) {
+                checks::installer(r, name, &runner.contents);
+                checks::provisioner(r, name, g);
+            }
+        });
     });
-    group.map(|g| checks::runner(env, ctx.dir, name, &Position::Machine(name.to_owned()), g))
+    runner
 }
 
 /// Machine `name`'s published ports, each with its host number ([`vagrantfile::chosen_host`]),
@@ -88,11 +96,12 @@ fn relays(published: &[(&PublishedPort, Value)]) -> Vec<(u16, Value)> {
         .collect()
 }
 
-/// `config.vm.define "<name>" do |m| ... end`, after a blank line. An `on_demand` machine (the
-/// access box) is defined `autostart: false`, so `vagrant up` skips it and the runner hot-adds it.
-pub(crate) fn define(r: &mut Ruby, name: &str, on_demand: bool, body: impl FnOnce(&mut Ruby)) {
+/// `config.vm.define "<name>" do |m| ... end`, after a blank line. A machine started
+/// [`Start::OnDemand`] (the access box) is defined `autostart: false`, so `vagrant up` skips it
+/// and `vagrant up <name>` starts it.
+pub(crate) fn define(r: &mut Ruby, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) {
     r.blank();
-    r.define(name, !on_demand, body);
+    r.define(name, start, body);
 }
 
 /// The main box of a machine booting `image` on CPU `arch`: its version, and its build pinned
@@ -113,21 +122,11 @@ fn boxed(r: &mut Ruby, image: &VagrantBox, arch: Arch, access: bool) {
     let fetched = access.then(|| {
         Value::raw(format!(
             "ENV.fetch({}, {})",
-            Value::str(manifest::contract::ACCESS_BOX),
+            Value::str(isoloom_spec::contract::ACCESS_BOX),
             Value::str(&image.name)
         ))
     });
     main_box(image, arch).render(r, "m", fetched);
-}
-
-/// The boxes environment machine `name`'s VM boots, provider by provider (none when it has no
-/// Vagrant box), as [`vm`] writes them.
-pub(crate) fn boxes(env: &Environment, name: &str, providers: &[manifest::Provider]) -> Vec<(manifest::Provider, ProviderBox)> {
-    let Some(planned) = env.vm(name) else { return Vec::new() };
-    let Some(image) = boxes::vagrant(planned) else { return Vec::new() };
-    let guest = guest(env, planned, &image, &Link::None);
-    let choice = guest.choice(main_box(&image, planned.plan.arch));
-    providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
 }
 
 /// The guest's hostname, set from `name` on Linux. Windows: no hostname here — Vagrant renames
@@ -144,13 +143,13 @@ fn hostname(r: &mut Ruby, name: &str, os: Os) {
 /// the libvirt network gets the block too (the host at its `::1`, guests talking IPv6); every
 /// provider's VM gets its IPv6 address from the set-up steps.
 pub(crate) fn private_network(r: &mut Ruby, env: &Environment, net: &str, ip: Ipv4Addr) {
-    let netname = super::network_name(&env.name, net);
+    let netname = crate::vagrantfile::host_name(&env.names().network(net));
     let mut call = Call::new("m.vm.network")
         .arg(Value::str("private_network"))
         .kw("ip", Value::str(&ip.to_string()))
         .kw("netmask", Value::str(&env.block(net).netmask().to_string()))
-        .kw("virtualbox__intnet", Value::str(&netname))
-        .kw("libvirt__network_name", Value::str(&netname));
+        .kw("virtualbox__intnet", netname.clone())
+        .kw("libvirt__network_name", netname);
     // Every VM on the network carries its network boot: libvirt creates the network with the
     // options of the first VM that comes up on it.
     call = boot::network(call, isoloom_plan::boot::network_boots(&env.machines).get(net));
@@ -173,8 +172,13 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         .first()
         .filter(|_| os == Os::Windows)
         .map(|(net, ip)| (*ip, env.block(net).netmask()));
+    let utm = Utm {
+        boxed: image.utm.as_deref(),
+        nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
+        windows: os == Os::Windows,
+    };
     let hyperv = HyperV {
-        env: &env.name,
+        names: env.names(),
         boxed: image.hyperv.clone(),
         nics: mp.addresses.iter().map(|(net, ip)| Nic::on(env, net, *ip)).collect(),
         windows: os == Os::Windows,
@@ -184,8 +188,8 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
         keeps_hostname: false,
     };
     Guest {
-        label: super::label(env, name),
-        vm_name: super::vm_name(env, name),
+        label: env.names().vm_label(name),
+        vm_name: env.names().vm_name(name),
         size: Size::of(mp),
         port_groups: super::port_groups(env, mp.addresses.keys().map(String::as_str)),
         libvirt_box: image.libvirt.as_deref(),
@@ -198,6 +202,7 @@ fn guest<'a>(env: &'a Environment, Vm { name, plan: mp, os: vm_os }: Vm<'a>, ima
             windows_address,
         },
         hyperv,
+        utm,
         tpm: mp.tpm,
         esxi_guestos: isoloom_render::esxi::guest_os(vm_os),
         esxi_box: None,
@@ -220,6 +225,7 @@ mod tests {
             libvirt: None,
             qemu: None,
             hyperv: HyperVBox::Main,
+            utm: None,
         };
         let mut r = Ruby::new();
         boxed(&mut r, &image, Arch::Amd64, true);

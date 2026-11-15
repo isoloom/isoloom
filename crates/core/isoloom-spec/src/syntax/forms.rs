@@ -131,17 +131,17 @@ pub fn vm(m: &Machine) -> Result<Form<'_>, NoForm> {
             Some(Recipe::Image(_)) => Err(NoForm::new(
                 "app.image",
                 "an image's filesystem can't be reproduced on a fresh VM",
-                "add `os` and `app.steps` for a VM form, or use `docker`, `docker-vm` or `cloud-docker`",
+                "add `os` and `app.steps` (its VM form), or `app.build` with a Dockerfile Isoloom translates; or run it on a container target (`docker`)",
             )),
             Some(Recipe::Build(_)) => Err(NoForm::new(
                 "app.build",
-                "a Dockerfile builds a container only",
-                "add `os` and `app.steps`, or use `docker`, `docker-vm` or `cloud-docker`",
+                "its Dockerfile wasn't read, so it has no VM form",
+                "generate from the project folder (its Dockerfile is translated into a VM form), or add `os` and `app.steps`",
             )),
             Some(Recipe::Appliance(_)) => Err(NoForm::new(
                 "app.appliance",
                 "an appliance's packaging exists only as a container",
-                "use `docker`, `docker-vm` or `cloud-docker`",
+                "run it on a container target (`docker`)",
             )),
             None => Err(NoForm::new("app", "an app needs a recipe", "`app: { steps: [...] }` with `os`")),
         },
@@ -185,7 +185,7 @@ mod tests {
         assert_eq!((refusal.code, refusal.path.as_str()), (Code::Refused, "machines.web.app.build"));
         assert_eq!(
             refusal.fix.as_deref(),
-            Some("add `os` and `app.steps`, or use `docker`, `docker-vm` or `cloud-docker`")
+            Some("generate from the project folder (its Dockerfile is translated into a VM form), or add `os` and `app.steps`")
         );
     }
 

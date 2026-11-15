@@ -1,9 +1,5 @@
-//! What the ESXi host is told about a VM, and what Vagrant's ESXi provider and the `esxi` target
-//! say of its console: the rules they share.
-
-/// Why an ESXi VM has no graphical console in the run manifest, the one text Vagrant's ESXi
-/// provider and the `esxi` target give.
-pub const NO_CONSOLE: &str = "an ESXi VM's console goes through ESXi's own API (a WebMKS ticket), which Isoloom doesn't use";
+//! What the ESXi host is told about a VM: the rules Vagrant's ESXi provider and the `esxi` target
+//! share.
 
 /// The guest OS type ESXi gives a VM of Windows `os` (VMware's names: Windows Server 2022 is the
 /// one after 2019, 2025 the one after 2022), so it offers the right virtual hardware and tools;
@@ -26,13 +22,11 @@ pub fn guest_os(os: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::KNOWN_OS;
-
     use super::guest_os;
 
     #[test]
     fn every_windows_os_has_an_esxi_guest_os_and_any_other_keeps_its_own() {
-        for os in KNOWN_OS.iter().filter(|o| isoloom_spec::os::Kind::of(o).is_windows()) {
+        for os in isoloom_spec::os::all().filter(|o| o.kind.is_windows()).map(|o| o.name) {
             assert!(guest_os(os).is_some(), "{os}");
         }
         assert_eq!(guest_os("windows-server-2019"), Some("windows2019srv-64"));

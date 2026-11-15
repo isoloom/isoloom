@@ -1,7 +1,8 @@
 //! The user documentation stays true: docs/spec.md is what `isoloom docs --spec` prints, every
 //! spec in the docs (a YAML block whose first line is `# isoloom.yml`) validates, every
 //! configuration file the docs and the crate's own docs show is read as that file is, and every
-//! link between the docs reaches a file and, with an anchor, a heading in it.
+//! link between the docs reaches a file and, with an anchor, a heading in it. The docs are user
+//! documentation: no decision records, maintainer notes or test-host material (`DEV_MARKERS`).
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -53,9 +54,10 @@ fn shown(path: &Path) -> String {
 }
 
 #[test]
-fn docs_spec_is_up_to_date() {
-    let on_disk = std::fs::read_to_string(root().join("docs/spec.md")).unwrap_or_default();
+fn docs_spec_is_up_to_date() -> Outcome {
+    let on_disk = std::fs::read_to_string(root().join("docs/spec.md"))?;
     assert!(on_disk == markdown(), "docs/spec.md is stale; run `cargo run -q -- docs --spec > docs/spec.md`");
+    Ok(())
 }
 
 /// The fenced code blocks of a page: (info string, first line number, body).
@@ -261,4 +263,121 @@ fn the_checks_read_blocks_links_and_headings() {
     assert_eq!(anchors(page), ["t", "x-y"]);
     let b = blocks(page);
     assert_eq!((b.len(), b[0].0.as_str(), b[0].1), (1, "yaml", 5));
+}
+
+/// Words that mark the project's own process rather than user documentation, lowercase: decision
+/// records, maintainer material and test-host or workflow vocabulary. Kept short and precise so
+/// a page explaining a feature never trips one; `.github/CONTRIBUTING.md` lists them.
+const DEV_MARKERS: [&str; 18] = [
+    "decision record",
+    "status: accepted",
+    "status: proposed",
+    "status: superseded",
+    "we decided",
+    "we chose",
+    "docs/dev/",
+    "real-host",
+    "self-hosted runner",
+    "test rig",
+    "the rig",
+    "worktree",
+    "dev branch",
+    "test gate",
+    "release gate",
+    "coding agent",
+    "ai agent",
+    "subagent",
+];
+
+/// The folders under docs/ that hold no user documentation.
+const DEV_FOLDERS: [&str; 2] = ["adr", "dev"];
+
+/// Whether `text` at byte `at` starts a word (no letter or digit just before it).
+fn starts_word(text: &str, at: usize) -> bool {
+    !text.get(..at).and_then(|s| s.chars().next_back()).is_some_and(char::is_alphanumeric)
+}
+
+/// Whether `marker`, found in `text` at byte `at`, is whole words there: a word starts at it and,
+/// when it ends with a letter, a word (or its plural) ends with it.
+fn is_whole(text: &str, at: usize, marker: &str) -> bool {
+    let rest = text.get(at + marker.len()..).unwrap_or_default();
+    let rest = rest.strip_prefix('s').unwrap_or(rest);
+    let ends = !marker.ends_with(char::is_alphanumeric) || !rest.starts_with(char::is_alphanumeric);
+    starts_word(text, at) && ends
+}
+
+/// The developer artefacts a page's text holds: each marker found, a decision record's number
+/// (`ADR 0004`, `adr-0001`) and a GitHub link pinned to a commit (`/blob/<hex>/`, `/tree/<hex>/`).
+fn dev_markers(text: &str) -> Vec<String> {
+    let lower = text.to_lowercase().replace('*', "");
+    let mut found: Vec<String> = DEV_MARKERS
+        .iter()
+        .filter(|m| lower.match_indices(*m).any(|(at, _)| is_whole(&lower, at, m)))
+        .map(|m| (*m).to_owned())
+        .collect();
+    for (at, _) in lower.match_indices("adr") {
+        let rest = lower.get(at + 3..).unwrap_or_default();
+        let number = rest.strip_prefix([' ', '-']).and_then(|n| n.get(..4)).unwrap_or_default();
+        if starts_word(&lower, at) && number.len() == 4 && number.bytes().all(|b| b.is_ascii_digit()) {
+            found.push(format!("adr {number}"));
+        }
+    }
+    for kind in ["/blob/", "/tree/"] {
+        for (at, _) in lower.match_indices(kind) {
+            let rest = lower.get(at + kind.len()..).unwrap_or_default();
+            let hex = rest.bytes().take_while(u8::is_ascii_hexdigit).count();
+            let (commit, after) = rest.split_at_checked(hex).unwrap_or_default();
+            if (7..=40).contains(&hex) && after.starts_with('/') {
+                found.push(format!("a link pinned to commit {commit}"));
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn the_docs_hold_no_developer_artefacts() -> Outcome {
+    let docs = root().join("docs");
+    let mut problems = Vec::new();
+    let mut dirs = vec![docs.clone()];
+    while let Some(next) = dirs.pop() {
+        for entry in std::fs::read_dir(&next)? {
+            let path = entry?.path();
+            if path.is_dir() {
+                if path.file_name().is_some_and(|n| DEV_FOLDERS.iter().any(|d| n == *d)) {
+                    problems.push(format!("{}: a folder of maintainer material; keep it out of docs/", shown(&path)));
+                }
+                dirs.push(path);
+            }
+        }
+    }
+    for page in files_under(&docs, "md")? {
+        for marker in dev_markers(&std::fs::read_to_string(&page)?) {
+            problems.push(format!("{}: `{marker}` is the project's process, not user documentation", shown(&page)));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    Ok(())
+}
+
+#[test]
+fn the_markers_find_decision_records_and_spare_user_text() {
+    let record = "# 0004 — Seal\n\n**Status:** Accepted (2026-10).\n\nSee [ADR 0001](adr/0001-x.md) and \
+                  [the CI](https://github.com/o/r/blob/a0a628feeda71c6891e821d9fbc32c1c8de34907/docs/dev/ci.md).";
+    assert_eq!(
+        dev_markers(record),
+        [
+            "status: accepted",
+            "docs/dev/",
+            "adr 0001",
+            "a link pinned to commit a0a628feeda71c6891e821d9fbc32c1c8de34907"
+        ]
+    );
+    assert_eq!(
+        dev_markers("The real-host CI runs on a self-hosted runner, in a worktree of the dev branch."),
+        ["real-host", "self-hosted runner", "worktree", "dev branch"]
+    );
+    let user = "Install the guest agent (`qemu-guest-agent`). Clone with `--branch v3.0.0`, see \
+                [the release](https://github.com/o/r/blob/v3.0.0/README.md) and a cheaper (ADRs aside) padr 0001, the right worktreeish gate.";
+    assert_eq!(dev_markers(user), Vec::<String>::new());
 }

@@ -2,7 +2,7 @@
 //! releases, each image is for an OS a release runs on, each setting's fields fit its type,
 //! each port's setting is a port, its files are its own, and the lock pins no release it lacks.
 
-use crate::catalogue::Entry;
+use crate::catalogue::{CONTRACT_YML, ENTRY_YML, Entry, LOCK_YML};
 use crate::entry::{PortNumber, Setting, SettingType, Source};
 use crate::error::Finding;
 
@@ -10,7 +10,7 @@ use crate::error::Finding;
 const SPDX: &str = "SPDX-License-Identifier: Apache-2.0";
 
 /// The files every entry has beside `files/`.
-const OWN: [&str; 3] = ["entry.yml", "lock.yml", "contract.yml"];
+const OWN: [&str; 3] = [ENTRY_YML, LOCK_YML, CONTRACT_YML];
 
 /// Every rule `entry`'s definition breaks.
 pub(super) fn check(entry: &Entry) -> Vec<Finding> {

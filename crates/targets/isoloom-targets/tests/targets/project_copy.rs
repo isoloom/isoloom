@@ -17,27 +17,12 @@ use crate::testing::{Outcome, example, generated as file};
 #[test]
 fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
     let vagrant = file(&example("hello-stack")?, Target::Vagrant, "vagrant/Vagrantfile")?;
-    let docker_vm = file(&example("hello-stack")?, Target::DockerVm, "docker-vm/Vagrantfile")?;
-    let hybrid = file(&example("mixed-office")?, Target::Hybrid, "hybrid/Vagrantfile")?;
-    for (name, v) in [("vagrant", &vagrant), ("docker-vm", &docker_vm), ("hybrid", &hybrid)] {
-        assert!(!v.contains("Dir.children(ROOT)"), "{name}: the project is listed when the Vagrantfile loads");
-        assert!(!v.contains("provision \"file\""), "{name}: a file provisioner copies the project");
-        assert!(v.contains("provisioner(:isoloom_project)"), "{name}: no project provisioner");
-    }
+    assert!(!vagrant.contains("Dir.children(ROOT)"), "the project is listed when the Vagrantfile loads");
+    assert!(!vagrant.contains("provision \"file\""), "a file provisioner copies the project");
+    assert!(vagrant.contains("provisioner(:isoloom_project)"), "no project provisioner");
     // One step per VM with provisioning (web, cache) and the controller isn't there: hello-stack
     // has no environment-level playbooks. Isoloom's outputs stay out.
     assert!(vagrant.contains("    m.vm.provision \"isoloom_project\", name: \"project\"\n"), "{vagrant}");
-    // docker-vm runs the generated Compose file: the `docker` target's outputs go in, no other's.
-    assert!(
-        docker_vm
-            .contains("  config.vm.provision \"project\", type: \"isoloom_project\", rules: \"/.isoloom*\n!/.isoloom/docker\n!/.isoloom/configure\n.git/\n"),
-        "{docker_vm}"
-    );
-    // hybrid's Docker host gets its Compose file, and nothing else of the outputs.
-    assert!(
-        hybrid.contains("m.vm.provision \"project\", type: \"isoloom_project\", rules: \"/.isoloom*\n!/.isoloom/hybrid/compose.yml\n.git/\n"),
-        "{hybrid}"
-    );
     // Every other step: the rules of a machine reading none of the outputs.
     assert!(vagrant.contains("IsoloomProject::COPY_RULES = \"/.isoloom*\n.git/\n"), "{vagrant}");
     Ok(())
@@ -61,7 +46,7 @@ fn archive(dir: &Path, root: &Path, outputs: &[&str], out: &str) -> Outcome<Stri
     let script = format!(
         "{FILTER_MAP_FOR_OLD_RUBY}eval(File.read(ARGV[0], encoding: \"UTF-8\").split(\"\\nVagrant.configure\").first.sub(/^ROOT = .*$/, \"\").sub(/^QEMU_HUBS = .*$/, \"\")); File.open(ARGV[2], \"wb\") {{ |f| IsoloomProject.write(ARGV[1], f, rules: ARGV[3]) }}"
     );
-    let rules = isoloom_manifest::ignore::copy_rules(outputs);
+    let rules = isoloom_spec::ignore::copy_rules(outputs);
     let st = Command::new("ruby")
         .arg("-e")
         .arg(script)
@@ -151,7 +136,7 @@ fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
     for gone in [".git/", "HEAD", "private_key", ".isoloom/vagrant/", ".isoloom/docker/", "tfstate"] {
         assert!(!list.contains(gone), "{gone} went in: {list}");
     }
-    // docker-vm's: the `docker` target's folder and the configuration files, all they hold.
+    // A Docker host's: the `docker` target's folder and the configuration files, all they hold.
     let compose = run(&[".isoloom/docker", ".isoloom/configure"], "compose.tgz")?;
     assert!(has(&compose, ".isoloom/docker/checks/web.sh"), "{compose}");
     assert!(has(&compose, ".isoloom/configure/lib/configure.sh"), "{compose}");
@@ -233,8 +218,8 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
     let proxmox = file(&spec, Target::Proxmox, "proxmox/main.tf")?;
     assert!(proxmox.contains("project_files = [for f in local.project_paths : {"), "{proxmox}");
     assert!(proxmox.contains("file(\"${local.root}/.isoloomignore\")"), "{proxmox}");
-    // The cloud modules never read the project: the runner archives it (by the same rules) and
-    // delivers it over SSH.
+    // The cloud modules archive the project by the same rules (`tar`'s exclusion list) and bring
+    // it in over SSH before they wait for the set-up.
     for (target, path) in [
         (Target::CloudVm, "cloud-vm/aws/main.tf"),
         (Target::CloudVm, "cloud-vm/gcp/main.tf"),
@@ -242,12 +227,11 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
         (Target::CloudDocker, "cloud-docker/azure/main.tf"),
     ] {
         let tf = file(&spec, target, path)?;
-        assert!(!tf.contains("isoloomignore") && !tf.contains("local_file"), "{path}");
+        assert!(
+            tf.contains("file(\"${local.root}/.isoloomignore\")") && tf.contains("local_file\" \"isoloom_project\""),
+            "{path}"
+        );
     }
-    // The Docker host on a Proxmox server also takes the project from the runner, over SSH
-    // (the docker-vm run manifest's `terraform.copy_module`), never a Terraform `local_file`.
-    let pve_docker = file(&spec, Target::DockerVm, "docker-vm/proxmox/main.tf")?;
-    assert!(!pve_docker.contains("local_file") && !pve_docker.contains("isoloomignore"), "{pve_docker}");
     Ok(())
 }
 

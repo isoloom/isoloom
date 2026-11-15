@@ -4,6 +4,23 @@
 //! problem coded and placed ([`Problem`]). The plan lowers it into [`crate::model`], the form
 //! the backends read, once per target.
 
+/// A type whose JSON schema is the one of the input shape it is parsed from (`$written`), under
+/// its own name.
+macro_rules! schema_as {
+    ($ty:ident, $written:ident) => {
+        impl schemars::JsonSchema for $ty {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($ty).into()
+            }
+
+            fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                <$written as schemars::JsonSchema>::json_schema(g)
+            }
+        }
+    };
+}
+pub(crate) use schema_as;
+
 mod app;
 mod check;
 mod files;
@@ -43,7 +60,7 @@ pub use overrides::{
 };
 pub use parse::parse;
 pub use ports::{Port, PortProtocol, Publish};
-pub use problem::{Code, FieldPath, Problem, Problems, Span, closest};
+pub use problem::{Code, FieldPath, Problem, Problems, Span, closest, one_line};
 pub use process::{Command, EnvValue, HealthPage, HealthProbe, Healthcheck, PortRef};
 pub use shared::{Group, Shared};
 pub use spans::Spans;
@@ -57,7 +74,7 @@ pub use warning::Warning;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 
-use crate::model::{Check, CloudServices, Constraints, Controller, EnvironmentDns, Network, Provision, Reach, SecretSource, SharedVolume, Target, Tool};
+use crate::model::{Check, Constraints, Controller, EnvironmentDns, Network, Provision, Reach, SecretSource, SharedVolume, Target, Tool};
 
 /// An environment spec, as written. Field order is kept (machines start in the order written).
 #[derive(Debug, Clone, PartialEq, Default, JsonSchema)]
@@ -138,9 +155,6 @@ pub struct Spec {
     /// What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time
     /// servers.
     pub constraints: Option<Constraints>,
-    /// An environment of cloud services rather than machines: a Terraform module applied into
-    /// the user's own cloud account.
-    pub cloud: Option<CloudServices>,
     /// Base machine name → its clones, for machines that had a `count`. Filled when parsing.
     #[schemars(skip)]
     pub clones: IndexMap<String, Vec<String>>,

@@ -56,15 +56,16 @@ pub(super) enum Vm {
     Os(OsRef),
 }
 
-/// The machine's container form, or why it has none (`service`: its catalogue services).
-pub(super) fn container<'a>(m: &'a syntax::Machine, service: Service<'a>) -> Result<Container<'a>, NoForm> {
+/// The machine's container form, or why it has none (`service`: its catalogue services;
+/// `daemons`: the foreground forms its services can run in).
+pub(super) fn container<'a>(m: &'a syntax::Machine, service: Service<'a>, daemons: &DaemonTable) -> Result<Container<'a>, NoForm> {
     match syntax::container_form(m)? {
         Form::Supplied => Ok(Container::Supplied),
         Form::Recipe(recipe) => Ok(Container::Recipe(recipe)),
-        Form::Service => service_container(m, resolved(service)?),
+        Form::Service => service_container(m, resolved(service)?, daemons),
         Form::Steps => {
             let (os, base) = official_image(m)?;
-            process(os, m)?;
+            process(os, m, daemons)?;
             Ok(Container::Steps { os, base })
         }
         Form::Os => official_image(m).map(|(_, image)| Container::Os { image }),
@@ -83,7 +84,7 @@ pub(super) fn vm(m: &syntax::Machine, service: Service<'_>) -> Result<Vm, NoForm
 /// The OS and its official image, for the container forms built from the OS.
 fn official_image(m: &syntax::Machine) -> Result<(OsRef, &'static str), NoForm> {
     let os = m.os.ok_or_else(|| no_os("the container is built from the OS's image"))?;
-    let image = isoloom_spec::os::container_image(os.name()).ok_or_else(|| NoForm {
+    let image = os.os().container_image().ok_or_else(|| NoForm {
         field: "os".to_owned(),
         reason: format!("`{}` has no official container image", os.os().id()),
         fix: "run it on a VM target, or give the app its own `app.image` or `app.build`".to_owned(),
@@ -94,10 +95,10 @@ fn official_image(m: &syntax::Machine) -> Result<(OsRef, &'static str), NoForm> 
 /// What the container built from the machine's steps runs (the configuration model's rule):
 /// refused when a service has no foreground form, or when it has ports and nothing
 /// serves them.
-fn process(os: OsRef, m: &syntax::Machine) -> Result<(), NoForm> {
+fn process(os: OsRef, m: &syntax::Machine, daemons: &DaemonTable) -> Result<(), NoForm> {
     // A step no form of the OS carries is the VM's refusal to report; a container of a Windows
     // OS doesn't exist.
-    let Ok(recipe) = configure::recipe(os, m, &DaemonTable::common()) else {
+    let Ok(recipe) = configure::recipe(os, m, daemons) else {
         return Ok(());
     };
     match ContainerProcess::of(&recipe, m) {
@@ -151,7 +152,7 @@ fn resolved(service: Service<'_>) -> Result<&[Resolved], NoForm> {
 /// A service machine's container: the entry's official image where the release publishes one
 /// for the machine's OS (and its architecture), else built from the OS's image with the entry's
 /// recipe; never one whose `start` restarts it, nor one whose services have no foreground form.
-fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Result<Container<'a>, NoForm> {
+fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved], daemons: &DaemonTable) -> Result<Container<'a>, NoForm> {
     // The spec refuses several services on a container before this.
     let Some(r) = resolved.first() else {
         return Err(no_os("a catalogue service runs on an OS"));
@@ -167,8 +168,8 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Resul
         if !image.platforms.contains(&m.hardware.arch) {
             return Err(NoForm {
                 field: "hardware.arch".to_owned(),
-                reason: format!("{} {} publishes no `{}` image", r.entry, r.release, arch(m.hardware.arch)),
-                fix: format!("another release, or `{}`", arch(isoloom_spec::model::Arch::Amd64)),
+                reason: format!("{} {} publishes no `{}` image", r.entry, r.release, m.hardware.arch.id()),
+                fix: format!("another release, or `{}`", isoloom_spec::model::Arch::Amd64.id()),
             });
         }
         let start = if image.start == ImageStart::Run { r.start.as_slice() } else { &[] };
@@ -177,7 +178,7 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Resul
     let (os, base) = official_image(m)?;
     let config = super::service::configuration(resolved).ok_or_else(|| no_os("a catalogue service runs on an OS"))?;
     let ports: Vec<isoloom_spec::model::Port> = Vec::new();
-    let process = Resolution::of(&config, &ports, &DaemonTable::common())
+    let process = Resolution::of(&config, &ports, daemons)
         .ok()
         .map(|recipe| ContainerProcess::resolve(&recipe, None, false));
     if let Some(Err(NoProcess::NoForeground { unit })) = process {
@@ -188,14 +189,6 @@ fn service_container<'a>(m: &syntax::Machine, resolved: &'a [Resolved]) -> Resul
         });
     }
     Ok(Container::Steps { os, base })
-}
-
-/// How a spec writes an architecture.
-fn arch(a: isoloom_spec::model::Arch) -> &'static str {
-    match a {
-        isoloom_spec::model::Arch::Amd64 => "amd64",
-        isoloom_spec::model::Arch::Arm64 => "arm64",
-    }
 }
 
 #[cfg(test)]
@@ -214,11 +207,11 @@ mod tests {
     #[test]
     fn an_os_runs_as_its_official_image_or_a_fresh_vm() {
         let os = machine("{ os: debian@12 }");
-        assert!(matches!(container(&os, None), Ok(Container::Os { image }) if image.starts_with("debian:12@sha256:")));
+        assert!(matches!(container(&os, None, &testing::daemons()), Ok(Container::Os { image }) if image.starts_with("debian:12@sha256:")));
         assert!(matches!(vm(&os, None), Ok(Vm::Os(o)) if o.name() == "debian-12"));
         let steps = machine("{ os: alpine, app: { steps: [{ run: a.sh }] } }");
         assert!(
-            matches!(container(&steps, None), Ok(Container::Steps { os: alpine, base }) if alpine.name().starts_with("alpine") && base.starts_with("alpine:"))
+            matches!(container(&steps, None, &testing::daemons()), Ok(Container::Steps { os: alpine, base }) if alpine.name().starts_with("alpine") && base.starts_with("alpine:"))
         );
         assert!(matches!(vm(&steps, None), Ok(Vm::Os(_))));
     }
@@ -226,13 +219,16 @@ mod tests {
     #[test]
     fn an_access_machine_without_an_os_is_supplied_in_both_forms() {
         let access = machine("{ access: true }");
-        assert_eq!((container(&access, None), vm(&access, None)), (Ok(Container::Supplied), Ok(Vm::Supplied)));
+        assert_eq!(
+            (container(&access, None, &testing::daemons()), vm(&access, None)),
+            (Ok(Container::Supplied), Ok(Vm::Supplied))
+        );
     }
 
     #[test]
     fn a_recipe_is_the_containers_own() {
         let built = machine("{ app: { build: build/web } }");
-        assert!(matches!(container(&built, None), Ok(Container::Recipe(Recipe::Build(_)))));
+        assert!(matches!(container(&built, None, &testing::daemons()), Ok(Container::Recipe(Recipe::Build(_)))));
         assert_eq!(vm(&built, None).map_err(|no| no.field), Err("app.build".to_owned()));
     }
 
@@ -244,7 +240,10 @@ mod tests {
             syntax::FieldPath::new("machines.m.service"),
             "the catalogue has no entry `postgres`",
         )]));
-        for no in [container(&db, service.as_ref()).map(|_| ()), vm(&db, service.as_ref()).map(|_| ())] {
+        for no in [
+            container(&db, service.as_ref(), &testing::daemons()).map(|_| ()),
+            vm(&db, service.as_ref()).map(|_| ()),
+        ] {
             let no = no.expect_err("no form");
             assert_eq!((no.field.as_str(), no.path("m").as_str()), ("service", "machines.m.service"));
             assert_eq!(no.reason, "the catalogue has no entry `postgres`");
@@ -254,7 +253,7 @@ mod tests {
     #[test]
     fn windows_has_no_container_form() {
         let dc = machine("{ os: windows-server@2022 }");
-        assert_eq!(container(&dc, None).map_err(|no| no.field), Err("os".to_owned()));
+        assert_eq!(container(&dc, None, &testing::daemons()).map_err(|no| no.field), Err("os".to_owned()));
         assert!(matches!(vm(&dc, None), Ok(Vm::Os(_))));
     }
 }

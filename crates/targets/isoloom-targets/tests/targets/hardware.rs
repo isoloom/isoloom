@@ -4,20 +4,20 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Error, GenerateError, Lab, generate};
 
-use crate::testing::{Outcome, generated as file, lab};
+use crate::testing::{Outcome, allowed, generated as file, lab};
 
 /// One machine with `hardware` set, as a container (an image) and as a VM (its OS and a step).
 fn spec(hardware: &str) -> Outcome<Lab> {
-    lab(&format!(
+    Ok(allowed(lab(&format!(
         "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lab: 10 }}, app: {{ image: nginx, steps: [{{ run: a.sh }}] }}, hardware: {{ {hardware} }} }}\n"
-    ))
+    ))?))
 }
 
 /// One machine with `hardware` set, its OS and a step (a VM on the VM targets).
 fn vm(hardware: &str) -> Outcome<Lab> {
-    lab(&format!(
+    Ok(allowed(lab(&format!(
         "version: 1\nname: hw\nnetworks: {{ lab: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  a: {{ os: debian@12, networks: {{ lab: 10 }}, app: {{ steps: [{{ run: a.sh }}] }}, hardware: {{ {hardware} }} }}\n"
-    ))
+    ))?))
 }
 
 /// Why `target` refuses the environment.
@@ -40,12 +40,7 @@ fn a_container_gets_the_hosts_gpus_and_devices_on_docker_only() -> Outcome {
         compose.contains("          - capabilities:\n            - gpu\n            - compute\n            driver: nvidia\n            count: 2\n"),
         "{compose}"
     );
-    for target in [Target::DockerVm, Target::CloudDocker] {
-        assert!(
-            refusal(&s, target)?.contains("asks for GPUs (`gpus`): its container runs on a VM Isoloom creates"),
-            "{target:?}"
-        );
-    }
+    assert!(refusal(&s, Target::CloudDocker)?.contains("asks for GPUs (`gpus`): its container runs on a VM Isoloom creates"));
     let devices_only = spec("devices: [/dev/fuse]")?;
     assert!(refusal(&devices_only, Target::Kubernetes)?.contains("is given host devices (`devices`)"));
     Ok(())
@@ -75,7 +70,7 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
         "\"--nested-hw-virt\", \"on\"",
         "v.vmx[\"vhv.enable\"] = \"TRUE\"",
         "v.nested = true",
-        "if machine.provider_name == :qemu",
+        "if %i[qemu utm].include?(machine.provider_name)",
     ] {
         assert!(v.contains(switch), "{switch}");
     }

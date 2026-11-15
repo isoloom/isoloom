@@ -1,20 +1,20 @@
 # Architecture
 
 Isoloom is a converter: it reads one `isoloom.yml` and writes the native files of every
-infrastructure and configuration tool, plus a run manifest. It runs nothing. This document is the
+infrastructure and configuration tool, and nothing else. It runs nothing. This document is the
 map of how the pieces fit; the per-crate docs (`cargo doc`) are the detail.
 
 ## Terms
 
 - **Environment**: what a spec describes and a target runs, its machines, networks and checks.
-  Every user-facing text (the docs, messages, a run manifest's notes) says environment.
+  Every user-facing text (the docs, messages, the generated files' comments) says environment.
   `isoloom_plan::Environment` is one target's plan of it.
 - **Lab** (`isoloom_targets::Lab`): an `isoloom.yml` project ready to generate, its authored spec
   with what it reads besides (the catalogue, the image table, the clouds' regions, the template
   files). Each target's `Environment` is planned from it. The type keeps its name: `Environment`
   already names the plan, and the runners embedding Isoloom build on `Lab`.
 - **Target**: a way to run the environment (`docker`, `vagrant`, `cloud-vm`…), each with its
-  generated files under `.isoloom/<target>/` and a run manifest (`run.json`).
+  generated files under `.isoloom/<target>/`.
 
 ## The pipeline
 
@@ -23,7 +23,7 @@ isoloom.yml ─► isoloom-spec ─► isoloom-plan ─► backends ─► nativ
  (one form)     (parse, the     (lower os +     (compose,    (Compose, K8s, Helm,
                  model,          service/app     kubernetes,   Kustomize, Vagrant,
                  validate,       through the     vagrant,      Terraform, cloud-init,
-                 the schema)     catalogue, the   terraform,    Ansible) + run.json
+                 the schema)     catalogue, the   terraform,    Ansible)
                                  environment)     ansible)
 ```
 
@@ -35,15 +35,15 @@ Supporting the backbone:
   (PowerShell, Dockerfile, the Ansible inventory), plus the configuration renderers and the shared
   container pieces. A builder only one backend uses is that backend's: the HCL builder is
   `isoloom-terraform`'s, the Ruby one (string quoting included) `isoloom-vagrant`'s.
-- **`isoloom-manifest`** — the run manifest types, its generated JSON schema and the fixtures
-  runners can test against, and the contract's names outside `run.json` (`contract`: the output
-  folder, the Vagrantfile's variables, the cloud tags, the machines' marks). It depends on no
-  other crate of the workspace; the spec builds on it for those names.
 - **`isoloom-import`** — the reverse direction: a spec drafted from Compose, Vagrant or Terraform
   files.
 - **`isoloom-targets`** — every backend behind one call, the composite targets, refusals, the
-  resolved snapshot, the capability matrix and the tiers.
+  resolved snapshot, the capability matrix and each target's validators.
 - **`isoloom`** — the command line.
+- **`isoloom-topology`** — a front-end: a network drawn in a topology editor (machines, LANs,
+  cables) compiled into a spec and the project files it refers to.
+- **`isoloom-wasm`** — that compiler and the targets in WebAssembly, for an editor in the
+  browser: the spec, every target's files and the zips to download (`cargo xtask wasm`).
 
 ## Lowering, not rewriting
 
@@ -76,9 +76,10 @@ render-twice test.
 
 ## One-way dependencies
 
-The crates sit in groups under `crates/` — `core/`, `backends/`, `tools/`, `targets/`, `cli/` —
-and depend only downward: spec → plan → render → backends → targets → cli. No backend depends on
-another backend; the targets made of two backends (`cloud-docker`, `docker-vm`, `hybrid`) are
+The crates sit in groups under `crates/` — `core/`, `backends/`, `tools/`, `targets/`, `cli/`,
+`frontends/` — and depend only downward: spec → plan → render → backends → targets → cli and the
+front-ends. No backend depends on
+another backend; the target made of two backends (`cloud-docker`) is
 composed in `isoloom-targets`. A test over `cargo metadata` fails on any upward or cross-backend
 edge.
 
@@ -94,16 +95,16 @@ path; an operation that fails its own way has an enum of its own beside it (`iso
 ## Honest proof
 
 Every generated file passes its format's official validator (`cargo xtask verify`, a pinned
-container image). Each target sits in a [tier](docs/matrix.md) worked out from recorded real runs,
-never written by hand. The capability matrix (`isoloom matrix`) is generated from the generators
+container image), and the Terraform modules' logic passes `terraform test` with every provider
+mocked (`cargo xtask tf-test`); each target is presented by what it writes and those validators
+([the matrix](docs/matrix.md)). The capability matrix (`isoloom matrix`) is generated from the generators
 themselves, so it can never claim more than they do.
 
 ## Converting, not running
 
-Isoloom converts; it runs nothing. A runner executes the run manifest, and an app may embed a
-runner behind its own interface. The run manifest is the contract between Isoloom and any runner.
-See the [run manifest reference](docs/reference/run-manifest.md).
-
-## Decisions
-
-Architecture decision records live in [`docs/explanation/adr/`](docs/explanation/adr/README.md).
+Isoloom converts; it runs nothing. A runner executes the native files as they are (Isothrum), and
+an app may embed a runner behind its own interface. What a runner shares with the generated files
+besides them lives in `isoloom-spec`: the contract's names (`isoloom_spec::contract`: the output
+folder, the Vagrantfile's variables, the cloud tags, the machines' marks), the project copy's
+rules (`isoloom_spec::ignore`), the project-relative path (`isoloom_spec::path::RelPath`) and the
+ready and check lines' grammars (`isoloom_spec::ready_line`, `isoloom_spec::check_line`).

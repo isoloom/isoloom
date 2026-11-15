@@ -6,13 +6,13 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Protocol;
 
 use super::{Way, rule, ssh_key, vm, vpc};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::{self, tag_list};
-use crate::docker_host::published;
+use crate::docker_host::container_ports;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::DIGITALOCEAN,
     size: Some(SizeVariable {
@@ -20,15 +20,16 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::Table(super::vm::DROPLETS),
     }),
     resources,
+    instance: "digitalocean_droplet",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the droplet; the Docker
 /// host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(vpc(crate::cloud::docker::HOST_SUBNET));
-    m.block(ssh_key());
-    m.block(droplet(env, user_data));
-    m.block(firewall(env));
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(vpc(crate::cloud::docker::HOST_SUBNET));
+    module.block(ssh_key());
+    module.block(droplet(env, user_data));
+    module.block(firewall(env));
     reference("digitalocean_droplet.env.ipv4_address")
 }
 
@@ -37,7 +38,7 @@ fn resource(kind: &str) -> BlockBuilder {
     crate::module::resource(kind, "env").add_attribute(("name", reference("local.name")))
 }
 
-/// The Docker host's OS from DigitalOcean's image table, with the runner's key, its expiry in its user data, run once ([`instance::set_up_once`]).
+/// The Docker host's OS from DigitalOcean's image table, with the operator's key, its set-up in its user data, run once ([`instance::set_up_once`]).
 fn droplet(env: &Environment, user_data: Expression) -> Block {
     resource("digitalocean_droplet")
         .add_attribute(("region", reference("var.region")))
@@ -59,10 +60,10 @@ fn firewall(env: &Environment) -> Block {
     let mut b = resource("digitalocean_firewall")
         .add_attribute(("droplet_ids", list([reference("digitalocean_droplet.env.id")])))
         .add_block(rule(Way::In, "tcp", Some("22"), allowed()));
-    for (protocol, p) in published(env, Protocol::Tcp)
+    for (protocol, p) in container_ports(env, Protocol::Tcp)
         .into_iter()
         .map(|p| ("tcp", p))
-        .chain(published(env, Protocol::Udp).into_iter().map(|p| ("udp", p)))
+        .chain(container_ports(env, Protocol::Udp).into_iter().map(|p| ("udp", p)))
     {
         b = b.add_block(rule(Way::In, protocol, Some(&p.to_string()), allowed()));
     }

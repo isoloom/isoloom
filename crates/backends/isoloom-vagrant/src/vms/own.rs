@@ -2,12 +2,8 @@
 //! controller that runs the environment's playbooks and the checks standing on every network.
 //! Their set-up goes through the same step renderings and transport as the environment's machines.
 
-use isoloom_manifest::contract::HALTING;
-use isoloom_spec::linux::CONFIG_DIR;
 use std::net::Ipv4Addr;
 
-use crate::boxes::{HyperVBox, MainBox, ProviderBox};
-use isoloom_manifest::Provider;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::Position;
 use isoloom_plan::lifecycle::Step;
@@ -16,6 +12,8 @@ use isoloom_render::boot::{self, Trigger};
 use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY};
 use isoloom_render::router;
 use isoloom_render::{GeneratedFile, controller};
+use isoloom_spec::contract::HALTING;
+use isoloom_spec::linux::CONFIG_DIR;
 use isoloom_spec::model::Spec;
 use isoloom_spec::net::NetworkBlock;
 
@@ -24,8 +22,10 @@ use super::machine::{define, private_network};
 use super::providers::{self, Guest, Qemu, Size};
 use super::qemu::Link;
 use super::transport::{Os, shell, step_provisioners};
-use super::{CONTROLLER, Ctx, Kind, TOOL_SHELL, checks};
-use crate::ruby::{Ruby, Value};
+use super::utm::Utm;
+use super::{CONTROLLER, Ctx, TOOL_SHELL, checks};
+use crate::boxes::{HyperVBox, MainBox};
+use crate::ruby::{Ruby, Start, Value};
 
 /// The Debian box of Isoloom's own VMs; libvirt can't run it, and uses [`HELPER_LIBVIRT_BOX`].
 const HELPER_BOX: &str = crate::boxes::DEBIAN_12;
@@ -47,8 +47,8 @@ const HELPER_LIBVIRT_BOX: &str = "generic/debian12";
 
 /// The provisioners of planned steps on one of Isoloom's own (Linux) VMs.
 fn steps_of(r: &mut Ruby, env: &Environment, vm: &str, steps: &[Step]) {
-    for s in steps {
-        step_provisioners(r, env, vm, s, Os::Linux);
+    for (at, s) in steps.iter().enumerate() {
+        step_provisioners(r, env, vm, (at, s), Os::Linux);
     }
 }
 
@@ -73,14 +73,15 @@ fn every_machine(env: &Environment) -> Step {
 /// of `at`, at its address there.
 fn helper<'a>(env: &'a Environment, define: &str, size: Size, at: Vec<(&'a str, Ipv4Addr)>, link: &'a Link) -> Guest<'a> {
     Guest {
-        label: super::label(env, define),
-        vm_name: super::vm_name(env, define),
+        label: env.names().vm_label(define),
+        vm_name: env.names().vm_name(define),
         size,
         port_groups: super::port_groups(env, at.iter().map(|(net, _)| *net)),
         libvirt_box: Some(HELPER_LIBVIRT_BOX),
         boot: None,
         qemu: Qemu::helper(link),
-        hyperv: HyperV::helper(env, at),
+        hyperv: HyperV::helper(env, at.iter().copied()),
+        utm: Utm::helper(env, at),
         tpm: None,
         esxi_guestos: None,
         esxi_box: None,
@@ -124,11 +125,11 @@ pub(crate) fn router_vm(r: &mut Ruby, ctx: &Ctx) {
     let v6 = isoloom_render::ipv6::router_linux(&pairs)
         .map(|s| boot::at_boot("ipv6", "IPv6 addresses of the isoloom router", &s, Trigger::BootAndLinkUp, &[]))
         .unwrap_or_default();
+    let rules = isoloom_spec::shell::heredoc("cat > /etc/nftables.conf", "NFT", &format!("flush ruleset\n{}", router::nftables(spec)));
     let script = format!(
-        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\ncat > /etc/nftables.conf <<'NFT'\nflush ruleset\n{}NFT\nsystemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
-        router::nftables(spec),
+        "set -e\nexport DEBIAN_FRONTEND=noninteractive\napt-get update -qq\napt-get install -y -qq nftables >/dev/null\necho 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p /etc/sysctl.d/90-isoloom.conf\n{rules}systemctl enable nftables\nnft -f /etc/nftables.conf\n{v6}{tc}",
     );
-    define(r, router::NAME, false, |r| {
+    define(r, router::NAME, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(router::NAME));
         for (net, ip) in routed {
@@ -158,7 +159,7 @@ pub(crate) fn tools(r: &mut Ruby, ctx: &Ctx) {
 fn tool_shell(r: &mut Ruby, ctx: &Ctx, tool: &ToolPlan) {
     let env = ctx.env;
     let link = ctx.links.get(TOOL_SHELL).unwrap_or(&Link::None);
-    r.define(TOOL_SHELL, true, |r| {
+    r.define(TOOL_SHELL, Start::WithUp, |r| {
         MainBox::plain(HELPER_BOX).render(r, "m", None);
         r.assign("m.vm.hostname", Value::str("shell"));
         for (net, ip) in &tool.addresses {
@@ -201,17 +202,6 @@ fn controller_guest<'a>(env: &'a Environment, link: &'a Link) -> (Guest<'a>, Mai
     (guest, main)
 }
 
-/// The boxes Isoloom's own VM `kind` boots, provider by provider, as this file writes them.
-pub(crate) fn boxes(env: &Environment, kind: Kind, providers: &[Provider]) -> Vec<(Provider, ProviderBox)> {
-    let (guest, main) = match kind {
-        Kind::Controller => controller_guest(env, &Link::None),
-        Kind::Router | Kind::ToolShell => (helper(env, router::NAME, Size::HELPER, Vec::new(), &Link::None), MainBox::plain(HELPER_BOX)),
-        Kind::Machine => return Vec::new(),
-    };
-    let choice = guest.choice(main);
-    providers.iter().flat_map(|&p| choice.on(p).into_iter().map(move |b| (p, b))).collect()
-}
-
 /// The controller: a small VM (Alpine by default) on every network at its controller address,
 /// started after every machine. It writes the inventory, runs the environment's playbooks, then
 /// halts unless the spec keeps it running; it runs the checks standing on every network on
@@ -226,18 +216,25 @@ pub(crate) fn controller_vm(r: &mut Ruby, ctx: &Ctx) -> Option<GeneratedFile> {
     steps.extend([every_machine(env), Step::Project]);
     steps.extend(isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()));
     let on_controller = &ctx.checks.controller;
-    define(r, CONTROLLER, false, |r| {
+    let runner = (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller));
+    define(r, CONTROLLER, Start::WithUp, |r| {
         main.render(r, "m", None);
         r.assign("m.vm.hostname", Value::str(CONTROLLER));
         networks(r, env, |c| Some(c.controller()));
         providers::blocks(r, &guest);
+        let offline = offline(env, !on_controller.is_empty());
+        if offline {
+            online_again(r);
+        }
         steps_of(r, env, CONTROLLER, &steps);
-        controller_steps(r, env, !on_controller.is_empty());
-        if !on_controller.is_empty() {
+        controller_steps(r, env, offline);
+        if let Some(runner) = &runner {
+            checks::installer(r, CONTROLLER, &runner.contents);
             checks::provisioner(r, CONTROLLER, on_controller);
         }
+        halt(r, env);
     });
-    (!on_controller.is_empty()).then(|| checks::runner(env, ctx.dir, CONTROLLER, &Position::Networks, on_controller))
+    runner
 }
 
 /// How the controller reaches the VMs: the boxes' own `vagrant` account (password auth); WinRM
@@ -257,25 +254,44 @@ pub(crate) fn access() -> Access<'static> {
     })
 }
 
-/// Ansible and the inventory, the environment's playbooks, going offline, halting.
-fn controller_steps(r: &mut Ruby, env: &Environment, with_checks: bool) {
+/// Whether the controller goes offline once set up: standing in for a user on offline networks
+/// to run checks, it would otherwise see its own NAT internet.
+fn offline(env: &Environment, with_checks: bool) -> bool {
+    with_checks && !env.networks.values().any(|n| n.internet)
+}
+
+/// The controller online again for its set-up, when Vagrant provisions it again once offline:
+/// its packages, Ansible and the playbooks' roles come from the internet. Its last steps take it
+/// offline again.
+fn online_again(r: &mut Ruby) {
+    shell(
+        r,
+        "online",
+        "if command -v nft >/dev/null; then nft delete table inet isoloom-egress 2>/dev/null || true; fi",
+    );
+}
+
+/// Ansible and the inventory, the environment's playbooks, going offline (`offline`).
+fn controller_steps(r: &mut Ruby, env: &Environment, offline: bool) {
     let spec = env.spec();
     let setup = format!(
-        "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\ncat > {CONTROLLER_INVENTORY} <<'INV'\n{}INV\n",
+        "set -e\n{CONTROLLER_PACKAGES}{}\nmkdir -p {CONFIG_DIR}\n{}",
         controller::INSTALL_ANSIBLE,
-        inventory::render(env, &access())
+        isoloom_spec::shell::heredoc(&format!("cat > {CONTROLLER_INVENTORY}"), "INV", &inventory::render(env, &access()))
     );
     shell(r, "controller", &setup);
     if !spec.provision.is_empty() {
         shell(r, "ansible", &controller::provision_script(spec, &[]));
     }
-    // Standing in for a user on offline networks, the controller goes offline too once it's
-    // done installing (its checks would otherwise see its own NAT internet).
-    if with_checks && !env.networks.values().any(|n| n.internet) {
-        step_provisioners(r, env, CONTROLLER, &Step::Egress, Os::Linux);
+    if offline {
+        step_provisioners(r, env, CONTROLLER, (0, &Step::Egress), Os::Linux);
     }
-    // Done: it halts (its disk kept) unless the spec keeps it running. Detached, so that the
-    // provisioner returns before the VM goes; the runner's `check` boots it again for the checks.
+}
+
+/// Done: the controller halts (its disk kept) unless the spec keeps it running. Detached, so
+/// that the provisioner returns before the VM goes; `vagrant up isoloom-controller` boots it
+/// again for its checks.
+fn halt(r: &mut Ruby, env: &Environment) {
     if !env.controller.as_ref().is_some_and(|c| c.keep_running) {
         shell(r, "halt", &format!("touch {HALTING}; (sleep 5; poweroff) >/dev/null 2>&1 &"));
     }

@@ -8,8 +8,8 @@ use isoloom_render::configure::{Configured, linux_unit};
 use isoloom_spec::syntax::{Guard, Invocation};
 use serde_json::{Value, json};
 
-use super::task::Task;
-use super::tasks::{project, project_var};
+use super::task::{Task, jinja};
+use super::tasks::{project_file, project_var};
 
 /// The `service` step: an enabled unit started (a defined one's file written first), or a disabled
 /// one stopped. Restarts come from the recipe's earlier changes notifying the handler and the
@@ -157,15 +157,16 @@ fn detect(cmd: &str, register: &str) -> Value {
 }
 
 /// The `run` step: a project script run behind its `creates`.
-pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str) -> Value {
+pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str, inputs: &[String]) -> Value {
     let mut args = serde_json::Map::new();
-    args.insert("cmd".to_owned(), project(vars));
+    args.insert("cmd".to_owned(), project_file(vars));
     if let Some(path) = &r.creates {
         args.insert("creates".to_owned(), Value::String(path.to_string()));
     }
     let task = Task::new(format!("run {}", r.script))
         .module("ansible.builtin.script", Value::Object(args))
         .set("vars", project_var(vars, r.script.as_str()));
+    let task = with_inputs(task, inputs);
     // No `creates`: it runs every apply (the shell renderer runs it too), so it always reports
     // `changed` (`ansible-lint`'s `no-changed-when`).
     let task = if r.creates.is_none() {
@@ -183,14 +184,30 @@ pub(super) fn reboot() -> Value {
 
 /// The `playbook` step: the project's playbook run on the host itself (`-c local`), as the shell
 /// carrier runs it.
-pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String], vars: &str) -> Value {
-    Task::new(format!("playbook {p}"))
+pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String], vars: &str, inputs: &[String]) -> Value {
+    let task = Task::new(format!("playbook {p}"))
         .module(
             "ansible.builtin.command",
-            json!({ "argv": ["ansible-playbook", "-c", "local", "-i", "localhost,", project(vars)] }),
+            json!({ "argv": ["ansible-playbook", "-c", "local", "-i", "localhost,", project_file(vars)] }),
         )
         .set("vars", project_var(vars, p.as_str()))
-        .set("changed_when", Value::Bool(true))
-        .notify(notify)
-        .into_value()
+        .set("changed_when", Value::Bool(true));
+    with_inputs(task, inputs).notify(notify).into_value()
+}
+
+/// `task` with the machine's `inputs` in its environment, as a VM's `run` and `playbook` steps
+/// read them: each from the environment `ansible-playbook` runs in, where the runner (or the user)
+/// puts the launch values. A lookup's result is data, which Ansible never evaluates as a template.
+/// Unchanged when the machine reads none.
+fn with_inputs(task: Task, inputs: &[String]) -> Task {
+    if inputs.is_empty() {
+        return task;
+    }
+    // An input's name is an environment variable's (letters, digits and `_`), so it sits in the
+    // lookup's quotes as is.
+    let env: serde_json::Map<String, Value> = inputs
+        .iter()
+        .map(|n| (n.clone(), jinja(format!("{{{{ lookup('ansible.builtin.env', '{n}') }}}}"))))
+        .collect();
+    task.set("environment", Value::Object(env))
 }

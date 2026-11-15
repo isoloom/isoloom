@@ -41,7 +41,7 @@ fn source() -> syntax::Spec {
 fn an_existing_network_is_the_target_being_lowereds_own() {
     let s = source();
     let external = |scope| networks(&s, scope).get("corp").and_then(|n| n.external.clone());
-    for t in [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker] {
+    for t in [Target::Docker, Target::Hosted, Target::CloudDocker] {
         assert_eq!(external(Scope::Target(t)).as_deref(), Some("corp-net"), "{t:?}");
     }
     assert_eq!(external(Scope::Target(Target::Proxmox)).as_deref(), Some("vmbr9"));
@@ -68,12 +68,23 @@ fn an_existing_volume_is_the_target_being_lowereds_own_and_virtiofs_proxmoxs() {
 fn a_machines_entry_is_its_own_else_its_counted_machines_else_its_groups() {
     let s = source();
     let proxmox = s.overrides.proxmox.as_ref().expect("proxmox overrides");
-    let image = |name: &str| for_machine(&s, &proxmox.machines, name).and_then(|m| m.image.clone());
+    let image = |name: &str| for_machine(&s, "proxmox", &proxmox.machines, name).and_then(|m| m.value.image.clone());
+    let at = |name: &str| for_machine(&s, "proxmox", &proxmox.machines, name).map(|m| m.at.to_string());
+    assert_eq!(at("db").as_deref(), Some("overrides.proxmox.machines.db"), "its own entry, where it is written");
+    assert_eq!(
+        at("w-01").as_deref(),
+        Some("overrides.proxmox.machines.everything"),
+        "a group's entry, at the group"
+    );
     assert_eq!(image("db").as_deref(), Some("local:vztmpl/db"), "its own entry first");
     assert_eq!(image("w-01").as_deref(), Some("local:vztmpl/base"), "a clone, through the groups");
     assert_eq!(image("a"), None);
     let vagrant = s.overrides.vagrant.as_ref().expect("vagrant overrides");
-    assert!(for_machine(&s, &vagrant.machines, "w-02").is_some(), "a clone takes its counted machine's");
+    assert_eq!(
+        for_machine(&s, "vagrant", &vagrant.machines, "w-02").map(|m| m.at.to_string()).as_deref(),
+        Some("overrides.vagrant.machines.w"),
+        "a clone takes its counted machine's, written there"
+    );
     assert!(lxc(&s, "db", Scope::Target(Target::Proxmox)) && !lxc(&s, "db", Scope::Lab) && !lxc(&s, "a", Scope::Target(Target::Proxmox)));
     assert_eq!(external(&s, "w-01").map(|e| e.address), Some("192.0.2.7".to_owned()));
     assert_eq!(external(&s, "a"), None);
@@ -115,6 +126,6 @@ fn a_clone_takes_the_entry_of_its_own_counted_machine_only() {
         .source()
         .clone();
     let vagrant = s.overrides.vagrant.as_ref().expect("vagrant overrides");
-    assert!(for_machine(&s, &vagrant.machines, "w-02").is_some());
-    assert!(for_machine(&s, &vagrant.machines, "v-01").is_none());
+    assert!(for_machine(&s, "vagrant", &vagrant.machines, "w-02").is_some());
+    assert!(for_machine(&s, "vagrant", &vagrant.machines, "v-01").is_none());
 }

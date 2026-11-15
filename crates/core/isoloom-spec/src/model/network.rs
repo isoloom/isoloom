@@ -64,7 +64,8 @@ pub struct Network {
     #[schemars(skip)] // lowering fills it from `overrides:`; a spec never writes it here.
     pub external: Option<String>,
     /// Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed
-    /// addresses in `cidr`, or DHCP from the LAN).
+    /// addresses in `cidr`, or DHCP from the LAN). Only when whoever runs the environment allows
+    /// `host-network`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bridged: Option<Bridged>,
     /// The largest packet the network carries, in bytes (576 to 9216): smaller to mimic a

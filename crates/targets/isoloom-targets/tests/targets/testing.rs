@@ -1,11 +1,11 @@
 //! What the targets' tests share: the repository's examples as environments or plans, specs written in
 //! a test, their problems, and the files a target generates, found by path.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use isoloom_manifest::{Manifest, Version};
 use isoloom_plan::Environment;
 use isoloom_spec::Spec;
+use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 use isoloom_targets::{GeneratedFile, Lab, generate};
 
@@ -34,7 +34,23 @@ pub(crate) fn lab(yaml: &str) -> Outcome<Lab> {
 
 /// A spec written in a test, as an environment with no problem.
 pub(crate) fn valid(yaml: &str) -> Outcome<Lab> {
-    let lab = lab(yaml)?;
+    no_problem(lab(yaml)?)
+}
+
+/// `lab` with every access to the computer that runs it allowed, as `--allow-host` allows each:
+/// the tests of what a target does with a field that reaches that computer.
+pub(crate) fn allowed(lab: Lab) -> Lab {
+    lab.with_host_access(Grants::of(HostAccess::ALL))
+}
+
+/// A spec written in a test that reaches the computer that runs it, as an environment allowed
+/// to, with no problem.
+pub(crate) fn valid_allowed(yaml: &str) -> Outcome<Lab> {
+    no_problem(allowed(lab(yaml)?))
+}
+
+/// `lab`, once it has no problem.
+fn no_problem(lab: Lab) -> Outcome<Lab> {
     match problems(&lab) {
         found if found.is_empty() => Ok(lab),
         found => Err(format!("the spec isn't valid: {found:?}").into()),
@@ -50,7 +66,7 @@ pub(crate) fn problems(lab: &Lab) -> Vec<String> {
 pub(crate) fn plan(name: &str, target: Target) -> Outcome<Environment> {
     let lab = example(name)?;
     match problems(&lab) {
-        found if found.is_empty() => Ok(Environment::build(&lab.for_target(target), target, None)?),
+        found if found.is_empty() => Ok(lab.plan(&lab.for_target(target), target, None)?),
         found => Err(format!("example `{name}` isn't valid: {found:?}").into()),
     }
 }
@@ -118,21 +134,34 @@ machines:
     )
 }
 
-/// The shared run-manifest fixture `name`.
-pub(crate) fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../core/isoloom-manifest/fixtures").join(name)
+/// The Vagrantfile `lab` generates, read into its Ruby blocks.
+pub(crate) fn vagrantfile(lab: &Lab) -> Outcome<isoloom_test_support::RubyBlock> {
+    Ok(isoloom_test_support::ruby_blocks(&generated(
+        lab,
+        Target::Vagrant,
+        ".isoloom/vagrant/Vagrantfile",
+    )?))
 }
 
-/// `generated` against the fixture `name`; `ISOLOOM_WRITE_FIXTURES=1` writes it instead.
-pub(crate) fn matches_fixture(mut generated: Manifest, name: &str) -> Outcome {
-    let path = fixture(name);
-    if std::env::var_os("ISOLOOM_WRITE_FIXTURES").is_some() {
-        std::fs::write(&path, isoloom_manifest::to_json(&generated)?)?;
-    }
-    let mut fixture = isoloom_manifest::parse(&std::fs::read_to_string(&path)?)?;
-    // A release changes the version, not the contract.
-    generated.generator.version = Version::parse("0.0.0")?;
-    fixture.generator.version = Version::parse("0.0.0")?;
-    assert_eq!(generated, fixture, "{name}");
-    Ok(())
+/// The VMs a Vagrantfile defines (`config.vm.define "<name>"`), in its order.
+pub(crate) fn defined(vf: &isoloom_test_support::RubyBlock) -> Vec<String> {
+    vf.find("config.vm.define \"")
+        .iter()
+        .filter_map(|b| b.head.strip_prefix("config.vm.define \"").and_then(|r| r.split('"').next()).map(str::to_owned))
+        .collect()
+}
+
+/// VM `name`'s block of a Vagrantfile (`config.vm.define "<name>"`).
+pub(crate) fn define<'v>(vf: &'v isoloom_test_support::RubyBlock, name: &str) -> &'v isoloom_test_support::RubyBlock {
+    vf.block(&format!("config.vm.define \"{name}\""))
+}
+
+/// The provisioners VM block `vm` runs, by name (`m.vm.provision "shell", name: "<name>"`), in
+/// order.
+pub(crate) fn provisioners(vm: &isoloom_test_support::RubyBlock) -> Vec<String> {
+    vm.every_statement()
+        .iter()
+        .filter(|s| s.starts_with("m.vm.provision "))
+        .filter_map(|s| s.split("name: \"").nth(1).and_then(|r| r.split('"').next()).map(str::to_owned))
+        .collect()
 }

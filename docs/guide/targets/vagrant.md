@@ -1,28 +1,39 @@
-# Vagrant: `vagrant`, `docker-vm` and `hybrid`
+# Vagrant: `vagrant`
 
-- **`vagrant`**: one local VM per machine, set up natively by the machine's `steps` (or its
-  catalogue service's recipe), in one Vagrantfile that every provider reads.
-- **`docker-vm`**: the `docker` target's containers, inside one VM. Useful where Docker can't run
-  on the host, or to keep the environment off it.
-- **`hybrid`**: containers and VMs together on the same networks, when some machines have only a
-  container form and others only a VM form.
+**`vagrant`**: one local VM per machine, set up natively by the machine's `steps` (or its
+catalogue service's recipe, or the VM form its Dockerfile translates to), in one Vagrantfile
+that every provider reads. Every machine is a true VM: no container runs inside a helper VM.
 
-## Providers and tiers
+## Providers
 
-| Provider | Host OS | Plugin | `vagrant` tier |
-|---|---|---|---|
-| VirtualBox | Linux, macOS, Windows | none | 2 (real runs from macOS) |
-| libvirt | Linux | `vagrant-libvirt` | **1** (Linux) |
-| Hyper-V | Windows | none | **1** (Windows) |
-| VMware Desktop (Workstation, Fusion) | Linux, macOS, Windows | `vagrant-vmware-desktop` and the VMware Utility | 2 |
-| Parallels | macOS | `vagrant-parallels` | 2 |
-| QEMU | Linux, macOS | `vagrant-qemu` | 2 |
-| Remote ESXi | any | `vagrant-vmware-esxi` | 2 (real runs from macOS) |
+The Vagrantfile is checked by `vagrant validate`. Each provider runs where its hypervisor does:
 
-`docker-vm` is Tier 2 on every provider, UTM (`vagrant_utm`, macOS) included (real runs on
-VirtualBox from macOS); `hybrid` is Tier 2. UTM runs `docker-vm` only: `vagrant_utm` gives a VM
-no private network, and every machine of an environment is on one, so the `vagrant` target has
-no UTM provider. The [target matrix](../../matrix.md) lists what each provider refuses.
+| Provider | Host OS | Plugin |
+|---|---|---|
+| VirtualBox | Linux, macOS, Windows | none |
+| libvirt | Linux | `vagrant-libvirt` |
+| Hyper-V | Windows | none |
+| VMware Desktop (Workstation, Fusion) | Linux, macOS, Windows | `vagrant-vmware-desktop` and the VMware Utility |
+| Parallels | macOS | `vagrant-parallels` |
+| QEMU | Linux, macOS | `vagrant-qemu` |
+| UTM | macOS (Apple silicon) | `vagrant_utm` 0.2.0 or later, UTM 4.6.5 or later from GitHub or Homebrew |
+| Remote ESXi | any | `vagrant-vmware-esxi` |
+
+On UTM, `vagrant_utm` makes no adapter for a private network and sets no address in the guest,
+so the Vagrantfile does both. Each network is an isolated vmnet network: QEMU's `vmnet-host`
+with a network id made from the project copy's folder and the network's name, so its VMs see
+each other and nothing else (not the Mac, not another network, no DHCP). Before each boot, a
+trigger sets the VM's adapters there (virtio, a fixed MAC) as QEMU arguments of its UTM
+configuration; once the guest answers, its addresses are set by MAC, as on Hyper-V. Published
+ports are Vagrant's forwards on the box's emulated adapter, and the box's shared adapter is the
+VM's way out. UTM boots UTM-format boxes only: `utm/bookworm` (Debian 12, also Isoloom's own
+VMs) and `utm/ubuntu-24.04` are built in; another OS needs
+`overrides.vagrant.machines.<m>.boxes.utm`, or the spec is refused. UTM attaches no data disk,
+bridges no network, gives no TPM, boots no machine its own way and has no nested
+virtualization: those specs are refused (nesting stops `vagrant up`). Every call to UTM is an
+Apple event: UTM must run in your session, and the terminal or app driving Vagrant must be
+allowed to control it (System Settings, Privacy & Security, Automation). The App Store build of
+UTM has no vmnet. The [target matrix](../../matrix.md) lists what each provider refuses.
 
 ## Prerequisites
 
@@ -45,16 +56,38 @@ vagrant destroy -f
 ```
 
 The provider is the one you choose at `vagrant up`, or `vagrant.provider` in your defaults
-([configuration](../../reference/configuration.md#defaults)). A runner reads
-`.isoloom/vagrant/run.json` and runs the same steps, then the checks:
+([configuration](../../reference/configuration.md#defaults)).
+
+`vagrant up` ends once every machine is ready: each machine's last provisioner is its readiness
+check, which tries its healthcheck and fails `vagrant up` when it doesn't pass. The access
+machine is defined `autostart: false`: `vagrant up` leaves it down, `vagrant up <machine>`
+starts it. Inputs are read from the environment of each `vagrant` command by their own names,
+and secrets as `ISOLOOM_SECRET_<NAME>` (unset: empty, or the value given before).
+
+`vagrant provision` (or `vagrant up --provision`) runs again safely: Isoloom's own steps
+converge, and a project script without `creates` runs once, until it changes (its mark is in
+`/var/lib/isoloom/done/` on Linux, `C:\ProgramData\isoloom\done\` on Windows).
+
+Each VM with checks has them installed at `/var/lib/isoloom/checks.sh` at every provisioning,
+and Vagrant runs them:
 
 ```sh
-isothrum up . --target vagrant --provider libvirt
-isothrum check . --target vagrant
-isothrum down . --target vagrant
+vagrant ssh web -c 'sudo sh /var/lib/isoloom/checks.sh'
 ```
 
-`docker-vm` is the same with `.isoloom/docker-vm/`.
+Each prints a PASS or FAIL line per check and fails when one does; `sudo ISOLOOM_DERIVED=0 sh
+...` leaves the checks Isoloom derives from the spec out. The checks that stand on every network
+run on `isoloom-controller`, which halts once set up unless `controller.keep_running` is set:
+`vagrant up isoloom-controller --no-provision` boots it first. The comment at the top of the
+Vagrantfile lists these commands for your spec.
+
+A runner runs the same Vagrantfile (Isothrum takes the target's folder as it is); the checks run as above:
+
+```sh
+isothrum up .isoloom/vagrant --provider libvirt
+isothrum down .isoloom/vagrant
+```
+
 
 ### A remote ESXi host
 

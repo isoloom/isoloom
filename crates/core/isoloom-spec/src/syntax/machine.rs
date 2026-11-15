@@ -12,6 +12,7 @@ use serde::de::{self, SeqAccess, Visitor};
 use super::app::App;
 use super::files::File;
 use super::hardware::Hardware;
+use super::mistake::Mistake;
 use super::names::{PortName, ServiceRef};
 use super::os::OsRef;
 use super::ports::Port;
@@ -40,7 +41,7 @@ pub struct Services {
 }
 
 /// A machine's address on a network: one last octet, or several (the first the primary one).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, JsonSchema)]
 #[serde(untagged)]
 pub enum Octets {
     /// The last octet of its address (0: an address from the LAN's DHCP server, on a bridged
@@ -48,6 +49,43 @@ pub enum Octets {
     One(u8),
     /// Several addresses on the network, by last octet: the first is its primary address.
     Several(Vec<u8>),
+}
+
+/// What an address on a network is written as, for a value that isn't one.
+const OCTETS: &str = "the last number of its address (0 to 255, like 10), or a list of them ([10, 11])";
+
+/// One last octet: a number from 0 to 255.
+fn octet<E: de::Error>(n: u64) -> Result<u8, E> {
+    u8::try_from(n).map_err(|_| E::custom(format!("`{n}` isn't the last number of an address: 0 to 255")))
+}
+
+impl<'de> Deserialize<'de> for Octets {
+    fn deserialize<D: de::Deserializer<'de>>(d: D) -> Result<Octets, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = Octets;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str(OCTETS)
+            }
+            fn visit_u64<E: de::Error>(self, n: u64) -> Result<Octets, E> {
+                octet(n).map(Octets::One)
+            }
+            fn visit_i64<E: de::Error>(self, n: i64) -> Result<Octets, E> {
+                u64::try_from(n).map_or_else(
+                    |_| Err(E::custom(format!("`{n}` isn't the last number of an address: 0 to 255"))),
+                    |n| self.visit_u64(n),
+                )
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Octets, A::Error> {
+                let mut all = Vec::new();
+                while let Some(n) = seq.next_element::<u64>()? {
+                    all.push(octet(n)?);
+                }
+                Ok(Octets::Several(all))
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 /// A machine of the environment.
@@ -149,7 +187,7 @@ pub(crate) struct MachineInput {
     #[serde(default)]
     access: bool,
     /// Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,
-    /// dormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and
+    /// dormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and
     /// `.port`, `.url`); a check names the machine and the port's number (`web:80`).
     #[serde(default)]
     ports: IndexMap<PortName, Port>,
@@ -185,13 +223,15 @@ pub(crate) struct MachineInput {
     /// Data disks beside its own, by name: `{ size_gb, fs, mount }`.
     #[serde(default)]
     disks: IndexMap<String, Disk>,
-    /// Folders of the computer that runs the environment, mounted in the machine both ways (what
-    /// it writes there lands on that computer): `{ from, path, read_only }`, `from` relative to
-    /// the project folder, in the home folder (`~/work`) or absolute. Linux machines, on the
+    /// Folders of the computer that runs the environment, mounted in the machine (read-only unless
+    /// `read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when
+    /// whoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)
+    /// or absolute; a writable one needs `writable-host-folders`, the container engine's socket
+    /// `docker-socket`. Linux machines, on the
     /// targets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each
-    /// provider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,
-    /// libvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;
-    /// UTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.
+    /// provider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with
+    /// `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and
+    /// QEMU a read-only one.
     /// VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable
     /// whatever its mode on the computer, so another account of the VM writes there once in that
     /// group.
@@ -212,7 +252,9 @@ pub(crate) struct MachineInput {
     /// `domain`, `options`.
     #[serde(default)]
     dns: Option<Dns>,
-    /// Kernel-level access (nested containers, kernel modules, raw devices).
+    /// Kernel-level access (nested containers, kernel modules, raw devices). A privileged
+    /// container reaches the host's kernel: refused unless whoever runs the environment allows
+    /// `privileged`.
     #[serde(default)]
     privileged: bool,
     /// How strongly its `internet: false` seal holds (`guaranteed` by default; `best-effort` lets a
@@ -275,13 +317,13 @@ fn services<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Vec<Service
 }
 
 impl TryFrom<MachineInput> for Machine {
-    type Error = Error;
+    type Error = Mistake;
 
-    fn try_from(m: MachineInput) -> Result<Machine, Error> {
+    fn try_from(m: MachineInput) -> Result<Machine, Mistake> {
         let kind = match (m.service, m.app) {
-            (Some(_), Some(_)) => return Err(Error::ServiceAndApp),
+            (Some(_), Some(_)) => return Err(Error::ServiceAndApp.into()),
             (Some(services), None) => Kind::Service(Services { services, with: m.with }),
-            (None, _) if !m.with.is_empty() => return Err(Error::WithWithoutService),
+            (None, _) if !m.with.is_empty() => return Err(Error::WithWithoutService.into()),
             (None, Some(app)) => Kind::App(app),
             (None, None) => Kind::Bare,
         };
@@ -327,15 +369,7 @@ impl Machine {
     }
 }
 
-impl JsonSchema for Machine {
-    fn schema_name() -> std::borrow::Cow<'static, str> {
-        "Machine".into()
-    }
-
-    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        MachineInput::json_schema(g)
-    }
-}
+crate::syntax::schema_as!(Machine, MachineInput);
 
 #[cfg(test)]
 mod tests;

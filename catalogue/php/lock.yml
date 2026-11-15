@@ -1,0 +1,93 @@
+# Written by `cargo xtask catalogue refresh php`, never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin.
+refreshed: 2026-11-14
+keys:
+  https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x15058500A0235D97F5D10063B188E2B695BD4743:
+    fingerprint: 15058500A0235D97F5D10063B188E2B695BD4743
+    sha256: 023b08fdf09fcf0a123ebef0b247765bad2481327bbdee3599bf7bbae3ae2061
+releases:
+  5.6.40:
+    packages:
+      debian@12:
+        php5.6-cli: 5.6.40-105+0~20261022.135+debian12~1.gbp37a17e
+        php5.6-common: 5.6.40-105+0~20261022.135+debian12~1.gbp37a17e
+        libapache2-mod-php5.6: 5.6.40-105+0~20261022.135+debian12~1.gbp37a17e
+        php5.6-fpm: 5.6.40-105+0~20261022.135+debian12~1.gbp37a17e
+  7.0.33:
+    packages:
+      debian@12:
+        php7.0-cli: 7.0.33-93+0~20261022.119+debian12~1.gbp952195
+        php7.0-common: 7.0.33-93+0~20261022.119+debian12~1.gbp952195
+        libapache2-mod-php7.0: 7.0.33-93+0~20261022.119+debian12~1.gbp952195
+        php7.0-fpm: 7.0.33-93+0~20261022.119+debian12~1.gbp952195
+  7.1.33:
+    packages:
+      debian@12:
+        php7.1-cli: 7.1.33-81+0~20261022.128+debian12~1.gbpa88ccf
+        php7.1-common: 7.1.33-81+0~20261022.128+debian12~1.gbpa88ccf
+        libapache2-mod-php7.1: 7.1.33-81+0~20261022.128+debian12~1.gbpa88ccf
+        php7.1-fpm: 7.1.33-81+0~20261022.128+debian12~1.gbpa88ccf
+  7.2.34:
+    packages:
+      debian@12:
+        php7.2-cli: 7.2.34-66+0~20261021.122+debian12~1.gbpe0bcd4
+        php7.2-common: 7.2.34-66+0~20261021.122+debian12~1.gbpe0bcd4
+        libapache2-mod-php7.2: 7.2.34-66+0~20261021.122+debian12~1.gbpe0bcd4
+        php7.2-fpm: 7.2.34-66+0~20261021.122+debian12~1.gbpe0bcd4
+  7.3.33:
+    packages:
+      debian@12:
+        php7.3-cli: 7.3.33-37+0~deb.sury.org.1+debian12
+        php7.3-common: 7.3.33-37+0~deb.sury.org.1+debian12
+        libapache2-mod-php7.3: 7.3.33-37+0~deb.sury.org.1+debian12
+        php7.3-fpm: 7.3.33-37+0~deb.sury.org.1+debian12
+  7.4.33:
+    packages:
+      debian@12:
+        php7.4-cli: 1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428
+        php7.4-common: 1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428
+        libapache2-mod-php7.4: 1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428
+        php7.4-fpm: 1:7.4.33-31+0~20261021.121+debian12~1.gbpe9c428
+  8.0.30:
+    packages:
+      debian@12:
+        php8.0-cli: 1:8.0.30-25+0~20261021.88+debian12~1.gbpabebea
+        php8.0-common: 1:8.0.30-25+0~20261021.88+debian12~1.gbpabebea
+        libapache2-mod-php8.0: 1:8.0.30-25+0~20261021.88+debian12~1.gbpabebea
+        php8.0-fpm: 1:8.0.30-25+0~20261021.88+debian12~1.gbpabebea
+  8.1.34:
+    packages:
+      debian@12:
+        php8.1-cli: 8.1.34-9+0~20261021.82+debian12~1.gbp4e430a
+        php8.1-common: 8.1.34-9+0~20261021.82+debian12~1.gbp4e430a
+        libapache2-mod-php8.1: 8.1.34-9+0~20261021.82+debian12~1.gbp4e430a
+        php8.1-fpm: 8.1.34-9+0~20261021.82+debian12~1.gbp4e430a
+  8.2.35:
+    packages:
+      debian@12:
+        php8.2-cli: 8.2.35-2+0~deb.sury.org.1+debian12
+        php8.2-common: 8.2.35-2+0~deb.sury.org.1+debian12
+        libapache2-mod-php8.2: 8.2.35-2+0~deb.sury.org.1+debian12
+        php8.2-fpm: 8.2.35-2+0~deb.sury.org.1+debian12
+  8.3.36:
+    packages:
+      debian@12:
+        php8.3-cli: 8.3.36-2+0~deb.sury.org.1+debian12
+        php8.3-common: 8.3.36-2+0~deb.sury.org.1+debian12
+        libapache2-mod-php8.3: 8.3.36-2+0~deb.sury.org.1+debian12
+        php8.3-fpm: 8.3.36-2+0~deb.sury.org.1+debian12
+  8.4.27:
+    packages:
+      debian@12:
+        php8.4-cli: 8.4.27-2+0~deb.sury.org.1+debian12
+        php8.4-common: 8.4.27-2+0~deb.sury.org.1+debian12
+        libapache2-mod-php8.4: 8.4.27-2+0~deb.sury.org.1+debian12
+        php8.4-fpm: 8.4.27-2+0~deb.sury.org.1+debian12
+  8.5.12:
+    packages:
+      debian@12:
+        php8.5-cli: 8.5.12-3+0~deb.sury.org.1+debian12
+        php8.5-common: 8.5.12-3+0~deb.sury.org.1+debian12
+        libapache2-mod-php8.5: 8.5.12-3+0~deb.sury.org.1+debian12
+        php8.5-fpm: 8.5.12-3+0~deb.sury.org.1+debian12

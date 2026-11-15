@@ -1,12 +1,12 @@
-//! `isoloom matrix`: what each target does with each spec field, and how far each target has been
-//! proven (its tier, with the evidence), worked out from the generators themselves.
+//! `isoloom matrix`: what each target does with each spec field, worked out from the generators
+//! themselves, and the validators that check each target's files.
 
 use super::{Console, Result, Verdict};
 
 // No doc comments on the clap types: clap would print them in `--help`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct Args {
-    /// The matrix as JSON: the columns with their tiers, every tier entry with its evidence, and
+    /// The matrix as JSON: the columns, each target's validators, and
     /// each row's cell per column (its state, and for a refusal the step and reason).
     #[arg(long)]
     json: bool,

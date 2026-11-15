@@ -205,35 +205,3 @@ fn the_size_floor_is_a_vms() {
     let tiny = problems(&spec("    app: { image: nginx }\n").replace("memory_mb: 64", "memory_mb: 8"));
     assert!(tiny.iter().any(|p| p.contains("at least 1 cpu and 16 MB")), "{tiny:?}");
 }
-
-/// Cloud-services variables take any value, and `{{ inputs.NAME }}` a declared launch-time input.
-#[test]
-fn cloud_vars_are_typed_and_can_take_inputs() {
-    let base = "version: 1\nname: t\ncloud:\n  provider: aws\n  terraform: tf\n";
-    let ok = lab(&format!(
-        "{base}  vars: {{ enabled: true, count: 3, ips: [\"10.0.0.1/32\"], cidr: \"{{{{ inputs.CLIENT_CIDR }}}}\" }}\ninputs: [CLIENT_CIDR]\n"
-    ))
-    .unwrap();
-    let vars = &ok.source().cloud.as_ref().unwrap().vars;
-    assert_eq!(vars["enabled"], serde_json::json!(true));
-    assert_eq!(vars["ips"], serde_json::json!(["10.0.0.1/32"]));
-    assert_eq!(isoloom_spec::CloudServices::input_of(&vars["cidr"]), Some("CLIENT_CIDR"));
-    assert_eq!(ok.problems(), []);
-    // At any depth, inside a string too.
-    let nested = lab(&format!(
-        "{base}  vars: {{ allow: [\"{{{{ inputs.IP }}}}/32\", {{ v: \"{{{{inputs.NOPE}}}}\" }}] }}\ninputs: [IP]\n"
-    ))
-    .unwrap();
-    let allow = &nested.source().cloud.as_ref().unwrap().vars["allow"];
-    assert_eq!(isoloom_spec::CloudServices::inputs_in(allow), ["IP", "NOPE"]);
-    let filled = isoloom_spec::CloudServices::fill_inputs(allow, &mut |n| (n == "IP").then(|| "203.0.113.7".to_owned()));
-    assert_eq!(filled, serde_json::json!(["203.0.113.7/32", { "v": "{{inputs.NOPE}}" }]));
-    assert!(nested.problems().iter().any(|p| p.reason.contains("`NOPE` isn't declared")));
-    // Other placeholders stay as written.
-    let other = serde_json::json!("{{ cloud.outputs.x }} and {{ inputs.IP }}");
-    assert_eq!(isoloom_spec::CloudServices::inputs_in(&other), ["IP"]);
-    let kept = isoloom_spec::CloudServices::fill_inputs(&other, &mut |_| Some("1".into()));
-    assert_eq!(kept, serde_json::json!("{{ cloud.outputs.x }} and 1"));
-    let undeclared = lab(&format!("{base}  vars: {{ cidr: \"{{{{ inputs.NOPE }}}}\" }}\n")).unwrap();
-    assert!(undeclared.problems().iter().any(|p| p.reason.contains("`NOPE` isn't declared")));
-}

@@ -196,10 +196,11 @@ fn an_image_whose_start_the_runner_runs_runs_it_then_its_own_process() {
         "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@13, service: nginx, networks: { lab: 10 } }\n",
     )
     .unwrap();
-    let catalogue = started_catalogue();
-    let lowered = crate::lower::lower(&source, &catalogue, crate::lower::Scope::Target(Target::Docker));
+    let catalogue: &'static isoloom_catalogue::Catalogue = Box::leak(Box::new(started_catalogue()));
+    let lowered = crate::lower::lower(&source, catalogue, crate::lower::Scope::Target(Target::Docker));
     assert_eq!(lowered.refusals, [], "the supervisor renders the start steps");
-    let env = crate::Environment::build(&lowered.spec, Target::Docker, None).expect("the spec plans");
+    let env =
+        crate::Environment::planned(&lowered.spec, Target::Docker, None, catalogue, &crate::configure::DaemonTable::from(catalogue)).expect("the spec plans");
     let web = &env.machines["web"];
     let Some(Image::Container {
         build: Some(Build::Generated { process, .. }),

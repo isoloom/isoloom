@@ -1,12 +1,12 @@
-# Proxmox VE: `proxmox` and `docker-vm` on Proxmox
+# Proxmox VE: `proxmox`
 
 The `proxmox` target writes a Terraform module (`.isoloom/proxmox/main.tf`, provider
 `bpg/proxmox ~> 0.116.1`) that makes one VM per machine on a Proxmox VE server, with an SDN zone
 and VNet per network, a resource pool, a router VM (between the networks, by the `reach` rules,
-and out to the internet), and Proxmox firewall rules. `docker-vm` can also put its single Docker VM on Proxmox
-(`.isoloom/docker-vm/proxmox/`). Both write a run manifest.
+and out to the internet), and Proxmox firewall rules.
 
-Tier 2: real runs from macOS are recorded; Linux and Windows hosts are pending.
+The module is checked by `terraform validate`, `tflint` and `terraform test` (the provider
+mocked).
 
 ## Prerequisites
 
@@ -63,18 +63,25 @@ terraform -chdir=.isoloom/proxmox apply \
   -var node=pve
 ```
 
-Or with a runner, which also gives the module the environment's inputs, waits for every set-up,
-seals offline networks and runs the checks (the machines take the project from their cloud-init;
-secrets are refused on Proxmox):
+Give it your key too (`-var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)" -var
+ssh_private_key_file=~/.ssh/id_ed25519`): the machines let it in, and Terraform signs in with it,
+through the router, to wait for each machine's set-up from its cloud-init
+(`terraform_data.isoloom_ready_<machine>` reads `/var/lib/isoloom/ready`, `isoloom-ready/1`, and
+fails the apply with the end of `/var/log/cloud-init-output.log` when a step failed). Once every
+machine is set up, `terraform_data.isoloom_seal` seals the `internet: false` networks at the
+router. So the apply ends with the environment ready. The environment's inputs are variables of
+their own names (`-var TOKEN=...`, or `TF_VAR_TOKEN`).
+
+Or with a runner, which also gives the module the environment's inputs (the
+machines take the project from their cloud-init; a Linux VM's secrets come from the module's
+`ISOLOOM_SECRET_<NAME>` variables in its cloud-init snippet, and Terraform stores sensitive values
+in its state, as it does for every variable; a Windows machine's or an LXC container's are
+refused):
 
 ```sh
-isothrum up . --target proxmox
-isothrum check . --target proxmox
-isothrum down . --target proxmox
+isothrum up .isoloom/proxmox
+isothrum down .isoloom/proxmox
 ```
-
-A runner whose machine can't route to the run's bridge goes through the node:
-`isothrum up --ssh-jump root@pve.example.internal`.
 
 ## Teardown
 

@@ -48,9 +48,8 @@ isoloom targets
 ```
 
 It lists the targets this spec can be generated for (`docker`, `kubernetes`, `vagrant`,
-`proxmox`, the clouds...), why the others can't take it, and each target's
-[tier](../reference/targets.md#tiers-how-far-a-target-is-proven): how far it has been proven by
-real runs.
+`proxmox`, the clouds...), why the others can't take it, and the
+[validators](../reference/targets.md#validators) that check each target's files.
 
 ## 4. Generate the Compose files
 
@@ -62,14 +61,13 @@ isoloom generate --target docker
 ✓ .isoloom/docker/compose.yml
 ✓ .isoloom/docker/checks/isoloom-networks.sh
 ...
-✓ .isoloom/docker/run.json
 ✓ .isoloom/resolved.json
 ✓ .isoloom/.gitignore
 ```
 
 Everything is written under `.isoloom/`. `compose.yml` is a plain Compose file: read it, run it
-by hand, or commit it. `run.json` is the run manifest a runner reads. `isoloom generate` with no
-`--target` writes every target the spec allows.
+by hand, or commit it. `isoloom generate` with no `--target` writes every target the spec
+allows.
 
 ## 5. Run it with Docker Compose
 
@@ -106,20 +104,18 @@ docker compose -f .isoloom/docker/compose.yml down -v
 
 ## 6. Run it with Isothrum
 
-A runner reads `run.json` and does all of the above for you: it checks the tools' versions,
-brings the environment up, waits until it is ready, runs every check (from each machine's
-position too), and removes everything at the end. [Isothrum](https://github.com/Isothrum/isothrum)
+A runner runs the same Compose file for you: it checks the tools' versions, brings the
+environment up, waits until it is ready, and removes everything at the end. [Isothrum](https://github.com/Isothrum/isothrum)
 is the reference runner; install it from its releases or with `cargo install --locked
 isothrum-cli`.
 
 ```sh
-isothrum up . --target docker
-isothrum check . --target docker
-isothrum down . --target docker
+isothrum up .isoloom/docker
+isothrum down .isoloom/docker
 ```
 
-`isothrum up` prints the published URLs and the spec's `message`. `isothrum check` exits 1 when a
-check fails.
+`isothrum up` takes the target's folder, the native files as Isoloom wrote them, and prints the
+published URLs; the checks run as the Compose file's header says (step 5).
 
 ## 7. Change it
 

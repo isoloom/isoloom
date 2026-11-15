@@ -2,9 +2,10 @@
 
 The `docker` target turns each machine into a container on your Docker host, with one Docker
 network per spec network and the spec's addresses. `hosted` writes the same Compose file for a
-hosting service that runs Compose files itself, without a run manifest.
+hosting service that runs Compose files itself.
 
-Tier: `docker` is Tier 1 (real runs from Linux, macOS and Windows); `hosted` is Tier 2.
+Both write a Compose file (`.isoloom/docker/compose.yml`) and the files it mounts, checked by
+`docker compose config`.
 
 ## Prerequisites
 
@@ -26,23 +27,32 @@ docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-c
 docker compose -f .isoloom/docker/compose.yml down -v
 ```
 
-When a machine with `setup:` is one no other machine depends on, its set-up job exits once done,
-and `up --wait` fails on a service that exits. The `# Start:` line at the top of the generated
-`compose.yml` is the start command for your spec: it brings everything else up and waits for it,
-then runs each such job attached.
+That one `up --wait` brings the environment to ready: every service up and healthy, and every
+set-up job done. A machine's `setup:` scripts run in a one-shot job once the machine is up;
+Compose's `--wait` accepts a job's exit only when another service waits for it to complete, so
+the jobs no machine waits for are waited for by `isoloom-jobs-done`, a small idle service of
+Isoloom's own: a job that fails fails the `up`.
 
-The checks that run from a machine's own position run as `isoloom-check-<machine>`:
+The checks that run from a machine's own position run as `isoloom-check-<machine>`, and a
+machine's `exec` checks are piped into it:
 
 ```sh
 docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-check-cache
+docker compose -f .isoloom/docker/compose.yml exec -T web sh -s < .isoloom/docker/checks/isoloom-exec-web.sh
 ```
 
-Or hand the run manifest to a runner, which does all of the above and reports each check:
+Each prints a PASS or FAIL line per check and fails when one does; `run -e ISOLOOM_DERIVED=0`
+leaves the checks Isoloom derives from the spec out. The access machine is in the `access`
+profile: `docker compose -f .isoloom/docker/compose.yml --profile access up -d <machine>` starts
+it. The comment at the top of the generated `compose.yml` lists these commands for your spec,
+and the variables it reads: each input by its own name (`${NAME}`, empty when unset), each
+secret as `ISOLOOM_SECRET_<NAME>`, from Compose's environment (the shell's, else `.env`).
+
+Or let a runner run the same Compose file (Isothrum takes the target's folder as it is), then run the checks as above:
 
 ```sh
-isothrum up . --target docker
-isothrum check . --target docker
-isothrum down . --target docker
+isothrum up .isoloom/docker
+isothrum down .isoloom/docker
 ```
 
 ## Published ports

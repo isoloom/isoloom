@@ -11,13 +11,11 @@ use crate::{Error, Result};
 /// The rows, as written.
 const DATA: &str = include_str!("probes.yml");
 
-/// The file: the environment, `hybrid`'s two more machines, the cloud environment, the rows.
+/// The file: the environment, the rows.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct File {
     base: Value,
-    hybrid: Value,
-    cloud: Value,
     rows: Vec<RowFile>,
 }
 
@@ -41,8 +39,6 @@ struct RowFile {
     without: Vec<String>,
     #[serde(default)]
     only: Vec<String>,
-    #[serde(default)]
-    cloud: bool,
     #[serde(default = "yes")]
     hosts: bool,
     patch: Value,
@@ -87,8 +83,6 @@ pub(crate) struct Probe {
     pub(crate) uses: Uses,
     /// The targets it applies to; empty: every target.
     pub(crate) only: Vec<Target>,
-    /// A row of the cloud-services lab.
-    pub(crate) cloud: bool,
     /// Whether `external`'s environment gives each machine an existing host.
     pub(crate) hosts: bool,
     pub(crate) patch: Value,
@@ -99,10 +93,6 @@ pub(crate) struct Probe {
 pub(crate) struct Probes {
     /// The one-machine environment.
     pub(crate) base: Value,
-    /// The same, with `hybrid`'s container-only and VM-only machines beside.
-    pub(crate) hybrid: Value,
-    /// The environment of cloud services.
-    pub(crate) cloud: Value,
     pub(crate) rows: Vec<Probe>,
 }
 
@@ -111,14 +101,7 @@ pub(crate) fn probes() -> Result<Probes> {
     let file: File = serde_yaml_ng::from_str(DATA).map_err(|e| invalid("probes.yml", &e.to_string()))?;
     let mut rows = file.rows.into_iter().map(row).collect::<Result<Vec<_>>>()?;
     rows.extend(os_rows());
-    let mut hybrid = file.base.clone();
-    merge(&mut hybrid, &mapping([("machines", file.hybrid)]));
-    Ok(Probes {
-        base: file.base,
-        hybrid,
-        cloud: file.cloud,
-        rows,
-    })
+    Ok(Probes { base: file.base, rows })
 }
 
 /// The error for a row that names what doesn't exist.
@@ -176,7 +159,6 @@ fn row(r: RowFile) -> Result<Probe> {
         features,
         uses,
         only,
-        cloud: r.cloud,
         hosts: r.hosts,
         patch: r.patch,
     })
@@ -187,10 +169,10 @@ fn os_rows() -> Vec<Probe> {
     isoloom_spec::os::DISTROS
         .iter()
         .flat_map(|family| {
-            family.versions.iter().map(move |(version, _)| {
-                let id = format!("{}@{version}", family.name);
+            family.releases.iter().map(move |release| {
+                let id = format!("{}@{}", family.name, release.version);
                 let mut values = vec![id.clone()];
-                if *version == family.default {
+                if release.version == family.default {
                     values.push(family.name.to_owned());
                 }
                 let mut m = Mapping::new();
@@ -210,7 +192,6 @@ fn os_rows() -> Vec<Probe> {
                         without: Vec::new(),
                     }),
                     only: Vec::new(),
-                    cloud: false,
                     hosts: true,
                     patch,
                 }
@@ -291,7 +272,7 @@ mod tests {
     fn the_rows_read_and_each_os_of_the_table_has_one() {
         let probes = probes().unwrap();
         let os = probes.rows.iter().filter(|r| r.field == "machines.*.os").count();
-        let versions: usize = isoloom_spec::os::DISTROS.iter().map(|f| f.versions.len()).sum();
+        let versions: usize = isoloom_spec::os::DISTROS.iter().map(|f| f.releases.len()).sum();
         assert_eq!(os, versions);
         assert!(probes.rows.iter().any(|r| r.value.as_deref() == Some("windows-server@2022")));
     }

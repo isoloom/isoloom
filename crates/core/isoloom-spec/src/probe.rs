@@ -86,7 +86,8 @@ impl Url {
     }
 }
 
-/// `host[:port]`, or `[ipv6]` with an optional `:port` after the bracket.
+/// `host[:port]`, or `[ipv6]` with an optional `:port` after the bracket: the one reading of a
+/// probe's host and port, for a URL and for a `tcp` check's target ([`tcp_target`]).
 fn host_and_port(hostport: &str) -> Option<(&str, Option<u16>)> {
     let port = |p: &str| p.parse::<u16>().ok().filter(|p| *p > 0);
     if let Some(rest) = hostport.strip_prefix('[') {
@@ -101,6 +102,14 @@ fn host_and_port(hostport: &str) -> Option<(&str, Option<u16>)> {
         Some((h, p)) => Some((h, Some(port(p)?))),
         None => Some((hostport, None)),
     }
+}
+
+/// A `tcp` check's target, `host:port` or `[ipv6]:port`: its host (without the brackets) and its
+/// port, 1 to 65535; None when it isn't one. Read as a URL's host and port are.
+#[must_use]
+pub fn tcp_target(target: &str) -> Option<(&str, u16)> {
+    let (host, port) = host_and_port(target)?;
+    Some((host, port?))
 }
 
 /// Whether a machine can run checks: Linux (or supplied by the runner), not Windows.

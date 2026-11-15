@@ -136,10 +136,6 @@
     "constraints": {
       "description": "What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time\nservers.",
       "$ref": "#/$defs/Constraints"
-    },
-    "cloud": {
-      "description": "An environment of cloud services rather than machines: a Terraform module applied into\nthe user's own cloud account.",
-      "$ref": "#/$defs/CloudServices"
     }
   },
   "required": [
@@ -178,7 +174,7 @@
           },
           "description": "The VLANs this LAN is split into, by id (1-4094), each with its own block inside the\nLAN's. Machines join one as `<lan>.vlan<id>` (`office.vlan10`); a `reach` rule naming\nthe LAN covers all of its VLANs. Each VLAN becomes a network of its own,\n`<lan>-vlan<id>`; the LAN itself stays a network only when a machine joins it directly.",
           "propertyNames": {
-            "pattern": "^[1-9][0-9]{0,3}$"
+            "pattern": "^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$"
           }
         },
         "switch": {
@@ -194,7 +190,7 @@
           "$ref": "#/$defs/Ipv6"
         },
         "bridged": {
-          "description": "Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed\naddresses in `cidr`, or DHCP from the LAN).",
+          "description": "Bridged to an interface of the host, so the machines sit on the host's own LAN (fixed\naddresses in `cidr`, or DHCP from the LAN). Only when whoever runs the environment allows\n`host-network`.",
           "$ref": "#/$defs/Bridged"
         },
         "mtu": {
@@ -543,7 +539,7 @@
               "$ref": "#/$defs/Port"
             }
           },
-          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
+          "description": "Its ports, by name (`site`, `dns-udp`): a number (TCP), or `{ port, protocol, publish,\ndormant, login }`. The message reaches them as `machines.<m>.ports.<name>.published` (and\n`.port`, `.url`); a check names the machine and the port's number (`web:80`)."
         },
         "command": {
           "description": "Its own command: a text (run by the shell), a list (run as is), or `{ run, cwd }`. Default:\nthe image's own; an `os`-only or steps-only machine stays up idle. Not with `service`.",
@@ -604,7 +600,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine (read-only unless\n`read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when\nwhoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)\nor absolute; a writable one needs `writable-host-folders`, the container engine's socket\n`docker-socket`. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with\n`virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and\nQEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -629,7 +625,7 @@
         },
         "privileged": {
           "type": "boolean",
-          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices). A privileged\ncontainer reaches the host's kernel: refused unless whoever runs the environment allows\n`privileged`.",
           "default": false
         },
         "seal": {
@@ -700,6 +696,102 @@
                     "description": "A folder of the project served at `/` (`site/`), holding an `index.html`. It replaces what is at /var/www/html, as a container's mount of it would. Without it, Apache's own welcome page."
                   }
                 },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^composer(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "composer's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^gitea(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "gitea's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^golang(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "golang's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^jenkins(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "jenkins's settings.",
+                "properties": {},
                 "required": [],
                 "additionalProperties": false
               }
@@ -990,6 +1082,30 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^node(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "node's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^openssh(@.+)?$"
               }
             },
@@ -1053,6 +1169,39 @@
             "properties": {
               "service": {
                 "type": "string",
+                "pattern": "^php(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "php's settings.",
+                "properties": {
+                  "server": {
+                    "type": "string",
+                    "enum": [
+                      "apache",
+                      "fpm"
+                    ],
+                    "description": "What serves PHP: `apache` (Apache with mod_php on port 80, serving /var/www/html) or `fpm` (php-fpm on port 9000). Without it, the CLI alone, as the php image's own variant."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
                 "pattern": "^php-fpm(@.+)?$"
               }
             },
@@ -1103,16 +1252,16 @@
                 "type": "object",
                 "description": "postgres's settings.",
                 "properties": {
-                  "database": {
-                    "type": "string",
-                    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
-                    "description": "The application database the image creates at first start.",
-                    "default": "app"
-                  },
                   "user": {
                     "type": "string",
                     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
                     "description": "The superuser the image creates at first start.",
+                    "default": "app"
+                  },
+                  "database": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]{0,62})$",
+                    "description": "The application database the image creates at first start.",
                     "default": "app"
                   },
                   "password": {
@@ -1155,6 +1304,30 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "service": {
+                "type": "string",
+                "pattern": "^python(@.+)?$"
+              }
+            },
+            "required": [
+              "service"
+            ]
+          },
+          "then": {
+            "properties": {
+              "with": {
+                "type": "object",
+                "description": "python's settings.",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
         }
       ]
     },
@@ -1178,6 +1351,7 @@
         "alma",
         "alma@9",
         "alpine",
+        "alpine@3.7",
         "alpine@3.19",
         "alpine@3.24",
         "kali",
@@ -1225,7 +1399,7 @@
           "description": "A published image, by tag or digest (`example/clamd:1.4`): the container form. With\n`build`, the name that build is tagged with: development builds and tags it, production\npulls it."
         },
         "build": {
-          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form; translating it to a VM is never attempted, so add\n`os` and `steps` for a VM form. With `image`, the build is tagged as that published name.",
+          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form, and on a VM target the VM form it translates to\n(`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as\nthat published name.",
           "$ref": "#/$defs/BuildInput"
         },
         "steps": {
@@ -1322,7 +1496,7 @@
       "properties": {
         "run": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "A project script (`.sh`; `.ps1` on Windows), run as root from the project folder."
         },
         "creates": {
@@ -1359,7 +1533,7 @@
         },
         "playbook": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "An Ansible playbook of the project, run in the machine (`ansible-playbook -c local`)."
         },
         "repository": {
@@ -1415,7 +1589,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "A file or folder of the project (a folder ends with `/`)."
         },
         "to": {
@@ -1621,7 +1795,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "pattern": "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
+          "pattern": "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
           "description": "A file of the project holding `{{ path }}` placeholders: `{{ machine.name }}`,\n`{{ machine.addresses.<network> }}`, `{{ machines.<m>.addresses.<network> }}` and\n`{{ machines.<m>.ports.<name>.port }}`. Filled in when Isoloom generates; no logic."
         },
         "to": {
@@ -1920,6 +2094,10 @@
           "type": "boolean",
           "description": "Only answers once something wakes it: nothing waits for it.",
           "default": false
+        },
+        "login": {
+          "$ref": "#/$defs/Login",
+          "description": "The account its service ships with, `{ user, password }`: shown to the user beside the\nport so they can sign in. For a training environment's published sign-in only, never a\nsecret (a secret is an input)."
         }
       },
       "description": "A port written in full."
@@ -1990,6 +2168,25 @@
         }
       ],
       "description": "`publish:` as written, for the schema."
+    },
+    "Login": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "The account's name."
+        },
+        "password": {
+          "type": "string",
+          "description": "Its password."
+        }
+      },
+      "required": [
+        "user",
+        "password"
+      ],
+      "description": "The fixed account a port's service ships with, shown to the user beside the port: a training\nenvironment's published sign-in, never a secret (a secret is an input)."
     },
     "Command": {
       "anyOf": [
@@ -2291,7 +2488,7 @@
       "properties": {
         "from": {
           "type": "string",
-          "description": "The folder on the computer that runs the environment: relative to the project folder (`shared`,\n`../notes`), in the home folder of the user running it (`~/work`), or absolute\n(`/srv/share`, `C:\\share`). A project folder must exist; a home or absolute one is the\nrunning computer's (the environment may run on another computer than the one generating it), so\nit isn't checked, and it is created when missing."
+          "description": "The folder on the computer that runs the environment: in the project folder (`shared`),\nor, when whoever runs the environment allows a folder outside it (`host-folders`, see\n[`crate::host_access`]), beside it (`../notes`), in the home folder of the user running it\n(`~/work`), or absolute (`/srv/share`, `C:\\share`). A project folder must exist and stay in\nthe project once its links are followed; a home or absolute one is the running computer's\n(the environment may run on another computer than the one generating it), so it isn't\nchecked, and it is created when missing."
         },
         "path": {
           "type": "string",
@@ -2299,14 +2496,14 @@
         },
         "read_only": {
           "type": "boolean",
-          "description": "The machine only reads it (it can't write there). Off by default."
+          "description": "The machine only reads it (it can't write there). On by default: a folder the machine\nwrites in (`read_only: false`) is one whoever runs the environment allows\n(`writable-host-folders`, see [`crate::host_access`])."
         }
       },
       "required": [
         "from",
         "path"
       ],
-      "description": "A folder of the computer that runs the environment, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `docker-vm` on a local\nprovider, `vagrant`); the others refuse a spec that asks for one."
+      "description": "A folder of the computer that runs the environment, mounted in the machine both ways: what the machine\nwrites there lands on that computer, and what is put there shows in the machine. Only the\ntargets whose machines run on that computer mount one (`docker`, `vagrant`); the others refuse\na spec that asks for one."
     },
     "Tmpfs": {
       "anyOf": [
@@ -2395,7 +2592,7 @@
           "items": {
             "$ref": "#/$defs/DeviceInput"
           },
-          "description": "The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest,\npermissions }`). A container only.",
+          "description": "The host's devices (`/dev/fuse`, `host:guest[:permissions]`, or `{ host, guest,\npermissions }`). A container only, and only when whoever runs the environment allows\n`devices`.",
           "default": []
         },
         "nested_virtualization": {
@@ -2556,7 +2753,7 @@
       "properties": {
         "kernel": {
           "type": "string",
-          "description": "A kernel to boot directly, instead of the image's boot loader."
+          "description": "A kernel to boot directly, instead of the image's boot loader. Like every file of the\nhypervisor's host a boot names (`initrd`, `dtb`, `loader`, `nvram`, `network.tftp_root`),\nonly when whoever runs the environment allows `boot-files`."
         },
         "initrd": {
           "type": "string",
@@ -2850,7 +3047,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine (read-only unless\n`read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when\nwhoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)\nor absolute; a writable one needs `writable-host-folders`, the container engine's socket\n`docker-socket`. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with\n`virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and\nQEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -2875,7 +3072,7 @@
         },
         "privileged": {
           "type": "boolean",
-          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices). A privileged\ncontainer reaches the host's kernel: refused unless whoever runs the environment allows\n`privileged`.",
           "default": false
         },
         "read_only": {
@@ -2991,7 +3188,7 @@
           "items": {
             "$ref": "#/$defs/HostFolder"
           },
-          "description": "Folders of the computer that runs the environment, mounted in the machine both ways (what\nit writes there lands on that computer): `{ from, path, read_only }`, `from` relative to\nthe project folder, in the home folder (`~/work`) or absolute. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, QEMU with `virtiofsd`,\nlibvirt's virtiofs) and `docker-vm` on a local provider (shared into its VM, then bound;\nUTM's too). Hyper-V (SMB asks for a password) and ESXi refuse it, and QEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
+          "description": "Folders of the computer that runs the environment, mounted in the machine (read-only unless\n`read_only: false`): `{ from, path, read_only }`, `from` in the project folder, or, when\nwhoever runs the environment allows `host-folders`, beside it, in the home folder (`~/work`)\nor absolute; a writable one needs `writable-host-folders`, the container engine's socket\n`docker-socket`. Linux machines, on the\ntargets whose machines run on that computer: `docker` (a bind mount), `vagrant` (each\nprovider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with\n`virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and\nQEMU a read-only one.\nVirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable\nwhatever its mode on the computer, so another account of the VM writes there once in that\ngroup.",
           "default": []
         },
         "tmpfs": {
@@ -3016,7 +3213,7 @@
         },
         "privileged": {
           "type": "boolean",
-          "description": "Kernel-level access (nested containers, kernel modules, raw devices).",
+          "description": "Kernel-level access (nested containers, kernel modules, raw devices). A privileged\ncontainer reaches the host's kernel: refused unless whoever runs the environment allows\n`privileged`.",
           "default": false
         },
         "read_only": {
@@ -3244,7 +3441,7 @@
       "additionalProperties": false,
       "properties": {
         "docker": {
-          "description": "Every target that runs the Compose file: `docker`, `hosted`, `docker-vm`, `cloud-docker`.",
+          "description": "Every target that runs the Compose file: `docker`, `hosted`, `cloud-docker`.",
           "$ref": "#/$defs/DockerOverrides"
         },
         "kubernetes": {
@@ -3252,7 +3449,7 @@
           "$ref": "#/$defs/KubernetesOverrides"
         },
         "vagrant": {
-          "description": "The `vagrant` target, and the VMs of `hybrid`.",
+          "description": "The `vagrant` target.",
           "$ref": "#/$defs/VagrantOverrides"
         },
         "proxmox": {
@@ -3424,6 +3621,10 @@
         "hyperv": {
           "type": "string",
           "description": "The box the Hyper-V provider boots."
+        },
+        "utm": {
+          "type": "string",
+          "description": "The box the UTM provider (`vagrant_utm`) boots: a UTM-format box."
         }
       },
       "description": "Boxes for the providers the machine's box has no build for."
@@ -3727,11 +3928,6 @@
         },
         {
           "type": "string",
-          "const": "docker-vm",
-          "description": "Docker on one VM: on this machine, an ESXi host or a Proxmox server."
-        },
-        {
-          "type": "string",
           "const": "cloud-docker",
           "description": "Docker on one cloud VM."
         },
@@ -3739,11 +3935,6 @@
           "type": "string",
           "const": "kubernetes",
           "description": "The containers on a Kubernetes cluster."
-        },
-        {
-          "type": "string",
-          "const": "hybrid",
-          "description": "Containers and VMs together on the same networks (local VMs): each machine as a\ncontainer when it can be one, else as a VM."
         },
         {
           "type": "string",
@@ -3769,11 +3960,6 @@
           "type": "string",
           "const": "external",
           "description": "Machines that already exist, reached over SSH at the addresses the spec gives\n(`machines.*.external`): nothing is created, everything else applies."
-        },
-        {
-          "type": "string",
-          "const": "cloud-services",
-          "description": "The spec's cloud services (`cloud:`): its Terraform module applied into the user's own\ncloud account."
         }
       ],
       "description": "Where an environment can run."
@@ -3865,90 +4051,6 @@
         }
       },
       "description": "Package mirrors (see [`Constraints::mirrors`])."
-    },
-    "CloudServices": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "provider": {
-          "$ref": "#/$defs/CloudProvider",
-          "description": "The cloud the module deploys into (its credentials come from the environment, as\nTerraform expects)."
-        },
-        "terraform": {
-          "type": "string",
-          "description": "A Terraform root module in the project (a folder holding `.tf` files), used as is."
-        },
-        "vars": {
-          "type": "object",
-          "additionalProperties": true,
-          "description": "The module's variables: any value (a string, number, boolean, list or map). A string\nholding `{{ inputs.NAME }}`, at any depth (`[\"{{ inputs.OPERATOR_IP }}/32\"]`), takes the\nlaunch-time input `NAME` (declared in `inputs`), e.g. an operator's IP for an allow-list:\nrequired when a runner brings the environment up, kept for taking it down."
-        },
-        "outputs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "What the environment exposes, by name: a module output each. Checks and the message\nuse them as `{{ cloud.outputs.<name> }}`."
-        },
-        "hourly_usd": {
-          "type": "number",
-          "format": "double",
-          "description": "About what the environment costs per hour while it exists, in US dollars: the author's\nestimate, for whoever runs it. A runner can say it before applying, and the resolved\nsnapshot carries it (`cloud.hourly_usd`) for anything that shows costs or keeps to a\nbudget. Isoloom doesn't bill or stop anything by it."
-        },
-        "before": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Steps run on this machine before Terraform applies the module (a key pair the module\nreads, a build): scripts in the project, run in order from the module's copy, with the\nspec's inputs and `env` in their environment. They run every time a runner brings the\nenvironment up: make them idempotent."
-        },
-        "env": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Environment variables for Terraform and the `before` steps (`AWS_REGION: us-east-1`).\nNot for credentials: those come from the user's own environment."
-        },
-        "apply_retries": {
-          "type": "integer",
-          "format": "uint8",
-          "minimum": 0,
-          "maximum": 255,
-          "description": "How many times to apply again when an apply fails (a module that only converges on a\nsecond apply), 0 to 5. 0 by default."
-        },
-        "requires": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "What the module needs on this machine besides Terraform: a command name (`jq`, `gsed`)\nthat must be on the PATH, or a shell command that must succeed\n(`python3 -c 'import boto3'`). A runner checks them before applying."
-        }
-      },
-      "required": [
-        "provider",
-        "terraform"
-      ],
-      "description": "An environment of cloud services: a Terraform module applied into the user's account."
-    },
-    "CloudProvider": {
-      "oneOf": [
-        {
-          "type": "string",
-          "const": "aws",
-          "description": "Amazon Web Services."
-        },
-        {
-          "type": "string",
-          "const": "azure",
-          "description": "Microsoft Azure."
-        },
-        {
-          "type": "string",
-          "const": "gcp",
-          "description": "Google Cloud."
-        }
-      ],
-      "description": "A cloud an environment of cloud services deploys into."
     }
   },
   "$id": "https://www.isoloom.com/schema/v1.json"

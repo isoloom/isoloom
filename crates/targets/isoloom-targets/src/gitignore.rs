@@ -7,20 +7,26 @@
 //! `terraform init` chose, so a project that commits its generated files commits it too, and
 //! every machine then installs the same providers.
 
-use isoloom_manifest::ignore::{TERRAFORM_STATE, VAGRANT_STATE};
 use isoloom_render::GeneratedFile;
+use isoloom_spec::ignore::{TERRAFORM_STATE, VAGRANT_STATE};
 
 /// Where it is written, relative to the project folder.
 pub const PATH: &str = ".isoloom/.gitignore";
 
+/// The file two `isoloom generate`s in one project take turns on (locked from reading the list of
+/// what Isoloom wrote to writing it), relative to the project folder.
+pub const TURN: &str = ".isoloom/.generated.lock";
+
 /// The patterns, each group under the comment that says whose files they are: the tools' state
-/// no copy of the project takes either ([`isoloom_manifest::ignore::never_copied`]).
-const SECTIONS: [(&str, &[&str]); 2] = [
+/// no copy of the project takes either ([`isoloom_spec::ignore::never_copied`]), and the file
+/// `isoloom generate` takes its turn on.
+const SECTIONS: [(&str, &[&str]); 3] = [
     (
         "Terraform: the provider cache, the state and its backups (secrets in plain text), the state's lock, crash logs.",
         TERRAFORM_STATE,
     ),
     ("Vagrant: each machine's folder (its id, its private key).", VAGRANT_STATE),
+    ("Isoloom: the file two `isoloom generate`s take turns on.", &[".generated.lock"]),
 ];
 
 /// The file.
@@ -43,7 +49,7 @@ pub(crate) fn file() -> GeneratedFile {
 
 #[cfg(test)]
 mod tests {
-    use isoloom_manifest::contract::OUTPUT_DIR;
+    use isoloom_spec::contract::OUTPUT_DIR;
 
     use super::*;
 
@@ -96,12 +102,7 @@ mod tests {
         ] {
             assert!(ignores(&text, path), "{path}:\n{text}");
         }
-        for path in [
-            "cloud-vm/aws/.terraform.lock.hcl",
-            "cloud-vm/aws/main.tf",
-            "docker/compose.yml",
-            "docker/run.json",
-        ] {
+        for path in ["cloud-vm/aws/.terraform.lock.hcl", "cloud-vm/aws/main.tf", "docker/compose.yml"] {
             assert!(!ignores(&text, path), "{path}:\n{text}");
         }
     }

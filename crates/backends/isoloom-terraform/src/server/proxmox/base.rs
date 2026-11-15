@@ -23,20 +23,20 @@ const MAX_SLOT: u64 = 99;
 pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
 
 /// Everything before the router.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    server::head(env, m, &[providers::PROXMOX, providers::TLS], variables(env), provider());
-    m.commented(
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    server::head(env, module, &[providers::PROXMOX, providers::TLS], variables(env), provider());
+    module.commented(
         "The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.",
         locals(env),
     );
-    m.commented(
+    module.commented(
         "The environment's VMs and containers, together in a pool of their own.",
         resource("proxmox_virtual_environment_pool", "env")
             .add_attribute(("pool_id", reference("local.zone")))
             .add_attribute(("comment", string(format!("Isoloom: {}", env.name))))
             .build(),
     );
-    m.commented(
+    module.commented(
         "Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.",
         resource("proxmox_sdn_applier", FINALIZER).build(),
     );
@@ -47,17 +47,17 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         zone = zone.add_attribute(("mtu", number(mtu.into())));
     }
     zone = zone.add_attribute(("depends_on", list([reference(&format!("proxmox_sdn_applier.{FINALIZER}"))])));
-    m.commented("The environment's networks: an SDN simple zone, a VNet per network.", zone.build());
-    credentials(env, m);
-    let vnets = super::links::vnets(env, m);
-    m.commented(
+    module.commented("The environment's networks: an SDN simple zone, a VNet per network.", zone.build());
+    credentials(env, module);
+    let vnets = super::links::vnets(env, module);
+    module.commented(
         "Applies the SDN objects once created, and again whenever one of them is replaced.",
         applier(vnets),
     );
-    images(env, m);
-    super::image::downloads(env, m);
-    super::firewall::ipsets(env, m);
-    super::virtiofs::mappings(env, m);
+    images(env, module);
+    super::image::downloads(env, module);
+    super::firewall::ipsets(env, module);
+    super::virtiofs::mappings(env, module);
 }
 
 /// The applier that runs last on destroy (`proxmox_sdn_applier.finalizer`): the provider's own
@@ -74,7 +74,7 @@ fn applier(vnets: Vec<Expression>) -> Block {
         .build()
 }
 
-/// The module's variables, the run manifest's params and slots among them.
+/// The module's variables, the values a runner passes at launch among them.
 pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     // No `isoloom_sealed` variable: the router's snippet never depends on it (a changed snippet
     // would recreate the router VM), so the seal is applied live by the manifest's seal-reload
@@ -91,7 +91,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     .concat()
 }
 
-/// The server's variables, the same in both modules (`proxmox`'s and `docker-vm`'s): the
+/// The server's variables (the `proxmox` module's): the
 /// connection, the node, where the disks, images and snippets go, the uplink bridge (`uplink`
 /// says what it is for), the environment's slot, 1 to [`MAX_SLOT`] (`slot` says how unique) and
 /// the key the `isoloom` user takes.
@@ -109,7 +109,8 @@ pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
             .describe("A datastore with 'snippets' content, for cloud-init"),
         s("uplink_bridge").default(string("vmbr0")).describe(uplink),
         server::slot_variable(MAX_SLOT, slot),
-        variable::ssh_public_key(true).default(string("")),
+        variable::ssh_public_key(),
+        variable::ssh_private_key_file(),
     ]);
     v
 }
@@ -255,7 +256,7 @@ fn locals(env: &Environment) -> Block {
 
 /// A cloud image per OS (the router's and the controller's Debian among them), per environment:
 /// a shared file would go with whichever environment is destroyed first.
-fn images(env: &Environment, m: &mut Module) {
+fn images(env: &Environment, module: &mut Module) {
     let mut oses: Vec<(&str, bool)> = env
         .vms()
         .filter(|vm| !super::image::has_own(vm.plan))
@@ -273,7 +274,7 @@ fn images(env: &Environment, m: &mut Module) {
             (ident(o), o.to_owned())
         };
         let block = download(&id, pin.url, &format!("-{file}.img"), Some(pin));
-        m.commented(
+        module.commented(
             &format!("The `{o}` cloud image, per environment: a shared file would go with whichever environment is destroyed first."),
             block,
         );

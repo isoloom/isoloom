@@ -8,27 +8,28 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::{SHAPE, availability_domain, availability_domains, owned, route_out, ubuntu_images, vm};
-use crate::cloud::docker::{Driver, HOST_OS};
+use crate::cloud::docker::{DockerDriver, HOST_OS};
 use crate::cloud::instance;
-use crate::docker_host::published;
+use crate::docker_host::container_ports;
 use crate::module::providers;
 
 /// Its `cloud-docker` driver: no size variable, its shape's OCPUs and memory follow the sizing.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::OCI,
     size: None,
     resources,
+    instance: "oci_core_instance",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
 /// by cloud-init); the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
-    m.block(availability_domains());
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(availability_domains());
     let version = vm::ubuntu(HOST_OS);
-    m.block(ubuntu_images(&vm::image_source(version), version));
-    m.blocks(network(env));
-    m.block(host(env, user_data));
+    module.block(ubuntu_images(&vm::image_source(version), version));
+    module.blocks(network(env));
+    module.block(host(env, user_data));
     reference("oci_core_instance.env.public_ip")
 }
 
@@ -67,10 +68,10 @@ fn security_list(env: &Environment) -> Block {
                 .build(),
         )
         .add_block(ingress("6", "tcp_options", 22));
-    for p in published(env, Protocol::Tcp) {
+    for p in container_ports(env, Protocol::Tcp) {
         b = b.add_block(ingress("6", "tcp_options", p));
     }
-    for p in published(env, Protocol::Udp) {
+    for p in container_ports(env, Protocol::Udp) {
         b = b.add_block(ingress("17", "udp_options", p));
     }
     b.build()

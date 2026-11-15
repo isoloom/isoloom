@@ -24,7 +24,7 @@ fn vswitch(interface: &str) -> String {
 }
 
 /// The bridged networks' vSwitches (one per physical NIC named) and port groups.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let mut nics: Vec<&str> = Vec::new();
     for (net, n) in &env.outside {
         let Join::Bridged(b) = &n.join else { continue };
@@ -32,7 +32,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             Some(nic) => {
                 if !nics.contains(&nic) {
                     nics.push(nic);
-                    m.commented(
+                    module.commented(
                         &format!("The host's NIC `{nic}`, on a vSwitch of its own: the LAN of the bridged networks on it."),
                         Block::builder("resource")
                             .add_label("esxi_vswitch")
@@ -46,7 +46,7 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
             }
             None => reference("var.uplink_vswitch"),
         };
-        m.commented(
+        module.commented(
             &format!("Network `{net}`: {}, bridged to the host's LAN.", n.cidr),
             Block::builder("resource")
                 .add_label("esxi_portgroup")

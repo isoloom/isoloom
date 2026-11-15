@@ -123,6 +123,12 @@ fn a_tcp_check_needs_a_port_and_expects_open_or_blocked() {
     let blocked = tcp("web:22", Some("blocked")).expect("resolved");
     assert_eq!((blocked.name.as_str(), blocked.wait), ("web:22 blocked from user", 0));
     assert_eq!(tcp("web:0", None), None);
+    let bracketed = tcp("[fd00::1]:22", None).expect("resolved");
+    assert!(
+        matches!(&bracketed.probe, Probe::Tcp { host: Host::Literal(h), port: 22, .. } if h == "fd00::1"),
+        "an IPv6 target's host goes without its brackets, as a URL's: {:?}",
+        bracketed.probe
+    );
     assert_eq!(tcp("web", None), None);
     assert_eq!(tcp("web:22", Some("closed")), None);
 }

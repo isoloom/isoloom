@@ -3,8 +3,8 @@ name: CI
 # Every push to main and every pull request: formatting, clippy and the tests on Linux, macOS and
 # Windows, the quality ratchet, the API docs, the supply chain (cargo-deny, unused dependencies),
 # spelling, the links between the docs, SemVer against the last release, the declared minimum
-# Rust, deterministic generation, the generated Terraform validated and its modules' tests, and the
-# generated Compose and Kubernetes files run for real. The release gate (gate.yml) runs the core of it again on the tag.
+# Rust, deterministic generation, the generated Terraform validated and its modules' tests, and
+# every target's generated files checked by their validators (never run). The release gate (gate.yml) runs the core of it again on the tag.
 on:
   push:
     branches: [main]
@@ -71,6 +71,9 @@ jobs:
         with:
           tool: cargo-machete@0.9.2
       - run: cargo run -p xtask --locked -- quality
+      # The generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are
+      # current; a stale one fails naming the command that regenerates them.
+      - run: .githooks/regenerate --check
       # The fuzz targets (a workspace of their own, outside the others' builds) still build
       # against the crates' public items, formatted and lint-clean.
       - run: cargo run -p xtask --locked -- fuzz --check
@@ -165,8 +168,8 @@ jobs:
           fail: true
           jobSummary: true
 
-  # The supported library API (docs/reference/policies.md: isoloom-spec, isoloom-targets and
-  # isoloom-manifest), compared by cargo-semver-checks with each crate's latest version on
+  # The supported library API (docs/reference/policies.md: isoloom-spec and isoloom-targets),
+  # compared by cargo-semver-checks with each crate's latest version on
   # crates.io. The other published crates are building blocks whose API is not a promise. The release type comes from the workspace version: when it is still the
   # published one, the changes are checked as a patch, so a breaking change fails until the version
   # is raised on purpose. One exception, decided for the release after 1.x: while crates.io's
@@ -203,28 +206,28 @@ jobs:
         run: |
           set -euo pipefail
           packages=()
-          for crate in isoloom-spec isoloom-targets isoloom-manifest; do
+          for crate in isoloom-spec isoloom-targets; do
             packages+=(-p "$crate")
           done
           # shellcheck disable=SC2086 # RELEASE_ARGS is empty or one flag and its value.
           cargo semver-checks "${packages[@]}" $RELEASE_ARGS
 
-  # The published crates build with their declared rust-version (1.88, Cargo.toml). `+1.88`
+  # The published crates build with their declared rust-version (1.89, Cargo.toml). `+1.89`
   # overrides the rust-toolchain.toml pin for this check only (without it the pinned toolchain
   # would build, and the job would prove nothing). The development tasks (xtask, xtask-quality)
   # are not published and build with the pinned toolchain only.
   msrv:
-    name: MSRV (Rust 1.88)
+    name: MSRV (Rust 1.89)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: rustup toolchain install 1.88 --profile minimal
+      - run: rustup toolchain install 1.89 --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo +1.88 check --workspace --exclude xtask --exclude xtask-quality --all-targets --locked
+      - run: cargo +1.89 check --workspace --exclude xtask --exclude xtask-quality --all-targets --locked
 
   # Generation is deterministic: every example rendered twice in one process (the test), then
   # generated twice by the command line in the same folder, gives the same files.
@@ -255,8 +258,40 @@ jobs:
           done
           diff -r "$RUNNER_TEMP/1" "$RUNNER_TEMP/2"
 
-  # The generated Terraform (Proxmox, ESXi, docker-vm on Proxmox, cloud-docker, cloud-vm,
-  # cloud-services) is valid for its providers, with the latest Terraform.
+  # The topology editor's engine (isoloom-wasm) builds for the browser, and its exports work as
+  # JavaScript calls them.
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # wasm-pack uses a wasm-bindgen on PATH when its version is the one Cargo.lock locks, so
+      # both come from install-action, which checks each download's SHA-256.
+      - name: wasm-bindgen version (from Cargo.lock)
+        id: bindgen
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: wasm-pack@0.13.1,wasm-bindgen@${{ steps.bindgen.outputs.version }}
+      - run: cargo run -p xtask --locked -- wasm
+      # The exports as JavaScript calls them (wasm-bindgen-test, on Node).
+      - run: wasm-pack test --node crates/frontends/isoloom-wasm
+
+  # The generated Terraform (Proxmox, ESXi, cloud-docker, cloud-vm) is valid for its providers,
+  # with the latest Terraform.
   terraform:
     name: Terraform validate
     runs-on: ubuntu-24.04
@@ -285,12 +320,8 @@ jobs:
             terraform -chdir="$1" init -backend=false -input=false >/dev/null
             terraform -chdir="$1" validate
           }
-          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/docker-vm/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
+          for d in examples/*/.isoloom/proxmox examples/*/.isoloom/esxi examples/*/.isoloom/cloud-docker/* examples/*/.isoloom/cloud-vm/*; do
             validate "$d"
-          done
-          # cloud-services runs the lab's own module, which its run manifest copies (`from`).
-          for d in examples/*/.isoloom/cloud-services; do
-            validate "$d/$(jq -r '.lifecycle.up[] | select(.action == "terraform.copy_module") | .with.from' "$d/run.json")"
           done
 
   # The cloud and server modules' logic proven without a cloud (`cargo xtask tf-test`): every
@@ -337,219 +368,45 @@ jobs:
           .github/scripts/no-vc-runtime.sh "${sysroot}/lib/rustlib/x86_64-pc-windows-msvc/bin/llvm-objdump.exe" \
             target/x86_64-pc-windows-msvc/release/isoloom.exe
 
-  # The binaries the real-run jobs below share: isoloom, and the Isothrum runner built from its
-  # repository at ISOTHRUM_REF (a repository variable: a release tag or a commit, never a branch,
-  # so a run is reproducible), so each job doesn't build both again. Without ISOTHRUM_REF the
-  # Compose real runs are skipped; the jobs that need isoloom alone still run.
-  binaries:
-    name: Binaries for the real runs
+  # Every target's generated files, checked by their tools' own validators in the pinned image
+  # (`cargo xtask verify`: docker compose config, terraform validate and tflint, vagrant
+  # validate, kubeconform and helm, cloud-init, hadolint, ansible-lint, shellcheck,
+  # PSScriptAnalyzer). Isoloom's output is validated, never run: running it is a runner's job.
+  # A failure the baseline (xtask/src/verify/baseline.json) doesn't know fails the job.
+  validators:
+    name: Validators on every target's output
     runs-on: ubuntu-24.04
-    env:
-      ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF }}
-    outputs:
-      runner: ${{ steps.ref.outputs.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false
-      - name: Isothrum's ref, pinned
-        id: ref
-        run: |
-          set -uo pipefail
-          status=0
-          .github/scripts/isothrum-ref.sh optional || status=$?
-          case "$status" in
-            0) echo "runner=true" >> "$GITHUB_OUTPUT" ;;
-            3) echo "runner=false" >> "$GITHUB_OUTPUT" ;;
-            *) exit 1 ;;
-          esac
-      - name: Check out Isothrum (the runner)
-        if: steps.ref.outputs.runner == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: Isothrum/isothrum
-          ref: ${{ env.ISOTHRUM_REF }}
-          path: .isothrum-src
           persist-credentials: false
       - run: rustup toolchain install --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Build
-        env:
-          RUNNER: ${{ steps.ref.outputs.runner }}
+      - run: cargo xtask verify
+      - name: Results
+        if: always()
+        run: cat target/verify/summary.txt target/verify/new.jsonl 2>/dev/null || true
+
+  # A Compose file, imported and generated: the draft's Compose file is valid for Compose.
+  import:
+    name: Import a Compose file, then validate the draft
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Import, generate, validate
         run: |
           set -euo pipefail
           cargo build -q --locked -p isoloom
-          mkdir -p bin
-          cp target/debug/isoloom bin/
-          if [ "$RUNNER" = true ]; then
-            cargo build -q --locked -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
-            cp .isothrum-src/target/debug/isothrum bin/
-          fi
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: binaries
-          path: bin/
-          if-no-files-found: error
-          retention-days: 3
-
-  # The generated Compose files, run for real through the Isothrum runner: Isoloom generates the
-  # files, `isothrum up` brings the example up, `isothrum check` passes (the spec's checks and the
-  # ones derived from its services and reach rules), and `isothrum down` leaves nothing behind.
-  docker:
-    name: Compose, run for real (${{ matrix.example }})
-    needs: binaries
-    if: needs.binaries.outputs.runner == 'true'
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        # The examples with a container form (tuned-web asks for a TPM: VM targets only).
-        example: [hello-stack, air-gapped, segmented, edge-firewall, slow-link, udp-dns, shared-files]
-    defaults:
-      run:
-        working-directory: examples/${{ matrix.example }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: binaries
-          path: ${{ runner.temp }}/bin
-      - name: Put the binaries on the PATH
-        working-directory: .
-        run: |
-          chmod +x "$RUNNER_TEMP/bin/"*
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Generate the Compose files
-        run: isoloom generate --target docker .
-      - name: Up
-        id: up
-        run: isothrum up . --target docker
-      - name: Checks (the spec's and the derived ones, from every machine)
-        if: steps.up.outcome == 'success'
-        run: isothrum check . --target docker
-      - name: Logs
-        if: failure()
-        run: docker compose -f .isoloom/docker/compose.yml --profile check logs --no-color
-      - name: Down (nothing left)
-        id: down
-        if: always() && steps.up.outcome == 'success'
-        run: |
-          isothrum down . --target docker
-          test -z "$(docker ps -aq --filter label=isoloom.managed=true)"
-      - name: Stop
-        if: always() && steps.down.outcome != 'success'
-        run: docker compose -f .isoloom/docker/compose.yml --profile check down -v || true
-
-  # The Kubernetes output on a real (throwaway) cluster: built images loaded, the environment
-  # applied and Available, then its checks as a Job (segmented's "cache is blocked" proves the
-  # network policies are enforced).
-  kubernetes:
-    name: Kubernetes on kind (${{ matrix.example }})
-    needs: binaries
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        example: [hello-stack, segmented, shared-files]
-    defaults:
-      run:
-        working-directory: examples/${{ matrix.example }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
-        with:
-          cluster_name: isoloom
-          config: .github/kind-calico.yaml
-          wait: 0s
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: binaries
-          path: ${{ runner.temp }}/bin
-      - name: Put the binaries on the PATH
-        working-directory: .
-        run: |
-          chmod +x "$RUNNER_TEMP/bin/"*
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Generate the Kubernetes files
-        run: isoloom generate --target kubernetes .
-      - name: Calico (enforces NetworkPolicies, egress included)
-        working-directory: .
-        run: |
-          kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml
-          kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s
-          kubectl wait --for=condition=Ready nodes --all --timeout=300s
-      - name: Build and load the project's images
-        run: |
-          grep -E '^#   docker build -t ' .isoloom/kubernetes/environment.yaml | sed 's/^#   //' | while read -r cmd; do
-            $cmd
-            kind load docker-image --name isoloom "$(echo "$cmd" | awk '{print $4}')"
-          done
-      - name: Start
-        run: |
-          kubectl kustomize --load-restrictor LoadRestrictionsNone .isoloom/kubernetes | kubectl apply -f -
-          ns=$(awk '/^kind: Namespace/{getline; getline; print $2; exit}' .isoloom/kubernetes/environment.yaml)
-          echo "NS=$ns" >> "$GITHUB_ENV"
-          kubectl -n "$ns" wait --for=condition=Available deployment --all --timeout=600s
-      - name: Checks (the spec's and the derived ones, from every machine)
-        # As .isoloom/kubernetes/checks says to run them: a Job per position, then their logs.
-        run: |
-          kubectl apply -k .isoloom/kubernetes/checks
-          kubectl -n "$NS" wait --for=condition=complete job --all --timeout=300s
-          kubectl -n "$NS" logs -l isoloom.com/check --tail=-1
-      # The Helm chart of the same environment, in a namespace of its own beside it: linted,
-      # installed, Available, and its checks as `helm test`.
-      - name: Helm chart (lint, install, helm test)
-        run: |
-          helm lint .isoloom/kubernetes/chart
-          helm install env .isoloom/kubernetes/chart -n "helm-$NS" --create-namespace
-          kubectl -n "helm-$NS" wait --for=condition=Available deployment --all --timeout=600s
-          helm test env -n "helm-$NS" --logs --timeout 5m
-      - name: Package the chart
-        run: |
-          helm package .isoloom/kubernetes/chart --version 1.2.3 -d "$RUNNER_TEMP"
-          ls "$RUNNER_TEMP"/*-1.2.3.tgz
-      - name: State
-        if: failure()
-        run: |
-          kubectl -n "helm-$NS" get all,networkpolicy,pvc,job -o wide || true
-          kubectl -n "$NS" get all,networkpolicy,pvc -o wide || true
-          kubectl -n "$NS" describe pods || true
-          kubectl -n "$NS" logs --all-containers --prefix -l isoloom.com/machine --tail=50 || true
-
-  # A Compose file, imported, generated and started: the draft runs.
-  import:
-    name: Import a Compose file, then run it
-    needs: binaries
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: binaries
-          path: ${{ runner.temp }}/bin
-      - name: Import, generate
-        run: |
-          set -euo pipefail
-          chmod +x "$RUNNER_TEMP/bin/"*
           shop="$RUNNER_TEMP/shop"
-          echo "SHOP=$shop" >> "$GITHUB_ENV"
           mkdir -p "$shop" && cp crates/tools/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml "$shop/"
-          "$RUNNER_TEMP/bin/isoloom" import compose "$shop/docker-compose.yml"
-          "$RUNNER_TEMP/bin/isoloom" generate "$shop" --target docker
-      - name: Start
-        run: API_TOKEN=t0k docker compose -f "$SHOP/.isoloom/docker/compose.yml" up -d --wait --wait-timeout 180
-      - name: Behaves like the original
-        run: |
-          docker compose -f "$SHOP/.isoloom/docker/compose.yml" exec -T cache wget -qO- http://web/ | grep -q "Welcome to nginx"
-          test "$(docker compose -f "$SHOP/.isoloom/docker/compose.yml" exec -T web printenv API_TOKEN)" = t0k
-      - name: Stop
-        if: always()
-        run: docker compose -f "$SHOP/.isoloom/docker/compose.yml" down -v
+          target/debug/isoloom import compose "$shop/docker-compose.yml"
+          target/debug/isoloom generate "$shop" --target docker
+          API_TOKEN=t0k docker compose -f "$shop/.isoloom/docker/compose.yml" config -q

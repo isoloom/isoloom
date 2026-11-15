@@ -5,12 +5,12 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Lab, refusal, refusal_on};
 
-use crate::testing::{Outcome, generated as file, valid};
+use crate::testing::{Outcome, generated as file, valid_allowed};
 
 /// Machine `web` with `fields` beside its network, `others` (more machines, as YAML lines) and
 /// the spec's `overrides` (YAML lines).
 fn build(fields: &str, others: &str, overrides: &str) -> Outcome<Lab> {
-    valid(&format!(
+    valid_allowed(&format!(
         "version: 1\nname: own\nnetworks: {{ lan: {{ cidr: 10.30.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, {fields} }}\n{others}{overrides}"
     ))
 }
@@ -77,9 +77,9 @@ fn every_target_boots_the_machines_own_image() -> Outcome {
 #[test]
 fn a_proxmox_template_is_cloned_and_an_own_image_stands_in_for_the_os() -> Outcome {
     let kali = spec("os: kali, app: { steps: [{ run: s.sh }] }")?;
-    assert!(refusal(&kali, Target::Proxmox).unwrap().contains("no Proxmox image for `kali`"));
+    assert!(refusal(&kali, Target::Proxmox).unwrap().unwrap().contains("no Proxmox image for `kali`"));
     // Kali is an AWS OS (its Marketplace image): only Proxmox needs the machine's own image.
-    assert_eq!(refusal(&kali, Target::CloudVm), None);
+    assert_eq!(refusal(&kali, Target::CloudVm).unwrap(), None);
     let s = build(
         "os: kali, app: { steps: [{ run: s.sh }] }",
         "",
@@ -88,7 +88,7 @@ fn a_proxmox_template_is_cloned_and_an_own_image_stands_in_for_the_os() -> Outco
     let proxmox = file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
     assert!(proxmox.contains("  clone {\n    vm_id = 9000\n    full  = true\n  }"), "{proxmox}");
     assert!(!proxmox.contains("proxmox_download_file.kali"), "{proxmox}");
-    assert_eq!(refusal(&s, Target::CloudVm), None);
+    assert_eq!(refusal(&s, Target::CloudVm).unwrap(), None);
     Ok(())
 }
 
@@ -115,20 +115,23 @@ fn libvirt_boots_the_machines_own_way() -> Outcome {
 #[test]
 fn a_target_or_provider_that_boots_the_image_as_it_is_refuses_and_says_why() -> Outcome {
     let s = spec(&boot(BOOT))?;
-    assert_eq!(refusal_on(&s, Target::Vagrant, Some("libvirt")), None);
-    let vbox = refusal_on(&s, Target::Vagrant, Some("virtualbox")).unwrap();
+    assert_eq!(refusal_on(&s, Target::Vagrant, Some("libvirt")).unwrap(), None);
+    let vbox = refusal_on(&s, Target::Vagrant, Some("virtualbox")).unwrap().unwrap();
     assert!(vbox.contains("Vagrant's virtualbox provider boots the box as it is"), "{vbox}");
-    let qemu = refusal_on(&pair(&boot(BOOT))?, Target::Vagrant, Some("qemu")).unwrap();
+    let qemu = refusal_on(&pair(&boot(BOOT))?, Target::Vagrant, Some("qemu")).unwrap().unwrap();
     assert!(qemu.contains("`hardware.boot.kernel`, `hardware.boot.initrd`"), "{qemu}");
-    assert_eq!(refusal_on(&pair(&boot("{ firmware_format: raw }"))?, Target::Vagrant, Some("qemu")), None);
-    let cloud = refusal(&s, Target::CloudVm).unwrap();
+    assert_eq!(
+        refusal_on(&pair(&boot("{ firmware_format: raw }"))?, Target::Vagrant, Some("qemu")).unwrap(),
+        None
+    );
+    let cloud = refusal(&s, Target::CloudVm).unwrap().unwrap();
     assert!(cloud.contains("machine `web` boots its own way (`hardware.boot`)"), "{cloud}");
-    let proxmox = refusal(&s, Target::Proxmox).unwrap();
+    let proxmox = refusal(&s, Target::Proxmox).unwrap().unwrap();
     assert!(
         proxmox.contains("machine `web` sets `hardware.boot.kernel`: Proxmox boots the VM's disk"),
         "{proxmox}"
     );
-    let cdrom = refusal(&spec(&boot("{ order: [cdrom] }"))?, Target::Proxmox).unwrap();
+    let cdrom = refusal(&spec(&boot("{ order: [cdrom] }"))?, Target::Proxmox).unwrap().unwrap();
     assert!(cdrom.contains("no CD-ROM drive"), "{cdrom}");
     Ok(())
 }

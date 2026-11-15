@@ -8,13 +8,13 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::{ec2_instance, egress, first_zone, host_instance_type, ingress, key_pair, root_disk, route_out, vm, zones};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance;
-use crate::docker_host::published;
+use crate::docker_host::container_ports;
 use crate::module::{ident, providers};
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::AWS,
     // Free Tier eligible sizes where they fit (the AWS Free plan refuses other types).
@@ -23,17 +23,18 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::ByMemory(|s| host_instance_type(s.memory_mb)),
     }),
     resources,
+    instance: "aws_instance",
 };
 
 /// The cloud's resources, after the module's head, `user_data` in the instance; the Docker
 /// host's address.
-fn resources(env: &Environment, m: &mut Module, user_data: Expression) -> Expression {
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
     let size = HostSize::of(env);
-    m.block(zones());
-    m.blocks(vm::ami_lookup(HOST_OS));
-    m.blocks(network());
-    m.block(security_group(env));
-    m.block(host(size, user_data));
+    module.block(zones());
+    module.blocks(vm::ami_lookup(HOST_OS));
+    module.blocks(network());
+    module.block(security_group(env));
+    module.block(host(size, user_data));
     reference("aws_instance.env.public_ip")
 }
 
@@ -85,10 +86,10 @@ fn security_group(env: &Environment) -> Block {
         .add_attribute(("name", reference("local.name")))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")))
         .add_block(ingress("SSH", (22, 22), "tcp", allowed()));
-    for p in published(env, Protocol::Tcp) {
+    for p in container_ports(env, Protocol::Tcp) {
         b = b.add_block(ingress(&format!("published {p}"), (p, p), "tcp", allowed()));
     }
-    for p in published(env, Protocol::Udp) {
+    for p in container_ports(env, Protocol::Udp) {
         b = b.add_block(ingress(&format!("published {p}/udp"), (p, p), "udp", allowed()));
     }
     b.add_block(egress()).build()

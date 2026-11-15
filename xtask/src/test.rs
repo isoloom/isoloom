@@ -55,9 +55,12 @@ fn tests(root: &Path, a: &Args, temp: &Path) -> Res<bool> {
     Ok(tests && doctests)
 }
 
-/// `cmd` with `temp` as its temporary folder, on every OS.
+/// `cmd` with `temp` as its temporary folder, on every OS. The .NET runtime of the PowerShell the
+/// Windows scripts' tests run opens its debugger and diagnostics pipes there
+/// (`clr-debug-pipe-*`, `dotnet-diagnostic-*`) and leaves them: `DOTNET_EnableDiagnostics=0`
+/// opens none.
 fn in_temp<'c>(cmd: &'c mut Command, temp: &Path) -> &'c mut Command {
-    cmd.env("TMPDIR", temp).env("TMP", temp).env("TEMP", temp)
+    cmd.env("TMPDIR", temp).env("TMP", temp).env("TEMP", temp).env("DOTNET_EnableDiagnostics", "0")
 }
 
 /// Whether the tests left `temp` empty; the leftovers are printed when they didn't.

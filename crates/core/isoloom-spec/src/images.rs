@@ -66,14 +66,19 @@ fn os_keys<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<String, VmImage>,
 /// What a Vagrant box's name is, for the refusal of one that isn't.
 pub(crate) const BOX_NAME: &str = "a Vagrant box name: letters, digits, `.`, `_` and `-`, after an optional `<org>/` (`bento/debian-12`)";
 
-/// The fields of `image` that name a Vagrant box (`vagrant`, `qemu`, `hyperv`) and hold something
+/// The fields of `image` that name a Vagrant box (`vagrant`, `qemu`, `hyperv`, `utm`) and hold something
 /// else, each with its value: the Vagrantfile reads a box name as Ruby text, so it is only ever
 /// [`BOX_NAME`].
 pub(crate) fn bad_boxes(image: &VmImage) -> impl Iterator<Item = (&'static str, &str)> {
-    [("vagrant", &image.vagrant), ("qemu", &image.qemu), ("hyperv", &image.hyperv)]
-        .into_iter()
-        .filter_map(|(field, value)| Some((field, value.as_deref()?)))
-        .filter(|(_, value)| !is_box_name(value))
+    [
+        ("vagrant", &image.vagrant),
+        ("qemu", &image.qemu),
+        ("hyperv", &image.hyperv),
+        ("utm", &image.utm),
+    ]
+    .into_iter()
+    .filter_map(|(field, value)| Some((field, value.as_deref()?)))
+    .filter(|(_, value)| !is_box_name(value))
 }
 
 /// Whether `s` is a box name: `<name>` or `<org>/<name>`, each part letters, digits, `.`, `_`

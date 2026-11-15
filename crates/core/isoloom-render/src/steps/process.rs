@@ -6,7 +6,7 @@
 use isoloom_plan::{Environment, Health, HealthTest, MachinePlan};
 use isoloom_spec::model::CommandLine;
 use isoloom_spec::shell::quote;
-use isoloom_spec::windows::ISOLOOM_DIR;
+use isoloom_spec::windows::{ISOLOOM_DIR, STATE_DIR as WINDOWS_STATE_DIR};
 
 use super::{MAKE_STATE_DIR, PROJECT_DIR, inputs_file};
 use crate::boot;
@@ -64,17 +64,11 @@ pub(super) fn setup(env: &Environment, machine: &str, paths: &[String]) -> Optio
 
 /// The `setup` scripts on Windows: each run once in order, from the project folder.
 pub(super) fn windows_setup(paths: &[String]) -> String {
-    let runs: Vec<String> = paths
-        .iter()
-        .map(|p| {
-            format!(
-                "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
-                powershell::quote(p)
-            )
-        })
-        .collect();
+    let runs: Vec<String> = paths.iter().map(|p| powershell::run_file(p)).collect();
     format!(
-        "if (-not (Test-Path '{ISOLOOM_DIR}\\setup.done')) {{ Set-Location {ISOLOOM_DIR}; {}; Set-Content '{ISOLOOM_DIR}\\setup.done' done }}",
+        // The mark lives in the state folder, which the project's unpack never touches (it wipes
+        // the project folder), so a reprovision doesn't run the setup again.
+        "if (-not (Test-Path '{WINDOWS_STATE_DIR}\\setup.done')) {{ Set-Location {ISOLOOM_DIR}; {}; New-Item -ItemType Directory -Force '{WINDOWS_STATE_DIR}' | Out-Null; Set-Content '{WINDOWS_STATE_DIR}\\setup.done' done }}",
         runs.join("; ")
     )
 }
@@ -126,16 +120,20 @@ fn powershell(c: &CommandLine) -> String {
     }
 }
 
-/// A script under the project folder, written from `lines`.
+/// A script in the state folder (the project's unpack wipes the project folder), written from
+/// `lines`.
 fn windows_script(name: &str, lines: &[String]) -> String {
     let body = lines.join("\n");
-    format!("Set-Content -Path '{ISOLOOM_DIR}\\{name}.ps1' -Value {}", powershell::quote(&body))
+    format!(
+        "New-Item -ItemType Directory -Force '{WINDOWS_STATE_DIR}' | Out-Null; Set-Content -Path '{WINDOWS_STATE_DIR}\\{name}.ps1' -Value {}",
+        powershell::quote(&body)
+    )
 }
 
 /// A startup task running `name.ps1` as SYSTEM, started now.
 fn startup_task(name: &str) -> String {
     format!(
-        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {ISOLOOM_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
+        "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File {WINDOWS_STATE_DIR}\\{name}.ps1'; Register-ScheduledTask -TaskName 'isoloom-{name}' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-{name}'"
     )
 }
 
@@ -167,7 +165,7 @@ pub(super) fn windows_healthy(env: &Environment, machine: &str) -> Option<String
             h.timeout,
             powershell::quote(&format!("http://127.0.0.1:{port}{path}"))
         ),
-        HealthTest::Command(c) => format!("Set-Location {}; {} | Out-Null; $LASTEXITCODE -eq 0", windows_dir(mp), powershell(c)),
+        HealthTest::Command(c) => windows_test(mp, c, h.timeout),
     };
     let failed = powershell::quote(&format!("{machine}: its healthcheck didn't pass after {} tries", h.retries));
     Some(format!(
@@ -176,10 +174,28 @@ pub(super) fn windows_healthy(env: &Environment, machine: &str) -> Option<String
     ))
 }
 
+/// A healthcheck command on Windows, run in a PowerShell of its own as Linux runs it in
+/// `sh -c`: an `exit` in it ends that PowerShell, not the step. It passes when that PowerShell
+/// exits 0 and the command's last output isn't `$false` (a cmdlet's test: `Test-Path`); a
+/// cmdlet's error fails it, and it is stopped after `timeout` seconds.
+fn windows_test(mp: &MachinePlan, c: &CommandLine, timeout: u32) -> String {
+    let child = format!(
+        "$ErrorActionPreference = 'Stop'; Set-Location {}; $r = & {{ {} }}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}; $last = @($r)[-1]; if ($last -is [bool] -and -not $last) {{ exit 1 }}; exit 0",
+        windows_dir(mp),
+        powershell(c)
+    );
+    // Encoded (UTF-16LE in base64), the command reaches the child as written, whatever quotes it holds.
+    format!(
+        "$c = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes({})); $p = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $c -NoNewWindow -PassThru; $null = $p.Handle; if ($p.WaitForExit({})) {{ $p.ExitCode -eq 0 }} else {{ $p.Kill(); $false }}",
+        powershell::quote(&child),
+        u64::from(timeout) * 1000
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use isoloom_plan::{Environment, Lab, lifecycle::Step};
-    use isoloom_spec::model::Target;
+    use isoloom_spec::model::{CommandLine, Target};
 
     const SPEC: &str = r"
 version: 1
@@ -210,7 +226,7 @@ machines:
     fn planned(yaml: &str) -> Environment {
         let lab = Lab::parse(yaml).expect("the test spec parses");
         assert_eq!(lab.problems(), [], "the test spec is valid");
-        Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
+        lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans")
     }
 
     fn env() -> Environment {
@@ -275,7 +291,10 @@ machines:
         let setup = step(&env, "win", |s| matches!(s, Step::Setup { .. }));
         let once = super::super::windows(&env, "win", &setup).expect("renders");
         assert!(
-            once.contains("secret.ps1") && once.contains("C:\\isoloom\\setup.done") && !once.contains("Register-ScheduledTask"),
+            once.contains("secret.ps1")
+                && once.contains("C:\\ProgramData\\isoloom\\setup.done")
+                && !once.contains("C:\\isoloom\\setup.done")
+                && !once.contains("Register-ScheduledTask"),
             "run once, not a startup task: {once}"
         );
         let command = super::super::windows(&env, "win", &Step::Command).expect("renders");
@@ -284,7 +303,10 @@ machines:
             "{command}"
         );
         let ready = super::super::windows(&env, "win", &Step::Ready).expect("renders");
-        assert!(ready.contains("& 'python' 'check.py' | Out-Null; $LASTEXITCODE -eq 0"), "{ready}");
+        assert!(
+            ready.contains("Set-Location ''C:\\isoloom''; $r = & { & ''python'' ''check.py'' };") && ready.contains("WaitForExit(3000)"),
+            "the test runs in a PowerShell of its own, stopped after its timeout: {ready}"
+        );
         assert!(ready.contains("Set-Content C:\\isoloom\\ready ready"), "{ready}");
     }
 
@@ -329,7 +351,7 @@ machines:
         );
         let windows = super::super::windows(&env, "iis", &Step::Command).expect("renders");
         assert!(
-            windows.starts_with("Set-Content -Path 'C:\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
+            windows.starts_with("New-Item -ItemType Directory -Force 'C:\\ProgramData\\isoloom' | Out-Null; Set-Content -Path 'C:\\ProgramData\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
             "{windows}"
         );
         assert!(
@@ -344,6 +366,38 @@ machines:
         let sh = super::super::linux(&env, "db", &Step::Ready).expect("renders");
         assert!(sh.contains("timeout 4 sh -c ''\\''pg_isready'\\'''\n) >/dev/null 2>&1; }"), "{sh}");
         assert!(sh.contains("echo 'db: its healthcheck didn'\\''t pass after 60 tries' >&2"), "{sh}");
+    }
+
+    #[test]
+    fn a_windows_command_healthcheck_runs_in_a_powershell_of_its_own() {
+        // A PowerShell to run it with (pwsh standing in for Windows PowerShell), else the test
+        // passes without running it.
+        if std::process::Command::new("pwsh").args(["-NoProfile", "-Command", "exit 0"]).output().is_err() {
+            return;
+        }
+        let env = env();
+        let mp = &env.machines["win"];
+        let passes = |text: &str, timeout: u32| {
+            let test = super::windows_test(mp, &CommandLine::Shell(text.to_owned()), timeout)
+                .replace("'C:\\isoloom'", "'.'")
+                .replace("-FilePath powershell.exe", "-FilePath pwsh");
+            let out = std::process::Command::new("pwsh")
+                .args(["-NoProfile", "-NonInteractive", "-Command", &test])
+                .output()
+                .expect("pwsh runs");
+            match String::from_utf8_lossy(&out.stdout).trim() {
+                "True" => true,
+                "False" => false,
+                other => panic!("{text}: {other}\n{}", String::from_utf8_lossy(&out.stderr)),
+            }
+        };
+        assert!(passes("exit 0", 30), "an exit 0 passes");
+        assert!(!passes("exit 1", 30), "an exit 1 fails, and ends the test only");
+        assert!(passes("Test-Path .", 30), "a cmdlet's true passes");
+        assert!(!passes("Test-Path ./nowhere", 30), "a cmdlet's false fails");
+        assert!(!passes("Get-Item ./nowhere", 30), "a cmdlet's error fails");
+        assert!(passes("if (\"a\" -eq 'a') { exit 0 } else { exit 1 }", 30), "quotes reach it as written");
+        assert!(!passes("Start-Sleep -Seconds 20", 1), "it is stopped after its timeout");
     }
 
     #[test]

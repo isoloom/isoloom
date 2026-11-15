@@ -20,7 +20,7 @@ pub enum Error {
         number: u8,
         /// Why it can't be made.
         #[source]
-        source: isoloom_spec::Error,
+        source: isoloom_spec::instance::InstanceError,
     },
     /// A `{{ path }}` of the message is one the message can't have, or points at nothing in the
     /// resolved snapshot.
@@ -45,22 +45,11 @@ pub enum Error {
     /// A file the generated output copies from the project can't be read.
     #[error("a project file the output copies can't be read")]
     ProjectCopies(#[source] isoloom_kubernetes::Error),
-    /// The tier list (`tiers.json`) isn't JSON of its shape.
-    #[error("tiers.json can't be read as the tier list")]
-    TiersJson(#[source] serde_json::Error),
     /// A row of the capability matrix (`probes.yml`) names what doesn't exist.
     #[error("the capability matrix's row `{row}`: {what}")]
     Probe {
         /// The row's field.
         row: String,
-        /// What is wrong with it.
-        what: String,
-    },
-    /// An entry of the tier list names what doesn't exist.
-    #[error("tiers.json: `{entry}`: {what}")]
-    Tiers {
-        /// The entry (`vagrant/libvirt`).
-        entry: String,
         /// What is wrong with it.
         what: String,
     },
@@ -75,6 +64,13 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Clone, thiserror::Error)]
 #[non_exhaustive]
 pub enum GenerateError {
+    /// The spec has problems (`Lab::problems`): nothing is generated for a spec that isn't
+    /// valid, whatever the target. Each problem as `path: reason`.
+    #[error("the spec isn't valid: {}", .problems.join("; "))]
+    Invalid {
+        /// Its problems, each as `path: reason`.
+        problems: Vec<String>,
+    },
     /// The environment's machines have no form this target runs (see `isoloom targets`).
     #[error("{}: not possible for this spec (see `isoloom targets`)", .0.id())]
     NotPossible(Target),
@@ -98,10 +94,10 @@ pub enum GenerateError {
         number: u8,
         /// Why it can't be made.
         #[source]
-        source: Arc<isoloom_spec::Error>,
+        source: isoloom_spec::instance::InstanceError,
     },
-    /// The backend failed, not the environment (a bug: a value the run manifest's types refused, a file
-    /// its writer couldn't write), with the error it failed with.
+    /// The backend failed, not the environment (a bug: a value its file's types refused, a file its
+    /// writer couldn't write), with the error it failed with.
     #[error("{}: {what}", target.id())]
     Internal {
         /// The target being generated.
@@ -166,7 +162,7 @@ mod tests {
     fn only_a_refusal_of_the_lab_is_a_refusal() {
         let failed = GenerateError::from(isoloom_render::Error::internal(
             Target::Vagrant,
-            "the run manifest refused a value of this backend",
+            "the module couldn't be written",
             std::io::Error::other("bad"),
         ));
         assert!(matches!(failed, GenerateError::Internal { target: Target::Vagrant, .. }));

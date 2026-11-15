@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 
 import hcl
 import shell_find
@@ -92,6 +94,16 @@ end
                 ('web: provision "hosts"', "bash", 'echo "a" >> /etc/hosts\n'),
             ],
         )
+
+
+class VagrantReadsBeside(unittest.TestCase):
+    def test_an_inline_script_reads_the_file_beside_the_vagrantfile_as_vagrant_does(self) -> None:
+        text = 'config.vm.define "web" do |m|\n  m.vm.provision "shell", name: "checks script", inline: "cat > /x <<\'T\'\\n" + File.read(File.join(__dir__, "checks/web.sh")) + "\\nT\\n"\nend\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "checks").mkdir()
+            (Path(tmp) / "checks" / "web.sh").write_text("echo ok", encoding="utf-8")
+            found = shell_find.vagrantfile(text, Path(tmp))
+        self.assertEqual(found[0].text, "cat > /x <<'T'\necho ok\nT\n\n")
 
 
 class CloudConfig(unittest.TestCase):

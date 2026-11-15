@@ -48,6 +48,9 @@ pub struct Resolved {
     pub configure: Vec<Step>,
     /// The `start` phase, run before the services at each start.
     pub start: Vec<Step>,
+    /// The three phases' steps in order (`install`, `configure`, `start`), each as a spec writes
+    /// it: what a machine's explicit `app.steps` would hold to do the same.
+    pub written: Vec<serde_json::Value>,
     /// The texts of the templates the steps place, by the path a step's `from` names.
     pub files: BTreeMap<ProjectPath, String>,
     /// The machine's ports, by name.
@@ -73,8 +76,10 @@ impl Catalogue {
         let Kind::Service(services) = &m.kind else { return Ok(Vec::new()) };
         let at = FieldPath::new("machines").key(machine);
         let Some(os) = m.os else {
-            // The spec's own check reports the missing `os`.
-            return Err(Vec::new());
+            // The spec's own check reports the missing `os` at the same field, so a caller that
+            // gathers both shows it once; an empty error would read as no problem at all.
+            let missing = Problem::new(Code::MissingField, at.key("os"), "a catalogue service runs on the OS the machine names");
+            return Err(vec![missing.fix("`os: debian@12`")]);
         };
         let mut problems = Vec::new();
         let mut out = Vec::new();
@@ -170,9 +175,7 @@ impl Entry {
             settings: &settings,
         };
         let mut files = BTreeMap::new();
-        let recipe = &self.definition().recipe;
-        let phases = [("install", &recipe.install), ("configure", &recipe.configure), ("start", &recipe.start)]
-            .map(|(name, steps)| context.phase(name, steps, &mut files));
+        let phases = self.definition().recipe.phases().map(|(name, steps)| context.phase(name, steps, &mut files));
         let [install, configure, start] = phases;
         let broken = |e: recipe::StepError| {
             vec![Problem::new(
@@ -185,6 +188,9 @@ impl Entry {
         let surface = surface::Surface::of(&context)
             .map_err(|reason| vec![Problem::new(Code::InvalidValue, request.field.clone(), format!("{}: {reason}", self.name()))])?;
         start.splice(0..0, surface.owners);
+        let written = install.iter().chain(&configure).chain(&start).map(|(_, w)| w.clone()).collect();
+        let steps = |phase: Vec<(Step, serde_json::Value)>| phase.into_iter().map(|(s, _)| s).collect::<Vec<_>>();
+        let (install, configure, start) = (steps(install), steps(configure), steps(start));
         Ok(Resolved {
             entry: self.name().clone(),
             release: release.version.clone(),
@@ -194,6 +200,7 @@ impl Entry {
             install,
             configure,
             start,
+            written,
             files,
             ports: surface.ports,
             data: self.definition().data.clone(),
@@ -206,8 +213,7 @@ impl Entry {
     /// The release `service`'s version picks: the default when it gives none.
     fn release_for(&self, service: &ServiceRef, field: &FieldPath) -> Result<&Release, Problem> {
         let def = self.definition();
-        let asked = service.as_str().split_once('@').map(|(_, v)| v);
-        let Some(asked) = asked else {
+        let Some(asked) = service.version() else {
             return def
                 .release(&def.default)
                 .ok_or_else(|| Problem::new(Code::InvalidValue, field.clone(), format!("{}'s default release is missing", self.name())));

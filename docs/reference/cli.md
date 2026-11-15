@@ -27,10 +27,11 @@ Arguments:
 | `--json` | Machine-readable output. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom targets`
 
-List the targets the spec can be generated for, why the others can't, and the tier of each one generated (how far it has been proven).
+List the targets the spec can be generated for, why the others can't, and the validators that check each one generated.
 
 ```text
 Usage: isoloom targets [OPTIONS] [DIR]
@@ -44,6 +45,7 @@ Arguments:
 | `--json` | JSON instead of text. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom resources`
 
@@ -61,6 +63,7 @@ Arguments:
 | `--json` | JSON instead of text. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom generate`
 
@@ -78,6 +81,7 @@ Arguments:
 | `--target <TARGET>` | Only this target (any that `isoloom targets` lists); a profile's pinned target when it has one. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom check`
 
@@ -95,6 +99,7 @@ Arguments:
 | `--target <TARGET>` | Only this target (any that `isoloom targets` lists); a profile's pinned target when it has one. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 | `-q, --quiet` | Only the files that fail, so a CI log shows what to fix. |
 | `--json` | Machine-readable output: one result per file, then a summary. |
 
@@ -115,6 +120,7 @@ Arguments:
 | `--json` | Machine-readable output. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom graph`
 
@@ -134,6 +140,7 @@ Arguments:
 | `--instance <N>` | Draw instance N (its blocks and name). |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom report`
 
@@ -153,6 +160,7 @@ Arguments:
 | `--instance <N>` | Report on instance N. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom message`
 
@@ -171,6 +179,7 @@ Arguments:
 | `--target <TARGET>` | The target it runs on, for the addresses machines have there (default: the spec's single target, else the spec's addresses). |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom inspect`
 
@@ -190,6 +199,7 @@ Arguments:
 | `--instance <N>` | The snapshot of instance N (1-99) of the spec: its own names, Docker blocks and published ports, as a runner makes them for several copies on one host. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom profiles`
 
@@ -207,6 +217,7 @@ Arguments:
 | `--json` | JSON instead of text. |
 | `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
 | `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
 
 ## `isoloom schema`
 
@@ -328,12 +339,12 @@ Arguments:
 | Argument | Description |
 | --- | --- |
 | `--spec` | The spec reference (docs/spec.md): every field, its type, default, allowed values and limits. |
-| `--matrix` | The capability matrix (docs/matrix.md): what each target does with each spec field, and each target's tier with its evidence. |
+| `--matrix` | The capability matrix (docs/matrix.md): what each target does with each spec field, and the validators of each target's files. |
 | `--cli` | The command-line reference (docs/reference/cli.md): every command and its arguments. |
 
 ## `isoloom matrix`
 
-Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and each target's tier with its evidence. `--json` for tools.
+Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and the validators of each target's files. `--json` for tools.
 
 ```text
 Usage: isoloom matrix [OPTIONS]
@@ -343,7 +354,56 @@ Arguments:
 
 | Argument | Description |
 | --- | --- |
-| `--json` | The matrix as JSON: the columns with their tiers, every tier entry with its evidence, and each row's cell per column (its state, and for a refusal the step and reason). |
+| `--json` | The matrix as JSON: the columns, each target's validators, and each row's cell per column (its state, and for a refusal the step and reason). |
+
+## `isoloom bases`
+
+Vendor the published Dockerfiles of the base images the project's builds start FROM that Isoloom's service matrix doesn't have (under vendor/bases/), so those machines get a VM form offline.
+
+```text
+Usage: isoloom bases [OPTIONS] <COMMAND>
+```
+
+## `isoloom bases fetch`
+
+Fetch and vendor the base images the builds need (under vendor/bases/).
+
+```text
+Usage: isoloom bases fetch [OPTIONS] [DIR]
+```
+
+Arguments:
+
+| Argument | Description |
+| --- | --- |
+| `[DIR]` | The project folder (holding isoloom.yml). Default: `.`. |
+| `--images <FILE>` | Your own image table (YAML): OS images, and the access machine when the spec leaves it to the runner. See <https://www.isoloom.com/en/docs/configuration#the-image-table>. |
+| `-s, --set <KEY=VALUE>` | Override a value for this command: `-s machines.web.os=ubuntu@24.04` on the spec, `-s defaults.cloud.aws.region=eu-west-1` on the defaults. Repeatable. |
+| `--allow-host <ACCESS>` | Allow the environment to reach this computer this way: `host-folders` (a folder outside the project), `writable-host-folders`, `docker-socket`, `privileged` (a privileged container), `devices`, `boot-files` (a VM's kernel, firmware or TFTP folder on the host), `host-network` (a bridged network). None by default: a spec that asks for one is refused. Repeatable. |
+
+## `isoloom bases help`
+
+Print this message or the help of the given subcommand(s).
+
+```text
+Usage: isoloom bases help [COMMAND]
+```
+
+## `isoloom bases help fetch`
+
+Fetch and vendor the base images the builds need (under vendor/bases/).
+
+```text
+Usage: isoloom bases help fetch
+```
+
+## `isoloom bases help help`
+
+Print this message or the help of the given subcommand(s).
+
+```text
+Usage: isoloom bases help help
+```
 
 ## `isoloom help`
 
@@ -363,7 +423,7 @@ Usage: isoloom help validate
 
 ## `isoloom help targets`
 
-List the targets the spec can be generated for, why the others can't, and the tier of each one generated (how far it has been proven).
+List the targets the spec can be generated for, why the others can't, and the validators that check each one generated.
 
 ```text
 Usage: isoloom help targets
@@ -491,10 +551,26 @@ Usage: isoloom help docs
 
 ## `isoloom help matrix`
 
-Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and each target's tier with its evidence. `--json` for tools.
+Show what each target does with each spec field (✓ generated, ✗ refused, with the step that refuses and why, – not applicable), worked out from the generators themselves, and the validators of each target's files. `--json` for tools.
 
 ```text
 Usage: isoloom help matrix
+```
+
+## `isoloom help bases`
+
+Vendor the published Dockerfiles of the base images the project's builds start FROM that Isoloom's service matrix doesn't have (under vendor/bases/), so those machines get a VM form offline.
+
+```text
+Usage: isoloom help bases [COMMAND]
+```
+
+## `isoloom help bases fetch`
+
+Fetch and vendor the base images the builds need (under vendor/bases/).
+
+```text
+Usage: isoloom help bases fetch
 ```
 
 ## `isoloom help help`

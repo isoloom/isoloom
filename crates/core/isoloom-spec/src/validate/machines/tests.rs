@@ -10,10 +10,6 @@ const WEB: &str = "  web: { networks: { lan: 10 }, docker: { image: nginx } }\n"
 #[test]
 fn a_lab_has_a_machine_and_one_access_machine_at_most() {
     assert_eq!(problems(&lab("")), ["machines: declare at least one machine"]);
-    assert_eq!(
-        problems("version: 1\nname: t\ncloud: { provider: aws, terraform: infra }\n"),
-        Vec::<String>::new()
-    );
     let one = "  a: { networks: { lan: 11 }, docker: { image: debian }, access: true }\n";
     assert_eq!(of(&format!("{one}{WEB}")), Vec::<String>::new());
     let two = "  b: { networks: { lan: 12 }, docker: { image: debian }, access: true }\n";

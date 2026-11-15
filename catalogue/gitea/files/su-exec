@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's gitea entry: the gitea image's `su-exec user[:group]
+# command...`, which its entrypoints use, as util-linux's setpriv on a Debian or Ubuntu machine.
+set -eu
+spec=$1
+shift
+user=${spec%%:*}
+group=${spec#*:}
+[ "$group" != "$spec" ] || group=$(id -gn "$user")
+exec setpriv --reuid "$(id -u "$user")" --regid "$(getent group "$group" | cut -d: -f3)" --init-groups -- "$@"

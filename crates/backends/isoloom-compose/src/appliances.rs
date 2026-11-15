@@ -332,7 +332,10 @@ fn iol_wiring(pid: usize, ports: Vec<Port>, cfg: String) -> Wiring {
         own_config: "/iol/own.txt",
         firmware: None,
         environment: vec![("IOL_PID".into(), pid.to_string())],
-        entrypoint: shell("cat /iol/base.txt /iol/own.txt > /iol/config.txt 2>/dev/null; echo end >> /iol/config.txt; exec /entrypoint.sh"),
+        entrypoint: shell(&format!(
+            "{}exec /entrypoint.sh",
+            startup_config("/iol/base.txt", "/iol/own.txt", "/iol/config.txt")
+        )),
         privileged: false,
         build: None,
     }
@@ -347,11 +350,12 @@ fn vrnetlab_wiring(name: &str, kind: Appliance, ports: Vec<Port>, cfg: String) -
     Wiring {
         ports,
         files: vec![base_cfg(cfg)],
-        own_config: "/config/own.cfg",
+        own_config: OWN_CFG,
         firmware: None,
         environment,
         entrypoint: shell(&format!(
-            "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; exec uv run /launch.py --username admin --password admin --hostname {name} --connection-mode tc --trace"
+            "{}exec uv run /launch.py --username admin --password admin --hostname {name} --connection-mode tc --trace",
+            startup_config(BASE_CFG, OWN_CFG, STARTUP_CFG)
         )),
         privileged: true,
         build: None,
@@ -375,22 +379,35 @@ fn dynamips_wiring(ports: Vec<Port>, cfg: String) -> Wiring {
     Wiring {
         ports,
         files: vec![base_cfg(cfg)],
-        own_config: "/config/own.cfg",
+        own_config: OWN_CFG,
         firmware: Some("/firmware/ios.bin"),
         environment: vec![("DYNAMIPS_ARGS".into(), args.concat())],
-        entrypoint: shell(
-            "cat /config/base.cfg /config/own.cfg > /config/startup-config.cfg 2>/dev/null; echo end >> /config/startup-config.cfg; cd /tmp && exec dynamips $DYNAMIPS_ARGS /firmware/ios.bin",
-        ),
+        entrypoint: shell(&format!(
+            "{}cd /tmp && exec dynamips $DYNAMIPS_ARGS /firmware/ios.bin",
+            startup_config(BASE_CFG, OWN_CFG, STARTUP_CFG)
+        )),
         privileged: false,
         build: Some(DYNAMIPS_DOCKERFILE),
     }
 }
 
+/// The shell line an appliance's entrypoint starts with: its startup configuration `out` written
+/// from Isoloom's `base` and the spec's `own` (when given), closed with `end`.
+fn startup_config(base: &str, own: &str, out: &str) -> String {
+    format!("cat {base} {own} > {out} 2>/dev/null; echo end >> {out}; ")
+}
+
+/// Where vrnetlab's and Dynamips' appliances find Isoloom's configuration, the spec's own, and
+/// the startup configuration made of both.
+const BASE_CFG: &str = "/config/base.cfg";
+const OWN_CFG: &str = "/config/own.cfg";
+const STARTUP_CFG: &str = "/config/startup-config.cfg";
+
 /// Isoloom's startup configuration, as `/config/base.cfg` (vrnetlab's and Dynamips' place).
 fn base_cfg(cfg: String) -> File {
     File {
         name: "base.cfg",
-        inside: "/config/base.cfg",
+        inside: BASE_CFG,
         contents: cfg,
     }
 }
@@ -428,7 +445,7 @@ mod tests {
     fn config(yaml: &str) -> String {
         let lab = isoloom_plan::Lab::new(isoloom_spec::parse(yaml).unwrap());
         let target = isoloom_spec::model::Target::Docker;
-        let env = Environment::build(&lab.for_target(target), target, None).expect("the spec plans");
+        let env = lab.plan(&lab.for_target(target), target, None).expect("the spec plans");
         StartupConfig {
             env: &env,
             name: "r",

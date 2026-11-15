@@ -12,12 +12,25 @@
 //! # Ok::<(), Vec<isoloom_spec::syntax::Problem>>(())
 //! ```
 
+#![cfg_attr(
+    all(test, not(windows)),
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
 pub mod appliance;
+mod as_written;
+pub mod check_line;
 mod clones;
+pub mod contract;
 pub mod defaults;
 mod error;
 pub mod groups;
 pub mod host;
+pub mod host_access;
+pub mod ignore;
 pub mod images;
 pub mod instance;
 pub mod linux;
@@ -25,9 +38,12 @@ mod load;
 pub mod model;
 pub mod net;
 pub mod os;
+pub mod path;
 pub mod placeholders;
 pub mod probe;
 pub mod profile;
+pub mod project_path;
+pub mod ready_line;
 pub mod reference;
 pub mod schema;
 pub mod shell;
@@ -42,7 +58,7 @@ pub mod windows;
 
 pub use error::{Error, Result};
 pub use load::{SPEC_FILE, SPEC_FILES, find, load, load_profiled, parse};
-pub use model::{Appliance, Arch, Check, CloudServices, Expect, Machine, Target, Tc};
+pub use model::{Appliance, Arch, Check, Expect, Machine, Target, Tc};
 pub use sizing::{CONTAINER_MEMORY_MB, DEFAULT_CPUS, Form, MachineSize, Totals, totals, totals_for};
 pub use syntax::Spec;
 pub use validate::{Problem, validate, validate_files};

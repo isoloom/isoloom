@@ -80,7 +80,7 @@ fn vms_and_networks(env: &Environment, with_controller: bool) -> Vec<(String, Ve
 }
 
 /// Each VM's link, by its define name: a VM on one network gets a port of its hub, one host port
-/// per linked VM, at most [`PORTS`] of them.
+/// per linked VM, at most [`HUB_PORT_COUNT`] of them.
 pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String, Link> {
     let mut linked = 0;
     vms_and_networks(env, with_controller)
@@ -90,13 +90,13 @@ pub(crate) fn links(env: &Environment, with_controller: bool) -> IndexMap<String
                 [] => Link::None,
                 [net] => {
                     linked += 1;
-                    if linked <= usize::from(PORTS) {
+                    if linked <= usize::from(HUB_PORT_COUNT) {
                         Link::Hub(HubPort {
                             net: (*net).to_owned(),
                             vm: name.clone(),
                         })
                     } else {
-                        Link::Refused(format!("`{name}`: QEMU links at most {PORTS} VMs of an environment, a host port each"))
+                        Link::Refused(format!("`{name}`: QEMU links at most {HUB_PORT_COUNT} VMs of an environment, a host port each"))
                     }
                 }
                 more => Link::Refused(format!("`{name}` is on {} networks, and QEMU gives a VM one", more.len())),
@@ -123,8 +123,9 @@ pub(crate) fn needs_ruby(links: &IndexMap<String, Link>, sized: bool) -> bool {
     sized || links.values().any(|l| matches!(l, Link::Hub(_)))
 }
 
-/// How many host ports the hubs pick from (`IsoloomQemu::PORTS`, from 20000).
-const PORTS: u16 = 20_000;
+/// How many host ports the hubs pick from: `IsoloomQemu::PORTS` in [`QEMU_RB`], which a test
+/// holds to this value.
+const HUB_PORT_COUNT: u16 = 20_000;
 
 /// The first VM that can't have its network, as the reason.
 pub(crate) fn refusal(links: IndexMap<String, Link>) -> Option<String> {
@@ -137,6 +138,15 @@ pub(crate) fn refusal(links: IndexMap<String, Link>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{HubPort, Link};
+
+    #[test]
+    fn the_hubs_port_count_is_the_rubys() {
+        let ruby = super::QEMU_RB
+            .lines()
+            .find_map(|l| l.trim().strip_prefix("PORTS = "))
+            .map(|n| n.replace('_', "").parse::<u16>());
+        assert_eq!(ruby, Some(Ok(super::HUB_PORT_COUNT)), "vagrant_qemu.rb's PORTS and qemu.rs's differ");
+    }
 
     fn hub(net: &str, vm: &str) -> Link {
         Link::Hub(HubPort {
@@ -183,6 +193,6 @@ mod tests {
 
     #[test]
     fn the_ruby_picks_from_as_many_ports_as_the_links_count() {
-        assert!(super::QEMU_RB.contains(&format!("PORTS = {}_{:03}\n", super::PORTS / 1000, super::PORTS % 1000)));
+        assert!(super::QEMU_RB.contains(&format!("PORTS = {}_{:03}\n", super::HUB_PORT_COUNT / 1000, super::HUB_PORT_COUNT % 1000)));
     }
 }

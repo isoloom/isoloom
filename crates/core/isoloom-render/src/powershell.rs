@@ -22,6 +22,15 @@ pub fn quote(s: &str) -> String {
     out
 }
 
+/// The line that runs the PowerShell script at `path` in a fresh `powershell` (no profile, any
+/// execution policy) and stops the calling script with its exit code when it fails.
+pub(crate) fn run_file(path: &str) -> String {
+    format!(
+        "& powershell -NoProfile -ExecutionPolicy Bypass -File {}; if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}",
+        quote(path)
+    )
+}
+
 /// Whether PowerShell reads `c` as a single quote.
 fn is_quote(c: char) -> bool {
     matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}')

@@ -1,7 +1,8 @@
 //! The controller: a Debian VM on every network (at the controller address) that runs the
 //! environment's playbooks over SSH with a key of its own, once every machine is set up, and the
 //! checks when no Linux machine can. A target makes the VM; this module gives its key, its
-//! set-up and the inventory.
+//! set-up and the inventory ([`inventory`]), and its waits for the machines before the playbooks
+//! ([`waits`]).
 
 use std::net::Ipv4Addr;
 
@@ -9,20 +10,26 @@ use crate::hcl_builder::{Expression, Module, Template, call, reference, string};
 use indexmap::IndexMap;
 use isoloom_plan::addressing::names_of;
 use isoloom_plan::{Controller, Environment, Step, Vm};
-use isoloom_render::inventory::{self, Access, CONTROLLER_INVENTORY, CONTROLLER_KEY, Vars, vars};
+use isoloom_render::inventory::{CONTROLLER_INVENTORY, CONTROLLER_KEY};
 use isoloom_render::{controller, steps};
+use isoloom_spec::MachineSize;
 use isoloom_spec::linux::CONFIG_DIR;
-use isoloom_spec::model::Winrm;
+
+mod inventory;
+mod waits;
+
+pub(crate) use inventory::{WinrmAuth, cloud_inventory, inventory_template, server_access};
+pub(crate) use waits::{linux_waits, windows_waits};
 
 use super::provisioner::{Connection, Provisioner, Upload};
-use super::{Shell, linux, windows};
+use super::{Shell, linux};
 use crate::module::{ident, resource};
 
 /// The controller's OS.
 pub(crate) const OS: &str = "debian-12";
 
-/// Its name: its host name, and its machine in a run manifest.
-pub(crate) const NAME: &str = isoloom_manifest::contract::CONTROLLER;
+/// Its name: its host name, and its machine in the module's outputs.
+pub(crate) const NAME: &str = isoloom_spec::contract::CONTROLLER;
 /// Where its key is uploaded before its set-up (then moved to `/etc/isoloom`).
 const KEY_UPLOAD: &str = "/tmp/isoloom-controller-key";
 /// Where its inventory is uploaded before its set-up.
@@ -55,18 +62,26 @@ pub(crate) fn install_packages() -> String {
 /// project fit, with room for their logs.
 pub(crate) const DISK_GB: u32 = 10;
 
-/// Its (CPUs, memory in MB, disk in GB): 1 CPU, 512 MB and [`DISK_GB`] unless the spec says
-/// otherwise.
-pub(crate) fn size(env: &Environment) -> (u32, u32, u32) {
-    env.controller.map_or((Controller::CPUS, Controller::MEMORY_MB, DISK_GB), |c| {
-        (c.cpus, c.memory_mb, c.disk_gb.unwrap_or(DISK_GB))
-    })
+/// Its size: 1 CPU, 512 MB and [`DISK_GB`] unless the spec says otherwise.
+pub(crate) fn size(env: &Environment) -> MachineSize {
+    env.controller.map_or(
+        MachineSize {
+            cpus: Controller::CPUS,
+            memory_mb: Controller::MEMORY_MB,
+            disk_gb: DISK_GB,
+        },
+        |c| MachineSize {
+            cpus: c.cpus,
+            memory_mb: c.memory_mb,
+            disk_gb: c.disk_gb.unwrap_or(DISK_GB),
+        },
+    )
 }
 
 /// Its key, `tls_private_key.controller`, when the environment needs a controller.
-pub(crate) fn write_key(env: &Environment, m: &mut Module) {
+pub(crate) fn write_key(env: &Environment, module: &mut Module) {
     if needed(env) {
-        m.commented(
+        module.commented(
             "The controller's own key: it runs the playbooks over SSH on every machine.",
             resource("tls_private_key", "controller")
                 .add_attribute(("algorithm", string("ED25519")))
@@ -124,83 +139,6 @@ pub(crate) fn hosts(env: &Environment) -> Option<String> {
 /// The playbooks, as the controller runs them.
 pub(crate) fn playbooks(env: &Environment) -> String {
     controller::provision_script(env.spec(), &[])
-}
-
-/// A cloud's inventory (the shared one, `isoloom_render::inventory`): each Linux VM as its
-/// image's user (`user(os)`), the Windows VMs over WinRM (authenticated with `auth`, as
-/// Terraform's own connection is) with the generated password.
-pub(crate) fn cloud_inventory(env: &Environment, user: impl Fn(&str) -> String, auth: WinrmAuth) -> Template {
-    inventory_template(env, |password| cloud_access(user, password, auth))
-}
-
-/// How WinRM authenticates over plain HTTP: Basic where the image allows it, NTLM where it
-/// doesn't (Azure's Windows images).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum WinrmAuth {
-    /// Basic authentication (the user data allows it).
-    Basic,
-    /// NTLM.
-    Ntlm,
-}
-
-/// How a Windows machine set up by Isoloom (on the servers and the clouds) is reached: as
-/// `isoloom` with a generated password, over WinRM on plain HTTP.
-fn isoloom_over_winrm(password: &str, transport: WinrmAuth) -> Vars {
-    let mut windows = vars(&[("ansible_user", "isoloom"), ("ansible_password", password), ("ansible_connection", "winrm")]);
-    windows.extend(match transport {
-        WinrmAuth::Basic => inventory::winrm_vars(Winrm::Plaintext),
-        WinrmAuth::Ntlm => vars(&[("ansible_port", "5985"), ("ansible_winrm_scheme", "http"), ("ansible_winrm_transport", "ntlm")]),
-    });
-    windows.extend(vars(&inventory::WINRM_PATIENCE));
-    windows
-}
-
-/// How the controller reaches the VMs of Isoloom's server targets (Proxmox, ESXi): the `isoloom`
-/// user cloud-init creates on each Linux VM, with the controller's key; on a Windows VM, the
-/// `isoloom` administrator its set-up makes, whose password is `windows_password` (a Terraform
-/// expression, as the module writes it), over WinRM.
-pub(crate) fn server_access<'a>(windows_password: &str) -> Access<'a> {
-    Access::new(
-        vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
-        isoloom_over_winrm(windows_password, WinrmAuth::Basic),
-        |h| {
-            if h.machine.is_windows() {
-                Vars::new()
-            } else {
-                vars(&[("ansible_user", "isoloom")])
-            }
-        },
-    )
-}
-
-/// How the controller reaches a cloud's VMs: each Linux VM as its image's user (`linux_user` of
-/// its OS) with the controller's key; Windows over plain-HTTP WinRM as `isoloom`, whose password
-/// is `windows_password` (a Terraform expression), authenticated as the cloud's images allow
-/// (`auth`, as Terraform's own connection does).
-pub(crate) fn cloud_access<'a>(linux_user: impl Fn(&str) -> String + 'a, windows_password: &str, auth: WinrmAuth) -> Access<'a> {
-    Access::new(
-        vars(&[("ansible_ssh_private_key_file", CONTROLLER_KEY)]),
-        isoloom_over_winrm(windows_password, auth),
-        move |h| match Vm::of(h.name, h.machine) {
-            Some(vm) if !vm.plan.is_windows() => vec![("ansible_user".to_owned(), linux_user(vm.os))],
-            _ => Vars::new(),
-        },
-    )
-}
-
-/// The inventory `access` gives (from the generated Windows password's Terraform expression),
-/// that password interpolated where the inventory names it.
-pub(crate) fn inventory_template<'a>(env: &Environment, access: impl FnOnce(&str) -> Access<'a>) -> Template {
-    let marker = format!("${{{}}}", windows::PASSWORD);
-    let text = inventory::render(env, &access(&marker));
-    let mut t = Template::new();
-    for (i, part) in text.split(marker.as_str()).enumerate() {
-        if i > 0 {
-            t.push_expr(reference(windows::PASSWORD));
-        }
-        t.push_text(part);
-    }
-    t
 }
 
 /// The controller over SSH, as Terraform reaches it.
@@ -267,41 +205,6 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     }
 }
 
-/// Each Linux machine's own set-up must be done (its ready file says `ready`) before the
-/// playbooks run: its name, and the wait, over SSH with the controller's key as `user` of its OS at the
-/// machine's first address.
-pub(crate) fn linux_waits(env: &Environment, user: &dyn Fn(&str) -> String) -> Vec<(String, String)> {
-    env.vms()
-        .filter(|vm| !vm.plan.is_windows())
-        .filter_map(|Vm { name, plan: mp, os }| {
-            let a = mp.addresses.values().next()?;
-            let u = user(os);
-            let ready = isoloom_render::steps::READY_FILE;
-            // Its ready file's first line: `ready` goes on, `failed: <step>` stops the playbooks.
-            let (done, failed) = (isoloom_manifest::ReadyLine::READY, isoloom_render::steps::failed_pattern());
-            let wait = format!(
-                "i=0; until s=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i {CONTROLLER_KEY} {u}@{a} head -n 1 {ready} 2>/dev/null) && [ \"$s\" = {done} ]; do case \"$s\" in {failed}) echo \"{name}: $s\"; exit 1;; esac; i=$((i+1)); [ $i -gt 240 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 5; done"
-            );
-            Some((name.to_owned(), Shell::Root.command(&wait)))
-        })
-        .collect()
-}
-
-/// The controller's wait for each Windows machine's ready marker, through Ansible over WinRM
-/// (the inventory's own connection), before the playbooks run: a Windows machine set up at its
-/// first boot (cloudbase-init) has no set-up of Terraform's to wait for.
-pub(crate) fn windows_waits(env: &Environment) -> Vec<String> {
-    env.vms()
-        .filter(|vm| vm.plan.is_windows())
-        .map(|Vm { name, .. }| {
-            format!(
-                "i=0; until /opt/ansible/bin/ansible -i {CONTROLLER_INVENTORY} {name} -m raw -a 'if (-not (Test-Path {ready})) {{ exit 1 }}' >/dev/null 2>&1; do i=$((i+1)); [ $i -gt 360 ] && {{ echo '{name} not ready'; exit 1; }}; sleep 10; done",
-                ready = isoloom_spec::windows::READY_FILE
-            )
-        })
-        .collect()
-}
-
 /// The controller's inventory as Isoloom's server and cloud VMs are reached.
 #[cfg(test)]
 mod inventory_tests {
@@ -309,7 +212,9 @@ mod inventory_tests {
     use isoloom_render::test_support::{INVENTORY_SPEC as SPEC, example, section};
     use isoloom_spec::model::Target;
 
-    use super::{Access, WinrmAuth, cloud_access, server_access};
+    use isoloom_render::inventory::Access;
+
+    use super::inventory::{WinrmAuth, cloud_access, server_access};
 
     /// AWS's image users, as the cloud-vm module names them.
     fn aws() -> Access<'static> {

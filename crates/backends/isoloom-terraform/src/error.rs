@@ -29,16 +29,6 @@ pub enum Error {
         #[source]
         source: hcl_builder::Error,
     },
-    /// A value of the run manifest was refused by the manifest's own types: a bug of this
-    /// backend (the plan checked what it is made of).
-    #[error("{}: {MANIFEST_REFUSED}", target.id())]
-    Manifest {
-        /// The target whose manifest it is.
-        target: Target,
-        /// What the manifest's types refused.
-        #[source]
-        source: isoloom_manifest::Error,
-    },
 }
 
 /// A result whose error is this crate's [`Error`].
@@ -46,19 +36,15 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl From<Error> for RenderError {
     /// The error as a backend reports it: an unsupported environment for the target, its reason
-    /// in full; or a failure of this backend (a module or manifest it couldn't write), with its
+    /// in full; or a failure of this backend (a module it couldn't write), with its
     /// cause.
     fn from(e: Error) -> RenderError {
         match e {
             Error::Refused { target, reason } => RenderError::Unsupported { target, what: reason },
             Error::Module { target, folder, source } => RenderError::internal(target, format!("the {folder} module couldn't be written"), source),
-            Error::Manifest { target, source } => RenderError::internal(target, MANIFEST_REFUSED, source),
         }
     }
 }
-
-/// What an [`Error::Manifest`] is, after its target.
-const MANIFEST_REFUSED: &str = "the run manifest refused a value of this backend";
 
 #[cfg(test)]
 mod tests {

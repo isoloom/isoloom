@@ -1,13 +1,18 @@
-//! The cloud-docker modules of hello-stack on every cloud, and the cloud-services scripts of
-//! cloud-bucket, rendered from their plan, as snapshots; and their determinism.
+//! The cloud-docker modules of hello-stack on every cloud, rendered from their plan, as
+//! snapshots; and their determinism.
 
 pub mod testing;
 
 use isoloom_plan::Environment;
-use isoloom_render::backend::Backend;
+use isoloom_render::backend::Files;
 use isoloom_spec::model::Target;
-use isoloom_terraform::{CloudServicesBackend, cloud_docker_modules as modules};
-use testing::{Outcome, example, file};
+use isoloom_terraform::cloud_docker_modules;
+use testing::{Outcome, docker_host, example, file};
+
+/// The cloud-docker modules of `e`, its host starting the Compose file.
+fn modules(e: &Environment) -> isoloom_terraform::Result<Files> {
+    cloud_docker_modules(e, &docker_host(&[]))
+}
 
 /// Example `name`'s plan for `target`.
 fn env(name: &str, target: Target) -> Outcome<Environment> {
@@ -57,21 +62,11 @@ fn cloud_docker_oci_hello_stack() -> Outcome {
 }
 
 #[test]
-fn cloud_services_cloud_bucket() -> Outcome {
-    let files = CloudServicesBackend.render(&env("cloud-bucket", Target::CloudServices)?)?;
-    let all: String = files.iter().map(|f| format!("==> {}\n{}", f.path, f.contents)).collect::<Vec<_>>().concat();
-    insta::assert_snapshot!(all);
-    Ok(())
-}
-
-#[test]
 fn rendering_twice_gives_the_same_files() -> Outcome {
     for name in ["hello-stack", "udp-dns", "segmented", "workbench"] {
         let e = env(name, Target::CloudDocker)?;
         assert_eq!(modules(&e)?, modules(&e)?, "{name}");
     }
-    let e = env("cloud-bucket", Target::CloudServices)?;
-    assert_eq!(CloudServicesBackend.render(&e), CloudServicesBackend.render(&e));
     Ok(())
 }
 

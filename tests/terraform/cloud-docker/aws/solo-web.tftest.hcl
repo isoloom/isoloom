@@ -54,6 +54,7 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "the_host_sits_on_the_one_subnet_of_its_vpc_behind_its_group" {

@@ -2,7 +2,7 @@
 //! at its router address, forwarding between networks with the `reach` rules and to the
 //! internet (the same ruleset), and keeping the sealed one beside it from its first boot. VMware
 //! Tools reports its uplink address: the published ports are reached there, and Terraform and the
-//! runner reach the machines through it. Once the machines are set up, the run manifest's seal
+//! runner reach the machines through it. Once the machines are set up, the module's seal
 //! applies the sealed ruleset over SSH, which closes the internet to the `internet: false`
 //! networks (`crate::server::router`).
 
@@ -12,7 +12,7 @@ use isoloom_spec::model::Target;
 use isoloom_spec::net::IPV6_PREFIX;
 
 use super::SERVICE_OS;
-use super::guest::{Guest, Nic};
+use super::guest::{Guest, GuestDns, Nic};
 use super::machines;
 use crate::module::ident;
 use crate::server::router::{NAME, Platform};
@@ -24,7 +24,7 @@ pub(super) const INDEX: u64 = 0;
 const ADDRESS_WAIT_SECS: u64 = 600;
 
 /// The router's VM.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
     let config = crate::server::router::cloud_config(env, Platform::default());
     let mut nics = vec![Nic::at(reference("var.uplink_port_group"), None)];
     nics.extend(env.networks.iter().map(|(net, plan)| {
@@ -39,9 +39,13 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         name: NAME.to_owned(),
         index: INDEX,
         os: SERVICE_OS.to_owned(),
-        size: (1, 512, 10),
+        size: isoloom_spec::MachineSize {
+            cpus: 1,
+            memory_mb: 512,
+            disk_gb: 10,
+        },
         nics,
-        dns: (Vec::new(), None),
+        dns: GuestDns::default(),
         user_data: config.document(),
         wait_for_address: Some(ADDRESS_WAIT_SECS),
         depends_on: env.networks.keys().map(|n| reference(&format!("esxi_portgroup.{}", ident(n)))).collect(),
@@ -52,11 +56,11 @@ pub(super) fn blocks(env: &Environment, m: &mut Module) {
         lifecycle: Some(uplink_checked(env)),
     };
     let sealed = if crate::seal::any(env) {
-        " The run's seal closes the internet to the internet: false networks once the machines are set up."
+        " The module's seal (isoloom_seal) closes the internet to the internet: false networks once the machines are set up."
     } else {
         ""
     };
-    m.commented(
+    module.commented(
         &format!("The router: forwards between networks with the reach rules, and to the internet.{sealed} VMware Tools reports its uplink address."),
         guest.block(&env.name),
     );
@@ -79,11 +83,11 @@ fn uplink_checked(env: &Environment) -> Block {
 }
 
 /// The outputs: the server router's, from its uplink address.
-pub(super) fn outputs(env: &Environment, m: &mut Module) {
-    m.block(
+pub(super) fn outputs(env: &Environment, module: &mut Module) {
+    module.block(
         Block::builder("locals")
             .add_attribute(("router_address", reference("esxi_guest.isoloom_router.ip_address")))
             .build(),
     );
-    crate::server::router::outputs(env, Target::Esxi, m);
+    crate::server::router::outputs(env, Target::Esxi, module);
 }

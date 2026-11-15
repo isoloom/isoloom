@@ -241,17 +241,39 @@ fn windows_routes_keep_across_restarts() {
     assert_eq!(windows(&env, "web", &none), None);
 }
 
+/// A step's name, how to pick it from a plan, and a text its rendering holds.
+type StepCase = (&'static str, fn(&Step) -> bool, &'static str);
+
 #[test]
 fn every_windows_step_is_powershell() {
     let env = testing::env(WINDOWS, Target::Vagrant);
     let step = |pick: fn(&Step) -> bool| windows(&env, "win", &planned(&env, "win", pick)).expect("a Windows step");
-    assert!(step(|s| matches!(s, Step::Settings)).contains("SetEnvironmentVariable('MODE', 'lab', 'Machine')"));
-    assert!(step(|s| matches!(s, Step::Ipv6 { .. })).contains("-IPAddress 'fd00:86::10' -PrefixLength 64"));
-    assert!(step(|s| matches!(s, Step::MoreAddresses { .. })).contains("-IPAddress '10.86.0.11' -PrefixLength 24"));
-    assert!(step(|s| matches!(s, Step::Project)).starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n"));
-    assert!(step(|s| matches!(s, Step::Files { .. })).contains("[IO.File]::WriteAllText('C:\\app\\a.ini', 'x')"));
-    assert!(step(|s| matches!(s, Step::DiskGrow)).contains("Resize-Partition -DriveLetter C"));
-    assert!(step(|s| matches!(s, Step::Disks { .. })).contains("-DriveLetter E "));
+    // Each step's PowerShell, and a text it holds: every step is checked, and every mismatch said.
+    let cases: [StepCase; 6] = [
+        ("settings", |s| matches!(s, Step::Settings), "SetEnvironmentVariable('MODE', 'lab', 'Machine')"),
+        ("ipv6", |s| matches!(s, Step::Ipv6 { .. }), "-IPAddress 'fd00:86::10' -PrefixLength 64"),
+        (
+            "more addresses",
+            |s| matches!(s, Step::MoreAddresses { .. }),
+            "-IPAddress '10.86.0.11' -PrefixLength 24",
+        ),
+        ("files", |s| matches!(s, Step::Files { .. }), "[IO.File]::WriteAllText('C:\\app\\a.ini', 'x')"),
+        ("disk grow", |s| matches!(s, Step::DiskGrow), "Resize-Partition -DriveLetter C"),
+        ("disks", |s| matches!(s, Step::Disks { .. }), "-DriveLetter E "),
+    ];
+    let wrong: Vec<String> = cases
+        .iter()
+        .filter_map(|(name, pick, holds)| {
+            let ps = step(*pick);
+            (!ps.contains(holds)).then(|| format!("{name}: no `{holds}` in\n{ps}"))
+        })
+        .collect();
+    assert!(wrong.is_empty(), "{}", wrong.join("\n\n"));
+    let project = step(|s| matches!(s, Step::Project));
+    assert!(
+        project.starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n"),
+        "{project}"
+    );
     assert_eq!(
         step(|s| matches!(s, Step::Run { .. })),
         "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'setup.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
@@ -381,7 +403,9 @@ fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
     assert!(!apt.contains("get.docker.com"), "the apt branch never pipes a script into sh: {apt}");
     // The RPM family installs with Docker's pinned install script.
     assert!(rpm.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{rpm}");
-    assert!(apt.contains("/(^|:)29[.]9[.]0/") && apt.contains("docker-ce 29.9.0 is not"), "{apt}");
+    let escaped = DOCKER_VERSION.replace('.', "[.]");
+    assert!(apt.contains(&format!("/(^|:){escaped}/")), "the apt branch matches the pinned version: {apt}");
+    assert!(apt.contains(&format!("docker-ce {DOCKER_VERSION} is not")), "{apt}");
 }
 
 #[test]
@@ -441,33 +465,33 @@ fn root_runs_a_command_as_it_is_and_another_user_through_sudo() {
 
 #[test]
 fn every_project_unpack_replaces_the_old_copy() {
-    use super::{Archive, project_unpack};
+    use super::{Archive, TopFolder, project_unpack};
     assert_eq!(
-        project_unpack(Archive::Stdin, false),
+        project_unpack(Archive::Stdin, TopFolder::Kept),
         "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf - -C /opt/isoloom"
     );
     assert_eq!(
-        project_unpack(Archive::Uploaded, true),
+        project_unpack(Archive::Uploaded, TopFolder::Stripped),
         "rm -rf /opt/isoloom && mkdir -p /opt/isoloom && tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1 && rm -f /tmp/isoloom-project.tgz"
     );
-    assert!(!project_unpack(Archive::Uploaded, false).contains('\''), "it goes in sh -c '…'");
+    assert!(!project_unpack(Archive::Uploaded, TopFolder::Kept).contains('\''), "it goes in sh -c '…'");
 }
 
 #[test]
 fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder() {
-    let unpack = super::windows_project_unpack(false);
+    let unpack = super::windows_project_unpack(super::TopFolder::Kept);
     assert!(
         unpack.starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 0\n"),
         "{unpack}"
     );
     assert!(unpack.ends_with(crate::powershell::UNTAR), "{unpack}");
-    assert!(super::windows_project_unpack(true).contains("; $strip = 1\n"));
+    assert!(super::windows_project_unpack(super::TopFolder::Stripped).contains("; $strip = 1\n"));
 }
 
 #[cfg(unix)]
 #[test]
 fn a_tracked_step_writes_lines_of_the_ready_grammar() {
-    use isoloom_manifest::ReadyLine;
+    use isoloom_spec::ready_line::ReadyLine;
     let dir = tempfile::Builder::new().prefix("isoloom-tracked-").tempdir().unwrap();
     let ready = dir.path().join("ready");
     let run = |command: &str| {

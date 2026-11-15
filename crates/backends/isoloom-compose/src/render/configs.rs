@@ -10,7 +10,6 @@
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan};
 use isoloom_render::container::{copied_from_project, project_variables, variable};
-use isoloom_render::run_manifest::RUNNER;
 
 use crate::file::{Config, ConfigMount};
 use crate::interpolation::literal;
@@ -29,9 +28,12 @@ pub(super) fn usage(env: &Environment) -> String {
     if vars.is_empty() {
         return String::new();
     }
-    let each: Vec<String> = vars.iter().map(|(var, path)| format!("{var} to {path}'s contents")).collect();
+    let each: Vec<String> = vars
+        .iter()
+        .map(|(var, path)| format!("{var}=\"$(cat {})\"", isoloom_spec::shell::quote(path)))
+        .collect();
     format!(
-        "# Project files with an owner or a mode: {RUNNER} reads them into Compose's environment; by hand, set {} for `up`.\n",
+        "# Project files with an owner or a mode: their contents in Compose's environment for `up` and `start`: {}.\n",
         each.join(", ")
     )
 }
@@ -134,7 +136,7 @@ machines:
             "ISOLOOM_FILE_WEB_2=\"$(cat 'conf/key.pem'; printf x)\" && ISOLOOM_FILE_WEB_2=\"${ISOLOOM_FILE_WEB_2%x}\" && export ISOLOOM_FILE_WEB_2 && "
         );
         assert!(
-            super::usage(&env).contains("set ISOLOOM_FILE_WEB_2 to conf/key.pem's contents"),
+            super::usage(&env).contains("ISOLOOM_FILE_WEB_2=\"$(cat 'conf/key.pem')\""),
             "{}",
             super::usage(&env)
         );

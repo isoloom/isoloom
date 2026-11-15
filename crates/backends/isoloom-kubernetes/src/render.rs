@@ -4,10 +4,10 @@
 
 use std::fmt;
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_render::{GeneratedFile, header};
+use isoloom_spec::contract::OUTPUT_DIR;
 use serde::Serialize;
 
 use crate::backend::capabilities;
@@ -122,7 +122,7 @@ impl fmt::Display for Usage<'_> {
                 writeln!(f, "#   {b}")?;
             }
         }
-        if env.machines.values().any(|m| !m.inputs.is_empty()) {
+        if reads_inputs(env) {
             let literals: Vec<String> = env.inputs.iter().map(|i| format!("--from-literal={}=…", i.name)).collect();
             writeln!(
                 f,
@@ -155,6 +155,12 @@ fn kustomization(r: &Rendered) -> Result<String> {
     }
     out.push_str(&document(&kustomize::environment(&r.namespace, &r.scripts, &r.labels))?);
     Ok(out)
+}
+
+/// Whether a machine reads the environment's inputs: the inputs Secret is then created by hand
+/// (kustomize) or from the chart's values.
+pub(crate) fn reads_inputs(env: &Environment) -> bool {
+    env.machines.values().any(|m| !m.inputs.is_empty())
 }
 
 /// The first lines of every generated YAML file.

@@ -23,13 +23,13 @@ isoloom-kubernetes.workspace = true
 isoloom-terraform.workspace = true
 isoloom-vagrant.workspace = true
 isoloom-ansible.workspace = true
-isoloom-manifest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+isoloom-test-support.workspace = true
 insta.workspace = true
 proptest.workspace = true
 jsonschema.workspace = true

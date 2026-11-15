@@ -10,8 +10,13 @@
 //! Each run copies the example, without any generated `.isoloom/` outputs, into a fresh folder,
 //! and runs the binary with an empty `ISOLOOM_HOME` and no other `ISOLOOM_*` variable, so the
 //! user's defaults and profile never leak in. A file a target shares with an earlier target of the
-//! same example (the Compose file under `docker-vm`, `resolved.json` everywhere), byte for byte,
+//! same example (`resolved.json` everywhere), byte for byte,
 //! is written once, in the earlier snapshot; the later one names it and says where it is.
+
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -94,7 +99,7 @@ fn normalize(text: &str, dir: &Path, home: &Path) -> String {
         text = text.replace(&path.display().to_string(), placeholder);
     }
     // A release changes the generator's version, not the files: the 142 snapshots that held
-    // the version broke at every release (2.1.9's gate, 2026-11-13).
+    // the version broke at every release (a release's gate).
     text.replace(&format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION")), "\"version\": \"[version]\"")
 }
 
@@ -214,8 +219,8 @@ fn every_example_on_every_target() -> Outcome {
     let dirs = examples()?;
     assert!(!dirs.is_empty(), "no example found");
     // The examples in batches of as many threads as the host has cores (each runs the binary
-    // once per target): one thread per example was a fan-out the host couldn't bound, on top of
-    // the test runner's own parallelism (Clean Code ch.13, 2026-11-13); `ISOLOOM_TEST_JOBS` caps
+    // once per target): one thread per example would be a fan-out the host couldn't bound, on top
+    // of the test runner's own parallelism; `ISOLOOM_TEST_JOBS` caps
     // it lower on a shared host. Snapshots are asserted in order afterwards.
     let jobs = std::env::var("ISOLOOM_TEST_JOBS")
         .ok()

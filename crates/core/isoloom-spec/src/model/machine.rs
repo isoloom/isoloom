@@ -266,7 +266,7 @@ pub struct Machine {
 #[serde(deny_unknown_fields)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "the lowered form keeps a port's switches as the spec writes them (`http`, `tls`, `fixed`, `dormant`); the run manifest joins `http` and `tls` with the protocol into one `PortKind`"
+    reason = "the lowered form keeps a port's switches as the spec writes them (`http`, `tls`, `fixed`, `dormant`), each a choice of its own"
 )]
 pub struct Port {
     /// The port the machine listens on (what the other machines and the
@@ -292,6 +292,10 @@ pub struct Port {
     /// environment can't start while another holds that port.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,
+    /// `publish: true`: a free host port, which the format picks itself where it can (Compose, Vagrant);
+    /// `publish` is then the port's own number, only preferred. Another machine may ask for the same.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub free: bool,
     /// Only answers later: nothing listens on it until something in the machine starts it. Declared,
     /// published and opened by `reach` like any port, but nothing waits for it (healthcheck,
     /// readiness probe, `depends_on`, `up --wait`) and no derived check expects it to answer.
@@ -303,6 +307,28 @@ pub struct Port {
     /// A port served over both is two entries, one per protocol.
     #[serde(default, skip_serializing_if = "Protocol::is_tcp")]
     pub protocol: Protocol,
+    /// The account its service ships with, shown to the user beside the port: a training
+    /// environment's published sign-in, never a secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<Login>,
+}
+
+/// The fixed account a port's service ships with, shown to the user beside the port: a training
+/// environment's published sign-in, never a secret (a secret is an input).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Login {
+    /// The account's name.
+    pub user: String,
+    /// Its password.
+    pub password: String,
+}
+
+// Leaves the password out, so a debug line never prints it.
+impl std::fmt::Debug for Login {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Login").field("user", &self.user).finish_non_exhaustive()
+    }
 }
 
 /// A port's transport protocol.
@@ -380,16 +406,9 @@ pub struct Resources {
     pub disk_gb: Option<u32>,
 }
 
-/// A machine's address on a network, as written: one last octet, or several (the first the
-/// primary one).
-#[derive(JsonSchema)]
-#[serde(untagged)]
-pub enum Octets {
-    /// The last octet of its address.
-    One(u8),
-    /// Several addresses on the network, the first its primary one.
-    Several(Vec<u8>),
-}
+/// A machine's address on a network, as written: the spec's own type, which the model's schema
+/// names too.
+pub use crate::syntax::Octets;
 
 /// A text, a number or a boolean, read as text (environment values, sysctl values).
 #[derive(JsonSchema)]

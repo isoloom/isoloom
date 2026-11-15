@@ -1,8 +1,12 @@
 //! The runner scripts' probes against real servers on 127.0.0.1, run by the runner's `sh`: a
 //! greeting read, a line sent, a redirect followed. Unix only, as the runner's shell is.
 
-use isoloom_manifest::CheckLine;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::JoinHandle;
+
 use isoloom_plan::checks::{self, Position, Probe};
+use isoloom_spec::check_line::CheckLine;
 
 use super::{BASE, runner};
 use crate::testing::{Outcome, lab};
@@ -20,31 +24,85 @@ fn fail(name: &str, reason: &str) -> CheckLine {
     }
 }
 
+/// A server on 127.0.0.1, read as its port. Dropping it stops its listener and joins every
+/// thread it started, so none outlives the test that started it.
+struct Server {
+    port: u16,
+    stop: Arc<AtomicBool>,
+    listener: Option<JoinHandle<()>>,
+}
+
+impl std::fmt::Display for Server {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.port)
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        // The listener waits in `accept`: a connection of its own wakes it to see the stop.
+        drop(std::net::TcpStream::connect(("127.0.0.1", self.port)));
+        if let Some(listener) = self.listener.take() {
+            drop(listener.join());
+        }
+    }
+}
+
 /// A server on 127.0.0.1 answering each connection with `answer` (of the line it read, when
-/// `wait_line`) after `delay_ms`, then holding the connection open a while (as a service does).
-fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<u16> {
+/// `wait_line`) after `delay_ms`, then holding the connection open (as a service does) until the
+/// client closes it or the test drops the server.
+fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<Server> {
     let l = std::net::TcpListener::bind("127.0.0.1:0")?;
     let port = l.local_addr()?.port();
-    std::thread::spawn(move || {
-        for c in l.incoming().flatten() {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stopped = Arc::clone(&stop);
+    let listener = std::thread::spawn(move || {
+        let mut connections = Vec::new();
+        for c in l.incoming() {
+            if stopped.load(Ordering::SeqCst) {
+                break;
+            }
             // A connection that drops is the check's to report, not the server's.
-            std::thread::spawn(move || answer_one(c, wait_line, delay_ms, answer).ok());
+            if let Ok(c) = c {
+                let held = Arc::clone(&stopped);
+                connections.push(std::thread::spawn(move || answer_one(c, wait_line, delay_ms, answer, &held).ok()));
+            }
+        }
+        for c in connections {
+            drop(c.join());
         }
     });
-    Ok(port)
+    Ok(Server {
+        port,
+        stop,
+        listener: Some(listener),
+    })
 }
 
 /// One connection of [`serve`]: the line read when `wait_line`, the answer after `delay_ms`,
-/// then the connection held open as a service holds it.
-fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> std::io::Result<()> {
-    use std::io::{BufRead, BufReader, Write};
+/// then the connection held open as a service holds it: until the client closes it, or `stop`
+/// (the test dropping the server), never on a clock of its own that a check's window could
+/// outlast on a slow host.
+fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer: fn(&str) -> String, stop: &AtomicBool) -> std::io::Result<()> {
+    use std::io::{BufRead, BufReader, Read, Write};
     let mut line = String::new();
     if wait_line {
         BufReader::new(c.try_clone()?).read_line(&mut line)?;
     }
     std::thread::sleep(std::time::Duration::from_millis(delay_ms));
     c.write_all(answer(line.trim_end_matches('\n')).as_bytes())?;
-    std::thread::sleep(std::time::Duration::from_secs(8));
+    // A short timeout only to look at `stop` between reads.
+    c.set_read_timeout(Some(std::time::Duration::from_millis(100)))?;
+    let mut sink = [0_u8; 64];
+    while !stop.load(Ordering::SeqCst) {
+        match c.read(&mut sink) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
+            Err(e) => return Err(e),
+        }
+    }
     Ok(())
 }
 
@@ -103,7 +161,7 @@ fn run_with_only(script: &str, tools: &[(&str, &str)]) -> Outcome<String> {
 
 /// A server for the redirect checks: /old redirects to /new (200); /loop redirects to itself
 /// for ever; /login answers a POST with a redirect to /home, which takes GET only.
-fn redirecting_server() -> Outcome<u16> {
+fn redirecting_server() -> Outcome<Server> {
     serve(true, 0, |l| {
         let path = l.split_whitespace().nth(1).unwrap_or("/");
         match path {
@@ -144,7 +202,8 @@ fn which(tool: &str) -> Outcome<Option<String>> {
 
 #[test]
 fn http_checks_follow_redirects_when_asked() -> Outcome {
-    let u = format!("http://127.0.0.1:{}", redirecting_server()?);
+    let server = redirecting_server()?;
+    let u = format!("http://127.0.0.1:{server}");
     let spec = lab(&format!(
         "{BASE}checks:\n  \
          - {{ name: first, http: '{u}/old', expect: 302, wait: 0 }}\n  \

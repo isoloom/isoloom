@@ -26,6 +26,12 @@ machines:
     files: [{ path: 'C:\key', secret: api-key }]
 ";
 
+/// [`LAB`]'s containers alone, and their secrets: what a Docker host runs.
+fn containers_only() -> String {
+    let containers = LAB.split("  vm:").next().unwrap_or(LAB);
+    containers.replace("  api-key: { env: API_KEY }\n", "")
+}
+
 fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFile {
     SecretFile {
         source: isoloom_plan::ValueSource::Secret(name.to_owned()),
@@ -137,7 +143,7 @@ fn the_wait_passes_once_delivered() {
 #[cfg(unix)]
 #[test]
 fn a_docker_host_reads_each_kept_value_into_its_variable() {
-    let env = testing::env(LAB, Target::Hybrid);
+    let env = testing::env(&containers_only(), Target::CloudDocker);
     assert_eq!(host_environment(&env, &[]), "");
     let names = vec!["db-password".to_owned()];
     let script = format!(
@@ -154,13 +160,13 @@ fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
     let sh = wait("web");
     assert!(sh.contains("if [ \"$i\" -gt 1800 ]; then echo"), "{sh}");
     assert!(sh.ends_with("sleep 5; done\n"), "{sh}");
-    assert!(sh.contains("'web: waiting for its secrets, which the runner (run.json) delivers'"), "{sh}");
+    assert!(sh.contains("'web: waiting for its secrets, which the tool that runs it delivers'"), "{sh}");
     assert!(!sh.contains('`'), "no backquote, which shellcheck reads as an expansion left unexpanded: {sh}");
 }
 
 #[test]
 fn a_docker_host_gets_the_secrets_of_its_containers_in_the_spec_s_order() {
-    let env = testing::env(LAB, Target::Hybrid);
+    let env = testing::env(&containers_only(), Target::CloudDocker);
     assert_eq!(of_containers(&env), ["db-password", "input-demo-secret"]);
     assert_eq!(compose_variable(&env, "db-password"), "ISOLOOM_SECRET_DB_PASSWORD");
     assert_eq!(

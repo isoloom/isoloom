@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What jenkins does, the same as a container and as a VM. `cargo xtask catalogue check jenkins`
+# builds a small lab (`web`, an access machine `probe`) and runs it through a runner.
+cases:
+  default: {}
+
+checks:
+  - name: the web port answers
+    tcp: "{{ machine }}:8080"
+    wait: 5m
+  - name: jenkins reports the release asked for
+    exec: curl -sfI http://localhost:8080/login | grep -i '^x-jenkins:'
+    expect: "{{ version }}"
+  - name: the image's plugin installer runs
+    exec: jenkins-plugin-cli --version
+    expect: "2.15.0"
+
+facts:
+  - name: the war's release
+    exec: unzip -p /usr/share/jenkins/jenkins.war META-INF/MANIFEST.MF | grep Jenkins-Version
+  - name: the Java runtime
+    exec: java -version 2>&1 | head -n 1

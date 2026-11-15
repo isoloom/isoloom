@@ -20,7 +20,6 @@
 //!   addresses.
 //! - **The containers' shared parts:** [`container`]; the check runners (the sh runner a
 //!   position's checks become, where a check reaches its host): [`checks`].
-//! - **The run manifest's pieces** every target's `run.json` is built from: [`run_manifest`].
 //! - **What an ESXi host is told about a VM** (its guest OS type), which the `esxi` target and
 //!   Vagrant's ESXi provider share: [`esxi`].
 //! - **Numbers from names** that are the same on every build: [`stable_hash`].
@@ -35,10 +34,18 @@
 //!     "version: 1\nname: demo\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
 //! )
 //! .expect("the spec parses");
-//! let env = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
+//! let env = lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
 //! let ready = isoloom_render::steps::linux(&env, "web", &Step::Ready).expect("every VM gets ready");
 //! assert!(ready.ends_with("echo ready > /var/lib/isoloom/ready\n"));
 //! ```
+
+#![cfg_attr(
+    test,
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
 
 pub mod backend;
 pub mod boot;
@@ -54,7 +61,6 @@ mod network;
 mod output;
 pub mod powershell;
 pub mod project;
-pub mod run_manifest;
 pub mod secrets;
 pub mod stable_hash;
 pub mod steps;

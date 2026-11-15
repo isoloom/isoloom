@@ -33,6 +33,7 @@ variables {
   proxmox_endpoint = "https://pve.test:8006/"
   node             = "pve-test"
   ssh_public_key   = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "each_vm_s_search_domain_is_the_zone_s" {

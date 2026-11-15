@@ -59,7 +59,7 @@ fn no_cloud_rule_lets_the_whole_internet_in_but_path_mtu_discovery() -> Outcome 
         }
         let lab = Lab::new(isoloom_spec::load(&dir)?);
         for target in [Target::CloudVm, Target::CloudDocker] {
-            if !lab.possible().contains(&target) || refusal(&lab, target).is_some() {
+            if !lab.possible().contains(&target) || refusal(&lab, target).unwrap().is_some() {
                 continue;
             }
             for f in generate(&lab, target)?

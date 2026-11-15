@@ -1,8 +1,8 @@
 # Tool versions
 
 `isoloom` itself needs nothing else to validate and generate. Running what it generates needs
-each target's tools. A run manifest lists them under `tools`, with the minimum versions below, and
-a runner checks them before it creates anything.
+each target's tools, with the minimum versions below; a runner checks them before it creates
+anything.
 
 ## The tools each target needs
 
@@ -10,16 +10,13 @@ a runner checks them before it creates anything.
 |---|---|---|
 | `docker`, `hosted` | Docker, Docker Compose | Compose 2.17.0 |
 | `kubernetes` | `kubectl` (with Kustomize), or Helm for the chart | none set |
-| `vagrant`, `docker-vm` (local) | Vagrant, and the provider's hypervisor (VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU; UTM for `docker-vm`) | Vagrant 2.4.0 |
-| `hybrid` | Docker Compose and Vagrant | as above |
-| `proxmox`, `docker-vm` on Proxmox | Terraform, an OpenSSH client | Terraform 1.6.0 |
+| `vagrant` | Vagrant, and the provider's hypervisor (VirtualBox, VMware, Parallels, libvirt, Hyper-V, QEMU) | Vagrant 2.4.0 |
+| `proxmox` | Terraform, an OpenSSH client | Terraform 1.6.0 |
 | `esxi` | Terraform, `ovftool`, an OpenSSH client | Terraform 1.6.0 |
 | `cloud-vm`, `cloud-docker` | Terraform, an OpenSSH client | Terraform 1.6.0 |
-| `cloud-services` | Terraform, and what the spec's `cloud.requires` lists | none set |
 | `external` | Ansible, an OpenSSH client | none set |
 
-Terraform 1.6 or later works for every target. On macOS the Proxmox run manifest may run
-Terraform from the pinned image `hashicorp/terraform:1.16.7` instead.
+Terraform 1.6 or later works for every target.
 
 A VM target installs on the controller VM the Ansible it runs (`ansible-core` 2.15 or 2.16, with
 `pywinrm`) and the pinned Galaxy collections `ansible.posix` 2.2.2 and `ansible.windows` 3.8.0
@@ -47,7 +44,7 @@ reaches you only through a new Isoloom release, after the modules are validated 
 | DigitalOcean | `digitalocean/digitalocean` | `~> 2.103.0` | on DigitalOcean |
 | Linode | `linode/linode` | `~> 4.7.0` | on Linode |
 | Oracle Cloud | `oracle/oci` | `~> 9.8.0` | on Oracle Cloud |
-| Proxmox VE | `bpg/proxmox` | `~> 0.116.1` | `proxmox`, `docker-vm` on Proxmox |
+| Proxmox VE | `bpg/proxmox` | `~> 0.116.1` | `proxmox` |
 | ESXi | `josenk/esxi` | `~> 1.10.3` | `esxi` |
 | TLS | `hashicorp/tls` | `~> 4.4.1` | the controller's SSH key |
 | Random | `hashicorp/random` | `~> 3.9.1` | Windows machines' and Linode's root passwords |
@@ -55,8 +52,7 @@ reaches you only through a new Isoloom release, after the modules are validated 
 | Time | `hashicorp/time` | `~> 0.14.2` | a Windows machine's restart after its renaming |
 
 `terraform init` downloads them from the Terraform Registry, or from your provider mirror
-([offline guide](../guide/offline.md#running-without-internet-access)). `cloud-services` runs your
-own module, with the providers it pins.
+([offline guide](../guide/offline.md#running-without-internet-access)).
 
 OpenTofu is not tested: no CI job runs the generated modules with it.
 

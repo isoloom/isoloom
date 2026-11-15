@@ -3,8 +3,9 @@
 //! carries (what a reaper reads), and the `lifecycle` of a VM set up once from its user data.
 
 use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, call, conditional, list, number, object, reference, string};
-use isoloom_manifest::contract::{EXPIRES_TAG, EXPIRES_WORD, INSTANCE_TAG};
+use crate::module::ProjectCopy;
 use isoloom_plan::Environment;
+use isoloom_spec::contract::{EXPIRES_TAG, EXPIRES_WORD, INSTANCE_TAG};
 
 /// The tags on every resource: the spec's own (`tags:`), then the environment, who manages it,
 /// its instance and its expiry (what a reaper reads).
@@ -51,16 +52,16 @@ fn named(env: &Environment) -> Vec<(&'static str, Expression)> {
 }
 
 /// The environment's random id (`terraform_data.id`) and the locals: its `name`, the project's
-/// `root` when the module reads it (only when Terraform copies the project, `with_root`; the
+/// `root` when the module reads it (only when Terraform copies the project, as `copy` says; the
 /// runner-delivered modules never read it, and a declared-but-unused local is a lint failure),
 /// then `extra`.
-pub(crate) fn id_and_locals(env: &Environment, extra: Vec<(&str, Expression)>, with_root: bool) -> Vec<Block> {
+pub(crate) fn id_and_locals(env: &Environment, extra: Vec<(&str, Expression)>, copy: ProjectCopy) -> Vec<Block> {
     let id = call("substr", [call("replace", [call("uuid", []), string("-"), string("")]), number(0), number(8)]);
     let name = Template::text(format!("isoloom-{}-", env.name))
         .with_expr(reference("terraform_data.id.output"))
         .into_expression();
     let mut locals = Block::builder("locals").add_attribute(("name", name));
-    if with_root {
+    if copy != ProjectCopy::Runner {
         let root = call(
             "abspath",
             [Template::new().with_expr(reference("path.module")).with_text("/../../..").into_expression()],

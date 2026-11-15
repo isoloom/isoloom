@@ -182,7 +182,7 @@ fn ci_runs_every_gate_the_release_gate_runs() -> Outcome {
     Ok(())
 }
 
-/// The repository's Markdown files a workflow points its reader to (`docs/dev/releasing.md`,
+/// The repository's Markdown files a workflow points its reader to (`.github/CONTRIBUTING.md`,
 /// `SECURITY.md`): each word ending in `.md` in its comments and in the notices it prints, from
 /// the root. Its commands' own files (release notes it writes) aren't pointers.
 fn named_documents(text: &str) -> BTreeSet<String> {
@@ -199,10 +199,9 @@ fn named_documents(text: &str) -> BTreeSet<String> {
 #[test]
 fn every_document_the_workflows_point_to_is_there() -> Outcome {
     let github = root().join(".github");
-    let mut files: Vec<PathBuf> = std::fs::read_dir(github.join("workflows"))?
+    let files: Vec<PathBuf> = std::fs::read_dir(github.join("workflows"))?
         .map(|e| e.map(|e| e.path()))
         .collect::<Result<_, _>>()?;
-    files.push(github.join("actionlint.yaml"));
     let mut missing = Vec::new();
     for file in &files {
         let text = std::fs::read_to_string(file)?;
@@ -218,38 +217,39 @@ fn every_document_the_workflows_point_to_is_there() -> Outcome {
     Ok(())
 }
 
-/// What `.github/scripts/isothrum-ref.sh <mode>` says of `reference`: its exit code.
-#[cfg(unix)]
-fn pinned(mode: &str, reference: &str) -> Outcome<Option<i32>> {
-    let script = root().join(".github/scripts/isothrum-ref.sh");
-    Ok(Command::new("bash")
-        .arg(script)
-        .arg(mode)
-        .env("ISOTHRUM_REF", reference)
-        .output()?
-        .status
-        .code())
-}
-
-#[cfg(unix)]
+/// Isoloom's output is validated, never run: no workflow builds a runner or starts what a target
+/// generates, and CI checks every target's files with their validators (`cargo xtask verify`).
 #[test]
-fn the_isothrum_runner_is_built_only_at_a_release_tag_or_a_commit() -> Outcome {
-    for reference in ["v2.0.0", "v2.0.0-rc.1", "0123456789abcdef0123456789abcdef01234567"] {
-        assert_eq!(pinned("required", reference)?, Some(0), "{reference}");
-    }
-    for reference in ["main", "release/2.0", "0123abc"] {
-        assert_eq!(pinned("optional", reference)?, Some(1), "{reference}");
-    }
-    assert_eq!(pinned("optional", "")?, Some(3), "unset: the runs that need it are skipped");
-    assert_eq!(pinned("required", "")?, Some(1));
-    // Every workflow that builds the runner checks its ref first, and none falls back to a branch.
+fn the_workflows_validate_the_generated_files_and_never_run_them() -> Outcome {
+    let starts = [
+        ["isothrum", "up"],
+        ["compose", "up"],
+        ["kubectl", "apply"],
+        ["helm", "install"],
+        ["vagrant", "up"],
+        ["terraform", "apply"],
+    ];
     for entry in std::fs::read_dir(root().join(".github/workflows"))? {
-        let text = std::fs::read_to_string(entry?.path())?;
-        if let Some(checkout) = text.find("repository: Isothrum/isothrum") {
-            let check = text.find(".github/scripts/isothrum-ref.sh").ok_or("no ref check")?;
-            assert!(check < checkout && !text.contains("ISOTHRUM_REF ||"), "{text}");
+        let path = entry?.path();
+        let text = std::fs::read_to_string(&path)?;
+        assert!(!text.contains("repository: Isothrum/isothrum"), "{} builds the runner", path.display());
+        for line in text.lines().filter(|l| !l.trim_start().starts_with('#')) {
+            let words: Vec<&str> = line.split_whitespace().collect();
+            for start in &starts {
+                assert!(
+                    !words.windows(2).any(|w| w == start.as_slice()),
+                    "{} runs generated files (`{}`): {line}",
+                    path.display(),
+                    start.join(" ")
+                );
+            }
         }
     }
+    let ci = lines()?;
+    assert!(
+        ci.iter().any(|w| w.windows(3).any(|w| w == ["cargo", "xtask", "verify"])),
+        "ci.yml doesn't run the validators on every target's output"
+    );
     Ok(())
 }
 

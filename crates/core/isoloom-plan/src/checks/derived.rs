@@ -128,8 +128,8 @@ fn derived_check(name: String, position: Position, probe: Probe, wait: u32) -> R
 /// or network appliances): every service answers at each of its addresses, from the
 /// environment's networks (on VM targets, the controller, which stands on every network).
 /// Nothing stands where `reach` blocks a service or where a network is offline, so those aren't
-/// asserted. A target where the machines that could run them don't (the containers of a hybrid
-/// environment) uses it too.
+/// asserted. A target where the machines that could run them don't (Proxmox's LXC containers)
+/// uses it too.
 #[must_use]
 pub fn from_networks(spec: &Spec) -> Vec<Resolved> {
     let mut out = Vec::new();

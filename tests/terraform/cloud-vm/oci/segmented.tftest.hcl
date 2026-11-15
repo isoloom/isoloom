@@ -79,6 +79,7 @@ variables {
   compartment_id       = "ocid1.compartment.oc1..tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_of_the_vcn_with_its_own_security_list" {
@@ -221,23 +222,20 @@ run "the_outputs_name_the_way_in_and_the_ready_file" {
 }
 
 # The spec: `back` has `internet: false`, so once its machines are set up they may not reach the
-# internet. During set-up back's security list lets its machines out to every public block (they
-# set themselves up over SSH); once every machine is ready the runner applies with
-# `isoloom_sealed = true` (the manifest's `seal`), and back's security list keeps no egress rule
-# to a public block. The seal is at the network, where root in the guest can't lift it; Oracle
-# Cloud's security list is stateful, so the runner's SSH and the published ports' replies still
-# leave, and cache keeps its public address, the way the runner reaches it. (Only the egress
-# rules are asserted: a failing assertion that reads a route table's `route_rules` crashes
-# Terraform 1.16's JSON view, the rules carry a deprecated attribute's mark.)
+# internet. During set-up back's subnet has the internet table and its security list lets its
+# machines out; once every machine is set up (the attachment waits for the readiness waits), the
+# same apply attaches a route table to back's subnet with no way to the internet, only to
+# allowed_cidr (the replies to SSH and the published ports). The seal is at the network, where
+# root in the guest can't lift it; cache keeps its public address.
 run "a_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
-  variables {
-    isoloom_sealed = true
-  }
-
   assert {
-    condition     = length([for r in oci_core_security_list.back.egress_security_rules : r.destination if r.protocol == "all" && !startswith(r.destination, "10.")]) == 0
-    error_message = "once sealed, back (internet: false) must keep no egress rule to a public block"
+    condition     = oci_core_route_table_attachment.sealed_back.subnet_id == oci_core_subnet.back.id
+    error_message = "the seal's route table must be attached to back's subnet"
+  }
+  assert {
+    condition     = [for r in oci_core_route_table.sealed_back.route_rules : r.destination] == ["203.0.113.7/32"]
+    error_message = "once sealed, back's only way out is to allowed_cidr, never 0.0.0.0/0"
   }
 }

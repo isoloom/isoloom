@@ -7,7 +7,7 @@ use crate::hcl_builder::{Expression, Module, reference, string};
 use isoloom_plan::{Environment, MachinePlan, Vm};
 
 use super::SERVICE_OS;
-use super::guest::{Guest, Nic};
+use super::guest::{Guest, GuestDns, Nic};
 use crate::machine::cloud_init::CloudConfig;
 use crate::machine::controller::{self, Ssh};
 use crate::machine::linux;
@@ -52,19 +52,29 @@ fn nics(env: &Environment, mp: &MachinePlan) -> Vec<Nic> {
 }
 
 /// The machines, each set up through the router, then the controller.
-pub(super) fn guests(env: &Environment, m: &mut Module) {
+pub(super) fn guests(env: &Environment, module: &mut Module) {
     for (i, vm) in (0..).zip(env.vms()) {
-        machine(env, vm, i, m);
+        machine(env, vm, i, module);
     }
     if controller::needed(env) {
-        controller(env, m);
+        controller(env, module);
     }
+    // Terraform sets each Linux machine and the controller up itself: the seal comes after.
+    let mut set_up: Vec<Expression> = env
+        .vms()
+        .filter(|vm| !vm.plan.is_windows())
+        .map(|vm| reference(&format!("terraform_data.{}", ident(vm.name))))
+        .collect();
+    if controller::needed(env) {
+        set_up.push(reference("terraform_data.isoloom_controller"));
+    }
+    module.blocks(crate::server::router::seal(env, reference("esxi_guest.isoloom_router.id"), set_up));
 }
 
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.
-fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, m: &mut Module) {
+fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, module: &mut Module) {
     let id = ident(name);
-    let dns = env.spec().machines.get(name).and_then(|sm| sm.dns.as_ref());
+    let dns = crate::server::dns_of(env, name);
     let servers = crate::server::resolvers(env, Some(name));
     let windows = mp.is_windows();
     let guest = Guest {
@@ -72,30 +82,40 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, m: &mut
         name: name.to_owned(),
         index: CONTROLLER_INDEX + 1 + i,
         os: os.to_owned(),
-        size: (mp.size().cpus, mp.size().memory_mb, mp.size().disk_gb),
+        size: mp.size(),
         nics: nics(env, mp),
         // Its own domain, else the private zone's (`dns.private`), whose names its hosts file
         // carries: ESXi has no DNS of its own to serve them.
-        dns: (
+        dns: GuestDns {
             servers,
-            dns.and_then(|d| d.domain.clone())
+            search: dns
+                .and_then(|d| d.domain.clone())
                 .or_else(|| env.private_dns.as_ref().map(|z| z.domain.clone())),
-        ),
+        },
         user_data: if windows {
             cloudbase_init::user_data(env, (name, mp))
         } else {
-            CloudConfig::new(name, reference("local.users")).document()
+            let mut config = CloudConfig::new(name, reference("local.users"));
+            // The secrets' values, root's alone, for the set-up over SSH to put in place.
+            if let Some(content) = crate::module::inputs::secrets_file(mp) {
+                config.files.push(crate::machine::cloud_init::file(
+                    crate::machine::cloud_init::WRITTEN_SECRETS,
+                    Some("0600"),
+                    content,
+                ));
+            }
+            config.document()
         },
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],
         firmware: super::boot::firmware(mp),
         guestos: isoloom_render::esxi::guest_os(os),
-        disks: super::disks::blocks(name, &mp.disks, m),
+        disks: super::disks::blocks(name, &mp.disks, module),
         windows,
         lifecycle: None,
     };
     let what = if windows { ": set up by cloudbase-init at its first boot" } else { "" };
-    m.commented(&format!("Machine `{name}`{what}."), guest.block(&env.name));
+    module.commented(&format!("Machine `{name}`{what}."), guest.block(&env.name));
     let Some(address) = mp.addresses.values().next().filter(|_| !windows) else {
         return;
     };
@@ -109,7 +129,7 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, m: &mut
         },
         user: crate::machine::USER.to_owned(),
     });
-    m.commented(
+    module.commented(
         "Its set-up: its steps from the plan, over SSH through the router.",
         setup.via(bastion()).block(),
     );
@@ -118,7 +138,7 @@ fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, m: &mut
 /// The controller: on every network at the controller address, then its playbooks over SSH
 /// through the router once every machine is set up (a Linux one's set-up done, a Windows one
 /// answering WinRM with its ready marker).
-fn controller(env: &Environment, m: &mut Module) {
+fn controller(env: &Environment, module: &mut Module) {
     let nics: Vec<Nic> = controller::addresses(env)
         .iter()
         .enumerate()
@@ -127,15 +147,17 @@ fn controller(env: &Environment, m: &mut Module) {
     let Some(host) = nics.first().and_then(|n| n.addresses.first()?.split('/').next().map(str::to_owned)) else {
         return;
     };
-    let (cpus, memory, disk) = controller::size(env);
     let guest = Guest {
         id: "isoloom_controller".to_owned(),
         name: controller::NAME.to_owned(),
         index: CONTROLLER_INDEX,
         os: SERVICE_OS.to_owned(),
-        size: (cpus, memory, disk),
+        size: controller::size(env),
         nics,
-        dns: (crate::server::resolvers(env, None), None),
+        dns: GuestDns {
+            servers: crate::server::resolvers(env, None),
+            search: None,
+        },
         user_data: CloudConfig::new(controller::NAME, reference("local.users")).document(),
         wait_for_address: None,
         depends_on: vec![reference("esxi_guest.isoloom_router")],
@@ -145,7 +167,7 @@ fn controller(env: &Environment, m: &mut Module) {
         windows: false,
         lifecycle: None,
     };
-    m.commented(
+    module.commented(
         "The controller: runs the environment's playbooks once every machine is set up.",
         guest.block(&env.name),
     );
@@ -166,5 +188,5 @@ fn controller(env: &Environment, m: &mut Module) {
             reference(&format!("{kind}.{}", ident(n)))
         })
         .collect();
-    m.block(setup.via(bastion()).block());
+    module.block(setup.via(bastion()).block());
 }

@@ -16,18 +16,23 @@
 //!   twice in each Linux family's container image;
 //! - `mutants`: mutation testing of the core crates (cargo-mutants);
 //! - `bench`: the generation benchmarks against `xtask/baselines/bench-baseline.json`;
-//! - `tiers record`: a real run added to the tier list, the evidence the tiers are worked out
-//!   from;
 //! - `catalogue refresh` and `catalogue check`: the catalogue's pins, and an entry's parity
-//!   contract run for real.
+//!   contract run for real;
+//! - `wasm`: the topology editor's engine (`isoloom-wasm`) built for the browser (`web/pkg/`), and
+//!   with `--copy-to <dir>` the two files a page serves copied there.
 //!
 //! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
-//! is the test that keeps the workspace's dependencies one way.
+//! is the test that keeps the workspace's dependencies one way (and Isoloom off the runner's
+//! crates), `guardrails` the scans of the product's sources clippy can't express.
 
 #![expect(
     clippy::print_stdout,
     clippy::print_stderr,
     reason = "the tasks report on the terminal: printing is their interface, not stray debugging output"
+)]
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the development tasks drive the tools (cargo, docker, terraform, the validators): each task is the adapter of its tools"
 )]
 
 mod bench;
@@ -38,6 +43,8 @@ mod deps;
 mod fuzz;
 mod fuzz_combos;
 mod generate_all;
+#[cfg(test)]
+mod guardrails;
 mod hack;
 mod mutants;
 mod process;
@@ -46,8 +53,8 @@ mod repo;
 mod test;
 mod text;
 mod tf_test;
-mod tiers;
 mod verify;
+mod wasm;
 
 use std::process::ExitCode;
 
@@ -104,12 +111,13 @@ enum Task {
     /// The generation benchmarks (criterion) against xtask/baselines/bench-baseline.json; exits 1
     /// when one is slower than the threshold allows.
     Bench(bench::Args),
-    /// The tier list (crates/targets/isoloom-targets/tiers.json): `record <entry> <host>
-    /// <result>` adds a real run, the evidence a tier is worked out from.
-    Tiers(tiers::Args),
     /// The catalogue: `refresh` pins what the entries fetch (lock.yml); `check <entry>` runs an
     /// entry's parity contract in both forms through a runner's command line.
     Catalogue(catalogue::Args),
+    /// The topology editor's engine (crates/frontends/isoloom-wasm) built for the browser with
+    /// wasm-pack, for size, into web/pkg/; `--copy-to <dir>` copies the two files a page serves
+    /// (the JavaScript glue and the WebAssembly) there.
+    Wasm(wasm::Args),
 }
 
 fn main() -> ExitCode {
@@ -136,7 +144,7 @@ fn run(cli: Cli) -> Res<ExitCode> {
         Task::Conformance(a) => Ok(conformance::run(&a)),
         Task::Mutants(a) => mutants::run(&a),
         Task::Bench(a) => bench::run(&a),
-        Task::Tiers(a) => tiers::run(&a),
         Task::Catalogue(a) => catalogue::run(&a),
+        Task::Wasm(a) => wasm::build(&a).map(|()| ExitCode::SUCCESS),
     }
 }

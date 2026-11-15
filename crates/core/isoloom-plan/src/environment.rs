@@ -15,38 +15,42 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use indexmap::IndexMap;
 use isoloom_spec::images;
 use isoloom_spec::model::{
-    Arch, Boot, Constraints, External, HostFolder, Input, Machine, MachineFile, Network, Protocol, Resources, Seal, SecretSource, Spec, Target, Tc, Ulimit,
-    VmImage, Winrm,
+    Arch, Boot, Constraints, External, HostFolder, Input, MachineFile, Network, Protocol, Resources, Seal, SecretSource, Spec, Target, Tc, Ulimit, VmImage,
+    Winrm,
 };
 use isoloom_spec::net::{NetworkBlock, Rate, RateError, docker_cidrs};
-use isoloom_spec::windows::{self, Tpm};
+use isoloom_spec::windows::Tpm;
 
 mod controller;
 mod image;
+mod machines;
 mod shape;
 mod size;
 mod vm;
 
 pub use controller::Controller;
 pub use image::{Build, Image};
+use machines::machines;
 use shape::shape;
 pub use shape::{MachineRole, MachineShape};
 pub use vm::Vm;
 
-use crate::addressing::{address, address_for, cidr, host_address, start_order};
+use crate::addressing::{address_for, cidr, host_address, start_order};
 use crate::ansible;
 use crate::checks::{self, Resolved};
+use isoloom_catalogue::Catalogue;
+
 use crate::configure::{DaemonTable, Recipe};
 use crate::hardware::{self, Hardware};
 use crate::images::Images;
 use crate::ipv6::{self, Ipv6Plan, Route6};
-use crate::lifecycle::{self, MachineLifecycle};
+use crate::lifecycle::MachineLifecycle;
 use crate::outside::{self, OutsideAddress, OutsideNetwork};
 use crate::process::Process;
 use crate::requirements::{self, Requirement};
 use crate::routing;
 use crate::secrets::SecretFile;
-use crate::storage::{self, DataDisk, Lifetime};
+use crate::storage::{DataDisk, Lifetime};
 use crate::tools::{self, ToolPlan};
 
 /// One environment, planned for one target.
@@ -99,6 +103,10 @@ pub struct Environment {
     /// defaults set one ([`crate::Lab::with_regions`]); a cloud left out keeps its own.
     pub regions: BTreeMap<String, String>,
     spec: Spec,
+    /// The catalogue it was planned with, for [`Environment::replan`] and the backends.
+    catalogue: &'static Catalogue,
+    /// The daemon table its machines' configurations were resolved with, for [`Environment::replan`].
+    daemons: DaemonTable,
 }
 
 /// A network, as the target lays it out.
@@ -306,16 +314,43 @@ impl Settings {
 }
 
 impl Environment {
-    /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run).
+    /// Plans another validated `spec` for `target` (`instance`: the copy it is) with what this
+    /// environment was planned with (its catalogue's daemon table): for a backend that derives
+    /// one environment from another (a hybrid's containers alone, a composite's Docker host).
+    ///
+    /// # Errors
+    ///
+    /// As [`Lab::plan`](crate::Lab::plan).
+    pub fn replan(&self, spec: &Spec, target: Target, instance: Option<u8>) -> Result<Environment, PlanError> {
+        Environment::planned(spec, target, instance, self.catalogue, &self.daemons)
+    }
+
+    /// The catalogue it was planned with (its `Lab`'s). Hidden: it returns a building-block crate's
+    /// type, as [`Lab::catalogue`](crate::Lab::catalogue) does.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn catalogue(&self) -> &'static Catalogue {
+        self.catalogue
+    }
+
+    /// Plans a validated `spec` for `target` (`instance`: the copy it is, when several run) with
+    /// its `Lab`'s `catalogue`, each machine's configuration resolved with `daemons`, the
+    /// catalogue's ([`Lab::plan`](crate::Lab::plan)).
     ///
     /// # Errors
     ///
     /// [`PlanError::UnresolvedRecipe`] for a machine whose configuration has steps its OS's
     /// family can't carry, which lowering refuses for the target first.
-    pub fn build(spec: &Spec, target: Target, instance: Option<u8>) -> Result<Environment, PlanError> {
+    pub(crate) fn planned(
+        spec: &Spec,
+        target: Target,
+        instance: Option<u8>,
+        catalogue: &'static Catalogue,
+        daemons: &DaemonTable,
+    ) -> Result<Environment, PlanError> {
         // Laid out with the outside networks (so a moved block avoids them), then without them.
         let laid_out = outside::without(&lay_out(spec, target));
-        let machines = machines(spec, &laid_out, target)?;
+        let machines = machines(spec, &laid_out, target, daemons)?;
         let requirements = all_requirements(spec, &laid_out, &machines);
         let networks = laid_out
             .networks
@@ -347,6 +382,8 @@ impl Environment {
             private_dns: crate::private_dns::plan(&laid_out),
             spec: laid_out,
             regions: BTreeMap::new(),
+            catalogue,
+            daemons: daemons.clone(),
         })
     }
 
@@ -356,6 +393,13 @@ impl Environment {
     #[must_use]
     pub fn spec(&self) -> &Spec {
         &self.spec
+    }
+
+    /// The names it takes on the host (its VMs, networks and libvirt domains), keyed by its name
+    /// and so by its instance: the one place a backend builds them from.
+    #[must_use]
+    pub fn names(&self) -> crate::Names<'_> {
+        crate::Names::new(&self.name)
     }
 
     /// The names of the launch values it reads, in spec order.
@@ -387,7 +431,7 @@ impl Environment {
 }
 
 /// Why a spec can't be planned: what lowering and validation refuse first, so a bug of either
-/// when it happens. [`Environment::build`] says so rather than plan around it (a machine with no
+/// when it happens. Planning says so rather than plan around it (a machine with no
 /// configuration at all).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -399,6 +443,13 @@ pub enum PlanError {
         machine: String,
         /// Each step its family can't carry, in step order.
         unportable: Vec<crate::configure::Unportable>,
+    },
+    /// The catalogue built into Isoloom doesn't load, so the environment's services and daemons
+    /// can't be known: planning stops rather than plan with an empty catalogue.
+    #[error("this Isoloom's catalogue doesn't load: {reason}")]
+    Catalogue {
+        /// Why it doesn't load.
+        reason: String,
     },
     /// A machine's `rate_limit` isn't a rate ([`Rate::parse`]).
     #[error("machine `{machine}`: `rate_limit`: `{rate}` {error}")]
@@ -452,19 +503,6 @@ fn network(spec: &Spec, name: &str, n: &Network, declared: NetworkBlock) -> Netw
     }
 }
 
-/// The machines of `laid_out`, each with its place on the outside networks of `spec`.
-fn machines(spec: &Spec, laid_out: &Spec, target: Target) -> Result<IndexMap<String, MachinePlan>, PlanError> {
-    laid_out
-        .machines
-        .iter()
-        .map(|(name, m)| {
-            let mut mp = machine(laid_out, target, name, m)?;
-            mp.outside = spec.machines.get(name).map(|om| outside::addresses(spec, om)).unwrap_or_default();
-            Ok((name.clone(), mp))
-        })
-        .collect()
-}
-
 /// Everything the environment requires, most fundamental first: the spec's own requirements,
 /// the outside networks', then those that depend on each machine's shape.
 fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, MachinePlan>) -> Vec<Requirement> {
@@ -473,6 +511,7 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
     out.extend(outside::requirements(spec));
     out.extend(requirements::mixed_shapes(laid_out, shape));
     out.extend(crate::machine_files::requirements(laid_out, shape));
+    out.extend(crate::published::requirement(laid_out));
     out.extend(crate::existing_hosts::check_requirement(laid_out, shape));
     out.extend(hardware::tpm(machines));
     out.extend(crate::boot::requirements(machines));
@@ -481,366 +520,5 @@ fn all_requirements(spec: &Spec, laid_out: &Spec, machines: &IndexMap<String, Ma
     out
 }
 
-/// Machine `name`'s recipe, when it has a configuration.
-fn recipe(name: &str, m: &Machine) -> Result<Option<Recipe>, PlanError> {
-    m.configuration
-        .as_ref()
-        .map(|c| Recipe::of(c, &m.ports, &DaemonTable::common()))
-        .transpose()
-        .map_err(|unportable| PlanError::UnresolvedRecipe {
-            machine: name.to_owned(),
-            unportable,
-        })
-}
-
-/// Machine `name`'s `rate_limit`, read once here (validation refuses one that isn't a rate).
-fn rate_limit(name: &str, m: &Machine) -> Result<Option<Rate>, PlanError> {
-    m.rate_limit
-        .as_deref()
-        .map(|rate| {
-            Rate::parse(rate).map_err(|error| PlanError::RateLimit {
-                machine: name.to_owned(),
-                rate: rate.to_owned(),
-                error,
-            })
-        })
-        .transpose()
-}
-
-/// Machine `name` (`m`), planned for `target`. Lowering refuses a configuration that doesn't
-/// resolve (an app's steps per target, a service's for the environment), so the lowered spec `build`
-/// plans has its recipe; one that doesn't is an error, not a machine with no configuration.
-fn machine(spec: &Spec, target: Target, name: &str, m: &Machine) -> Result<MachinePlan, PlanError> {
-    let shape = shape(target, m);
-    let routing = lifecycle::Routing::of(spec, target, name, m);
-    let recipe = recipe(name, m)?;
-    Ok(MachinePlan {
-        shape,
-        role: if m.access { MachineRole::Access } else { MachineRole::Member },
-        addresses: m.networks.iter().map(|(n, o)| (n.clone(), address(spec, n, *o))).collect(),
-        more_addresses: crate::more_addresses::of(spec, m),
-        addresses6: ipv6::addresses(spec, m),
-        names: crate::private_dns::names(spec, name, m),
-        lifecycle: if shape == MachineShape::Vm {
-            lifecycle::of(spec, name, m, recipe.as_ref(), &routing)
-        } else {
-            Vec::new()
-        },
-        routes: routing.routes,
-        routes6: routing.routes6,
-        default_gateway: routing.default,
-        is_gateway: routing::is_gateway(spec, name),
-        offline: routing::offline(spec, name, m),
-        seal: m.seal,
-        ports: published(m),
-        volumes: storage::volumes(spec, name, m),
-        files: files(spec, m, shape),
-        disks: storage::disks(name, m),
-        host_folders: m.host_folders.clone(),
-        settings: Settings {
-            environment: m.environment.clone(),
-            sysctls: m.sysctls.clone(),
-            ulimits: m.ulimits.clone(),
-        },
-        inputs: m.inputs.clone(),
-        secrets: m.secrets.iter().map(|s| SecretFile::of(spec, s)).collect(),
-        resources: m.resources.unwrap_or_default(),
-        arch: m.arch,
-        platform: m.platform,
-        rate_limit: rate_limit(name, m)?,
-        image: image::of(spec, shape, name, m, recipe.as_ref()),
-        vm_image: m.vm.as_ref().and_then(|v| v.image.clone()),
-        boot: m.vm.as_ref().and_then(|v| v.boot.clone()),
-        depends_on: m.depends_on.clone(),
-        os: m.vm.as_ref().map(|v| v.os.clone()),
-        winrm: m.vm.as_ref().filter(|v| images::is_windows(&v.os) && !windows::winssh(v)).map(images::winrm),
-        winssh: m.vm.as_ref().is_some_and(windows::winssh),
-        tpm: m.vm.as_ref().and_then(windows::tpm),
-        external: m.external.clone(),
-        host_vars: ansible::host_vars(spec, name),
-        outside: IndexMap::new(),
-        process: Process::of(m),
-        hardware: Hardware::of(m),
-        recipe,
-    })
-}
-
-fn published(m: &Machine) -> Vec<PublishedPort> {
-    m.ports
-        .iter()
-        .filter_map(|s| {
-            s.publish.map(|publish| PublishedPort {
-                name: m.port_label(s),
-                port: s.port,
-                publish,
-                protocol: s.protocol,
-                fixed: s.fixed,
-            })
-        })
-        .collect()
-}
-
-/// A machine's files: the spec's, and for a container the certificate authorities it trusts
-/// (`constraints.ca_certificates`) where its trust store reads them (a VM installs them in a
-/// set-up step instead).
-fn files(spec: &Spec, m: &Machine, shape: MachineShape) -> Vec<MachineFile> {
-    let authorities = spec.constraints.iter().flat_map(|c| c.ca_certificates.iter()).enumerate();
-    let trusted = authorities.filter(|_| shape == MachineShape::Container).map(|(n, source)| MachineFile {
-        path: Constraints::ca_certificate_path(n),
-        source: Some(source.clone()),
-        content: None,
-        uid: None,
-        gid: None,
-        mode: None,
-    });
-    m.files.iter().cloned().chain(trusted).collect()
-}
-
 #[cfg(test)]
-mod tests {
-    use isoloom_spec::model::Target;
-
-    use super::{Controller, Environment};
-    use crate::testing;
-
-    const NEEDS_ONE: &str = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nprovision: [{ ansible: site.yml }]\n";
-
-    fn controller(extra: &str) -> Option<Controller> {
-        testing::environment(&format!("{NEEDS_ONE}{extra}"), Target::Vagrant).controller
-    }
-
-    #[test]
-    fn each_input_carries_the_sensitivity_the_spec_gives_it() {
-        let env = testing::environment(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\ninputs: { URL: { sensitive: false }, TOKEN: {} }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
-            Target::Vagrant,
-        );
-        let inputs: Vec<(&str, bool)> = env.inputs.iter().map(|i| (i.name.as_str(), i.sensitive)).collect();
-        assert_eq!(inputs, [("URL", false), ("TOKEN", true)]);
-        assert_eq!(env.input_names(), ["URL", "TOKEN"]);
-    }
-
-    #[test]
-    fn the_controller_has_one_cpu_and_512_mb_unless_the_spec_sizes_it() {
-        assert_eq!(
-            controller(""),
-            Some(Controller {
-                cpus: 1,
-                memory_mb: 512,
-                disk_gb: None,
-                keep_running: false
-            })
-        );
-        assert_eq!(
-            controller("controller: { resources: { cpus: 2, memory_mb: 768, disk_gb: 10 }, keep_running: true }\n"),
-            Some(Controller {
-                cpus: 2,
-                memory_mb: 768,
-                disk_gb: Some(10),
-                keep_running: true
-            })
-        );
-    }
-
-    #[test]
-    fn settings_are_empty_until_one_is_set() {
-        assert!(super::Settings::default().is_empty());
-        let mut s = super::Settings::default();
-        s.sysctls.insert("net.ipv4.ip_forward".into(), "1".into());
-        assert!(!s.is_empty());
-        let mut u = super::Settings::default();
-        u.environment.insert("A".into(), "1".into());
-        assert!(!u.is_empty());
-    }
-
-    #[test]
-    fn a_probe_reaches_a_machine_at_its_address_else_by_name() {
-        let env = testing::environment(
-            "version: 1\nname: t\nnetworks:\n  v4: { cidr: 10.9.0.0/24 }\n  v6: { cidr: 10.8.0.0/24, ipv6: { cidr: \"fd00:8::/64\", only: true } }\n  auto: { cidr: 10.7.0.0/24, ipv6: { cidr: \"fd00:7::/64\", only: true, addresses: auto } }\nmachines:\n  web: { networks: { v4: 10, v6: 10, auto: 10 }, app: { image: nginx } }\n",
-            Target::Kubernetes,
-        );
-        assert_eq!(env.probe_address("web", "v4"), "10.9.0.10");
-        assert_eq!(env.probe_address("web", "v6"), "fd00:8::10");
-        assert_eq!(env.probe_address("web", "auto"), "web");
-        assert_eq!(env.probe_address("ghost", "v4"), "ghost");
-    }
-
-    /// `web` has both forms, `img` only an image, `vm` only a VM (a reboot), `ct` is an LXC
-    /// container on Proxmox, `user` is supplied; `data` is shared by `vm` and `both`.
-    const SHAPES: &str = "version: 1
-name: t
-networks: { a: { cidr: 10.1.0.0/24, ipv6: { cidr: \"fd00:1::/64\" } }, b: { cidr: 10.2.0.0/24, ipv6: { cidr: \"fd00:2::/64\" } } }
-reach: [{ from: a, to: b }]
-volumes: { data: { owner: vm } }
-machines:
-  both: { networks: { a: 10 }, os: debian@12, app: { image: nginx, steps: [{ run: a.sh }] }, volumes: { data: /d, own: /o } }
-  img: { networks: { a: 11 }, app: { image: nginx } }
-  vm: { networks: { b: 12 }, os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d } }
-  ct: { networks: { a: 13 }, app: { image: alpine } }
-  win: { networks: { a: 14 }, os: windows-server@2022 }
-  user: { access: true, networks: { a: 5 } }
-overrides:
-  proxmox: { machines: { ct: { lxc: true } } }
-  vagrant: { machines: { win: { winrm: ssl } } }
-";
-
-    fn shapes(target: Target) -> Vec<(String, super::MachineShape)> {
-        testing::environment(SHAPES, target)
-            .machines
-            .iter()
-            .map(|(n, m)| (n.clone(), m.shape))
-            .collect()
-    }
-
-    fn shape_of(target: Target, machine: &str) -> Option<super::MachineShape> {
-        shapes(target).into_iter().find(|(n, _)| n == machine).map(|(_, s)| s)
-    }
-
-    #[test]
-    fn each_target_produces_a_machine_in_the_form_it_runs() {
-        use super::MachineShape::{Container, External, Supplied, Vm};
-        for t in [Target::Docker, Target::Hosted, Target::DockerVm, Target::CloudDocker, Target::Kubernetes] {
-            assert_eq!(shape_of(t, "both"), Some(Container), "{t:?}");
-            assert_eq!(shape_of(t, "user"), Some(Supplied), "{t:?}");
-        }
-        assert_eq!(shape_of(Target::Hybrid, "both"), Some(Container), "a container where it has one");
-        assert_eq!(shape_of(Target::Hybrid, "vm"), Some(Vm));
-        assert_eq!(shape_of(Target::Proxmox, "ct"), Some(Container), "an LXC container");
-        assert_eq!(shape_of(Target::Proxmox, "both"), Some(Vm));
-        assert_eq!(
-            shape_of(Target::Proxmox, "img"),
-            Some(Supplied),
-            "no VM and no LXC: Proxmox refuses it, nothing is built"
-        );
-        assert_eq!(shape_of(Target::Vagrant, "both"), Some(Vm));
-        assert_eq!(shape_of(Target::External, "both"), Some(External));
-    }
-
-    #[test]
-    fn every_vm_comes_with_its_os_and_nothing_else_is_one() {
-        for t in [Target::Hybrid, Target::Proxmox, Target::Vagrant, Target::Docker] {
-            let env = testing::environment(SHAPES, t);
-            let vms: Vec<(&str, &str)> = env.vms().map(|vm| (vm.name, vm.os)).collect();
-            let shaped = env.machines.values().filter(|m| m.shape == super::MachineShape::Vm).count();
-            assert_eq!(vms.len(), shaped, "{t:?}: {vms:?}");
-            assert!(vms.iter().all(|(_, os)| !os.is_empty()), "{t:?}: {vms:?}");
-        }
-        let env = testing::environment(SHAPES, Target::Proxmox);
-        assert_eq!(env.vm("win").map(|vm| vm.os), Some("windows-server-2022"));
-        assert!(env.vm("ct").is_none(), "a container is no VM");
-    }
-
-    #[test]
-    fn a_vm_has_set_up_steps_and_a_container_none() {
-        let env = testing::environment(SHAPES, Target::Hybrid);
-        let steps = |m: &str| env.machines.get(m).map_or(0, |p| p.lifecycle.len());
-        assert!(steps("vm") > 0);
-        assert_eq!(steps("both"), 0);
-    }
-
-    #[test]
-    fn a_cloud_routes_ipv6_itself_and_the_other_vm_targets_through_the_router() {
-        let routes6 = |t: Target| {
-            testing::environment(SHAPES, t)
-                .machines
-                .get("both")
-                .map(|m| m.routes6.len())
-                .unwrap_or_default()
-        };
-        assert_eq!(routes6(Target::Vagrant), 1);
-        assert_eq!(routes6(Target::CloudVm), 0);
-        let cloud = testing::environment(SHAPES, Target::CloudVm);
-        let ipv6_routes = cloud.machines.get("both").and_then(|m| {
-            m.lifecycle.iter().find_map(|s| match s {
-                crate::Step::Ipv6 { routes, .. } => Some(routes.len()),
-                _ => None,
-            })
-        });
-        assert_eq!(ipv6_routes, Some(0));
-    }
-
-    #[test]
-    fn a_shared_volume_names_its_owner_and_users_and_an_own_one_is_the_machines() {
-        let env = testing::environment(SHAPES, Target::Vagrant);
-        let both = env.machines.get("both").map(|m| m.volumes.clone()).unwrap_or_default();
-        let kinds: Vec<(&str, &super::VolumeKind)> = both.iter().map(|v| (v.name.as_str(), &v.kind)).collect();
-        assert_eq!(
-            kinds,
-            [
-                (
-                    "data",
-                    &super::VolumeKind::Shared {
-                        owner: "vm".into(),
-                        users: vec!["both".into(), "vm".into()]
-                    }
-                ),
-                ("own", &super::VolumeKind::Own)
-            ]
-        );
-    }
-
-    #[test]
-    fn a_windows_vm_answers_winrm_its_way() {
-        let env = testing::environment(SHAPES, Target::Vagrant);
-        let win = env.machines.get("win").expect("planned");
-        assert!(win.is_windows() && !win.winssh);
-        assert_eq!(win.winrm, Some(isoloom_spec::model::Winrm::Ssl));
-        let vm = env.machines.get("vm").expect("planned");
-        assert!(!vm.is_windows() && vm.winrm.is_none());
-        assert!(super::on_docker(Target::Docker) && super::on_docker(Target::Hosted) && !super::on_docker(Target::DockerVm));
-    }
-
-    #[test]
-    fn only_playbooks_need_a_controller() {
-        let lab = testing::lab(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.sh]\n",
-        );
-        let spec = lab.for_target(Target::Vagrant);
-        assert!(!Controller::needed(&spec) && Environment::build(&spec, Target::Vagrant, None).expect("the spec plans").controller.is_none());
-        let playbook = testing::lab(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\nchecks: [checks/a.yml]\n",
-        );
-        assert!(Controller::needed(&playbook.for_target(Target::Vagrant)));
-        assert_eq!(Controller::of(&spec).memory_mb, Controller::MEMORY_MB);
-    }
-
-    #[test]
-    fn a_configuration_that_doesnt_resolve_is_an_error_not_a_vm_without_one() {
-        let lab = testing::lab(
-            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  win: { networks: { lan: 10 }, os: windows-server@2022, app: { steps: [{ run: iis.ps1 }, { copy: { from: a, to: 'C:\\a', owner: admin } }] } }\n",
-        );
-        assert!(lab.refusal(Target::Vagrant).is_some(), "lowering refuses the step first");
-        let unresolved = Environment::build(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect_err("the recipe doesn't resolve");
-        let super::PlanError::UnresolvedRecipe { machine, unportable } = &unresolved else {
-            panic!("not the recipe: {unresolved:?}")
-        };
-        assert_eq!((machine.as_str(), unportable.len()), ("win", 1), "{unresolved:?}");
-        assert!(
-            unresolved
-                .to_string()
-                .starts_with("machine `win`: its configuration doesn't resolve on its OS: "),
-            "{unresolved}"
-        );
-    }
-
-    #[test]
-    fn a_rate_limit_is_planned_as_a_rate_and_one_that_isnt_is_an_error() {
-        let plan = |rate: &str| {
-            let lab = testing::lab(&format!(
-                "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, rate_limit: {rate} }}\n"
-            ));
-            Environment::build(&lab.for_target(Target::Proxmox), Target::Proxmox, None)
-        };
-        let env = plan("512kbit").expect("a rate plans");
-        let rate = env.machines["web"].rate_limit.as_ref().expect("its rate limit");
-        assert_eq!((rate.to_string(), rate.megabytes_per_second()), ("512kbit".to_owned(), 0.064));
-        assert_eq!(
-            plan("fast").expect_err("validation refuses it, and the plan doesn't drop it"),
-            super::PlanError::RateLimit {
-                machine: "web".into(),
-                rate: "fast".into(),
-                error: isoloom_spec::net::RateError::Malformed
-            }
-        );
-    }
-}
+mod tests;

@@ -1,16 +1,16 @@
 //! The Vagrant box each OS boots: the built-in table, the image table's or the spec's own box
 //! (`vm.image.vagrant`) winning, and the boxes a provider boots instead of the main one
-//! (libvirt, QEMU, Hyper-V) where the main one has no build for it.
+//! (libvirt, QEMU, Hyper-V, UTM) where the main one has no build for it.
 
 mod choice;
 
 use isoloom_plan::Vm;
 use isoloom_spec::images::is_windows;
 
-pub(crate) use choice::{ARM_HOST, Choice, MainBox, ProviderBox};
+pub(crate) use choice::{ARM_HOST, MainBox};
 
-/// A Vagrant box: its name, a pinned version when known-good, and the libvirt, QEMU and Hyper-V
-/// boxes when the main one has no build for them.
+/// A Vagrant box: its name, a pinned version when known-good, and the libvirt, QEMU, Hyper-V and
+/// UTM boxes when the main one has no build for them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct VagrantBox {
     /// The box's name on Vagrant Cloud (`bento/debian-12`).
@@ -23,6 +23,9 @@ pub(crate) struct VagrantBox {
     pub(crate) qemu: Option<String>,
     /// The box the Hyper-V provider boots.
     pub(crate) hyperv: HyperVBox,
+    /// The box the UTM provider boots: a UTM-format box (`vagrant_utm` boots no other format).
+    /// `None`: none known for this OS, give one with `overrides.vagrant.machines.<m>.boxes.utm`.
+    pub(crate) utm: Option<String>,
 }
 
 /// The box Vagrant's Hyper-V provider boots for a machine.
@@ -51,10 +54,6 @@ pub(crate) const HYPERV_DEBIAN_12: (&str, &str) = ("generic/debian12", ROBOXES);
 /// containers' host) boot too.
 pub(crate) const DEBIAN_12: &str = "bento/debian-12";
 
-/// Debian 12 for UTM (`vagrant_utm`), which bento's and roboxes' boxes have no build for: an
-/// amd64 and an arm64 one. The containers' host boots it there.
-pub(crate) const UTM_DEBIAN_12: &str = "utm/bookworm";
-
 /// The last version of the roboxes `generic/*` boxes, which have Hyper-V builds.
 const ROBOXES: &str = "4.3.12";
 
@@ -71,7 +70,18 @@ fn boxed(name: &str, version: Option<&str>, libvirt: Option<&str>) -> VagrantBox
         libvirt: libvirt.map(Into::into),
         qemu: None,
         hyperv: HyperVBox::Main,
+        utm: None,
     }
+}
+
+/// Debian 12 for UTM: `vagrant_utm`'s own box (arm64, built from Debian's cloud image). Isoloom's
+/// own Debian VMs (router, controller, tool shell) use it there too.
+pub(crate) const UTM_DEBIAN_12: &str = "utm/bookworm";
+
+/// `b` with its UTM box: the UTM boxes are `vagrant_utm`'s own (`utm/*`), for a few OSes only.
+fn with_utm(mut b: VagrantBox, utm: &str) -> VagrantBox {
+    b.utm = Some(utm.into());
+    b
 }
 
 /// `b` with its QEMU box (vagrant-qemu boots libvirt-format boxes), where the main one has none.
@@ -98,10 +108,13 @@ fn no_hyperv(mut b: VagrantBox) -> VagrantBox {
 
 /// Debian 12's built-in boxes: an environment machine's on `debian@12`, and the containers' host's.
 pub(crate) fn debian_12() -> VagrantBox {
-    with_hyperv(
-        with_qemu(boxed(DEBIAN_12, None, Some("generic/debian12")), QEMU_DEBIAN_12),
-        HYPERV_DEBIAN_12.0,
-        HYPERV_DEBIAN_12.1,
+    with_utm(
+        with_hyperv(
+            with_qemu(boxed(DEBIAN_12, None, Some("generic/debian12")), QEMU_DEBIAN_12),
+            HYPERV_DEBIAN_12.0,
+            HYPERV_DEBIAN_12.1,
+        ),
+        UTM_DEBIAN_12,
     )
 }
 
@@ -123,12 +136,17 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "ubuntu-20.04" => h(b("bento/ubuntu-20.04", None, Some("generic/ubuntu2004")), "generic/ubuntu2004", ROBOXES),
         "ubuntu-22.04" => h(b("bento/ubuntu-22.04", None, Some("generic/ubuntu2204")), "generic/ubuntu2204", ROBOXES),
         // No roboxes build of 24.04: gusztavvargadr's, its last version with a Hyper-V build.
-        "ubuntu-24.04" => h(b("bento/ubuntu-24.04", None, None), "gusztavvargadr/ubuntu-server-2404-lts", "2607.0.0"),
+        "ubuntu-24.04" => with_utm(
+            h(b("bento/ubuntu-24.04", None, None), "gusztavvargadr/ubuntu-server-2404-lts", "2607.0.0"),
+            "utm/ubuntu-24.04",
+        ),
         "rocky-9" => h(b("bento/rockylinux-9", None, Some("generic/rocky9")), "generic/rocky9", ROBOXES),
         "almalinux-9" => h(b("bento/almalinux-9", None, Some("generic/alma9")), "generic/alma9", ROBOXES),
         // End of life (2024): for labs about older systems.
         "centos-7" => h(b("bento/centos-7", None, Some("generic/centos7")), "generic/centos7", ROBOXES),
         "fedora-42" => no_hyperv(b("bento/fedora-42", None, None)),
+        // End of life (2019): for labs built on it (OWASP SKF's). Roboxes' box, every provider.
+        "alpine-3.7" => b("generic/alpine37", None, None),
         // The box Isoloom's own controller boots (roboxes, with libvirt and Hyper-V builds).
         "alpine-3.19" => b("generic/alpine319", None, None),
         // A supported Alpine: the official cloud image as a box (VirtualBox, libvirt and QEMU
@@ -138,25 +156,6 @@ fn builtin_vagrant(os: &str) -> Option<VagrantBox> {
         "kali" => b("kalilinux/rolling", None, None),
         _ => return None,
     })
-}
-
-impl VagrantBox {
-    /// The boxes one of Isoloom's own VMs boots when it boots this one: the computer's build on
-    /// every provider, libvirt's and QEMU's own where it has them, `utm` on UTM; no Hyper-V block.
-    pub(crate) fn own_vm<'a>(&'a self, utm: Option<&'a str>) -> Choice<'a> {
-        Choice {
-            main: MainBox {
-                version: self.version.as_deref(),
-                ..MainBox::plain(&self.name)
-            },
-            libvirt: self.libvirt.as_deref(),
-            qemu: self.qemu.as_deref(),
-            cpu: None,
-            hyperv: None,
-            esxi: None,
-            utm,
-        }
-    }
 }
 
 /// The built-in Windows boxes: each has a Hyper-V build at its pinned version, but
@@ -206,24 +205,26 @@ pub(crate) fn vagrant(vm: Vm) -> Option<VagrantBox> {
             libvirt: None,
             qemu: image.and_then(|i| i.qemu.clone()),
             hyperv: HyperVBox::Main,
+            utm: None,
         },
         None => builtin_vagrant(vm.os)?,
     };
     if let Some(name) = image.and_then(|i| i.hyperv.clone()) {
         b.hyperv = HyperVBox::Other { name, version: None };
     }
+    if let Some(name) = image.and_then(|i| i.utm.clone()) {
+        b.utm = Some(name);
+    }
     Some(b)
 }
 
 #[cfg(test)]
 mod tests {
-    use isoloom_spec::model::KNOWN_OS;
-
     use super::*;
 
     #[test]
     fn every_os_name_has_a_vagrant_box() {
-        for os in KNOWN_OS {
+        for os in isoloom_spec::os::all().map(|o| o.name) {
             assert!(builtin_vagrant(os).is_some(), "no built-in Vagrant box for `{os}`");
         }
     }
@@ -244,6 +245,19 @@ mod tests {
         for os in ["debian-13", "ubuntu-14.04", "fedora-42"] {
             assert_eq!(builtin_vagrant(os).map(|b| b.hyperv), Some(HyperVBox::Missing), "{os}");
         }
+    }
+
+    #[test]
+    fn utm_boxes_only_where_vagrant_utm_has_one() {
+        assert_eq!(builtin_vagrant("debian-12").and_then(|b| b.utm).as_deref(), Some(UTM_DEBIAN_12));
+        assert_eq!(builtin_vagrant("ubuntu-24.04").and_then(|b| b.utm).as_deref(), Some("utm/ubuntu-24.04"));
+        for os in ["debian-13", "kali", "windows-11", "windows-server-2022"] {
+            assert_eq!(builtin_vagrant(os).and_then(|b| b.utm), None, "{os}");
+        }
+        let env = crate::testing::environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@13, networks: { lan: 10 } }\noverrides: { vagrant: { machines: { web: { boxes: { utm: my/debian13-utm } } } } }\n",
+        );
+        assert_eq!(vagrant(env.vm("web").unwrap()).unwrap().utm.as_deref(), Some("my/debian13-utm"));
     }
 
     #[test]

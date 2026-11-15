@@ -3,10 +3,9 @@
 //! evaluated. What the format expresses goes into the draft; everything else becomes a note.
 
 mod boxes;
+mod networks;
 mod recording;
 mod write;
-
-use std::net::Ipv4Addr;
 
 use indexmap::IndexMap;
 use isoloom_spec::net::Cidr;
@@ -14,6 +13,7 @@ use serde_json::Value;
 
 pub use recording::Recording;
 
+use crate::draft::writer::Port;
 use crate::draft::{Draft, NoteKind, Notes};
 use crate::naming::{label, unique};
 use crate::{Error, Result};
@@ -28,14 +28,44 @@ struct Machine {
     image: Option<(String, Option<String>)>,
     /// Each private network's block and the machine's last octet on it.
     networks: Vec<(String, u8)>,
-    /// (guest port, host port, UDP).
-    publish: Vec<(u16, u16, bool)>,
-    /// Folders of the computer shared into it: (from, path, read only).
-    host_folders: Vec<(String, String, bool)>,
+    /// Its forwarded ports, each a guest port published on a host port.
+    publish: Vec<Port>,
+    /// Folders of the computer shared into it.
+    host_folders: Vec<HostFolder>,
     cpus: Option<u32>,
     memory_mb: Option<u32>,
     /// Its provisioning steps: scripts, playbooks and reboots, in order.
     steps: Vec<String>,
+}
+
+/// The shell provisioner's options a step has no field for, each with what the step does instead.
+const SHELL_OPTIONS_LEFT_OUT: [(&str, &str); 4] = [
+    ("args", "a step runs its script with no arguments: write them into the script"),
+    (
+        "env",
+        "a step's script has no variables of its own: set them in the script, or use the machine's `environment`",
+    ),
+    ("privileged", "a step runs as root"),
+    ("run", "a step runs once, when the machine is set up"),
+];
+
+/// Whether a shell provisioner's option says what a step does anyway: run as root, once.
+fn is_shell_default(key: &str, v: &Value) -> bool {
+    match key {
+        "privileged" => v.as_bool() == Some(true),
+        "run" => v.as_str() == Some("once"),
+        _ => false,
+    }
+}
+
+/// A folder of the computer shared into a machine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct HostFolder {
+    /// The folder on the computer.
+    from: String,
+    /// Where the machine sees it.
+    path: String,
+    read_only: bool,
 }
 
 /// The step a shell provisioner's `reboot: true` becomes.
@@ -222,53 +252,6 @@ impl<'a> Import<'a> {
         }
     }
 
-    /// A public network: a `bridged` network, at the machine's fixed address in its block, else
-    /// by DHCP from the LAN (the block a placeholder then, said).
-    fn public_network(&mut self, at: &str, m: &mut Machine, c: &Call) {
-        let at = format!("{at}.vm.network");
-        let interface = match c.opt("bridge") {
-            Some(Value::Array(list)) => {
-                let first = text(list.first());
-                if list.len() > 1 {
-                    self.notes.add(
-                        &at,
-                        NoteKind::Changed,
-                        format!(
-                            "several interfaces to bridge to: the first, `{}`, is kept",
-                            first.as_deref().unwrap_or_default()
-                        ),
-                    );
-                }
-                first
-            }
-            other => text(other),
-        };
-        let fixed = text(c.opt("ip")).and_then(|ip| ip.parse::<Ipv4Addr>().ok());
-        let dhcp = fixed.is_none();
-        let bridge = Bridge {
-            interface: interface.clone(),
-            dhcp,
-            default_route: dhcp && c.opt("use_dhcp_assigned_default_route").and_then(Value::as_bool) == Some(true),
-        };
-        let (cidr, octet) = if let Some(ip) = fixed {
-            (block(ip, text(c.opt("netmask")).as_deref()).0, ip.octets()[3])
-        } else {
-            self.notes.add(
-                &at,
-                NoteKind::Changed,
-                format!("by DHCP from the LAN, whose block the Vagrantfile doesn't say: `cidr` is {LAN_PLACEHOLDER}, set it to the LAN's"),
-            );
-            (LAN_PLACEHOLDER, 0)
-        };
-        let key = format!("bridged {}", if dhcp { interface.unwrap_or_default() } else { cidr.to_string() });
-        self.nets.entry(key.clone()).or_insert_with(|| Net {
-            cidr,
-            name: "lan".to_owned(),
-            bridged: Some(bridge),
-        });
-        m.networks.push((key, octet));
-    }
-
     /// A synced folder: a host folder of a Linux machine, read only when mounted `ro`. Vagrant's
     /// own share of the project at `/vagrant` is Isoloom's copy of it. How Vagrant shares it
     /// (`type`, owners) isn't kept, and said.
@@ -306,45 +289,7 @@ impl<'a> Import<'a> {
                 format!("`{from}`: each target shares a host folder its own way; not kept: {}", ignored.join(", ")),
             );
         }
-        m.host_folders.push((from, path, read_only));
-    }
-
-    /// A private network with a fixed address: the machine joins its block (said when it isn't
-    /// the address's own: one wider than /24 or narrower than /29). An address that isn't IPv4 is
-    /// left out, and said.
-    fn private_network(&mut self, at: &str, m: &mut Machine, c: &Call) {
-        if text(c.opt("type")).as_deref() == Some("dhcp") || c.opt("ip").is_none() {
-            self.notes.add(
-                format!("{at}.vm.network"),
-                NoteKind::Changed,
-                "a DHCP private network: give the machine a fixed address",
-            );
-            return;
-        }
-        let given = text(c.opt("ip")).unwrap_or_default();
-        let Ok(ip) = given.parse::<Ipv4Addr>() else {
-            self.notes.add(
-                format!("{at}.vm.network"),
-                NoteKind::Changed,
-                format!("`{given}` isn't an IPv4 address: the machine joins no network for it; give it an IPv4 one"),
-            );
-            return;
-        };
-        let (cidr, asked) = block(ip, text(c.opt("netmask")).as_deref());
-        if let Some(len) = asked {
-            self.notes.add(
-                format!("{at}.vm.network"),
-                NoteKind::Changed,
-                format!("{ip}/{len} isn't a /24 to /29; re-addressed to {cidr}"),
-            );
-        }
-        let key = cidr.to_string();
-        self.nets.entry(key.clone()).or_insert_with(|| Net {
-            cidr,
-            name: text(c.opt("virtualbox__intnet")).map(|n| label(&n)).unwrap_or_default(),
-            bridged: None,
-        });
-        m.networks.push((key, ip.octets()[3]));
+        m.host_folders.push(HostFolder { from, path, read_only });
     }
 
     fn forwarded_port(&mut self, at: &str, m: &mut Machine, c: &Call) {
@@ -355,7 +300,11 @@ impl<'a> Import<'a> {
         match (port("guest"), port("host")) {
             (Some(g), Some(h)) => {
                 let udp = text(c.opt("protocol")).is_some_and(|p| p.eq_ignore_ascii_case("udp"));
-                m.publish.push((g, h, udp));
+                m.publish.push(Port {
+                    number: g,
+                    udp,
+                    publish: Some(h),
+                });
             }
             _ => self.notes.add(
                 format!("{at}.vm.network"),
@@ -417,6 +366,15 @@ impl<'a> Import<'a> {
                 .add(at, NoteKind::InImage, "an inline script: put it in a file and list it in `app.steps`"),
             _ => {}
         }
+        // What the script was run with: a step runs its script as root, once, with no arguments
+        // and no variables of its own.
+        let given: Vec<String> = SHELL_OPTIONS_LEFT_OUT
+            .iter()
+            .filter_map(|(key, why)| c.opt(key).filter(|v| !is_shell_default(key, v)).map(|v| format!("`{key}: {v}` ({why})")))
+            .collect();
+        if !given.is_empty() {
+            self.notes.add(at, NoteKind::Changed, format!("left out: {}", given.join(", ")));
+        }
         // `reboot: true`: Vagrant restarts the guest after the script (if any).
         if c.opt("reboot").and_then(Value::as_bool) == Some(true) {
             if isoloom_spec::images::is_windows(m.os) {
@@ -432,21 +390,11 @@ impl<'a> Import<'a> {
     }
 }
 
-/// The block of a private network's address: its netmask's (an address or a length), /24 when
-/// it gives none, and never wider than /24 or narrower than /29 (the spec's sizes); with the
-/// length asked when it was outside those.
-fn block(ip: Ipv4Addr, netmask: Option<&str>) -> (Cidr, Option<u32>) {
-    let asked = netmask
-        .and_then(|m| m.parse::<Ipv4Addr>().ok().map(|mask| u32::from(mask).count_ones()).or_else(|| m.parse().ok()))
-        .unwrap_or(24);
-    let clamped = asked.clamp(24, 29);
-    // The clamp keeps it within 24..=29, so it fits a `u8`.
-    let len = u8::try_from(clamped).unwrap_or(24);
-    (Cidr::enclosing(ip, len), (asked != clamped).then_some(asked))
-}
-
 #[cfg(test)]
 mod tests {
+    use std::net::Ipv4Addr;
+
+    use super::networks::block;
     use super::*;
 
     #[test]
@@ -486,6 +434,23 @@ mod tests {
         assert!(said.iter().any(|t| t.starts_with("`fd00::10` isn't an IPv4 address")), "{said:?}");
         assert!(said.contains(&"10.9.3.10/16 isn't a /24 to /29; re-addressed to 10.9.3.0/24"), "{said:?}");
         assert!(d.yaml.contains("cidr: 10.9.3.0/24"), "{}", d.yaml);
+        Ok(())
+    }
+
+    /// What the spec drafts instead of an address or a netmask it can't read is said.
+    #[test]
+    fn an_unreadable_address_or_netmask_is_said() -> Result<()> {
+        let recorded: Recording = r#"{"children":{"vm":{"calls":[
+            {"name":"network","args":["public_network",{"ip":"192.168.1.x"}]},
+            {"name":"network","args":["private_network",{"ip":"10.9.3.10","netmask":"wide"}]}]}}}"#
+            .parse()?;
+        let d = draft(&recorded, "lab", "Vagrantfile")?;
+        let said: Vec<&str> = d.notes.iter().map(|n| n.text.as_str()).collect();
+        assert!(said.contains(&"`192.168.1.x` isn't an IPv4 address: drafted as an address by DHCP"), "{said:?}");
+        assert!(
+            said.contains(&"netmask `wide` is neither an address nor a length: the block is a /24"),
+            "{said:?}"
+        );
         Ok(())
     }
 

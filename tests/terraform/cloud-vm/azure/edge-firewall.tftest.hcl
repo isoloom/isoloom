@@ -77,6 +77,7 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDwvyPBIAHawI6izLXPHSZzyxevpbnDLLk4uonfaF96l tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "each_network_is_a_subnet_at_its_exact_range" {
@@ -188,19 +189,25 @@ run "each_machine_admits_its_networks_ssh_and_its_reach_rules_only" {
 }
 
 # The spec: lan has `internet: false` and `gateway: fw`. During set-up cache reaches the internet
-# over its Standard public address; once every machine is ready the runner applies with
-# `isoloom_sealed = true` (the manifest's `seal`) and cache's group then denies the internet
-# outbound, at the network, where root in the guest can't lift it. cache still reaches the other
-# networks through fw, and keeps its public address, the way the runner reaches it.
+# over its Standard public address; once every machine is ready (the association waits on each
+# machine's ready marker), lan's subnet takes the sealed group, which denies the internet
+# outbound, at the network, where root in the guest can't lift it. Azure applies a NIC's group and
+# its subnet's, both: cache's own group still allows out, the subnet's denies the internet. cache
+# still reaches the other networks through fw, and keeps its public address, the way the runner
+# reaches it (the sealed group admits the virtual network and allowed_cidr in).
 run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
-  variables {
-    isoloom_sealed = true
-  }
-
   assert {
-    condition     = [for r in azurerm_network_security_group.cache.security_rule : "${r.access} ${r.destination_address_prefix}" if r.direction == "Outbound"] == ["Deny Internet"]
-    error_message = "once sealed, cache (on lan, internet: false) must deny the internet outbound, at the network"
+    condition     = [for r in azurerm_network_security_group.sealed.security_rule : "${r.access} ${r.protocol} ${r.destination_address_prefix}" if r.direction == "Outbound"] == ["Deny * Internet"]
+    error_message = "the sealed group must deny the internet outbound, and nothing else"
+  }
+  assert {
+    condition     = sort([for r in azurerm_network_security_group.sealed.security_rule : "${r.access} ${r.source_address_prefix}" if r.direction == "Inbound"]) == sort(["Allow 203.0.113.7/32", "Allow VirtualNetwork"])
+    error_message = "the sealed group must still admit the virtual network and allowed_cidr (the runner's way in)"
+  }
+  assert {
+    condition     = azurerm_subnet_network_security_group_association.sealed_lan.subnet_id == azurerm_subnet.lan.id
+    error_message = "lan (internet: false) must take the sealed group at its subnet"
   }
 }

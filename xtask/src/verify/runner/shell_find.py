@@ -22,6 +22,7 @@ import gzip
 import re
 import shlex
 from dataclasses import dataclass, replace
+from pathlib import Path
 
 import hcl
 import yaml
@@ -97,6 +98,29 @@ def dedent(body: str) -> str:
 def ruby_string(text: str, i: int) -> str:
     """The Ruby string literal whose quote is at `i`, read: a double-quoted one's escapes, and
     each `#{...}` as `0` (a single-quoted one keeps all but `\\\\` and `\\'`)."""
+    return ruby_string_at(text, i)[0]
+
+
+# `+ File.read(File.join(__dir__, "<path>")) + "...`: a provisioner's script that reads a file
+# beside the Vagrantfile when Vagrant reads it (the checks installer), then goes on.
+READ_BESIDE = re.compile(r"""\s*\+\s*File\.read\(File\.join\(__dir__,\s*"([^"]+)"\)\)\s*\+\s*(?=["'])""")
+
+
+def ruby_inline(text: str, i: int, beside: Path | None) -> str:
+    """The script an `inline:` expression whose first string's quote is at `i` gives Vagrant:
+    that string, then each `+ File.read(File.join(__dir__, "<path>")) + "<string>"` with the
+    file's text (from `beside`, the Vagrantfile's folder) and the string after it."""
+    out, end = ruby_string_at(text, i)
+    while beside is not None and (m := READ_BESIDE.match(text, end)):
+        read = beside / m.group(1)
+        out += read.read_text(encoding="utf-8") if read.is_file() else ""
+        more, end = ruby_string_at(text, m.end())
+        out += more
+    return out
+
+
+def ruby_string_at(text: str, i: int) -> tuple[str, int]:
+    """The Ruby string literal whose quote is at `i`, read ([`ruby_string`]), and where it ends."""
     quote, out, i = text[i], [], i + 1
     while i < len(text) and text[i] != quote:
         c = text[i]
@@ -114,7 +138,7 @@ def ruby_string(text: str, i: int) -> str:
         else:
             out.append(c)
             i += 1
-    return "".join(out)
+    return "".join(out), i + 1
 
 
 def vagrant_where(text: str, at: int) -> str:
@@ -136,15 +160,15 @@ def windows_machines(text: str) -> list[tuple[int, int]]:
     return [(a, b) for a, b in blocks if re.search(r"\bvm\.guest\s*=\s*:windows\b", text[a:b])]
 
 
-def vagrantfile(text: str) -> list[Script]:
+def vagrantfile(text: str, beside: Path | None = None) -> list[Script]:
     """A Vagrantfile's shell scripts: its `<<~'SH'` heredocs and `inline:` strings, outside the
-    Windows machines."""
+    Windows machines; `beside` is its folder, where an `inline:` script reads its files."""
     windows = windows_machines(text)
-    found = [s for at, s in vagrant_scripts(text) if not any(a <= at < b for a, b in windows)]
+    found = [s for at, s in vagrant_scripts(text, beside) if not any(a <= at < b for a, b in windows)]
     return with_written(found)
 
 
-def vagrant_scripts(text: str) -> list[tuple[int, Script]]:
+def vagrant_scripts(text: str, beside: Path | None = None) -> list[tuple[int, Script]]:
     """Every `<<~'SH'` heredoc and `inline:` string, with where it starts."""
     found = []
     for m in RUBY_HEREDOC.finditer(text):
@@ -156,7 +180,7 @@ def vagrant_scripts(text: str) -> list[tuple[int, Script]]:
         body = dedent(body) if m.group(1) == "~" else body
         found.append((m.start(), Script(vagrant_where(text, m.start()), shell_of(body, "bash") or "bash", body)))
     for m in RUBY_STRING.finditer(text):
-        body = ruby_string(text, m.end() - 1)
+        body = ruby_inline(text, m.end() - 1, beside)
         found.append((m.start(), Script(vagrant_where(text, m.start()), shell_of(body, "bash") or "bash", body + "\n")))
     return found
 

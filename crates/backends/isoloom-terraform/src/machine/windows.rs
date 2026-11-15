@@ -23,9 +23,9 @@ pub(crate) fn any(env: &Environment) -> bool {
 
 /// The Windows machines' administrator password (user `isoloom`), for WinRM, when a VM runs
 /// Windows.
-pub(crate) fn write_password(env: &Environment, m: &mut Module) {
+pub(crate) fn write_password(env: &Environment, module: &mut Module) {
     if any(env) {
-        m.commented(
+        module.commented(
             "The Windows machines' administrator password (user isoloom), for WinRM.",
             module::password("windows"),
         );
@@ -137,7 +137,7 @@ fn has_runs(w: &Machine) -> bool {
 /// then its steps.
 fn setup_script(w: &Machine) -> String {
     let Remote { env, name, plan, .. } = w.remote;
-    let ports = env.spec().machines.get(name).map(|m| m.ports.as_slice()).unwrap_or_default();
+    let ports = spec_ports(env, name);
     let mut ps = vec![
         "$ErrorActionPreference = 'Stop'".to_owned(),
         format!(
@@ -147,7 +147,7 @@ fn setup_script(w: &Machine) -> String {
     ];
     ps.extend(ports.iter().filter_map(port_proxy));
     ps.extend(ports.iter().flat_map(firewall));
-    if ports.iter().any(|p| p.port == REMOTE_DESKTOP && p.protocol.is_tcp()) {
+    if opens_remote_desktop(ports) {
         ps.push(remote_desktop());
     }
     let runs = has_runs(w);
@@ -160,8 +160,19 @@ fn setup_script(w: &Machine) -> String {
     ps.join("\n") + "\n"
 }
 
-/// Remote Desktop's port: a spec opening it turns Remote Desktop on.
-const REMOTE_DESKTOP: u16 = 3389;
+/// Remote Desktop's port: a spec opening it turns Remote Desktop on, and a cloud's console
+/// reaches the machine on it.
+pub(crate) const RDP_PORT: u16 = 3389;
+
+/// Whether `ports` open Remote Desktop's port (TCP).
+pub(crate) fn opens_remote_desktop(ports: &[Port]) -> bool {
+    ports.iter().any(|p| p.port == RDP_PORT && p.protocol.is_tcp())
+}
+
+/// The ports machine `name`'s spec opens (none for a machine the spec doesn't write).
+pub(crate) fn spec_ports<'a>(env: &'a Environment, name: &str) -> &'a [Port] {
+    env.spec().machines.get(name).map(|m| m.ports.as_slice()).unwrap_or_default()
+}
 
 /// Remote Desktop turned on (a server image may have it off), with Network Level Authentication:
 /// the port the spec opens is its firewall rule.

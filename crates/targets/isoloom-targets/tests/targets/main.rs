@@ -1,14 +1,17 @@
 //! Generation across the backends, from the repository's examples and specs written in the
-//! tests: what each target writes, what it refuses and why, the resolved snapshot, its reports
-//! and the run manifests, the way the composition root puts them together.
+//! tests: what each target writes, what it refuses and why, the resolved snapshot, its reports,
+//! the way the composition root puts them together.
+
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
 
 mod appliances;
-mod boot_digest;
 mod chart;
 mod checks;
 mod clones;
 mod cloud_docker;
-mod cloud_services;
 mod cloud_vm_aws_kali;
 mod cloud_vm_azure;
 mod cloud_vm_digitalocean;
@@ -20,8 +23,6 @@ mod constraints;
 mod defaults;
 mod determinism;
 mod disk;
-mod docker_host_boxes;
-mod docker_vm_manifest;
 mod every_example;
 mod external;
 mod forwarding;
@@ -33,7 +34,6 @@ mod helper_images;
 mod host_folders;
 mod inbound;
 mod instance;
-mod launch_values;
 mod machine_settings;
 mod managed;
 mod message;
@@ -46,16 +46,15 @@ mod reboot;
 mod report;
 mod reserved_names;
 mod resolved;
-mod run_manifest;
 mod server_slot;
 mod shared_volumes;
 mod spaced_paths;
 mod tags;
 mod tc;
 mod testing;
-mod tiers;
 mod tools;
+mod true_forms;
 mod trunks;
-mod vagrant_manifest;
 mod vagrant_providers;
+mod vagrantfile;
 mod windows_names;

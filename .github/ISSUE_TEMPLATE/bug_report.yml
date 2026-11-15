@@ -37,13 +37,10 @@ body:
         - hosted
         - kubernetes (manifests, Kustomize or the Helm chart)
         - vagrant
-        - docker-vm
-        - hybrid
         - proxmox
         - esxi
         - cloud-vm
         - cloud-docker
-        - cloud-services
         - external
         - none (validate, generate, import, another command)
     validations:

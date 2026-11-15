@@ -18,12 +18,12 @@ use crate::server::{self, user};
 const MAX_SLOT: u64 = 63;
 
 /// Everything before the router.
-pub(super) fn blocks(env: &Environment, m: &mut Module) {
-    server::head(env, m, &[providers::ESXI, providers::TLS, providers::LOCAL], variables(env), provider());
-    m.commented("The project's root, and the `isoloom` user on every VM.", locals());
-    credentials(env, m);
-    super::networks::blocks(env, m);
-    super::outside::blocks(env, m);
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    server::head(env, module, &[providers::ESXI, providers::TLS, providers::LOCAL], variables(env), provider());
+    module.commented("The project's root, and the `isoloom` user on every VM.", locals());
+    credentials(env, module);
+    super::networks::blocks(env, module);
+    super::outside::blocks(env, module);
 }
 
 /// The OSes the module deploys, the router's and the controller's among them, sorted.
@@ -35,7 +35,7 @@ fn oses(env: &Environment) -> Vec<&str> {
     all
 }
 
-/// The module's variables, the run manifest's params and slots among them.
+/// The module's variables, the values a runner passes at launch among them.
 pub(super) fn variables(env: &Environment) -> Vec<Variable> {
     let s = |name: &str| Variable::new(name, "string");
     let mut out = vec![
@@ -53,7 +53,7 @@ pub(super) fn variables(env: &Environment) -> Vec<Variable> {
             "unique per environment on this host: it names the vSwitches and the VMs, and makes the MACs",
         ),
         images(env),
-        variable::ssh_public_key(false),
+        variable::ssh_public_key(),
         s("ssh_private_key_file").describe("The private key of ssh_public_key: Terraform sets the machines up over SSH, through the router"),
     ];
     if super::outside::on_host_vswitch(env) {

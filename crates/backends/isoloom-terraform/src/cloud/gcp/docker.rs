@@ -7,13 +7,13 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::{public_ip, vm};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance;
-use crate::docker_host::{port_strings, published, tcp_ports};
+use crate::docker_host::{container_ports, port_strings, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::GOOGLE,
     size: Some(SizeVariable {
@@ -21,13 +21,14 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::ByMemory(|s| s.pick(["e2-medium", "e2-standard-2", "e2-standard-4"])),
     }),
     resources,
+    instance: "google_compute_instance",
 };
 
 /// The cloud's resources, after the module's head, `setup` as the instance's startup script;
 /// the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, setup: Expression) -> Expression {
-    m.blocks(network(env));
-    m.block(host(env, HostSize::of(env), setup));
+fn resources(env: &Environment, module: &mut Module, setup: Expression) -> Expression {
+    module.blocks(network(env));
+    module.block(host(env, HostSize::of(env), setup));
     public_ip("env")
 }
 
@@ -51,7 +52,7 @@ fn allow(protocol: &str, ports: &[u16]) -> Block {
 /// The network, its subnet, and the firewall: SSH and the published ports from `allowed_cidr`.
 fn network(env: &Environment) -> Vec<Block> {
     let tcp = tcp_ports(env);
-    let udp = published(env, Protocol::Udp);
+    let udp = container_ports(env, Protocol::Udp);
     let mut firewall = resource("google_compute_firewall")
         .add_attribute(("network", reference("google_compute_network.env.id")))
         .add_attribute(("source_ranges", list([reference("var.allowed_cidr")])))
@@ -73,7 +74,7 @@ fn network(env: &Environment) -> Vec<Block> {
 }
 
 /// The Docker host's OS from Google Cloud's image table in the region's first zone, its user
-/// (the image's, as on `cloud-vm`) with the runner's key, set up by its startup script (Google's Debian images have no cloud-init; the script runs at every boot).
+/// (the image's, as on `cloud-vm`) with the operator's key, set up by its startup script (Google's Debian images have no cloud-init; the script runs at every boot).
 /// The script is an entry of `metadata`, which the provider updates in place (unlike
 /// `metadata_startup_script`, which forces a new VM): a later apply with another expiry neither
 /// replaces nor restarts the VM, and the next boot schedules the new expiry, so no lifecycle

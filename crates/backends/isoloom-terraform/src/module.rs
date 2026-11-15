@@ -4,16 +4,18 @@
 //! the project's lists at its end.
 
 pub(crate) mod inputs;
-pub(crate) mod manifest;
 pub(crate) mod providers;
 mod usage;
 pub(crate) mod variable;
 
 use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, number};
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_render::{GeneratedFile, project};
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::model::Target;
 
+/// How a module's machines get the project's files, which decides the lists it ends with
+/// (`isoloom_render::project`), under the name the modules use.
+pub(crate) use isoloom_render::project::Copy as ProjectCopy;
 pub(crate) use usage::Usage;
 
 use crate::{Error, Result};
@@ -29,16 +31,51 @@ pub(crate) fn resource(kind: &str, name: &str) -> BlockBuilder {
     Block::builder("resource").add_label(kind).add_label(name)
 }
 
+/// A resource's address: its type and its name (a Terraform identifier), spelled in one place
+/// for its block and for every reference to it, so the two can't drift apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResourceRef {
+    kind: &'static str,
+    name: String,
+}
+
+impl ResourceRef {
+    /// Resource `name` of type `kind`; `name` is made an identifier ([`ident`]).
+    pub(crate) fn new(kind: &'static str, name: &str) -> ResourceRef {
+        ResourceRef { kind, name: ident(name) }
+    }
+
+    /// Its name, the block's second label.
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Its block, started.
+    pub(crate) fn block(&self) -> BlockBuilder {
+        resource(self.kind, &self.name)
+    }
+
+    /// Its attribute `attr`: `aws_subnet.lan.id`.
+    pub(crate) fn attr(&self, attr: &str) -> Expression {
+        crate::hcl_builder::reference(&format!("{}.{}.{attr}", self.kind, self.name))
+    }
+
+    /// The resource itself, as `depends_on` names it: `aws_internet_gateway.env`.
+    pub(crate) fn whole(&self) -> Expression {
+        crate::hcl_builder::reference(&format!("{}.{}", self.kind, self.name))
+    }
+}
+
 /// An `output` block.
 pub(crate) fn output(name: &str, value: Expression) -> Block {
     Block::builder("output").add_label(name).add_attribute(("value", value)).build()
 }
 
 /// The `published` output's entries, `"<machine>/<port>" = "<address>:<host port>"`, for each port
-/// `machines` publish (the plan's [`isoloom_plan::PublishedPort`]s, named as the run manifest and
+/// `machines` publish (the plan's [`isoloom_plan::PublishedPort`]s, named as the module's outputs and
 /// the message name them), `at` giving the expression of the address a machine is reached at:
 /// the one rule of the servers' and the clouds' `published` outputs.
-pub(crate) fn published<'a>(
+pub(crate) fn published_output_entries<'a>(
     machines: impl IntoIterator<Item = (&'a str, &'a isoloom_plan::MachinePlan)>,
     at: impl Fn(&str) -> Expression,
 ) -> Vec<(String, Expression)> {
@@ -63,10 +100,6 @@ pub(crate) fn password(name: &str) -> Block {
         .add_attribute(("min_numeric", number(2)))
         .build()
 }
-
-/// How a module's machines get the project's files, which decides the lists it ends with
-/// (`isoloom_render::project`), under the name the modules use.
-pub(crate) use isoloom_render::project::Copy as ProjectCopy;
 
 /// A module, started with its header and how to start and stop it.
 pub(crate) fn start(usage: &Usage) -> Module {

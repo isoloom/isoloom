@@ -43,8 +43,7 @@ constraints:
 | `ntp` | The time servers Linux VMs synchronise with |
 | `dns` | The resolvers (IP addresses) Isoloom's own machines and every VM naming none of its own ask, where the public `1.1.1.1` is blocked: the Proxmox and ESXi VMs, Isoloom's controller there, and the Proxmox router's resolver, which forwards the containers' queries to them |
 
-The [target matrix](../matrix.md) shows which targets apply each key (every target but
-`cloud-services` for the proxy and registries). Windows VMs get `ca_certificates` and, on
+The [target matrix](../matrix.md) shows which targets apply each key. Windows VMs get `ca_certificates` and, on
 Proxmox and ESXi, `dns`; not the proxy, the package mirrors or `ntp`. Field details:
 [spec reference](../spec.md#constraints).
 

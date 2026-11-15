@@ -34,7 +34,7 @@ pub enum Error {
     Internal {
         /// The target being rendered.
         target: Target,
-        /// What failed (`the run manifest refused a value of this backend`).
+        /// What failed (`the module couldn't be written`).
         what: String,
         /// The error it failed with.
         #[source]
@@ -72,7 +72,7 @@ impl Error {
     }
 
     /// The same error, reported as `target`'s: a backend that renders part of another target's
-    /// files (the `docker` target's Compose file inside `docker-vm`'s VM) refuses or fails as
+    /// files (the `docker` target's Compose file inside `cloud-docker`'s VM) refuses or fails as
     /// that target.
     #[must_use]
     pub fn on(self, target: Target) -> Error {
@@ -141,10 +141,10 @@ mod tests {
         use std::error::Error as _;
 
         let cause = std::io::Error::other("disk full");
-        let failed = Error::internal(Target::Docker, "the Compose file couldn't be written", cause).on(Target::DockerVm);
-        assert_eq!(failed.to_string(), "docker-vm: the Compose file couldn't be written");
+        let failed = Error::internal(Target::Docker, "the Compose file couldn't be written", cause).on(Target::CloudDocker);
+        assert_eq!(failed.to_string(), "cloud-docker: the Compose file couldn't be written");
         assert_eq!(failed.source().map(ToString::to_string).as_deref(), Some("disk full"));
         assert_eq!(failed.refusal(), None);
-        assert_eq!(failed.target(), Target::DockerVm);
+        assert_eq!(failed.target(), Target::CloudDocker);
     }
 }

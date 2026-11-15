@@ -1,7 +1,6 @@
 # yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
-# A hybrid environment: a Windows file server (a VM, it has no container form) next to an
-# intranet web app (a container), on one network. The `hybrid` target runs each the light way;
-# `vagrant` and the other VM targets run both as VMs. The checks reach both from the inside.
+# A Windows file server (a VM, it has no container form) next to an intranet web app, on one
+# network: `vagrant` and the other VM targets run both as VMs. The checks reach both from the inside.
 # The file server has a TPM: on `cloud-vm`, AWS refuses it and Azure runs it (trusted launch).
 version: 1
 name: mixed-office

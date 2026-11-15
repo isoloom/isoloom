@@ -1,9 +1,7 @@
 //! The variables a Vagrantfile reads from the host's environment, each with the default it falls
-//! back to, written once: the Vagrantfile reads them from here (`ENV.fetch`), and the run
-//! manifest's params advertise the same names and defaults (`crate::manifest`), so the runner
-//! never sees one default and the Vagrantfile use another.
+//! back to, written once: the Vagrantfile reads them from here (`ENV.fetch`).
 
-use isoloom_manifest::contract;
+use isoloom_spec::contract;
 
 use crate::ruby::Value;
 
@@ -28,8 +26,8 @@ pub(crate) enum Fallback {
 }
 
 impl Setting {
-    /// Its default as the run manifest's param gives it.
-    pub(crate) fn default(self) -> Option<String> {
+    /// Its fallback text.
+    pub(crate) fn fallback_text(self) -> Option<String> {
         match self.fallback {
             Fallback::None => None,
             Fallback::Text(text) => Some(text.to_owned()),
@@ -40,7 +38,11 @@ impl Setting {
     /// The Ruby reading it: `ENV.fetch("<name>", "<default>")`, the default empty when it has
     /// none.
     pub(crate) fn fetch(self) -> String {
-        format!("ENV.fetch({}, {})", Value::str(self.name), Value::str(&self.default().unwrap_or_default()))
+        format!(
+            "ENV.fetch({}, {})",
+            Value::str(self.name),
+            Value::str(&self.fallback_text().unwrap_or_default())
+        )
     }
 
     /// The Ruby reading it as it is, `nil` when unset: `ENV["<name>"]`.
@@ -67,7 +69,7 @@ pub(crate) const ESXI_USERNAME: Setting = Setting {
     fallback: Fallback::Text("root"),
 };
 
-/// The ESXi user's password: a secret slot of the run manifest, read by the ESXi plugin itself
+/// The ESXi user's password, from the environment, read by the ESXi plugin itself
 /// (`env:ESXI_PASSWORD`), never by the Vagrantfile.
 pub(crate) const ESXI_PASSWORD: Setting = Setting {
     name: "ESXI_PASSWORD",
@@ -111,9 +113,9 @@ mod tests {
     #[test]
     fn a_setting_reads_with_its_default_or_as_it_is() {
         assert_eq!(ESXI_HOSTPORT.fetch(), "ENV.fetch(\"ESXI_HOSTPORT\", \"22\")");
-        assert_eq!(ESXI_HOSTPORT.default().as_deref(), Some("22"));
+        assert_eq!(ESXI_HOSTPORT.fallback_text().as_deref(), Some("22"));
         assert_eq!(ESXI_HOSTNAME.fetch(), "ENV.fetch(\"ESXI_HOSTNAME\", \"\")");
-        assert_eq!(ESXI_HOSTNAME.default(), None);
+        assert_eq!(ESXI_HOSTNAME.fallback_text(), None);
         assert_eq!(ESXI_DATASTORE.raw(), "ENV[\"ESXI_DATASTORE\"]");
     }
 }

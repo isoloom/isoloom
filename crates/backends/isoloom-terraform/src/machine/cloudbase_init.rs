@@ -39,8 +39,7 @@ pub(crate) fn user_data(env: &Environment, (name, mp): (&str, &MachinePlan)) -> 
     if mp.lifecycle.iter().any(|s| matches!(s, Step::Run { .. }) || copies(s)) {
         t.append(project_files());
     }
-    let ports = env.spec().machines.get(name).map(|m| m.ports.as_slice()).unwrap_or_default();
-    let mut ps: Vec<String> = ports.iter().flat_map(windows::firewall).collect();
+    let mut ps: Vec<String> = windows::spec_ports(env, name).iter().flat_map(windows::firewall).collect();
     ps.extend(
         mp.lifecycle
             .iter()

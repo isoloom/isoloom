@@ -41,6 +41,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/kubernetes/kustomization.yaml
 .isoloom/resolved.json
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/kubernetes/chart/Chart.yaml
@@ -174,6 +176,9 @@ spec:
     spec:
       hostname: web
       subdomain: arm-lab
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
@@ -197,8 +202,25 @@ spec:
         image: '{{ index .Values.images "web" }}'
         imagePullPolicy: IfNotPresent
         securityContext:
-          privileged: true
           readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 80
         readinessProbe:
@@ -622,7 +644,7 @@ metadata:
   name: isoloom-arm-lab
   labels:
     app.kubernetes.io/managed-by: isoloom
-    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce: baseline
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -645,6 +667,9 @@ spec:
     spec:
       hostname: web
       subdomain: arm-lab
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
       - name: isoloom-probe
         image: busybox:1.37.0-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
@@ -668,8 +693,25 @@ spec:
         image: nginx:1.27
         imagePullPolicy: IfNotPresent
         securityContext:
-          privileged: true
           readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - AUDIT_WRITE
+            - CHOWN
+            - DAC_OVERRIDE
+            - FOWNER
+            - FSETID
+            - KILL
+            - MKNOD
+            - NET_BIND_SERVICE
+            - SETFCAP
+            - SETGID
+            - SETPCAP
+            - SETUID
+            - SYS_CHROOT
         ports:
         - containerPort: 80
         readinessProbe:

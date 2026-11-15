@@ -7,7 +7,6 @@ pub mod testing;
 
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
-use isoloom_render::run_manifest::guest::{GuestCommand, GuestCompose};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{EsxiBackend, ProxmoxBackend};
 use testing::{Outcome, example, file, planned};
@@ -15,32 +14,6 @@ use testing::{Outcome, example, file, planned};
 fn proxmox(name: &str) -> Outcome<String> {
     let env: Environment = planned(&example(name)?, Target::Proxmox)?;
     Ok(file(&ProxmoxBackend.render(&env)?, "proxmox/main.tf")?.to_owned())
-}
-
-/// An empty guest, for a docker-vm module test that reads only the module (not what runs in the VM).
-///
-/// # Errors
-///
-/// When the status step's id isn't one (it is fixed, so this never fails).
-fn no_guest() -> Outcome<GuestCompose> {
-    Ok(isoloom_render::test_support::empty_guest(GuestCommand {
-        id: isoloom_manifest::StepId::parse("ps")?,
-        note: None,
-        command: isoloom_manifest::Template::text("true"),
-        timeout_s: 60,
-        failure: isoloom_manifest::Failure::Fail,
-        download: false,
-    }))
-}
-
-/// The docker-vm Proxmox module's `main.tf` for `env`.
-///
-/// # Errors
-///
-/// When the module can't be rendered, or has no `main.tf`.
-fn docker_vm_main_tf(env: &Environment) -> Outcome<String> {
-    let files = isoloom_terraform::docker_vm_module(env, &no_guest()?)?;
-    Ok(files.into_iter().find(|f| f.path.ends_with("main.tf")).ok_or("no main.tf")?.contents)
 }
 
 fn esxi(name: &str) -> Outcome<String> {
@@ -74,7 +47,7 @@ fn a_destroy_applies_the_sdn_deletions_once_the_zone_is_gone() -> Outcome {
 #[test]
 fn the_node_has_no_default_name() -> Outcome {
     // Regression: `node` defaulted to `pve`, while a server's first node can be named anything
-    // (a connection test passed on `pve-lab`, then the launch failed).
+    // (a connection test passed on a test server, then the launch failed).
     let tf = proxmox("hello-stack")?;
     let node = block(&tf, "variable \"node\"");
     assert!(!node.contains("default"), "{node}");
@@ -103,11 +76,6 @@ fn a_router_that_never_reported_an_address_can_still_be_destroyed() -> Outcome {
     // index" (the router's address list is empty in the state), leaving the lab behind.
     let tf = proxmox("hello-stack")?;
     assert!(tf.contains("router_address = try(["), "{tf}");
-    let lab =
-        testing::spec("version: 1\nname: d\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n")?;
-    let env = planned(&lab, Target::DockerVm)?;
-    let host = docker_vm_main_tf(&env)?;
-    assert!(host.contains("ip = try(["), "{host}");
     Ok(())
 }
 

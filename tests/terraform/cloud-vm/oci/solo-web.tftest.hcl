@@ -61,6 +61,7 @@ variables {
   compartment_id       = "ocid1.compartment.oc1..tftest"
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "the_network_is_a_subnet_of_the_vcn_routed_to_the_internet" {

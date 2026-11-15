@@ -3,7 +3,7 @@
 
 use clap::{Parser, Subcommand};
 
-use crate::commands::{Listing, check, defaults, docs, generate, graph, import, inspect, matrix, message, report, schema, validate};
+use crate::commands::{Listing, bases, check, defaults, docs, generate, graph, import, inspect, matrix, message, report, schema, validate};
 
 // No doc comments on the clap types themselves: clap would print them in `--help`.
 #[derive(Debug, Parser)]
@@ -25,8 +25,8 @@ pub(crate) struct Cli {
 pub(crate) enum Command {
     /// Check the spec for mistakes (and that every path it mentions exists).
     Validate(validate::Args),
-    /// List the targets the spec can be generated for, why the others can't, and the tier of
-    /// each one generated (how far it has been proven).
+    /// List the targets the spec can be generated for, why the others can't, and the validators
+    /// that check each one generated.
     Targets(Listing),
     /// Add up the machines, CPUs, memory and disk the spec needs.
     Resources(Listing),
@@ -63,6 +63,11 @@ pub(crate) enum Command {
     Docs(docs::Args),
     /// Show what each target does with each spec field (✓ generated, ✗ refused, with the step
     /// that refuses and why, – not applicable), worked out from the generators themselves, and
-    /// each target's tier with its evidence. `--json` for tools.
+    /// the validators of each target's files. `--json` for tools.
     Matrix(matrix::Args),
+    /// Vendor the published Dockerfiles of the base images the project's builds start FROM
+    /// that Isoloom's service matrix doesn't have (under vendor/bases/), so those machines get a
+    /// VM form offline.
+    #[command(subcommand)]
+    Bases(bases::Bases),
 }

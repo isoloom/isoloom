@@ -25,6 +25,8 @@ pub(crate) const NAME: &str = "addresses";
 /// address; that card unmanaged and given the address back; then the cards written down for
 /// NetworkManager's next starts.
 pub(crate) const SCRIPT: &str = r#"set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=""
 for address in "$@"; do

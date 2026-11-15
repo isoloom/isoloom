@@ -21,10 +21,11 @@ use std::collections::BTreeSet;
 use std::fs::Metadata;
 use std::io::Write as _;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use isoloom_targets::{GeneratedFile, Lab};
 
-use isoloom_manifest::contract::OUTPUT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
 
 use crate::error::{CliError, Result};
 
@@ -33,6 +34,37 @@ pub(crate) const LIST: &str = ".isoloom/.generated";
 
 /// The list's first line: what it is.
 const LIST_HEADER: &str = "# The files isoloom generate wrote here, which it removes once it no longer writes them. Don't edit.";
+
+/// The file two `generate`s in one project take turns on ([`Turn`]): never renamed or removed,
+/// so both lock the same one.
+pub(crate) const TURN: &str = isoloom_targets::gitignore::TURN;
+
+/// One `generate`'s turn in its project, from reading [`LIST`] to writing it: held while it
+/// lives, so another `generate` there waits for it rather than writing a list that drops this
+/// one's files. The lock goes with the process, so a `generate` that dies never leaves it held.
+pub(crate) struct Turn {
+    _file: std::fs::File,
+}
+
+impl Turn {
+    /// Waits for the project `dir`'s turn and takes it. Its file is under `.isoloom/`, so it is
+    /// refused where a generated file would be ([`writable`]: through a symbolic link), and taken
+    /// only when the generation writes files.
+    pub(crate) fn take(dir: &Path) -> Result<Turn> {
+        writable(dir, [&GeneratedFile::new(TURN, String::new())])?;
+        let path = dir.join(TURN);
+        let parent = path.parent().unwrap_or(dir);
+        std::fs::create_dir_all(parent).map_err(CliError::writing(parent))?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+            .map_err(CliError::writing(&path))?;
+        file.lock().map_err(CliError::writing(&path))?;
+        Ok(Turn { _file: file })
+    }
+}
 
 /// The generator's files plus the project's own files they copy into the output.
 pub(crate) fn finish(lab: &Lab, mut files: Vec<GeneratedFile>, dir: &Path) -> Result<Vec<GeneratedFile>> {
@@ -54,17 +86,18 @@ pub(crate) fn writable<'a>(dir: &Path, files: impl IntoIterator<Item = &'a Gener
 
 /// Writes one file under `dir`, creating its folders: into a fresh file beside it, then renamed
 /// into its place, so what was there is replaced, never written through. [`writable`] first.
+///
+/// The fresh file's name is this writer's own (the process and a count within it): two
+/// `generate`s in one project at once each rename a whole file into place, the last one's
+/// staying, where a shared name let one remove or rename the other's file mid-write and fail.
 pub(crate) fn write_file(dir: &Path, f: &GeneratedFile) -> Result<()> {
+    static WRITES: AtomicU64 = AtomicU64::new(0);
     let path = dir.join(&f.path);
     let parent = path.parent().unwrap_or(dir);
     std::fs::create_dir_all(parent).map_err(CliError::writing(parent))?;
     let mut fresh = path.clone().into_os_string();
-    fresh.push(".isoloom-new");
+    fresh.push(format!(".isoloom-new-{}-{}", std::process::id(), WRITES.fetch_add(1, Ordering::Relaxed)));
     let fresh = PathBuf::from(fresh);
-    match std::fs::remove_file(&fresh) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(CliError::writing(&fresh)(e)),
-        _ => {}
-    }
     std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -148,8 +181,7 @@ fn refused(entry: &str, why: String) -> CliError {
 }
 
 /// The folder a generation covers: every file under `.isoloom/` when it generated every
-/// target, else the one target's own folder (`.isoloom/<target>/`; a folder several targets
-/// write, `docker/` for `docker-vm`, belongs to the target it is named after).
+/// target, else the one target's own folder (`.isoloom/<target>/`).
 pub(crate) fn scope(target: Option<&str>) -> String {
     target.map_or_else(|| format!("{OUTPUT_DIR}/"), |t| format!("{OUTPUT_DIR}/{t}/"))
 }
@@ -212,5 +244,41 @@ mod tests {
     #[test]
     fn the_list_is_under_the_output_folder() {
         assert_eq!(LIST, format!("{OUTPUT_DIR}/.generated"));
+    }
+
+    /// Two writers of one file at once (two `generate`s in one project) both succeed, and the
+    /// file holds one of them whole, with no fresh file left beside it.
+    #[test]
+    fn two_writers_of_one_file_at_once_both_succeed() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        const ROUNDS: usize = 200;
+        let dir = tempfile::tempdir()?;
+        let start = std::sync::Barrier::new(2);
+        let file = |contents: &str| GeneratedFile {
+            path: ".isoloom/docker/compose.yml".into(),
+            contents: contents.repeat(4096),
+        };
+        let results: Vec<Result<()>> = std::thread::scope(|s| {
+            let writers: Vec<_> = ["a", "b"]
+                .map(|c| {
+                    let (dir, start, f) = (dir.path(), &start, file(c));
+                    s.spawn(move || {
+                        start.wait();
+                        (0..ROUNDS).try_for_each(|_| write_file(dir, &f))
+                    })
+                })
+                .into_iter()
+                .collect();
+            writers.into_iter().map(|w| w.join().expect("a writer thread")).collect()
+        });
+        for r in results {
+            r?;
+        }
+        let written = std::fs::read_to_string(dir.path().join(".isoloom/docker/compose.yml"))?;
+        assert!(written == file("a").contents || written == file("b").contents, "a mixed file");
+        let names: Vec<_> = std::fs::read_dir(dir.path().join(".isoloom/docker"))?
+            .map(|e| e.map(|e| e.file_name()))
+            .collect::<std::io::Result<_>>()?;
+        assert_eq!(names, ["compose.yml"], "a fresh file left beside it");
+        Ok(())
     }
 }

@@ -5,22 +5,22 @@ decide when you run it. To report a vulnerability: [SECURITY.md](../../.github/S
 
 ## Trust model
 
-- **A spec is code.** Its steps run as root in the machines; `cloud.before` steps and a
-  `cloud-services` module run on the computer that applies them; a playbook step runs whatever it
+- **A spec is code.** Its steps run as root in the machines; a playbook step runs whatever it
   holds. Review a spec, and the scripts it names, as you would a script.
 - **`isoloom` itself runs nothing** from the spec. It reads files and writes files, opens no
   network connection and starts no program, except `d2`/`dot` for `isoloom graph -o` and Ruby for
   `isoloom import vagrant`, which evaluates the Vagrantfile it imports (import only Vagrantfiles
   you trust).
-- **The generated files and the run manifest are trusted input** for whatever runs them: they name
+- **The generated files are trusted input** for whatever runs them: they name
   the commands that run.
 
 ## Secrets never land in a file
 
 A secret or input is declared by name and source (`env`, `file`, Vault, SOPS). Its value is never
-in the spec, a generated file, `resolved.json` or the run manifest: the manifest holds a slot (a
-name and a destination). A runner reads the value at run time and delivers it as the slot says,
-usually as a file in the machine over SSH standard input, never on a command line. Vagrant hands
+in the spec, a generated file or `resolved.json`: the files name it, and each tool takes the value
+the native way at run time (Compose from its environment, the Vagrantfile from its provisioner's
+environment, Terraform as a sensitive `TF_VAR_<name>` variable, delivered by user data or
+cloud-init and kept in Terraform's state), never on a command line. Vagrant hands
 a value to a provisioner in its environment, which it writes into a shell string: every
 Vagrantfile passes it in base64, which the provisioner's script decodes, so a `$(...)` or a
 backquote in a value is read as text, never run. Cloud credentials reach only the Terraform
@@ -46,7 +46,7 @@ then, whatever that file says: Isoloom's outputs but those the machine reads (a 
 `.isoloom*` entry is left out, and a machine has no use for the file), version control, and what the tools write at
 any depth: Terraform's cache, state, lock and crash logs, and Vagrant's machine folders (their
 private keys). One rule,
-`isoloom_manifest::ignore::copy_rules`, which `.isoloom/.gitignore` shares.
+`isoloom_spec::ignore::copy_rules`, which `.isoloom/.gitignore` shares.
 
 ## Published ports
 
@@ -59,16 +59,20 @@ private keys). One rule,
 
 ## Graphical consoles
 
-A VM's graphical console (its screen, [run manifest](../reference/run-manifest.md#graphical-consoles))
+A VM's graphical console (its screen)
 listens only on the loopback of the computer that runs Vagrant: libvirt's and QEMU's VNC, VMware's
 VNC server and VirtualBox's remote display all bind `127.0.0.1`. VMware's takes a password the
 runner makes for each run and keeps until `down` (VMware writes it in the VM's `.vmx`, as it does
 every setting); libvirt's, QEMU's and VirtualBox's take none, so any program of a user of that
 computer can reach them while the VM runs, as it can reach the forwarded ports. Proxmox's console
-goes through its API, with the connection's own credentials and a ticket per session. A cloud
-Windows VM's Remote Desktop is reached only through an SSH tunnel the runner opens from the
-loopback, through a Linux machine of the run: Isoloom opens no port for it at the VM's public
-address.
+goes through its API, with the connection's own credentials and a ticket per session. A Windows
+VM's Remote Desktop (when its spec opens 3389/tcp) is reached only through an SSH tunnel from the
+loopback: on a cloud through a Linux machine of the lab on a network the Windows one is on, on
+Proxmox and ESXi through the router. Isoloom opens no port for it at a public address. The module
+says where in its `consoles` output (per machine: `protocol`, `port`, `host`, `via`, `user`), with
+the administrator in `windows_user` and its password in the sensitive `windows_password`; a cloud
+Windows VM no Linux machine shares a network with has no entry, and with no entry at all the
+`consoles` output is left out.
 
 ## Kubernetes
 
@@ -80,8 +84,9 @@ set); a cluster that admits only `restricted` pods refuses them. Every object is
 
 ## Public IP addresses on cloud VMs
 
-Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: the runner reaches
-the machines over SSH to deliver the project and secrets and to run the checks. Their security
+Every `cloud-vm` machine, and the `cloud-docker` host, has a public IP address: Terraform reaches
+the machines over SSH to bring the project in and wait for their set-up, and you to run the
+checks. Their security
 groups or firewalls accept SSH (22), WinRM (5985, Windows) and the published ports only from
 `allowed_cidr`, which has no default: set it to your address or your egress range. Nothing is
 open to `0.0.0.0/0` inbound but one ICMP message on Oracle Cloud: "fragmentation needed" (and
@@ -94,11 +99,21 @@ on top.
 An `internet: false` network is a guarantee, not a convention. On Compose, the containers have no
 route out and a privileged container on such a network is refused unless it accepts a best-effort
 seal. On the clouds and the servers (Proxmox, ESXi), machines need the internet while they set
-themselves up, so the runner seals the network once they are ready, where root in a machine can't
-undo it: at the cloud's own level (a second apply with `isoloom_sealed`), or at a server's router
-(its sealed ruleset applied over SSH). Egress is then limited to the environment's networks. The
-seal fails closed, and every later apply keeps it. [ADR 0004](adr/0004-egress-seal.md) explains
-the design and its one residual channel (the cloud's DNS resolver).
+themselves up, so the module seals the network once they are ready, within the same `terraform
+apply`, where root in a machine can't undo it. The closing resources depend on each machine's
+readiness wait (its ready file, read over SSH), at the cloud's own level (a network ACL on AWS, a
+security group on Azure, deny rules on Google Cloud, a route table on Oracle Cloud), or at a
+server's router (its sealed ruleset applied over SSH). Egress is then limited to the
+environment's networks. The seal fails closed: a failed seal fails the apply, and the environment
+is not ready. Every later apply keeps it, so a later change can't silently reopen the network.
+DigitalOcean and Linode, whose firewalls only allow and are made with the machine, can't close a
+network once it is set up, so they refuse one without internet. One channel stays open on the
+clouds: the cloud's own DNS resolver still answers for public names, so a machine can still resolve
+them, and a program that tunnels data through DNS lookups can still reach out.
+
+On the Terraform targets, values given at launch are module variables (`sensitive` for secrets
+and sensitive inputs), written into a machine by its user data, its cloud-init snippet or an
+upload over SSH. Terraform stores sensitive values in its state, as it does for every variable.
 
 ## Expiry
 

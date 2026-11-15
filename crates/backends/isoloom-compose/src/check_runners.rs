@@ -4,12 +4,12 @@
 //! `exec` checks run inside it (`docker compose exec`), from a script of their own.
 
 use indexmap::IndexMap;
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::Environment;
 use isoloom_plan::checks::{Host, Position, Probe, Resolved};
 use isoloom_render::GeneratedFile;
 use isoloom_render::checks::{Render, script};
 use isoloom_render::container::{CHECK_IMAGE, UTILITY_IMAGE, exec_runner, init_names};
+use isoloom_spec::contract::OUTPUT_DIR;
 
 use crate::file::{Condition, NetworkMode, RO_BIND, Service};
 use crate::layout::{DIR, ROOT};
@@ -18,7 +18,7 @@ use crate::names::{STAND_IN, check_runner_service, routes_service};
 use crate::{networks, sidecars};
 
 /// The profile the runners (and the stand-in) are in: `up` leaves them out.
-const PROFILE: &str = "check";
+pub(crate) const PROFILE: &str = "check";
 
 /// Adds each position's runner to `services`; returns their scripts.
 pub(crate) fn services(env: &Environment, services: &mut IndexMap<String, Service>) -> Vec<GeneratedFile> {
@@ -82,7 +82,7 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
     match pos {
         Position::Machine(name) => {
             if let Some(m) = Machine::of(env, name) {
-                let ns = namespace(env, m, &mut c, services);
+                let ns = join_namespace(env, m, &mut c, services);
                 c.network_mode = Some(NetworkMode::Service(ns));
             }
         }
@@ -91,9 +91,10 @@ fn runner(env: &Environment, pos: &Position, scripts: bool, services: &mut Index
     c
 }
 
-/// The namespace a machine's checks run in: its own container, else the stand-in (added once,
-/// with its sidecar, both only started with the check profile).
-fn namespace(env: &Environment, m: Machine<'_>, c: &mut Service, services: &mut IndexMap<String, Service>) -> String {
+/// Puts check service `c` in the namespace a machine's checks run in, and names it: the
+/// machine's own container, else the stand-in (added to `services` once, with its sidecar, both
+/// only started with the check profile).
+fn join_namespace(env: &Environment, m: Machine<'_>, c: &mut Service, services: &mut IndexMap<String, Service>) -> String {
     // An access machine lives in the `access` profile (the runner brings it up on demand), so a
     // check in the `check` profile can't share its namespace: it uses the stand-in (a check-profile
     // idle container at the same addresses) instead, even when the access box has a container form.

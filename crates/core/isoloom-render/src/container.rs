@@ -1,17 +1,15 @@
 //! What every target that runs the machines as containers shares, whichever backend writes the
 //! files (Compose, Kubernetes) or builds the host they run on (a cloud VM, a local VM): the
 //! images Isoloom brings and the readiness probe here; the one-shot jobs' names (`jobs`); the project files read into Compose's environment
-//! (`project_files`); where the containers' host folders are bound from ([`host_folders`]); the size of the VM the containers run on (`host`); the containers' side
-//! of a hybrid environment (`hybrid`). Pure functions over the spec and the plan.
+//! (`project_files`); where the containers' host folders are bound from ([`host_folders`]); the size of the VM the containers run on (`host`). Pure functions over the spec and
+//! the plan.
 
 mod host;
 pub mod host_folders;
-mod hybrid;
 mod jobs;
 mod project_files;
 
 pub use host::HostSize;
-pub use hybrid::{HybridContainers, docker_net};
 pub use jobs::init_names;
 pub use project_files::{copied_from_project, host_environment, project_variables, variable};
 
@@ -72,8 +70,8 @@ pub fn exec_runner(machine: &str) -> String {
 pub(crate) const CHECK_RUNNER_PREFIX: &str = "isoloom-check";
 
 /// The check runner of a position: `isoloom-check` where a user stands (`default`),
-/// `isoloom-check-<position>` for the others. The one rule the Compose services, the resolved
-/// snapshot and the run manifest name them by.
+/// `isoloom-check-<position>` for the others. The one rule the Compose services and the resolved
+/// snapshot name them by.
 #[must_use]
 pub fn check_runner(pos: &Position, default: &Position) -> String {
     if pos == default {
@@ -83,9 +81,13 @@ pub fn check_runner(pos: &Position, default: &Position) -> String {
     }
 }
 
-/// The VM the containers run in (`docker-vm`'s, `cloud-docker`'s, the hybrid target's), as run
-/// manifests and Vagrantfiles name it: Isoloom's own, under the prefix an environment's machines can't
-/// take, so it never collides with one (a machine named `docker` included).
+/// Isoloom's outputs a Docker host VM gets with the project (`cloud-docker`): the `docker`
+/// target's Compose file's folder and the configuration files it mounts.
+pub const COMPOSE_OUTPUTS: [&str; 2] = [".isoloom/docker", crate::configure::DIR];
+
+/// The VM the containers run in (`cloud-docker`'s): Isoloom's own, under the prefix an
+/// environment's machines can't take, so it never collides with one (a machine named `docker`
+/// included).
 pub const DOCKER_HOST: &str = "isoloom-docker-host";
 
 #[cfg(test)]

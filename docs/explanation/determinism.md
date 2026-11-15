@@ -23,9 +23,9 @@ binary.
 
 ## How it is checked
 
-A test renders every example twice in one process and compares the files; CI's `determinism` job
-also generates every example twice with the command line, in the same folder, and compares the
-trees.
+Every example is generated twice, in one process and again with the command line in the same
+folder, and the two sets of files must be identical. To check your own spec, generate it twice
+and compare, or run `isoloom check` against committed files.
 
 ## What is not deterministic
 

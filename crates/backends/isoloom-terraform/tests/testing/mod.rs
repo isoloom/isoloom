@@ -7,6 +7,7 @@ use std::path::Path;
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
+use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
 
@@ -57,7 +58,7 @@ pub fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
 ///
 /// When it can't be planned.
 pub fn planned(lab: &Lab, target: Target) -> Outcome<Environment> {
-    Ok(Environment::build(&lab.for_target(target), target, None)?)
+    Ok(lab.plan(&lab.for_target(target), target, None)?)
 }
 
 /// `cloud`'s `cloud-vm` module for `yaml`, a valid spec.
@@ -94,9 +95,13 @@ pub fn refusal(backend: &dyn Backend, yaml: &str) -> Outcome<Option<String>> {
     Ok(backend.refusal(&planned(&parsed(yaml)?, backend.target())?))
 }
 
-/// The environment of `yaml`, valid or not.
+/// The environment of `yaml`, valid or not, with every access to the computer that runs it
+/// allowed: these tests are of what the backends write, and the consent to a spec reaching that
+/// computer is the caller's (`--allow-host`), tested with the plan.
 fn parsed(yaml: &str) -> Outcome<Lab> {
-    Lab::parse(yaml).map_err(|problems| format!("the spec doesn't parse: {problems:?}").into())
+    Lab::parse(yaml)
+        .map(|lab| lab.with_host_access(Grants::of(HostAccess::ALL)))
+        .map_err(|problems| format!("the spec doesn't parse: {problems:?}").into())
 }
 
 /// `lab`, when nothing is wrong with its spec.
@@ -120,4 +125,15 @@ pub fn file<'a>(files: &'a [GeneratedFile], suffix: &str) -> Outcome<&'a str> {
         .find(|f| f.path.ends_with(suffix))
         .map(|f| f.contents.as_str())
         .ok_or_else(|| format!("no file ending with {suffix}").into())
+}
+
+/// A Docker host as the `docker` target's files give it (`isoloom-targets` builds it): the
+/// Compose file's folder, its start, the values its containers read.
+#[must_use]
+pub fn docker_host(values: &[&str]) -> isoloom_terraform::CloudDockerHost {
+    isoloom_terraform::CloudDockerHost {
+        outputs: vec![".isoloom/docker".to_owned()],
+        start: vec!["cd /opt/isoloom && docker compose --project-name env --file .isoloom/docker/compose.yml up -d --build --wait".to_owned()],
+        values: values.iter().map(|v| (*v).to_owned()).collect(),
+    }
 }

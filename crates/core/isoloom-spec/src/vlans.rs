@@ -13,8 +13,7 @@ use crate::model::{Network, Reach, Spec, Vlan};
 use crate::net::Cidr;
 use crate::syntax::{Code, FieldPath, Problem};
 
-/// The VLAN ids 802.1Q allows (0 and 4095 are reserved): one range where three places wrote
-/// its bounds (Clean Code G25, 2026-11-13).
+/// The VLAN ids 802.1Q allows (0 and 4095 are reserved).
 pub(crate) const VLAN_IDS: std::ops::RangeInclusive<u16> = 1..=4094;
 
 /// The network a VLAN becomes: `office` + 10 -> `office-vlan10`.
@@ -66,7 +65,9 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, Problem> {
     if spec.networks.values().all(|n| n.vlans.is_empty()) {
         return Ok(spec);
     }
-    check_vlans(&spec)?;
+    if let Some(first) = problems(&spec).into_iter().next() {
+        return Err(first);
+    }
     rename_attachments(&mut spec);
     let (networks, covers) = flat_networks(&spec);
     spec.reach = flat_reach(&spec.reach, &covers);
@@ -74,9 +75,11 @@ pub fn flatten(mut spec: Spec) -> Result<Spec, Problem> {
     Ok(spec)
 }
 
-/// Checks first: ids, blocks inside the LAN, no clash with a network already named so.
-fn check_vlans(spec: &Spec) -> Result<(), Problem> {
+/// Every problem of the spec's VLANs: ids, blocks inside the LAN, no clash with a network
+/// already named so. [`flatten`] refuses on the first; validation reports them all.
+pub(crate) fn problems(spec: &Spec) -> Vec<Problem> {
     let refused = |at: FieldPath, reason: String| Problem::new(Code::InvalidValue, at, reason);
+    let mut out = Vec::new();
     for (lan, net) in &spec.networks {
         if net.vlans.is_empty() {
             continue;
@@ -84,31 +87,32 @@ fn check_vlans(spec: &Spec) -> Result<(), Problem> {
         let here = FieldPath::new("networks").key(lan);
         if net.gateway.is_some() {
             let why = "a LAN split into VLANs can't have a `gateway` (set the gateway machine on each VLAN's network instead)";
-            return Err(refused(here, why.to_owned()));
+            out.push(refused(here.clone(), why.to_owned()));
         }
         if net.ipv6.is_some() {
             let why = "a LAN split into VLANs carries IPv4 only (drop `ipv6`, or give it no `vlans`)";
-            return Err(refused(here.key("ipv6"), why.to_owned()));
+            out.push(refused(here.key("ipv6"), why.to_owned()));
         }
         let outer = Cidr::parse(&net.cidr);
         for (id, vlan) in &net.vlans {
             let at = here.key("vlans").key(&id.to_string());
             if !VLAN_IDS.contains(id) {
-                return Err(refused(at, format!("a VLAN id is between {} and {}", VLAN_IDS.start(), VLAN_IDS.end())));
+                out.push(refused(at.clone(), format!("a VLAN id is between {} and {}", VLAN_IDS.start(), VLAN_IDS.end())));
             }
-            let inner = Cidr::parse(&vlan.cidr).ok_or_else(|| refused(at.key("cidr"), format!("`{}` isn't an IPv4 block such as 10.10.10.0/24", vlan.cidr)))?;
-            if let Some(outer) = outer
-                && !outer.contains(inner)
-            {
-                return Err(refused(at.key("cidr"), format!("{} isn't inside the LAN's block {}", vlan.cidr, net.cidr)));
+            match Cidr::parse(&vlan.cidr) {
+                None => out.push(refused(at.key("cidr"), format!("`{}` isn't an IPv4 block such as 10.10.10.0/24", vlan.cidr))),
+                Some(inner) if outer.is_some_and(|outer| !outer.contains(inner)) => {
+                    out.push(refused(at.key("cidr"), format!("{} isn't inside the LAN's block {}", vlan.cidr, net.cidr)));
+                }
+                Some(_) => {}
             }
             let flat = vlan_network(lan, *id);
             if spec.networks.contains_key(&flat) {
-                return Err(refused(at, format!("it becomes the network `{flat}`, which the spec already has")));
+                out.push(refused(at, format!("it becomes the network `{flat}`, which the spec already has")));
             }
         }
     }
-    Ok(())
+    out
 }
 
 /// Machines: `office.vlan10` -> `office-vlan10`.

@@ -51,6 +51,17 @@ fn paths_are_absolute_in_the_machine_and_relative_in_the_project() {
 }
 
 #[test]
+fn a_urls_host_leaves_out_its_user_and_its_port() {
+    let host = |url: &str| url.parse::<HttpsUrl>().ok().map(|u| u.host().to_owned());
+    assert_eq!(host("https://repo.example.com/deb").as_deref(), Some("repo.example.com"));
+    assert_eq!(host("https://repo.example.com:8443/deb").as_deref(), Some("repo.example.com"));
+    assert_eq!(host("https://user@repo.example.com/deb").as_deref(), Some("repo.example.com"));
+    assert_eq!(host("https://user:pw@repo.example.com:8443/deb?x#y").as_deref(), Some("repo.example.com"));
+    assert_eq!(host("https://repo.example.com").as_deref(), Some("repo.example.com"));
+    assert_eq!(host("https://[fd00::1]:8443/deb").as_deref(), Some("[fd00::1]"));
+}
+
+#[test]
 fn every_fetch_is_https_and_every_checksum_a_sha256() {
     assert!("https://nginx.org/keys/nginx_signing.key".parse::<HttpsUrl>().is_ok());
     for bad in ["http://nginx.org/", "https://", "https:///x", "https://a b/"] {

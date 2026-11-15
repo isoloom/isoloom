@@ -8,13 +8,13 @@ use isoloom_render::container::HostSize;
 use isoloom_spec::model::Protocol;
 
 use super::vm::{self, USER};
-use crate::cloud::docker::{Driver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
 use crate::cloud::instance::set_up_once;
-use crate::docker_host::{port_strings, published, tcp_ports};
+use crate::docker_host::{container_ports, port_strings, tcp_ports};
 use crate::module::providers;
 
 /// Its `cloud-docker` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
     base: super::BASE,
     requires: providers::AZURERM,
     size: Some(SizeVariable {
@@ -22,15 +22,16 @@ pub(crate) const DRIVER: Driver = Driver {
         sizes: HostSizes::ByMemory(|s| s.pick(["Standard_D2als_v6", "Standard_D2as_v6", "Standard_D4as_v6"])),
     }),
     resources,
+    instance: "azurerm_linux_virtual_machine",
 };
 
 /// The cloud's resources, after the module's head, `custom_data` in the VM (read by
 /// cloud-init); the Docker host's address.
-fn resources(env: &Environment, m: &mut Module, custom_data: Expression) -> Expression {
-    m.blocks(network());
-    m.block(security_group(env));
-    m.blocks(interface());
-    m.block(host(HostSize::of(env), custom_data));
+fn resources(env: &Environment, module: &mut Module, custom_data: Expression) -> Expression {
+    module.blocks(network());
+    module.block(security_group(env));
+    module.blocks(interface());
+    module.block(host(HostSize::of(env), custom_data));
     reference("azurerm_public_ip.env.ip_address")
 }
 
@@ -91,7 +92,7 @@ fn rule(name: &str, priority: u64, protocol: &str, ports: Expression) -> Block {
 fn security_group(env: &Environment) -> Block {
     let tcp = tcp_ports(env);
     let mut b = placed("azurerm_network_security_group").add_block(rule("ssh-and-published", 100, "Tcp", port_strings(&tcp)));
-    let udp = published(env, Protocol::Udp);
+    let udp = container_ports(env, Protocol::Udp);
     if !udp.is_empty() {
         b = b.add_block(rule("published-udp", 110, "Udp", port_strings(&udp)));
     }
@@ -118,7 +119,7 @@ fn interface() -> Vec<Block> {
     ]
 }
 
-/// The Docker host's OS from Azure's image table, the cloud's user with the runner's key, its
+/// The Docker host's OS from Azure's image table, the cloud's user with the operator's key, its
 /// disk as a `cloud-vm` machine's, its expiry in its custom data, run once ([`set_up_once`]).
 fn host(size: HostSize, custom_data: Expression) -> Block {
     placed("azurerm_linux_virtual_machine")

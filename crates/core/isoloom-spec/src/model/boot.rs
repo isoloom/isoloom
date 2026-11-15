@@ -12,7 +12,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Boot {
-    /// A kernel to boot directly, instead of the image's boot loader.
+    /// A kernel to boot directly, instead of the image's boot loader. Like every file of the
+    /// hypervisor's host a boot names (`initrd`, `dtb`, `loader`, `nvram`, `network.tftp_root`),
+    /// only when whoever runs the environment allows `boot-files`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kernel: Option<String>,
     /// The initial RAM disk booted with `kernel`.
@@ -49,6 +51,18 @@ pub struct Boot {
 }
 
 impl Boot {
+    /// The files of the hypervisor's host it names, by field (`network.tftp_root` aside), each
+    /// `None` when unset.
+    pub(crate) fn host_files(&self) -> [(&'static str, Option<&String>); 5] {
+        [
+            ("kernel", self.kernel.as_ref()),
+            ("initrd", self.initrd.as_ref()),
+            ("dtb", self.dtb.as_ref()),
+            ("loader", self.loader.as_ref()),
+            ("nvram", self.nvram.as_ref()),
+        ]
+    }
+
     /// The fields set besides `firmware_format` and `firmware: uefi`, by name: what Vagrant's
     /// QEMU provider can't boot (it boots the box's disk through its own UEFI firmware).
     #[must_use]

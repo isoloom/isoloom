@@ -16,7 +16,7 @@ use crate::module::{Usage, resource};
 /// machines, the project and region, the provider and project, and its images' users.
 pub(crate) const BASE: Base = Base {
     cloud: crate::cloud::Cloud::Gcp,
-    usage: |folder| Usage::with_runner_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
+    usage: |folder| Usage::with_key(folder, "-var billing_account=<id> -var allowed_cidr=<your IP>/32 "),
     variables: |region| variables(region).into(),
     provider: |env, m| {
         let mut locals = provider_and_project(env, m);
@@ -50,9 +50,9 @@ pub(crate) fn provider() -> Block {
 }
 
 /// The provider, and the project local: the project given, else one of its own ([`project`]).
-pub(crate) fn provider_and_project(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
-    m.block(provider());
-    vec![("project", project(env, m))]
+pub(crate) fn provider_and_project(env: &Environment, module: &mut Module) -> Vec<(&'static str, Expression)> {
+    module.block(provider());
+    vec![("project", project(env, module))]
 }
 
 /// `var.project == "" ? 1 : 0`: a project of its own when none is given.
@@ -62,10 +62,10 @@ pub(crate) fn own_project() -> Expression {
 
 /// The project of its own when none is given (everything goes when the environment is
 /// destroyed) and the Compute API in it; the module's project, as `local.project` takes it.
-pub(crate) fn project(env: &Environment, m: &mut Module) -> Expression {
+pub(crate) fn project(env: &Environment, module: &mut Module) -> Expression {
     let org = conditional(binary(reference("var.org_id"), BinaryOperator::Eq, string("")), null(), reference("var.org_id"));
     let id = Template::text("isoloom-").with_expr(reference("terraform_data.id.output"));
-    m.commented(
+    module.commented(
         "A project of its own when none is given: everything goes when the environment is destroyed.",
         resource("google_project", "env")
             .add_attribute(("count", own_project()))
@@ -78,7 +78,7 @@ pub(crate) fn project(env: &Environment, m: &mut Module) -> Expression {
             .add_attribute(("labels", crate::cloud::instance::labels(env)))
             .build(),
     );
-    m.block(
+    module.block(
         resource("google_project_service", "compute")
             .add_attribute(("count", own_project()))
             .add_attribute(("project", attr(index(reference("google_project.env"), 0), "project_id")))

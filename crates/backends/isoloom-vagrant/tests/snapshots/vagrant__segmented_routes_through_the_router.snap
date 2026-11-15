@@ -6,6 +6,9 @@ expression: "vagrantfile(\"segmented\")?"
 # `isoloom generate`. `isoloom check` fails when this file is out of date.
 # Start:  cd .isoloom/vagrant && vagrant up
 # Stop:   cd .isoloom/vagrant && vagrant destroy -f
+# Access: vagrant up user (`vagrant up` leaves it down)
+# Checks: vagrant ssh <vm> -c 'sudo sh /var/lib/isoloom/checks.sh', for each of cache, web, user; each check prints a PASS or FAIL line,
+#         and a failed one fails the command (ISOLOOM_DERIVED=0 after sudo leaves the derived checks out)
 
 # One machine at a time, in order (QEMU and libvirt would boot them all at once).
 ENV["VAGRANT_NO_PARALLEL"] = "1"
@@ -316,6 +319,12 @@ $archive = 'C:\Windows\Temp\isoloom-project.tgz'; $dest = 'C:\isoloom'; $strip =
     }
   }
   $in.Close()
+  # A machine's command runs from the project folder: stopped first, Windows refuses to remove a
+  # folder a process works in (its step starts it again). Before Windows 8 and Server 2012 there
+  # is no ScheduledTasks module, and so no such task.
+  if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {
+    Get-ScheduledTask -TaskName 'isoloom-*' -ErrorAction SilentlyContinue | Stop-ScheduledTask -ErrorAction SilentlyContinue
+  }
   if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
   Move-Item $new $dest
   Remove-Item $archive -Force
@@ -415,6 +424,78 @@ module IsoloomHyperV
     ps(names.map { |n| "if ((Hyper-V\\Get-VMSwitch -Name #{q(n)} -ErrorAction SilentlyContinue) -and -not (Hyper-V\\Get-VMNetworkAdapter -All | Where-Object { $_.SwitchName -eq #{q(n)} })) { Hyper-V\\Remove-VMSwitch -Name #{q(n)} -Force }" }.join("; "))
   end
 end
+# UTM (`vagrant up --provider utm`, vagrant_utm 0.2.0 or later, UTM from GitHub or Homebrew: the
+# App Store build has no vmnet). The plugin makes no adapter for a private network and sets no
+# address in the guest, so Isoloom does it:
+# - each network is an isolated vmnet network (QEMU's `vmnet-host` with a `net-uuid`): the VMs
+#   on it see each other and nothing else, not the host, not another network, and get no DHCP.
+#   Its id is made from this copy's folder and the network's name (`net_uuid`): two copies of an
+#   environment never share a network, and a reload finds its own again;
+# - before each boot (the VM stopped, its configuration editable), the VM's adapters on them, with
+#   the MACs Isoloom gives them, as QEMU arguments of its UTM configuration, the earlier ones of
+#   Isoloom's replaced and the plugin's own (its shared folders) kept (`attach`);
+# - once the guest answers, before its provisioning, each adapter's address set in the guest, found
+#   by its MAC (`address`), as on Hyper-V.
+# Every call to UTM is an Apple event: UTM must be open in this session, and this app allowed to
+# control it (System Settings, Privacy & Security, Automation).
+module IsoloomUtm
+  def self.fail!(message)
+    raise Class.new(Vagrant::Errors::VagrantError) { define_method(:error_message) { "UTM: #{message}" } }
+  end
+
+  # Network `net`'s vmnet id: a UUID (version 4 layout) made from this copy's folder and the
+  # network's name.
+  def self.net_uuid(net)
+    require "digest"
+    h = Digest::SHA256.hexdigest("#{__dir__}\0#{net}")
+    variant = ((h[16].to_i(16) & 0x3) | 0x8).to_s(16)
+    "#{h[0, 8]}-#{h[8, 4]}-4#{h[13, 3]}-#{variant}#{h[17, 3]}-#{h[20, 12]}"
+  end
+
+  # The marker of the QEMU arguments Isoloom puts in a VM's UTM configuration: its netdevs' ids.
+  MARK = "isoloomnet"
+
+  # Replaces the VM's QEMU arguments marked `MARK` with `args`, the others kept (AppleScript, read
+  # from stdin; the VM is stopped).
+  SET_ARGS = <<~'APPLESCRIPT'
+    on run argv
+      set vmId to item 1 of argv
+      set mark to item 2 of argv
+      tell application "UTM"
+        set vm to virtual machine id vmId
+        set config to configuration of vm
+        set kept to {}
+        repeat with arg in (qemu additional arguments of config)
+          if (argument string of arg) does not contain mark then set end of kept to (contents of arg)
+        end repeat
+        repeat with i from 3 to (count of argv)
+          set end of kept to {argument string:(item i of argv)}
+        end repeat
+        set qemu additional arguments of config to kept
+        update configuration of vm with config
+      end tell
+    end run
+  APPLESCRIPT
+
+  # Before the VM boots: an adapter on each network of `nics` (`[[network, mac], ...]`), in
+  # order, a virtio card on the network's vmnet network.
+  def self.attach(machine, nics)
+    require "open3"
+    args = nics.each_with_index.flat_map do |(net, mac), i|
+      ["-netdev vmnet-host,id=#{MARK}#{i},net-uuid=#{net_uuid(net)}",
+       "-device virtio-net-pci,netdev=#{MARK}#{i},mac=#{mac}"]
+    end
+    out, status = Open3.capture2e("osascript", "-", machine.id.to_s, MARK, *args, stdin_data: SET_ARGS)
+    fail!("#{machine.name}'s adapters on the environment's networks couldn't be set: #{out.strip}") unless status.success?
+  end
+
+  # Once the guest answers (a UTM step, so this runs on UTM only), before its provisioning: its
+  # addresses on the networks.
+  def self.address(machine, script)
+    fail!("#{machine.name} didn't answer within #{machine.config.vm.boot_timeout} s") unless machine.communicate.wait_for_ready(machine.config.vm.boot_timeout)
+    machine.communicate.sudo(script)
+  end
+end
 # Vagrant's own check of a host port before forwarding it (`Vagrant::Util::IsPortOpen`) asks
 # `Socket.tcp` with a timeout, and on macOS 27 that hands back a socket for a refused connection
 # (Ruby bug #22223: the retried `connect_nonblock` answers EISCONN while the socket's SO_ERROR
@@ -440,6 +521,15 @@ if RUBY_PLATFORM.include?("darwin") && defined?(Vagrant)
       end
     end
   end
+end
+# This copy's key, in every name a provider shares between copies of the environment (its VMs,
+# its networks, its libvirt domains): the one the runner gives in ISOLOOM_KEY, the same at each of
+# its commands, else one made from this folder's path, so a copy run by hand has its own too.
+ISOLOOM_KEY = ENV.fetch("ISOLOOM_KEY", "").then do |given|
+  next given if given.match?(/\A[0-9a-z]{6}\z/)
+  abort "ISOLOOM_KEY is a copy's key, 6 lowercase letters or digits, not #{given.inspect}" unless given.empty?
+  hash = File.expand_path(__dir__ || Dir.pwd).bytes.reduce(0x811c9dc5) { |h, b| ((h ^ b) * 0x01000193) & 0xffffffff }
+  hash.to_s(36).rjust(6, "0")[-6, 6]
 end
 # The VMs' graphical consoles, on this computer's loopback only.
 # - VMware: the port and password the runner chose for a machine, from ISOLOOM_CONSOLES
@@ -494,7 +584,9 @@ end
 #   host, and the ones a running hub of this copy listens on while it runs. A hub starts before a
 #   VM on its network does, unless one runs, with `SPARE` ports more for VMs that join the network
 #   while it runs; it is never restarted under the VMs connected to it, and stops once the
-#   network's last VM is destroyed: destroying one VM leaves it to the others.
+#   network's last VM is destroyed: destroying one VM leaves it to the others. Vagrant starts and
+#   destroys QEMU's VMs in parallel (and two Vagrant processes can act on one copy at once), so a
+#   network's hub is started, joined and stopped under that network's lock only (`locked`).
 # - A VM's disk is an overlay of its box's, and a size below the box's disk would cut its file
 #   system off: `disk_resize` is set only when the machine's size is above the box's (every
 #   installed version of it, read with qemu-img). Until the box is downloaded the size is unknown
@@ -527,6 +619,19 @@ module IsoloomQemu
     pid if command.include?(pid_file(net))
   rescue ArgumentError, SystemCallError
     nil
+  end
+
+  # Runs the block holding network `net`'s lock (an exclusive lock on its file in `hubs_dir`,
+  # across threads and processes), so the hub is decided by one VM at a time: two VMs starting at
+  # once would each find no hub and start one (the second stopping the first's under the VM
+  # connected to it), and a start beside the last VM's destroy would find a hub about to stop.
+  def self.locked(net)
+    require "fileutils"
+    FileUtils.mkdir_p(hubs_dir)
+    File.open(File.join(hubs_dir, "#{net}.lock"), File::RDWR | File::CREAT, 0o600) do |f|
+      f.flock(File::LOCK_EX)
+      yield
+    end
   end
 
   # The hub ports: 20000-39999.
@@ -624,6 +729,11 @@ module IsoloomQemu
   # than restarted under the VMs connected to it. A hub without a record Isoloom reads (an older
   # Isoloom started it) is replaced: the VM about to start connects to its new port.
   def self.hub(net, ports)
+    locked(net) { start_or_join(net, ports) }
+  end
+
+  # `hub`'s work, under the network's lock.
+  def self.start_or_join(net, ports)
     rec = record(net)
     if rec
       joined = ports.reject { |vm, port| rec[:vms][vm] == port }
@@ -636,8 +746,6 @@ module IsoloomQemu
       return
     end
     stop(net)
-    require "fileutils"
-    FileUtils.mkdir_p(hubs_dir)
     taken = ports.values.dup
     at = taken.max || start
     spare = Array.new(SPARE) do
@@ -660,10 +768,11 @@ module IsoloomQemu
   # holds) is left besides the one just destroyed. A VM is left while Vagrant keeps its id: a
   # halted one still holds its port, and the hub starts again for it anyway if stopped.
   def self.release(net, vms, env, gone)
-    rec = record(net)
-    left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
-    return if left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
-    stop(net)
+    locked(net) do
+      rec = record(net)
+      left = (vms + (rec ? rec[:vms].keys : [])).uniq.reject { |vm| vm == gone.to_s }
+      stop(net) unless left.any? { |vm| env.local_data_path.join("machines", vm, "qemu", "id").file? }
+    end
   end
 
   # Stops the network's hub, if it runs, and forgets it. The hub can be gone, pid file and all, by
@@ -708,7 +817,7 @@ module IsoloomQemu
   # virtiofsd's arguments for a host folder (`host_folders`) every account of the VM writes, as
   # on the other providers: vagrant-qemu maps only its guest user and group to this computer's
   # (`--translate-uid map:1000:<uid>:1`), and an unprivileged virtiofsd refuses any other id
-  # (EPERM: the attack box's player, root in docker-vm's VM), whatever the folder's permissions
+  # (EPERM: an account of the VM other than the guest user), whatever the folder's permissions
   # say. Every other guest uid and gid is squashed to this computer's user and group, in two
   # ranges either side of the mapped one, so no two rules overlap. Only where the virtiofsd
   # vagrant-qemu starts translates ids (1.13 or later, `--translate-uid` in its `--help`, as
@@ -741,28 +850,28 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 900
   config.ssh.proxy_command = ENV["ISOLOOM_SSH_PROXY_COMMAND"] if ENV["ISOLOOM_SSH_PROXY_COMMAND"]
   config.vm.provider "libvirt" do |v|
-    v.default_prefix = "segmented_"
+    v.default_prefix = "segmented-#{ISOLOOM_KEY}_"
   end
 
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.61.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.61.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-back", libvirt__network_name: "isoloom-segmented-back", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - isoloom-router"
+      v.name = "segmented-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - isoloom-router"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - isoloom-router"
+      v.name = "segmented-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
@@ -782,7 +891,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1, 2, 3])
-      v.guest_name = "segmented-isoloom-router"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-isoloom-router"
       v.guest_numvcpus = 1
       v.guest_memsize = 512
     end
@@ -796,17 +905,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-isoloom-router"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-isoloom-router"
       v.cpus = 1
       v.memory = 512
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-front", "isoloom-segmented-back", "isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-front", "isoloom-segmented-#{ISOLOOM_KEY}-back", "isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-front", "02155B9982B0"], ["isoloom-segmented-back", "0215581C0E5A"], ["isoloom-segmented-access", "021593D5CF93"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-front", "02155B9982B0"], ["isoloom-segmented-#{ISOLOOM_KEY}-back", "0215581C0E5A"], ["isoloom-segmented-#{ISOLOOM_KEY}-access", "021593D5CF93"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -815,7 +924,7 @@ Vagrant.configure("2") do |config|
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -866,7 +975,75 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-front", "isoloom-segmented-back", "isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-front", "isoloom-segmented-#{ISOLOOM_KEY}-back", "isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "segmented-#{ISOLOOM_KEY} - isoloom-router"
+      v.cpus = 1
+      v.memory = 512
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["front", "02:15:5b:99:82:b0"], ["back", "02:15:58:1c:0e:5a"], ["access", "02:15:93:d5:cf:93"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:5b:99:82:b0 10.61.10.254/24 || rc=1
+          set_address 02:15:58:1c:0e:5a 10.61.20.254/24 || rc=1
+          set_address 02:15:93:d5:cf:93 10.61.99.254/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:5b:99:82:b0;mac:02:15:58:1c:0e:5a;mac:02:15:93:d5:cf:93\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "shell", name: "router", inline: <<~'SH'
       set -e
@@ -895,17 +1072,17 @@ Vagrant.configure("2") do |config|
   config.vm.define "cache" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
-    m.vm.network "private_network", ip: "10.61.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-back", libvirt__network_name: "isoloom-segmented-back", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.20.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-back", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "10GB", primary: true
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - cache"
+      v.name = "segmented-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - cache"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("cache"))
@@ -916,7 +1093,7 @@ Vagrant.configure("2") do |config|
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - cache"
+      v.name = "segmented-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -954,7 +1131,7 @@ Vagrant.configure("2") do |config|
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([2])
-      v.guest_name = "segmented-cache"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-cache"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
       v.guest_boot_disk_size = 10
@@ -974,17 +1151,17 @@ Vagrant.configure("2") do |config|
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-cache"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-cache"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-back"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-back", "0215A2748606"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-back", "0215A2748606"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -993,7 +1170,7 @@ Vagrant.configure("2") do |config|
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1042,9 +1219,77 @@ Vagrant.configure("2") do |config|
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-back"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-back"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "segmented-#{ISOLOOM_KEY} - cache"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["back", "02:15:a2:74:86:06"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:a2:74:86:06 10.61.20.20/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:a2:74:86:06\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1125,7 +1370,16 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "volumes", inline: "mkdir -p '/data'"
-    m.vm.provision "shell", name: "provision/cache.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/cache.sh'\\'''"
+    m.vm.provision "shell", name: "provision/cache.sh", inline: <<~'SH'
+      isoloom_sum="$(cksum < '/opt/isoloom/provision/cache.sh')"
+      if [ "$(cat /var/lib/isoloom/done/08-b13e5bbc 2>/dev/null)" = "$isoloom_sum" ]; then
+        echo 'provision/cache.sh: done already (remove /var/lib/isoloom/done/08-b13e5bbc to run it again)'
+      else
+      (
+      cd /opt/isoloom && sh -c 'sh '\''provision/cache.sh'\'''
+      ) && mkdir -p /var/lib/isoloom/done && printf '%s\n' "$isoloom_sum" > /var/lib/isoloom/done/08-b13e5bbc
+      fi
+    SH
     m.vm.provision "shell", name: "no internet", inline: <<~'SH'
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
       command -v nft >/dev/null || pkg nftables
@@ -1162,23 +1416,24 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       /etc/isoloom/egress.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
+    m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/cache.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/cache.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 
   config.vm.define "web" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
-    m.vm.network "private_network", ip: "10.61.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-front", libvirt__network_name: "isoloom-segmented-front", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-front", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - web"
+      v.name = "segmented-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - web"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("web"))
@@ -1189,7 +1444,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - web"
+      v.name = "segmented-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1226,7 +1481,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([1])
-      v.guest_name = "segmented-web"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-web"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1244,17 +1499,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-web"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-web"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-front"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-front"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-front", "02158239B368"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-front", "02158239B368"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1263,7 +1518,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1312,9 +1567,77 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-front"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-front"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "segmented-#{ISOLOOM_KEY} - web"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["front", "02:15:82:39:b3:68"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:82:39:b3:68 10.61.10.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:82:39:b3:68\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1375,24 +1698,34 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       fi
     SH
     m.vm.provision "shell", name: "wait for cache", inline: "i=0; until (bash -c '</dev/tcp/cache/6379' 2>/dev/null || nc -z -w 2 cache 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"cache didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"cache answers\""
-    m.vm.provision "shell", name: "provision/web.sh", inline: "cd /opt/isoloom && sh -c 'sh '\\''provision/web.sh'\\'''"
-    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
+    m.vm.provision "shell", name: "provision/web.sh", inline: <<~'SH'
+      isoloom_sum="$(cksum < '/opt/isoloom/provision/web.sh')"
+      if [ "$(cat /var/lib/isoloom/done/07-1a24a8d0 2>/dev/null)" = "$isoloom_sum" ]; then
+        echo 'provision/web.sh: done already (remove /var/lib/isoloom/done/07-1a24a8d0 to run it again)'
+      else
+      (
+      cd /opt/isoloom && sh -c 'sh '\''provision/web.sh'\'''
+      ) && mkdir -p /var/lib/isoloom/done && printf '%s\n' "$isoloom_sum" > /var/lib/isoloom/done/07-1a24a8d0
+      fi
+    SH
+    m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/web.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/web.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.61.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-access", libvirt__network_name: "isoloom-segmented-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.61.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-segmented-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
-      v.name = "segmented - user"
+      v.name = "segmented-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
     m.vm.provider "vmware_desktop" do |v|
-      v.vmx["displayName"] = "segmented - user"
+      v.vmx["displayName"] = "segmented-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
       if (console = IsoloomConsole.of("user"))
@@ -1403,7 +1736,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.vm.provider "parallels" do |v|
-      v.name = "segmented - user"
+      v.name = "segmented-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
@@ -1440,7 +1773,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       v.esxi_password = "env:ESXI_PASSWORD"
       v.esxi_disk_store = ENV["ESXI_DATASTORE"] if ENV["ESXI_DATASTORE"]
       v.esxi_virtual_network = esxi_networks([3])
-      v.guest_name = "segmented-user"
+      v.guest_name = "segmented-#{ISOLOOM_KEY}-user"
       v.guest_numvcpus = 1
       v.guest_memsize = 1024
     end
@@ -1458,17 +1791,17 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
     m.vm.provider "hyperv" do |v, o|
       o.vm.box = "generic/debian12"
       o.vm.box_version = "4.3.12"
-      v.vmname = "segmented-user"
+      v.vmname = "segmented-#{ISOLOOM_KEY}-user"
       v.cpus = 1
       v.memory = 1024
       v.linked_clone = true
       o.vm.network "private_network", bridge: HYPERV_SWITCH
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::Configure", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-access", "02154AF607BC"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-segmented-#{ISOLOOM_KEY}-access", "02154AF607BC"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1477,7 +1810,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           mkdir -p /etc/isoloom
           cat > /etc/isoloom/env-net.sh <<'NET'
           #!/bin/sh
-          # This machine's addresses on the environment's networks (Hyper-V sets none), by adapter MAC.
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
           set_address() {
             for d in /sys/class/net/*; do
               [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
@@ -1526,9 +1859,77 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-access"]) }
+      t.ruby { |_, _| IsoloomHyperV.prune(["isoloom-segmented-#{ISOLOOM_KEY}-access"]) }
+    end
+    m.vm.provider "utm" do |v, o|
+      o.vm.box = "utm/bookworm"
+      o.vm.box_version = ">= 0"
+      o.vm.box_architecture = :auto
+      v.name = "segmented-#{ISOLOOM_KEY} - user"
+      v.cpus = 1
+      v.memory = 1024
+    end
+    m.trigger.before :"VagrantPlugins::Utm::Action::Boot", type: :action do |t|
+      t.ruby { |_, machine| IsoloomUtm.attach(machine, [["access", "02:15:4a:f6:07:bc"]]) }
+    end
+    m.trigger.after :"VagrantPlugins::Utm::Action::CheckGuestAdditions", type: :action do |t|
+      t.ruby do |_, machine|
+        IsoloomUtm.address(machine, <<~'SH')
+          set -e
+          mkdir -p /etc/isoloom
+          cat > /etc/isoloom/env-net.sh <<'NET'
+          #!/bin/sh
+          # This machine's addresses on the environment's networks (its hypervisor sets none), by adapter MAC.
+          set_address() {
+            for d in /sys/class/net/*; do
+              [ "$(cat "$d/address" 2>/dev/null)" = "$1" ] || continue
+              IF=${d##*/}
+              if command -v nmcli >/dev/null; then nmcli device set "$IF" managed no 2>/dev/null || true; fi
+              ip link set "$IF" up
+              ip -4 addr show dev "$IF" | grep -q " $2 " || ip addr add "$2" dev "$IF"
+              return 0
+            done
+            echo "isoloom: no network adapter with MAC $1" >&2
+            return 1
+          }
+          rc=0
+          set_address 02:15:4a:f6:07:bc 10.61.99.10/24 || rc=1
+          exit $rc
+          NET
+          chmod +x /etc/isoloom/env-net.sh
+          # NetworkManager would try DHCP there.
+          if [ -d /etc/NetworkManager/conf.d ]; then
+            printf '[keyfile]\nunmanaged-devices=mac:02:15:4a:f6:07:bc\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          if [ -d /run/systemd/system ]; then
+            cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
+          [Unit]
+          Description=Isoloom: addresses on the environment networks
+          After=network-pre.target NetworkManager.service systemd-networkd.service
+          Before=network-online.target isoloom-routes.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/etc/isoloom/env-net.sh
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+            systemctl daemon-reload
+            systemctl enable -q isoloom-env-net.service
+          elif command -v rc-update >/dev/null; then
+            printf '#!/bin/sh\nexec /etc/isoloom/env-net.sh\n' > /etc/local.d/isoloom-env-net.start
+            chmod +x /etc/local.d/isoloom-env-net.start
+            rc-update add local default >/dev/null
+          fi
+          /etc/isoloom/env-net.sh
+        SH
+      end
     end
     m.vm.provision "addresses", type: "shell", run: "always", inline: "set -eu
+# nmcli translates its states (`connecting`) even in its terse output: read them in C.
+export LC_ALL=C
 command -v nmcli >/dev/null 2>&1 && nmcli -t general status >/dev/null 2>&1 || exit 0
 cards=\"\"
 for address in \"$@\"; do
@@ -1588,7 +1989,8 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
       /etc/isoloom/routes.sh || true
       fi
     SH
-    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
+    m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/user.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"
     m.vm.provision "shell", name: "checks", run: "never", path: "checks/user.sh", env: { "ISOLOOM_DERIVED" => ENV.fetch("ISOLOOM_DERIVED", "1") }
+    m.vm.provision "shell", name: "ready", inline: "mkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready"
   end
 end

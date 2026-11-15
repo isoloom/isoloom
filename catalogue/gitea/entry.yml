@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The gitea entry: Gitea, as the official gitea image has it for a lab's own entrypoint to run
+# (the `gitea` binary on the PATH, a `git` user with /data/git, /etc/gitea, the image's `su-exec`):
+# Gitea's build of the exact release, pinned by the SHA-256 Gitea publishes beside it. A lab's
+# Dockerfile writes app.ini and starts `gitea web` itself, so the entry runs no service of its
+# own. lock.yml beside it is written only by `cargo xtask catalogue refresh gitea`.
+name: gitea
+description: >-
+  Gitea of an exact release, installed the way the official gitea image has it (the binary, a
+  `git` user, /data and /etc/gitea, `su-exec`): what a lab's own Gitea start runs on.
+upstream: https://about.gitea.com/
+licence:
+  software: MIT
+  notes: The release bundles its dependencies under their own licences.
+
+releases:
+  - version: 1.22.6
+    source: download
+    os: [debian@12, debian@13, ubuntu@22.04, ubuntu@24.04]
+    vars: { url: "https://dl.gitea.com/gitea/1.22.6/gitea-1.22.6-linux-amd64", sha256: fd77f1a0273c85a0950207c1cfa6753a9fa57604e4ab1382484b191cc919ce15 }
+default: 1.22.6
+
+recipe:
+  install:
+    - packages: [ca-certificates, git, openssh-client, util-linux]
+    - file: { path: /usr/local/bin/gitea, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}", mode: "0755" }
+    - group: { name: git }
+    - user: { name: git, group: git, home: /data/git, shell: /bin/sh }
+
+  configure:
+    - file: { path: /data, state: directory, owner: git, group: git, mode: "0755" }
+    - file: { path: /etc/gitea, state: directory, owner: git, group: git, mode: "0755" }
+    - template: { from: files/su-exec, to: /usr/local/bin/su-exec, mode: "0755" }
+
+  start: []

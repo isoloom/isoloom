@@ -145,3 +145,95 @@ fn problems_read_as_json_too() {
     ));
     insta::assert_snapshot!(serde_json::to_string_pretty(&found).unwrap_or_else(|e| panic!("{e}")));
 }
+
+#[test]
+fn clones_past_the_last_address() {
+    let shown = rendered(&spec("machines:\n  m: { app: { image: nginx }, networks: { lab: 250 }, count: 10 }\n"));
+    assert!(shown.starts_with("error[invalid-value] machines.m.networks.lab  (isoloom.yml:6:"), "{shown}");
+    assert!(
+        shown.ends_with("\n  10 machines from .250 run past .255 (the last would be .259): start lower or count fewer"),
+        "one problem, saying why: {shown}"
+    );
+}
+
+#[test]
+fn a_value_of_the_wrong_kind_says_what_the_field_takes() {
+    let reason = |machine: &str| {
+        let found = problems(&spec(&format!("machines:\n  m: {{ app: {{ image: nginx }}, {machine} }}\n")));
+        let [p] = &found[..] else { panic!("one problem: {found:?}") };
+        (p.path.to_string(), p.reason.clone())
+    };
+    assert_eq!(
+        reason("networks: { lab: 300 }"),
+        (
+            "machines.m.networks.lab".to_owned(),
+            "`300` isn't the last number of an address: 0 to 255".to_owned()
+        )
+    );
+    assert_eq!(reason("networks: { lab: [10, 256] }").1, "`256` isn't the last number of an address: 0 to 255");
+    let typed = reason("networks: { lab: \"10\" }").1;
+    assert!(
+        typed.ends_with("expected the last number of its address (0 to 255, like 10), or a list of them ([10, 11])"),
+        "{typed}"
+    );
+    let limit = reason("networks: { lab: 10 }, ulimits: { nofile: abc }").1;
+    assert!(limit.ends_with("expected a number for both limits (65536), or `{ soft, hard }`"), "{limit}");
+    let test = reason("networks: { lab: 10 }, healthcheck: { test: 5 }").1;
+    assert!(
+        test.ends_with("expected a text the shell runs, or a list of arguments run as they are"),
+        "{test}"
+    );
+}
+
+#[test]
+fn a_secrets_source_and_a_device_of_the_wrong_kind_say_what_they_take() {
+    let reason = |rest: &str| {
+        let found = problems(&spec(rest));
+        let [p] = &found[..] else { panic!("one problem: {found:?}") };
+        (p.path.to_string(), p.reason.clone())
+    };
+    let machine = "machines:\n  m: { os: debian@12, networks: { lab: 10 } }\n";
+    let store = "one store: `{ env: NAME }`, `{ file: <path> }`, `{ vault: <path>#<field> }` or `{ sops: <file>#<key> }`";
+    for source in ["5", "[DB]", "{}", "{ env: A, file: b }"] {
+        let (path, why) = reason(&format!("secrets: {{ db: {source} }}\n{machine}"));
+        assert_eq!(path, "secrets.db", "{source}");
+        assert!(why.contains(store) && !why.contains("untagged"), "{source}: {why}");
+    }
+    let (_, typo) = reason(&format!("secrets: {{ db: {{ evn: DB }} }}\n{machine}"));
+    assert_eq!(typo, "`evn` isn't a field here");
+    let device = |value: &str| {
+        reason(&format!(
+            "machines:\n  m: {{ app: {{ image: nginx }}, networks: {{ lab: 10 }}, hardware: {{ devices: [{value}] }} }}\n"
+        ))
+    };
+    let (path, why) = device("5");
+    assert_eq!(path, "machines.m.hardware.devices[0]");
+    assert!(
+        why.ends_with("expected a device path (`/dev/fuse`, or `host:guest[:permissions]`), or `{ host, guest, permissions }`"),
+        "{why}"
+    );
+    let (_, misspelt) = device("{ hots: /dev/fuse }");
+    assert_eq!(misspelt, "`hots` isn't a field here");
+}
+
+#[test]
+fn a_free_host_port_is_asked_for_by_any_number_of_machines_and_a_number_once() {
+    let web = |rest: &str| problems(&spec(&format!("machines:\n  web: {{ os: debian@12, networks: {{ lab: 10 }}, {rest} }}\n")));
+    assert_eq!(web("count: 3, ports: { web: { port: 80, publish: true } }"), []);
+    let both = problems(&spec(
+        "machines:\n  a: { os: debian@12, networks: { lab: 10 }, ports: { web: { port: 80, publish: true } } }\n  b: { os: debian@12, networks: { lab: 11 }, ports: { web: { port: 80, publish: true } } }\n",
+    ));
+    assert_eq!(both, []);
+    for publish in ["8080", "{ host: 8080 }", "{ host: 8080, fixed: true }"] {
+        let found = web(&format!("count: 3, ports: {{ web: {{ port: 80, publish: {publish} }} }}"));
+        let [p] = &found[..] else {
+            panic!("{publish}: one problem, on the machine as written: {found:?}")
+        };
+        assert_eq!(p.path.to_string(), "machines.web.ports.web.publish", "{publish}");
+        assert!(
+            p.reason.contains("its 3 clones (`count`) can't all have host port 8080: `publish: true`"),
+            "{publish}: {}",
+            p.reason
+        );
+    }
+}

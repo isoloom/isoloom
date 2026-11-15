@@ -1,5 +1,5 @@
 //! The project copied into the machines, without what `.isoloomignore` leaves out: its rules
-//! ([`ignore`], the run manifest's: the runner's `project.archive` follows them too), and the
+//! ([`ignore`]: a runner that copies the project follows them too), and the
 //! same rules in the Terraform outputs, read when Terraform runs, exactly as the Vagrantfiles read
 //! them (`vagrant_project.rb`), so every target leaves out the same files.
 //!
@@ -22,7 +22,7 @@
 //!
 //! A module gets only the lists it reads ([`lists`]).
 
-pub use isoloom_manifest::ignore;
+pub use isoloom_spec::ignore;
 
 /// How a Terraform module copies the project into its machines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +33,7 @@ pub enum Copy {
     /// An archive made where Terraform runs, with `tar`: its exclusion list is a file too.
     Archive,
     /// None: Terraform only makes the machines, and the runner copies the project in over SSH
-    /// (the run manifest's `project.archive`, piped to the guest), so the module lists nothing.
+    /// (piped to the guest), so the module lists nothing.
     Runner,
 }
 

@@ -1,5 +1,6 @@
-//! The one placeholder grammar of the whole spec: `{{ path }}`, in the message, in an app's
-//! templates and in a catalogue entry's recipe and files. Isoloom fills every placeholder in when
+//! The placeholder grammar of the spec: `{{ path }}`, in the message, in an app's templates and
+//! in a catalogue entry's recipe and files (a cloud variable's `{{ inputs.NAME }}` is matched on
+//! its own, in `model/cloud.rs`). Isoloom fills every placeholder in when
 //! it generates (never Jinja2 or envsubst), so every CM tool installs the same bytes.
 //!
 //! | Path | Where |
@@ -7,7 +8,6 @@
 //! | `machine.name`, `machine.addresses.<network>` | templates (this machine's) |
 //! | `machines.<m>.addresses.<network>`, `machines.<m>.ports.<name>.port` | templates and the message |
 //! | `machines.<m>.ports.<name>.published`, `.url` | the message only: run-time values |
-//! | `cloud.outputs.<name>` | the message |
 //! | `version`, `os.family`, `os.version`, `os.codename`, `vars.<x>`, `with.<setting>`, `with.<setting>.path` | a catalogue entry |
 //! | `item.<field>`, `item.<field>.path` | a catalogue entry's step repeated with `for_each` |
 //!
@@ -48,8 +48,6 @@ pub enum Reference {
         /// What of it.
         field: PortField,
     },
-    /// `cloud.outputs.<name>`: an output of the cloud module.
-    CloudOutput(String),
     /// `version`: a catalogue entry's resolved release.
     Version,
     /// `os.family`, `os.version`, `os.codename`: the machine's OS.
@@ -142,7 +140,6 @@ impl Reference {
             Reference::Port { .. } if self.is_run_time() && place != Place::Message => {
                 Err("a published port and a URL are known only once the environment runs; a file gets `port`")
             }
-            Reference::CloudOutput(_) if place != Place::Message => Err("a cloud output is the message's only"),
             Reference::Version | Reference::Os(_) | Reference::Var(_) | Reference::Setting { .. } if !entry => Err("only a catalogue entry has it"),
             Reference::Item(_) | Reference::ItemPath(_) if place != Place::EntryItem => Err("only a step repeated with `for_each` has an `item`"),
             _ => Ok(()),
@@ -168,7 +165,6 @@ impl FromStr for Reference {
             ["machines", m, rest @ ..] => {
                 machine(m, rest).ok_or_else(|| unknown("a machine's paths are `ports.<name>.port`, `.published`, `.url` and `addresses.<network>`"))
             }
-            ["cloud", "outputs", name] => Ok(Reference::CloudOutput((*name).to_owned())),
             ["version"] => Ok(Reference::Version),
             ["os", "family"] => Ok(Reference::Os(OsField::Family)),
             ["os", "version"] => Ok(Reference::Os(OsField::Version)),
@@ -186,7 +182,7 @@ impl FromStr for Reference {
             ["item", field] => Ok(Reference::Item((*field).to_owned())),
             ["item", field, "path"] => Ok(Reference::ItemPath((*field).to_owned())),
             _ => Err(unknown(
-                "the paths start with `machine.`, `machines.<m>.`, `cloud.outputs.`, `version`, `os.`, `vars.`, `with.` or `item.`",
+                "the paths start with `machine.`, `machines.<m>.`, `version`, `os.`, `vars.`, `with.` or `item.`",
             )),
         }
     }
@@ -231,7 +227,6 @@ impl fmt::Display for Reference {
                 };
                 write!(f, "machines.{machine}.ports.{port}.{field}")
             }
-            Reference::CloudOutput(name) => write!(f, "cloud.outputs.{name}"),
             Reference::Version => f.write_str("version"),
             Reference::Os(OsField::Family) => f.write_str("os.family"),
             Reference::Os(OsField::Version) => f.write_str("os.version"),

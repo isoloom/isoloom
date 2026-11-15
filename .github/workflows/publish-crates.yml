@@ -9,7 +9,7 @@ name: Publish crates
 # Setup (per crate, done once by the maintainer): add a Trusted Publisher on crates.io for the
 # crate, pointing at repository `isoloom/isoloom`, this workflow file (`publish-crates.yml`) and
 # the `crates-io` environment. A brand-new crate name must be created by one manual `cargo publish`
-# first (trusted publishing cannot create a crate that does not exist). See docs/dev/releasing.md.
+# first (trusted publishing cannot create a crate that does not exist). See .github/CONTRIBUTING.md, "Releasing (maintainers)".
 on:
   push:
     tags: ["v*"]
@@ -51,7 +51,6 @@ jobs:
           set -euo pipefail
           # Leaf crates first: every crate's dependencies are published before it.
           crates=(
-            isoloom-manifest
             isoloom-spec
             isoloom-catalogue
             isoloom-plan
@@ -64,6 +63,8 @@ jobs:
             isoloom-targets
             isoloom-import
             isoloom
+            isoloom-topology
+            isoloom-wasm
           )
           version="$(cargo metadata --format-version 1 --no-deps \
             | jq -r '.packages[] | select(.name=="isoloom-spec") | .version')"

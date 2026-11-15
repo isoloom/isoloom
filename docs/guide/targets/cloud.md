@@ -1,15 +1,15 @@
-# Clouds: `cloud-vm`, `cloud-docker` and `cloud-services`
+# Clouds: `cloud-vm` and `cloud-docker`
 
 - **`cloud-vm`**: one cloud VM per machine, set up by the machine's steps, on AWS, Azure, Google
   Cloud, DigitalOcean, Linode or Oracle Cloud. `.isoloom/cloud-vm/<cloud>/`, one Terraform module
-  and run manifest per cloud that can take the environment.
+  per cloud that can take the environment.
 - **`cloud-docker`**: the `docker` target's containers on one cloud VM, on the same six clouds.
   `.isoloom/cloud-docker/<cloud>/`.
-- **`cloud-services`**: your own Terraform module (the spec's `cloud:`), applied into your account
-  on AWS, Azure or Google Cloud, with the spec's checks. `.isoloom/cloud-services/`.
 
-Every cloud target is Tier 2: CI runs `terraform validate` on every example's modules, and AWS
-has real runs from macOS. `isoloom targets` says which clouds can
+`cloud-services` is not supported in Isoloom 3.0: a spec with `cloud:` is refused.
+
+Each cloud's module is checked by `terraform validate`, `tflint` and `terraform test` (every
+provider mocked); `cloud-docker`'s Compose file by `docker compose config` too. `isoloom targets` says which clouds can
 take an environment and why the others can't (DigitalOcean takes one machine on one network for
 `cloud-vm`; Windows runs on AWS and Azure only).
 
@@ -18,17 +18,27 @@ take an environment and why the others can't (DigitalOcean takes one machine on 
 - Terraform 1.6 or later and an OpenSSH client ([tool versions](../../reference/tool-versions.md)).
 - An account on the cloud, and the credentials below in your environment.
 - Your public IP, or the range your connections come from, for `allowed_cidr`.
-- An SSH key pair: the machines let in `ssh_public_key`.
+- An SSH key pair: the machines let in `ssh_public_key`, and Terraform signs in with its private
+  half (`ssh_private_key_file`) to bring the project in and wait for the set-up.
 
-Isoloom only writes files; it calls no cloud API. A runner applies the module. Without one, apply
-it with Terraform: the machines then wait for the project, which only a runner delivers (over
-SSH), so a hand-applied `cloud-vm` module gives you machines that aren't set up.
+Isoloom only writes files; it calls no cloud API. `terraform apply` alone brings the environment
+to ready, with no runner:
+
+- **`cloud-vm`**: each Linux machine sets itself up from its user data. For each one (and the
+  controller), a `terraform_data.isoloom_ready_<machine>` signs in over SSH, uploads the project
+  (archived where Terraform runs, `.isoloomignore` honoured) and waits for the set-up's end: it
+  reads `/var/lib/isoloom/ready` (`isoloom-ready/1`), after `cloud-init status --wait`, and fails
+  the apply with the end of `/var/log/isoloom-setup.log` when a step failed. A machine whose
+  set-up restarts it is waited for again once it is back.
+- **`cloud-docker`**: the Docker host's user data installs Docker and starts the Compose file
+  (`docker compose … up -d --wait`) once Terraform has brought in the project and the Compose
+  file's folder; `terraform_data.isoloom_ready_docker_host` waits for it the same way.
+- Then the networks without internet are sealed (below), in the same apply.
 
 ## Credentials
 
-Each cloud's own Terraform credentials, from the environment of whoever applies the module. A run
-manifest declares them as slots; a runner passes them to the Terraform steps only, never to a
-machine or a generated file.
+Each cloud's own Terraform credentials, from the environment of whoever applies the module, never
+a machine or a generated file.
 
 | Cloud | Environment | Module variables |
 |---|---|---|
@@ -39,8 +49,21 @@ machine or a generated file.
 | Linode | `LINODE_TOKEN` | `region` |
 | Oracle Cloud | the OCI CLI's `~/.oci/config` | `compartment_id`, `config_file_profile`, `region` |
 
-Every module also takes `allowed_cidr` (required), `ssh_public_key`, `expires_at` and, when an
-offline network needs sealing, `isoloom_sealed` (set by the runner).
+Every module also takes `allowed_cidr`, `ssh_public_key` and `ssh_private_key_file` (required),
+and `expires_at`.
+
+The values given at launch are variables of their own, named as Compose and the Vagrantfile read
+them, so one environment of values starts every format (`TF_VAR_<name>`, or `-var`):
+
+- each input (`inputs:`) a machine reads, under its own name: sensitive unless the spec marks it
+  `sensitive: false`, empty when not given;
+- each secret a machine gets as a file (`secrets:`), as `ISOLOOM_SECRET_<NAME>` (`db-password` is
+  `ISOLOOM_SECRET_DB_PASSWORD`): sensitive, with no default, so Terraform refuses to apply without
+  it.
+
+A machine's user data writes them in place (the inputs file, its secret files), so they are in
+the cloud's copy of the user data. Terraform stores sensitive values in its state, as it does for
+every variable.
 
 Prefer short-lived credentials: an assumed role (AWS), a workload identity or service principal
 with a federated credential (Azure), a service account impersonated or federated (Google Cloud).
@@ -162,15 +185,19 @@ time overrides it too ([configuration](../../reference/configuration.md#defaults
 ## Network exposure
 
 - Every machine gets a public IP address (AWS also an Elastic IP for a machine on several
-  networks), so the runner can reach it.
+  networks), so Terraform (and you) can reach it over SSH.
 - SSH (22), WinRM (5985, Windows machines) and the published ports accept connections only from
   `allowed_cidr`. Nothing else is open to the whole internet but, on Oracle Cloud, ICMP's
   "fragmentation needed" (and ICMPv6's "packet too big"), which path MTU discovery needs. Set
   `allowed_cidr` to your address (`/32`) or your egress range, never `0.0.0.0/0`.
-- An `internet: false` network is sealed once the machines are set up (the runner applies the
-  module again with `isoloom_sealed = true`): its machines' egress is then limited to the
-  environment's own networks, while SSH from `allowed_cidr` and the published ports keep working.
-  The seal fails closed, and every later apply keeps it.
+- An `internet: false` network is sealed once the machines are set up, in the same apply: the
+  closing resources wait for every `isoloom_ready_<machine>`. AWS attaches a network ACL to its
+  subnets (out to the environment's networks and `allowed_cidr` only), Azure a security group to
+  its subnets (no internet out), Google Cloud deny rules above its machines' allow rules, Oracle
+  Cloud a route table with no way to the internet. SSH from `allowed_cidr` and the published ports
+  keep working. DigitalOcean's and Linode's firewalls only allow, and each machine's is made with
+  it, so nothing made after the set-up could close it: those two clouds refuse a network without
+  internet.
 
 See [security considerations](../../explanation/security.md#public-ip-addresses-on-cloud-vms).
 
@@ -189,18 +216,14 @@ Isoloom doesn't know your prices and bills nothing. What it gives you to keep co
   containers' total memory, and the size is a module variable (`instance_type`, `size`,
   `machine_type` or `type`), except on Oracle Cloud, whose shape takes its OCPUs and memory from
   that total, with no variable. `isoloom resources` adds up what the machines ask for.
-- **Expiry.** A run manifest carries an expiry (240 minutes by default; `isothrum up --lifetime`
-  changes it). The runner sets `expires_at`: every resource is tagged `isoloom-expires-at`, and the
+- **Expiry.** A runner gives a run an expiry (Isothrum: 240 minutes by default; `isothrum up
+  --lifetime` changes it) and sets `expires_at`: every resource is tagged `isoloom-expires-at`, and the
   machines shut themselves down at that time (an AWS `cloud-vm` instance that shuts itself down is
-  terminated). A stopped machine stops most compute charges, not disks or addresses: `isothrum reap <cloud>` destroys the runs past their expiry and lists what
-  the cloud still holds past its expiry that no run records. Run it on a schedule. Applied by hand,
+  terminated). A stopped machine stops most compute charges, not disks or addresses: `isothrum reap` removes the recorded runs past their expiry. Run it on a schedule. Applied by hand,
   `expires_at` is empty: no end.
 - **Tags.** Every resource carries `managed-by = isoloom`, `isoloom-environment` and
   `isoloom-instance` (labels on Google Cloud), so a cost report can group by environment. The
   spec's `tags:` map adds your own cost-allocation tags to every resource.
-- **`cloud.hourly_usd`** (for `cloud-services`): the spec author's estimate of what the
-  environment costs per hour. Isoloom copies it into `.isoloom/resolved.json`; a runner or a
-  portal can show it before applying or keep to a budget with it. It is an estimate, not a limit.
 - The best guard is the cloud's own: a budget with an action (AWS Budgets, Azure cost alerts,
   Google Cloud budgets) on a dedicated account.
 
@@ -209,19 +232,23 @@ Isoloom doesn't know your prices and bills nothing. What it gives you to keep co
 ```sh
 isoloom generate --target cloud-vm
 export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
-isothrum up .isoloom/cloud-vm/aws/run.json \
-  --secret-from-env AWS_ACCESS_KEY_ID --secret-from-env AWS_SECRET_ACCESS_KEY \
-  --param allowed_cidr="$(curl -fsS https://checkip.amazonaws.com)/32" --lifetime 120
-isothrum check .isoloom/cloud-vm/aws/run.json
-isothrum down .isoloom/cloud-vm/aws/run.json
+export TF_VAR_allowed_cidr="$(curl -fsS https://checkip.amazonaws.com)/32"
+export TF_VAR_ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)" TF_VAR_ssh_private_key_file=~/.ssh/id_ed25519
+terraform -chdir=.isoloom/cloud-vm/aws init
+terraform -chdir=.isoloom/cloud-vm/aws apply    # ends once every machine is set up
+terraform -chdir=.isoloom/cloud-vm/aws output checks
+terraform -chdir=.isoloom/cloud-vm/aws destroy
 ```
 
-The runner's parameters, secret inputs and lifetime are documented with it:
-[Isothrum](https://github.com/Isothrum/isothrum).
+The checks run on the machines over SSH: the `checks` output gives each position's machine, its
+address, its user and the command (`cd /opt/isoloom && … sh .isoloom/cloud-vm/checks/<position>.sh`,
+the runner scripts Terraform brought in with the project). A runner such as
+[Isothrum](https://github.com/Isothrum/isothrum) runs the same commands, with no contract of its
+own.
 
 ## Teardown
 
-`isothrum down`, or `terraform destroy` with the same variables. Each run's Terraform state is
-local, in the runner's state folder ([remote state](../remote-terraform-state.md)). Leftovers of
+`terraform destroy` with the same variables (or a runner's `down`). Each run's Terraform state is
+local, in the module's folder or a runner's state folder ([remote state](../remote-terraform-state.md)). Leftovers of
 an interrupted run are found by their tags and destroyed by `isothrum reap`. On Google Cloud, a
 project created for the environment is deleted with it.

@@ -16,12 +16,12 @@ fn rid(name: &str, d: &DataDisk) -> String {
 }
 
 /// Machine `name`'s disks, written to `m`; their ids, for its VM to attach in order.
-pub(super) fn blocks(name: &str, disks: &[DataDisk], m: &mut Module) -> Vec<Expression> {
+pub(super) fn blocks(name: &str, disks: &[DataDisk], module: &mut Module) -> Vec<Expression> {
     disks
         .iter()
         .map(|d| {
             let id = rid(name, d);
-            m.commented(
+            module.commented(
                 &format!("Machine `{name}`'s disk `{}`: {} GB.", d.name, d.size_gb),
                 resource("esxi_virtual_disk", &id)
                     .add_attribute(("virtual_disk_disk_store", reference("var.disk_store")))

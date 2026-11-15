@@ -6,9 +6,9 @@
 //! supervisor (`super::supervisor`) is the image's entrypoint, and starts it. The project folder is the
 //! build context.
 
-use isoloom_manifest::contract::OUTPUT_DIR;
 use isoloom_plan::configure::{ContainerProcess, Resource, RunPlan, TemplatePlan};
 use isoloom_plan::{Build, Environment, Image, MachineShape};
+use isoloom_spec::contract::OUTPUT_DIR;
 use isoloom_spec::shell::quote;
 use isoloom_spec::syntax::Mode;
 

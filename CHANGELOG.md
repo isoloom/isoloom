@@ -10,6 +10,219 @@ stable spec format.
 
 ## [Unreleased]
 
+### Added
+
+- **UTM runs an environment's VMs again, each on its networks (the `vagrant` target's `utm`
+  provider).** vagrant_utm (0.2.0) makes no adapter for a private network and sets no address,
+  so the Vagrantfile does both: each network is an isolated vmnet network (QEMU's `vmnet-host`
+  with an id made from the copy's folder and the network's name: its VMs only, not the Mac nor
+  another network, no DHCP), a VM's adapters there are set before each boot (a typed action
+  trigger on the plugin's `Boot`, virtio cards with fixed MACs, Isoloom's earlier QEMU arguments
+  replaced and the plugin's own kept), and its addresses are set once it answers, by MAC, with
+  Hyper-V's scripts. A VM boots a UTM box: `utm/bookworm` for Debian 12 and Isoloom's own VMs,
+  `utm/ubuntu-24.04`; another OS takes `overrides.vagrant.machines.<m>.boxes.utm` (the spec
+  schema's `boxes.utm`), else UTM refuses the spec saying so. UTM refuses data disks, bridged
+  networks, a TPM and a machine's own boot, stops `vagrant up` on nested virtualization, and
+  offers no console (SPICE). `vagrant/utm` is a matrix
+  column again. Breaking for the Rust API: `ProviderBoxes` and
+  `VmImage` have a new public field, `utm`.
+
+- **A machine built from a Dockerfile has a true VM form (#295).** On a target that runs VMs, a
+  machine written as `app.build` with no `app.steps` of its own takes the VM form its Dockerfile
+  translates to: the base image's OS, its `RUN`, `COPY`, `ENV`, `USER` and `WORKDIR` as steps, and
+  its command as the machine's service. A service image the Dockerfile starts `FROM` (MySQL,
+  MariaDB, PostgreSQL, PHP, Python, Node, Go, Gitea, MongoDB...) installs its catalogue entry's VM
+  recipe, pinned to the image's exact release, and keeps the image's first-start contract; a line
+  with no VM form is refused at that line. `isoloom bases fetch` vendors the base images the
+  catalogue doesn't have.
+- **A port declares the fixed login its service ships with (#296).** `login: { user, password }`
+  on a port written in full is kept on the spec's port (`isoloom_spec::model::Login`,
+  `model::Port::login`), so an embedder reading the spec through the library shows the sign-in
+  next to the port it belongs to. For a training environment's published account only, never a
+  secret (a secret is an input); a login names its account. Nothing of it reaches the rendered
+  files. Breaking for the Rust API (a new public field on the spec's `Port`s).
+- `isoloom_spec::shell::here_tag` and `isoloom_spec::shell::heredoc`: a here-document's
+  terminator chosen so no line of its text ends it, and the whole document written with it.
+- **`isoloom_plan::Names` (`Environment::names`): every name an environment takes on the host,
+  built in one place.** A VM's display name (VirtualBox, VMware Desktop, Parallels, UTM), its
+  Hyper-V and ESXi name, its libvirt domain and the environment's libvirt prefix, and each
+  network's host name (VirtualBox internal network, libvirt network, Hyper-V private switch, the
+  hybrid Docker host's network) all come from the environment's name, which carries its
+  instance's suffix. The Vagrantfiles and the run manifests of the `vagrant`, `docker-vm` and
+  `hybrid` targets now read them there, so the two can't drift apart, and a test holds two
+  instances of the VM examples to disjoint VM, network and prefix names (#285). Two copies of
+  one environment are also told apart by their key (below).
+- **`isoloom-topology` and `isoloom-wasm`, the topology editor's compiler and its WebAssembly
+  engine, moved here from Isothrum** (where they were `isothrum-compiler` and `isothrum-wasm`):
+  a network drawn in an editor becomes an `isoloom.yml` and its project files, and in the
+  browser every target's files and the zips to download. `cargo xtask wasm` builds the engine
+  (`isoloom_wasm.js`, `isoloom_wasm_bg.wasm`); the JavaScript exports keep their names.
+
+### Changed
+
+- **Targets are presented by what they write and the validators that check it**, not by tiers of
+  real runs: `isoloom targets` ends with each generated target's validators, and `isoloom matrix`
+  and `docs/matrix.md` have a validators table (target, what it writes, validated by) in place of
+  the tiers; the matrix's column headers carry no tier. The validators are the ones `cargo xtask
+  verify` runs, with `terraform test` from `cargo xtask tf-test`.
+- **Two copies of one environment never share a VM, network or libvirt domain name, numbered or
+  not (#285).** **Breaking:** every name a Vagrantfile gives on the host carries the copy's key
+  after the environment's name: `<env>-<key> - <machine>` (VirtualBox, VMware Desktop,
+  Parallels, UTM), `<env>-<key>-<machine>` (Hyper-V, ESXi), the libvirt prefix `<env>-<key>_`,
+  and `isoloom-<env>-<key>-<network>` (VirtualBox internal network, libvirt network, Hyper-V
+  private switch, the hybrid Docker host's interfaces). The Vagrantfile reads the key when Vagrant
+  loads it, from `ISOLOOM_KEY` (six lowercase letters or digits; another value stops the load),
+  which a runner sets for every command of a run; unset (`vagrant up` by hand), it makes one from
+  its folder's path, so two copies in two folders differ too. `isoloom_plan::Names` gives each name
+  as a `HostName` (with a key, around the key, or without it); `KEY_VAR` and `KEY_LEN` are new.
+  The run manifest names no VM (`vm_names` is empty) and no Vagrant network (`native` absent): a
+  runner finds the VMs by the ids Vagrant records. A Hyper-V adapter's MAC address and the
+  hybrid host's Docker networks, which are the copy's own already, keep their names without the
+  key. A copy started before keeps working through Vagrant, which finds its VMs by the ids it
+  recorded, but stop it before the upgrade to keep its VMs' names and networks consistent.
+- **`isoloom_render::steps::project_unpack` and `windows_project_unpack` take a `TopFolder`
+  (`Kept`, `Stripped`) instead of a `strip: bool`** (breaking, for 3.0): a call says what it does
+  with the archive's top folder instead of passing a bare `true` or `false`.
+- **A lab that doesn't plan for a target is a failure, never a target shown as generated
+  (#381).** **Breaking, for library users:** `isoloom_targets::refusal`, `refusal_on` and
+  `cloud_refusals` return a `Result` (`GenerateError::Internal` when the lab doesn't plan, as
+  `generate` fails there), not an `Option` that read such a lab as generated; `isoloom targets`
+  and the capability matrix fail with it, and the resolved snapshot's `targets` lists it under
+  `failed`, a key it has only then.
+- **Errors split by what can return them (#381).** **Breaking, for library users:**
+  `isoloom_spec::instance::apply` fails with its own `InstanceError` (`Number`, `Name`, `Port`,
+  `Docker`, `Ipv6`), no longer five variants of the crate-wide `isoloom_spec::Error`. A lab
+  whose built-in catalogue doesn't load fails to plan with the new `PlanError::Catalogue`, never
+  plans with an empty catalogue.
+
+### Removed
+
+- **The `cloud-services` target and the spec's `cloud:` section** (`provider`, `terraform`,
+  `vars`, `outputs`, `hourly_usd`, `before`, `env`, `apply_retries`, `requires`), for now: a spec
+  with `cloud:` is refused with "cloud-services is not supported in Isoloom 3.0". The
+  `{{ cloud.outputs.<name> }}` placeholders and the `cloud-bucket` example go with it. Breaking for
+  the Rust API: `Target::CloudServices` and `Shape::Cloud` are gone (`Target::ALL` has 9 targets);
+  `isoloom_spec::CloudServices`, `model::CloudProvider` and `model::CloudServices` are gone, with
+  `model::Spec::cloud` and `syntax::Spec::cloud`; `placeholder::Reference::CloudOutput` is gone;
+  `isoloom_plan::NotPossible::{CloudServicesOnly, NoCloud}` are gone; so is
+  `isoloom_terraform::CloudServicesBackend`. The resolved snapshot has no `cloud` section.
+- **The tier list.** `tiers.json`, `cargo xtask tiers record` and `isoloom_targets::tiers` (`Tier`,
+  `TierEntry`, `Run`, `RunResult`, `HostOs`, `Date`) are gone, with every run-evidence claim.
+  Breaking for the Rust API: `tiers::variants` is `isoloom_targets::validators::variants`, and
+  `isoloom_targets::validators` (`Validated`, `of`, `all`) says what each target writes and its
+  validators; `Matrix::tiers` is `Matrix::validators`. Breaking for `--json`: `isoloom targets
+  --json` gives each target's `writes` and `validators` in place of `tiers`, and `isoloom matrix
+  --json` a `validators` list in place of `tiers`, its columns without tiers.
+- **The `docker-vm` and `hybrid` targets.** Every machine now runs in its true form: a container on
+  the container targets, a VM on the VM targets (a container machine taking the VM form its
+  Dockerfile or its OS gives it). A lab that used `docker-vm` runs on `docker` (its containers) or
+  on `vagrant` (their VM forms); one that used `hybrid` runs on `vagrant`, its containers in their
+  VM forms.
+- **The run manifest (`run.json`) and the `isoloom-manifest` crate.** Each target writes its tool's
+  native files only, complete enough that `docker compose up -d --wait`, `vagrant up` and
+  `terraform apply` bring the environment to ready. The schema
+  (`schemas/run-manifest-v1.schema.json`) and its fixtures go with the crate. The contract's
+  names, the project copy's rules, the project-relative path and the ready and check lines'
+  grammars live in `isoloom-spec` (`isoloom_spec::contract`, `ignore`, `path::RelPath`,
+  `ready_line`, `check_line`). Breaking for the Rust API: `Backend::run_manifest`,
+  `Backend::run_manifests` and `Placed` are gone, with `isoloom_render::run_manifest`;
+  `isoloom_compose::guest` is replaced by `isoloom_compose::vm_start` (`VmStart { start, values }`);
+  `isoloom_terraform::cloud_docker_manifests` is gone. The capability matrix loses its graphical
+  consoles section, which the run manifests fed.
+
+### Fixed
+
+- **Proxmox refuses `nested_virtualization` on an arm64 VM (#324),** whose CPU QEMU emulates, so it
+  can't nest.
+- **A Linux VM mounts its `tmpfs` entries (#322),** in fstab and at once (or remounts a path that
+  is one already), where the VM targets wrote nothing for them; a Windows machine's `tmpfs` is
+  refused at validation.
+- **A secret's source and a device of the wrong kind say what they take (#320),** where they were
+  refused with "data did not match any variant of untagged enum": a source is one store
+  (`{ env }`, `{ file }`, `{ vault }` or `{ sops }`), a device a path, `host:guest[:permissions]`
+  or `{ host, guest, permissions }`, and a misspelt key is named as such.
+- **An external machine's run and playbook steps get its inputs (#316),** through the task's
+  `environment` read from where Ansible runs (`lookup('ansible.builtin.env')`).
+- **An external machine's `files[].secret` and `files[].input` are refused (#317),** as on Proxmox
+  and ESXi: nothing delivered them there, though the backend said a runner would.
+- **Two `isoloom generate` runs in one project at once no longer fail each other (#297):** each
+  writes its fresh copy of a file under a name of its own before renaming it into place, where they
+  shared one and could remove or rename the other's half-written copy.
+- **A Windows machine's command healthcheck runs in a PowerShell of its own (#290),** as Linux runs
+  it in `sh -c`. The Ready step pasted the test into its own script: an `exit 1` ended the
+  provisioner at once, an `exit 0` ended it before the ready file was written, a cmdlet-only test
+  (`Test-Path`) never passed, and the timeout was ignored. It passes now when the child exits 0
+  and the command's last output isn't `$false`, and the child is stopped after the timeout.
+- **An external machine's `environment`, `sysctls` and `ulimits` are refused at validation (#311),**
+  naming the field and pointing to the environment's own provisioning, where they were dropped
+  without a word. An environment variable set from an input is still taken.
+- **An instance that would wrap a Docker block onto another is refused (#305):** instance 9 of
+  `10.250.0.0/24` became `10.3.0.0/24`, a block another network or instance may hold; it now fails
+  with `isoloom_spec::Error::InstanceDocker`.
+- **`/data` and `/DATA` are two mount points on a Linux machine (#304):** the duplicate-mount
+  check folds case for Windows drives only.
+- **The schema's `vlans:` keys are exactly 1 to 4094 (#306),** as validation takes them.
+- **A catalogue copy's source written `{{with.root}}/`, without spaces, is taken (#310).**
+- **A Kubernetes container's command, arguments and environment values reach it as written
+  (#300).** The kubelet expands `$(VAR)` in them, so `pa$$word` arrived as `pa$word`; every `$` is
+  doubled now, so it expands nothing. Probe commands, which it doesn't expand, are left as they are.
+- **An environment value reaches every format as it is written (#315).** An unquoted `1.10`,
+  `0x10` or `1e3` was read as a number and written back as `1.1`, `16` or `1000`, through the
+  spec, `-s` overrides, written-back specs and profiles; it keeps its text now, and Compose,
+  Kubernetes, Vagrant and Proxmox write it as text.
+- **`--profile` takes the inputs of a spec that declares them as a map (#312).** With
+  `inputs: { FLAG: { sensitive: false } }`, every input a profile gave was "not one of the spec's
+  inputs", and every command with that profile failed.
+- **A Linux VM keeps every environment variable when one value has several lines (#302).** Such
+  a value broke systemd's `DefaultEnvironment`, and every service lost every variable. systemd
+  now reads the line breaks escaped (`\n`), and a value of several lines reaches logins through
+  `/etc/profile.d/90-isoloom-environment.sh` instead of `/etc/environment`, which can't hold it.
+- **`isoloom import vagrant` and `isoloom import terraform` read a box or a cloud image's OS with
+  its version and family (#303):** `ubuntu/jammy64` drafts Ubuntu 22.04, `windows-10` Windows 10,
+  and Rocky, CentOS, Alpine and Fedora boxes their family; a shell provisioner's `args`, `env`,
+  `privileged` and `run` are noted in the draft instead of dropped.
+- **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer
+  fails on a running command (#289).** The setup mark and the command script lived in
+  `C:\isoloom`, the project folder, which every unpack replaces: the mark was gone and the setup
+  ran again, and the command's task, working in that folder, made its removal fail. Both now live
+  in the state folder (`C:\ProgramData\isoloom`), and the unpack stops Isoloom's scheduled tasks
+  before it replaces the project (the command's step starts its task again).
+- **A machine's address, `ulimits` entry or `healthcheck.test` of the wrong kind says what the
+  field takes (#314)** (`` `300` isn't the last number of an address: 0 to 255 ``), where the spec
+  was refused with "data did not match any variant of untagged enum". A ulimit written
+  `{ soft, hard }` now refuses a key it doesn't know.
+- **A counted machine whose clones run past `.255` on a network is one problem at that network
+  (#313),** saying why, where the spec was refused with a raw "untagged enum" error from the
+  parser.
+- **`isoloom import compose` drafts a host folder read from the shell as a folder, and says when a
+  variable is set from another one (#301).** A short volume `${DATA:-./data}:/path` was split on
+  the `:` inside `${...}` and drafted as a named volume `-./data}`, so the draft didn't validate;
+  it is split outside `${...}` now, and a source read from the shell or on a Windows drive is a
+  host folder. `KEY: ${OTHER:-default}` drafted the input `OTHER` under its own name with no word
+  that the container never gets `KEY` nor the default: such an entry now gets a "changed" note.
+- **VMs of one network started at once on QEMU share one hub.** Vagrant starts QEMU's VMs in
+  parallel: two could each find no hub and start one, the second failing on the ports or
+  stopping the hub the first VM had just connected to. A network's hub is now started, joined and
+  stopped under a lock of its own (`<network>.lock` beside its record).
+
+- **A Windows machine's reprovision no longer runs its setup again, and its unpack no longer
+  fails on a running command (#289).** The setup mark and the command script lived in
+  `C:\isoloom`, the project folder, which every unpack replaces: the mark was gone and the setup
+  ran again, and the command's task, working in that folder, made its removal fail. Both now live
+  in the state folder (`C:\ProgramData\isoloom`), and the unpack stops Isoloom's scheduled tasks
+  before it replaces the project (the command's step starts its task again).
+- **A problem with a box set through a group's or a counted machine's override is reported at
+  the key it is written under (#292).** A VM image, an LXC flag or an existing host taken from
+  `overrides.<target>.machines.<group>` was reported at the machine's own name
+  (`overrides.vagrant.machines.dc1.box` for a box written under the group `windows`), a path that
+  doesn't exist in the spec; the Proxmox and cloud image, `lxc` and `ssh` paths did the same.
+- **No line of a machine's text ends the here-document that writes it (#293).** The scripts
+  Isoloom renders fed text it doesn't choose (a machine's command and environment, the spec's
+  nftables rules, the inventory, a check script) to `cat` through here-documents with fixed
+  terminators (`COMMAND`, `NFT`, `INV`, `NET`, `ISOLOOM_SETUP`, `ISOLOOM_EOF`...): a line equal to
+  the terminator ended the document early, and the rest ran as root shell. The terminator is now
+  picked so that no line of the text is it; the rendered files keep their terminators otherwise.
+
 ## [2.1.9] — 2026-11-12
 
 ### Fixed
@@ -151,7 +364,7 @@ stable spec format.
   is `vagrant box add <box> --provider <format>`, the format the provider boots: its own name, but
   `libvirt` for `qemu` (vagrant-qemu boots libvirt-format boxes). It said the provider, and a
   runner following it downloaded a QEMU environment's box twice (Isothrum/isothrum#71). The type's
-  doc, the committed schema and [the run manifest](docs/reference/run-manifest.md) say so; the
+  doc, the committed schema and [the run manifest](https://github.com/isoloom/isoloom/blob/v2.1.1/docs/reference/run-manifest.md) say so; the
   manifest itself is unchanged.
 
 ## [2.1.0] — 2026-11-11
@@ -467,7 +680,7 @@ stable spec format.
   and cloud Linux VMs say why they have none. `isoloom_manifest::{Console, ConsoleProtocol,
   ConsoleSource, ConsoleAccount}`, `Machine::console`, `Provider::id`,
   `contract::CONSOLES`, the errors `console_shape`, `console_twice` and `unknown_slot`, and the
-  matrix's "Graphical consoles" table ([run manifest](docs/reference/run-manifest.md#graphical-consoles)).
+  matrix's "Graphical consoles" table ([run manifest](https://github.com/isoloom/isoloom/blob/v2.0.0/docs/reference/run-manifest.md#graphical-consoles)).
 
 - **`isoloom defaults` takes `--images` and `-s`**, as the commands that read the lab do, so it
   shows the image table's and the command line's layers with their sources.

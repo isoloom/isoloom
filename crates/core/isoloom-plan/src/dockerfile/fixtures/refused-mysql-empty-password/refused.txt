@@ -1,0 +1,2 @@
+refused: build/refused-mysql-empty-password/Dockerfile: the image's environment doesn't set `MYSQL_ROOT_PASSWORD`, which the catalogue's `mysql` needs
+fix: give the machine `os` and `app.steps`

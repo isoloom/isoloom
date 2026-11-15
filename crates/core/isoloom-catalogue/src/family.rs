@@ -69,26 +69,6 @@ impl From<OsRef> for Family {
     }
 }
 
-/// The codename of an apt release (`bookworm` for `debian@12`): an apt repository's default
-/// suite, and `{{ os.codename }}`. `None` for an OS that has none.
-#[must_use]
-pub(crate) fn codename(os: Os) -> Option<&'static str> {
-    let name = match (os.family, os.version) {
-        ("debian", "11") => "bullseye",
-        ("debian", "12") => "bookworm",
-        ("debian", "13") => "trixie",
-        ("ubuntu", "14.04") => "trusty",
-        ("ubuntu", "16.04") => "xenial",
-        ("ubuntu", "18.04") => "bionic",
-        ("ubuntu", "20.04") => "focal",
-        ("ubuntu", "22.04") => "jammy",
-        ("ubuntu", "24.04") => "noble",
-        ("kali", _) => "kali-rolling",
-        _ => return None,
-    };
-    Some(name)
-}
-
 /// A repository's `suite` and `components` on `os`, as a step gives them or by apt's defaults:
 /// the OS's codename and `main`. They are apt's: off apt, no suite, and the components as given
 /// (which the spec refuses).
@@ -97,7 +77,7 @@ pub fn apt_defaults<S: FromStr, C: FromStr>(os: Os, suite: Option<S>, components
     if !os.installs_with_apt() {
         return (None, components.unwrap_or_default());
     }
-    let suite = suite.or_else(|| codename(os).and_then(|c| c.parse().ok()));
+    let suite = suite.or_else(|| os.codename().and_then(|c| c.parse().ok()));
     let components = components.unwrap_or_else(|| "main".parse().ok().into_iter().collect());
     (suite, components)
 }
@@ -131,9 +111,9 @@ mod tests {
     fn every_apt_release_has_its_codename() {
         for spelling in isoloom_spec::os::spellings() {
             let o = os(&spelling);
-            assert_eq!(codename(o).is_some(), Family::of(o) == Family::Debian, "{spelling}");
+            assert_eq!(o.codename().is_some(), Family::of(o) == Family::Debian, "{spelling}");
         }
-        assert_eq!(codename(os("debian@12")), Some("bookworm"));
+        assert_eq!(os("debian@12").codename(), Some("bookworm"));
     }
 
     #[test]

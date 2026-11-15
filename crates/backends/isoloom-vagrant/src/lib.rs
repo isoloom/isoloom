@@ -1,14 +1,11 @@
-//! Isoloom's Vagrant backend: the `vagrant` target (one VM per machine, on every provider), and
-//! the Vagrant sides of `docker-vm` (Docker on one local VM) and `hybrid` (containers and VMs
-//! side by side), which `isoloom-targets` puts together with their Compose files. Every
+//! Isoloom's Vagrant backend: the `vagrant` target (one VM per machine, on every provider). Every
 //! Vagrantfile is written with one Ruby builder, so no value can end a string or interpolate,
 //! and the statements every Vagrantfile shares are written once.
 //!
 //! It sits with the other backends, above the rendering layer (`isoloom-render`) and below the
 //! targets' registry (`isoloom-targets`), and depends on no other backend: [`VagrantBackend`]
 //! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files;
-//! [`docker_vm`] and [`hybrid`] write those targets' Vagrant sides; [`provider_refusal`] says
-//! what a provider can't run ([`docker_vm_refusal`], what `docker-vm`'s VM can't).
+//! [`provider_refusal`] says what a provider can't run.
 //!
 //! # Example
 //!
@@ -27,7 +24,7 @@
 //! ",
 //! )?);
 //! let spec = lab.for_target(Target::Vagrant);
-//! let env = Environment::build(&spec, Target::Vagrant, None)?;
+//! let env = lab.plan(&spec, Target::Vagrant, None)?;
 //! let files = VagrantBackend.render(&env)?;
 //! let vagrantfile = files.iter().find(|f| f.path == ".isoloom/vagrant/Vagrantfile").ok_or("no Vagrantfile")?;
 //! assert!(vagrantfile.contents.contains("config.vm.define \"web\" do |m|"));
@@ -35,16 +32,19 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+#![cfg_attr(
+    all(test, not(windows)),
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
 mod backend;
-mod boot_digest;
 mod boxes;
 mod console;
-mod docker_host;
-pub mod docker_vm;
 mod error;
 mod host_folders;
-pub mod hybrid;
-mod manifest;
 mod ruby;
 mod settings;
 #[cfg(test)]
@@ -54,7 +54,6 @@ mod vms;
 
 pub use backend::VagrantBackend;
 pub use error::{Error, Result};
-pub use host_folders::docker_vm_refusal;
 /// A Ruby string literal holding any text, as every Vagrantfile string is written.
 pub use ruby::quote as ruby_quote;
 pub use vms::network_name;

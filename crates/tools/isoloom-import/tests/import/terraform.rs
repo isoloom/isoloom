@@ -80,3 +80,20 @@ fn a_subnet_of_another_size_is_read_as_the_network_holding_it() -> Outcome {
     }
     Ok(())
 }
+
+/// A `count` that isn't a whole number drafts no machine, and says so: it once drafted none
+/// without a word.
+#[test]
+fn a_count_that_isnt_a_whole_number_is_said() -> Outcome {
+    let tf = vec![(
+        "main.tf".to_owned(),
+        "resource \"aws_instance\" \"web\" {\n  count         = -1\n  ami           = \"ami-1\"\n  instance_type = \"t3.micro\"\n}\nresource \"aws_instance\" \"db\" {\n  ami           = \"ami-1\"\n  instance_type = \"t3.micro\"\n}\n".to_owned(),
+    )];
+    let d = draft(&tf, "counted", "main.tf")?;
+    assert!(
+        d.notes.iter().any(|n| n.text.starts_with("its `count` is -1, not a whole number of machines")),
+        "{:?}",
+        d.notes
+    );
+    Ok(())
+}

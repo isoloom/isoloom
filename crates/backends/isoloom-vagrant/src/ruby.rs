@@ -16,10 +16,7 @@
 //! - [`Provision`]: a provisioner, its script a string or a squiggly heredoc (`<<~'SH'`, nothing
 //!   expanded, its tag never a line of the script); [`Ruby::provision`] writes it.
 //! - [`Ruby::configure`] writes the `Vagrant.configure` block and [`Ruby::define`] a VM's
-//!   `config.vm.define` block in it; as they are written, the builder records what Vagrant
-//!   applies to each VM only when it boots ([`BootStatements`]): every statement of the configure
-//!   block but comments and provisioners (known by their type, never by their text), those of a
-//!   define for its VM, the others for every VM.
+//!   `config.vm.define` block in it.
 
 use std::fmt;
 
@@ -162,16 +159,12 @@ impl fmt::Display for Call {
 }
 
 /// A provisioner: `<var>.vm.provision "<name>", key: value`, with its script as a keyword
-/// argument (a string, or a heredoc after the call). [`Ruby::provision`] writes it; being one by
-/// construction, it is never recorded as what a VM boots with (`vagrant up --provision` runs it on
-/// a running VM).
+/// argument (a string, or a heredoc after the call). [`Ruby::provision`] writes it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Provision {
     call: Call,
     /// The heredoc the call ends with: its keyword, its tag, the script.
     heredoc: Option<(String, String, String)>,
-    /// Its name, when `vagrant up --provision-with` takes it ([`Provision::named`]).
-    named: Option<String>,
 }
 
 impl Provision {
@@ -181,19 +174,14 @@ impl Provision {
         Provision {
             call: Call::new(format!("{var}.vm.provision")).arg(Value::str(name)),
             heredoc: None,
-            named: None,
         }
     }
 
     /// `<var>.vm.provision "<name>", type: "<kind>"`: a provisioner named at its own level, which
     /// `vagrant up --provision-with <name>` takes (it refuses a name given only as the shell
-    /// provisioner's own `name:` option, and the project provisioner has no such option). The
-    /// writer records the name ([`Ruby::named_provisioners`]).
+    /// provisioner's own `name:` option, and the project provisioner has no such option).
     pub(crate) fn named(var: &str, name: &str, kind: &str) -> Provision {
-        Provision {
-            named: Some(name.to_owned()),
-            ..Provision::new(var, name).kw("type", Value::str(kind))
-        }
+        Provision::new(var, name).kw("type", Value::str(kind))
     }
 
     /// Adds a keyword argument (`key: value`).
@@ -231,46 +219,21 @@ impl Provision {
     }
 }
 
+/// When a VM [`Ruby::define`] writes is started.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Start {
+    /// By `vagrant up`, with the environment.
+    WithUp,
+    /// Not by `vagrant up` (`autostart: false`): the runner brings it up on its own.
+    OnDemand,
+}
+
 /// Ruby source, written statement by statement at the depth of the enclosing blocks (two
 /// spaces a level).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Ruby {
     out: String,
     depth: usize,
-    /// What the configure block being written applies at boot, while it is written.
-    recording: Option<Recording>,
-    /// What the configure block applied at boot, once written.
-    boot: BootStatements,
-    /// The named provisioners written ([`Provision::named`]), each once, in the file's order.
-    named: Vec<String>,
-}
-
-/// The statements of a Vagrantfile's configure block that Vagrant applies to a VM only when it
-/// boots it (`vagrant up` of a stopped VM, `vagrant reload`): synced folders, networks, forwarded
-/// ports, size, provider settings. Comments and provisioners ([`Provision`], which `vagrant up
-/// --provision` runs on a running VM) are left out; each statement is indented to its depth in
-/// its scope. Nothing outside the configure block is recorded: what a VM boots with must be
-/// written in it, never read from a constant the spec sets above it (the ESXi port groups are
-/// each define's own indexes, not a lookup in a list of the networks). The constants above it
-/// that boot settings read come from the host running Vagrant, not from the spec: `ROOT`,
-/// `HOST_ARCH`, `ESXI_NETWORKS`, `HYPERV_SWITCH` and the host ports the runner chose
-/// (`ISOLOOM_HOSTPORTS`).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct BootStatements {
-    /// The configure block's own statements, outside every define: what all its VMs share.
-    pub(crate) shared: Vec<String>,
-    /// Each define's statements, by its VM's name, in the file's order.
-    pub(crate) defines: Vec<(String, Vec<String>)>,
-}
-
-/// The configure block being written: the statements so far and the scope a statement lands in.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct Recording {
-    statements: BootStatements,
-    /// The depth of the configure block's body.
-    base: usize,
-    /// The define being written, with the depth of its body.
-    define: Option<(usize, usize)>,
 }
 
 impl Ruby {
@@ -280,21 +243,18 @@ impl Ruby {
     }
 
     /// Prepared Ruby, added as it is (its own indentation and line ends): a library outside the
-    /// configure block, so nothing Vagrant applies at boot is recorded from it.
+    /// configure block.
     pub(crate) fn text(&mut self, ruby: &str) -> &mut Ruby {
         self.out.push_str(ruby);
         self
     }
 
-    /// One line of code at the current depth, recorded when it is a statement Vagrant applies at
-    /// boot ([`BootStatements`]).
+    /// One line of code at the current depth.
     pub(crate) fn line(&mut self, code: impl fmt::Display) -> &mut Ruby {
-        let code = code.to_string();
-        self.record(&code);
-        self.write(&code)
+        self.write(&code.to_string())
     }
 
-    /// One line at the current depth, not recorded.
+    /// One line at the current depth.
     fn write(&mut self, code: &str) -> &mut Ruby {
         self.indent();
         self.out.push_str(code);
@@ -302,69 +262,27 @@ impl Ruby {
         self
     }
 
-    /// `code`, a statement at the current depth, in the scope it is written in (a define, else
-    /// the configure block's own), unless no configure block is being written.
-    fn record(&mut self, code: &str) {
-        let depth = self.depth;
-        let Some(rec) = self.recording.as_mut() else {
-            return;
-        };
-        let (scope, at) = match rec.define {
-            Some((i, at)) => (rec.statements.defines.get_mut(i).map(|(_, s)| s), at),
-            None => (Some(&mut rec.statements.shared), rec.base),
-        };
-        if let Some(scope) = scope {
-            scope.push(format!("{}{code}", "  ".repeat(depth.saturating_sub(at))));
-        }
-    }
-
-    /// `Vagrant.configure("2") do |config|`, `body` one level deeper, then `end`, recording what
-    /// Vagrant applies at boot ([`Ruby::boot`]).
+    /// `Vagrant.configure("2") do |config|`, `body` one level deeper, then `end`.
     pub(crate) fn configure(&mut self, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
         self.write("Vagrant.configure(\"2\") do |config|");
         self.depth += 1;
-        self.recording = Some(Recording {
-            base: self.depth,
-            ..Recording::default()
-        });
         body(self);
-        if let Some(rec) = self.recording.take() {
-            self.boot = rec.statements;
-        }
         self.depth -= 1;
         self.write("end")
     }
 
-    /// `config.vm.define "<name>" do |m|` (`autostart: false` unless `autostart`), `body` one
-    /// level deeper, then `end`: VM `name`, whose statements are recorded as its own.
-    pub(crate) fn define(&mut self, name: &str, autostart: bool, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
+    /// `config.vm.define "<name>" do |m|` (`autostart: false` for a VM started [`Start::OnDemand`]),
+    /// `body` one level deeper, then `end`: VM `name`.
+    pub(crate) fn define(&mut self, name: &str, start: Start, body: impl FnOnce(&mut Ruby)) -> &mut Ruby {
         let mut call = Call::new("config.vm.define").arg(Value::str(name));
-        if !autostart {
+        if start == Start::OnDemand {
             call = call.kw("autostart", false);
         }
         self.write(&format!("{call} do |m|"));
         self.depth += 1;
-        let outer = self.recording.as_mut().map(|rec| {
-            rec.statements.defines.push((name.to_owned(), Vec::new()));
-            rec.define.replace((rec.statements.defines.len() - 1, self.depth))
-        });
         body(self);
-        if let (Some(rec), Some(outer)) = (self.recording.as_mut(), outer) {
-            rec.define = outer;
-        }
         self.depth -= 1;
         self.write("end")
-    }
-
-    /// What the configure block written applies at boot (empty before [`Ruby::configure`]).
-    pub(crate) fn boot(&self) -> &BootStatements {
-        &self.boot
-    }
-
-    /// The names of the provisioners written with [`Provision::named`], each once, in the file's
-    /// order: what `vagrant up --provision-with` can take.
-    pub(crate) fn named_provisioners(&self) -> &[String] {
-        &self.named
     }
 
     /// An empty line.
@@ -373,7 +291,7 @@ impl Ruby {
         self
     }
 
-    /// A comment, one `#` line per line of `text` (never recorded).
+    /// A comment, one `#` line per line of `text`.
     pub(crate) fn comment(&mut self, text: &str) -> &mut Ruby {
         for l in text.lines() {
             self.write(&format!("# {l}"));
@@ -412,14 +330,8 @@ impl Ruby {
     }
 
     /// A provisioner: its call, then its heredoc's lines one level deeper and its closing tag,
-    /// when it has one. Never recorded ([`BootStatements`]).
+    /// when it has one.
     pub(crate) fn provision(&mut self, p: Provision) -> &mut Ruby {
-        if let Some(name) = p.named
-            && !self.named.contains(&name)
-        {
-            self.named.push(name);
-        }
-        let recording = self.recording.take();
         match p.heredoc {
             None => self.line(p.call),
             Some((key, tag, script)) => {
@@ -427,7 +339,6 @@ impl Ruby {
                 self.heredoc_body(&tag, &script)
             }
         };
-        self.recording = recording;
         self
     }
 
@@ -503,163 +414,4 @@ fn closing_tag(tag: &str, script: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use proptest::prelude::*;
-
-    use super::{Call, Provision, Ruby, Value, closing_tag, quote};
-
-    #[test]
-    fn quotes_backslashes_and_interpolations_are_escaped() {
-        assert_eq!(quote(r#"a"b\c"#), r#""a\"b\\c""#);
-        assert_eq!(quote("#{x} #$y #@z # {"), r#""\#{x} \#$y \#@z # {""#);
-    }
-
-    #[test]
-    fn a_vagrantfile_is_written_from_typed_pieces() {
-        let mut r = Ruby::new();
-        r.block("Vagrant.configure(\"2\")", "config", |r| {
-            r.assign("config.vm.box", Value::str("bento/debian-12"));
-            r.block(Call::new("config.vm.provider").arg(Value::str("virtualbox")), "v", |r| {
-                r.assign("v.cpus", 2u32);
-            });
-            r.provision(Provision::new("config", "shell").kw("inline", Value::str("echo hi")));
-        });
-        assert_eq!(
-            r.finish(),
-            "Vagrant.configure(\"2\") do |config|\n  config.vm.box = \"bento/debian-12\"\n  config.vm.provider \"virtualbox\" do |v|\n    v.cpus = 2\n  end\n  config.vm.provision \"shell\", inline: \"echo hi\"\nend\n"
-        );
-    }
-
-    #[test]
-    fn a_heredoc_tag_never_is_a_line_of_its_script() {
-        assert_eq!(closing_tag("SH", "a\nb"), "SH");
-        assert_eq!(closing_tag("SH", "a\n  SH\nb"), "ISOLOOM_SH");
-        assert_eq!(closing_tag("SH", "SH\nISOLOOM_SH\nISOLOOM_SH_2"), "ISOLOOM_SH_3");
-        let mut r = Ruby::new();
-        r.heredoc_argument("f(", ")", "PS1", "PS1\nx");
-        assert_eq!(r.finish(), "f(<<~'ISOLOOM_PS1')\n  PS1\n  x\nISOLOOM_PS1\n");
-    }
-
-    proptest! {
-        #[test]
-        fn a_heredoc_ends_only_at_its_own_closing_line(lines in prop::collection::vec("( *)(SH|ISOLOOM_SH|ISOLOOM_SH_2|[a-z]{1,6})", 2..8)) {
-            let script = lines.join("\n");
-            let mut r = Ruby::new();
-            r.provision(Provision::new("p", "shell").script("inline", &script));
-            let written = r.finish();
-            let rows: Vec<&str> = written.lines().collect();
-            let (first, rest) = rows.split_first().expect("the call");
-            let tag = first.split("<<~'").nth(1).and_then(|t| t.strip_suffix('\'')).expect("a heredoc");
-            let (last, body) = rest.split_last().expect("the closing line");
-            prop_assert_eq!(*last, tag);
-            prop_assert!(body.iter().all(|l| l.trim() != tag), "{written}");
-            prop_assert_eq!(body.len(), lines.len());
-        }
-    }
-
-    #[test]
-    fn strings_are_quoted_and_cannot_interpolate() {
-        assert_eq!(Value::str("a \"b\" #{c}").to_string(), r#""a \"b\" \#{c}""#);
-        assert_eq!(Value::raw("ENV[\"X\"]").to_string(), "ENV[\"X\"]");
-    }
-
-    #[test]
-    fn values_compose() {
-        assert_eq!(Value::sym("windows").to_string(), ":windows");
-        assert_eq!(Value::array([Value::str("a"), 2u16.into()]).to_string(), "[\"a\", 2]");
-        assert_eq!(Value::hash([(Value::str("k"), true.into())]).to_string(), "{ \"k\" => true }");
-        assert_eq!(Value::hash([]).to_string(), "{}");
-    }
-
-    #[test]
-    fn a_call_lists_positional_then_keyword_arguments() {
-        let c = Call::new("m.vm.network")
-            .arg(Value::str("forwarded_port"))
-            .kw("guest", 80u16)
-            .kw_opt("protocol", None)
-            .kw_opt("id", Some(Value::str("web")))
-            .comment("why");
-        assert_eq!(c.to_string(), "m.vm.network \"forwarded_port\", guest: 80, id: \"web\" # why");
-    }
-
-    #[test]
-    fn blocks_nest_and_indent() {
-        let mut r = Ruby::new();
-        r.block("a", "", |r| {
-            r.block(Call::new("b").arg(Value::str("c")), "v, o", |r| {
-                r.assign_if("v.x", Value::raw("ENV[\"X\"]"), "ENV[\"X\"]");
-            });
-        });
-        assert_eq!(r.finish(), "a do\n  b \"c\" do |v, o|\n    v.x = ENV[\"X\"] if ENV[\"X\"]\n  end\nend\n");
-    }
-
-    #[test]
-    fn a_heredoc_indents_its_script_and_keeps_blank_lines_empty() {
-        let mut r = Ruby::new();
-        r.provision(Provision::new("m", "shell").heredoc("inline", "SH", "set -e\n\necho hi\n"));
-        assert_eq!(r.finish(), "m.vm.provision \"shell\", inline: <<~'SH'\n  set -e\n\n  echo hi\nSH\n");
-    }
-
-    #[test]
-    fn a_script_is_a_string_on_one_line_and_a_heredoc_on_more() {
-        let mut r = Ruby::new();
-        let p = || Provision::new("p", "shell");
-        r.provision(p().script("inline", "echo \"hi\"\n"));
-        r.provision(p().script("inline", "a\nb\n"));
-        r.provision(p().script("inline", "cat <<SH\nx\nSH\n"));
-        assert_eq!(
-            r.finish(),
-            "p.vm.provision \"shell\", inline: \"echo \\\"hi\\\"\"\np.vm.provision \"shell\", inline: <<~'SH'\n  a\n  b\nSH\np.vm.provision \"shell\", inline: <<~'ISOLOOM_SH'\n  cat <<SH\n  x\n  SH\nISOLOOM_SH\n"
-        );
-    }
-
-    #[test]
-    fn an_if_block_nests() {
-        let mut r = Ruby::new();
-        r.if_block("a != b", |r| {
-            r.assign("x", 1u32);
-        });
-        assert_eq!(r.finish(), "if a != b\n  x = 1\nend\n");
-    }
-
-    #[test]
-    fn a_hash_constant_lists_one_entry_a_line() {
-        let mut r = Ruby::new();
-        r.comment("Inputs.").hash("INPUTS", [(Value::str("A"), Value::raw("ENV.fetch(\"A\", \"\")"))]);
-        assert_eq!(r.finish(), "# Inputs.\nINPUTS = {\n  \"A\" => ENV.fetch(\"A\", \"\"),\n}\n");
-    }
-
-    #[test]
-    fn text_goes_in_as_it_is() {
-        let mut r = Ruby::new();
-        r.text("x\n").blank();
-        assert_eq!(r.finish(), "x\n\n");
-    }
-
-    #[test]
-    fn the_configure_block_records_what_each_vm_boots_with() {
-        let mut r = Ruby::new();
-        r.assign("ROOT", Value::raw("1"));
-        r.configure(|r| {
-            r.assign("config.vm.boot_timeout", 900u32);
-            r.comment("shared");
-            r.provision(Provision::new("config", "shell").heredoc("inline", "SH", "echo a\n"));
-            r.define("web", false, |r| {
-                r.block(Call::new("m.vm.provider").arg(Value::str("utm")), "_, o", |r| {
-                    r.assign("o.memory", 512u32);
-                });
-                r.provision(Provision::new("m", "shell").script("inline", "b"));
-            });
-        });
-        let boot = r.boot().clone();
-        assert_eq!(boot.shared, ["config.vm.boot_timeout = 900"]);
-        assert_eq!(
-            boot.defines,
-            [(
-                "web".to_owned(),
-                vec!["m.vm.provider \"utm\" do |_, o|".to_owned(), "  o.memory = 512".to_owned(), "end".to_owned()]
-            )]
-        );
-        assert!(r.finish().contains("config.vm.define \"web\", autostart: false do |m|\n"));
-    }
-}
+mod tests;

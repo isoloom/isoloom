@@ -1,0 +1,10 @@
+# A VM whose environment value reads like Terraform and shell syntax: it is valid, and every
+# generated file carries it as text, never as an expression.
+version: 1
+name: quoted-values
+networks: { lan: { cidr: 10.0.0.0/24 } }
+machines:
+  vm1:
+    networks: { lan: 20 }
+    os: debian@12
+    environment: { A: "${file(\"~/.ssh/id_rsa\")}%{ if true }x%{ endif }\\\"" }

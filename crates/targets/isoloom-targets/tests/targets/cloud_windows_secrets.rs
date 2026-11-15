@@ -1,7 +1,6 @@
 //! A Windows machine in the cloud gets no secrets: its set-up runs over WinRM during Terraform's
-//! apply, and the runner delivers a machine's secrets once `up`'s steps are done, so the set-up
-//! would wait for them until it timed out. AWS and Azure refuse it; a Windows machine without
-//! secrets still generates.
+//! apply, and the module writes secret files from a Linux machine's user data only. AWS and Azure
+//! refuse it; a Windows machine without secrets still generates.
 
 use isoloom_spec::Target;
 use isoloom_targets::refusal_on;
@@ -18,12 +17,14 @@ fn a_windows_machine_in_the_cloud_with_secrets_is_refused() -> Outcome {
     ))?;
     let without = lab(&SPEC.replace("FILES", ""))?;
     for cloud in ["aws", "azure"] {
-        let why = refusal_on(&with, Target::CloudVm, Some(cloud)).ok_or_else(|| format!("{cloud} refuses it"))?;
+        let why = refusal_on(&with, Target::CloudVm, Some(cloud))
+            .unwrap()
+            .ok_or_else(|| format!("{cloud} refuses it"))?;
         assert!(
-            why.contains("machine `dc` gets `secrets`") && why.contains("before the runner delivers them"),
+            why.contains("machine `dc` gets `secrets`") && why.contains("a Linux machine's user data only"),
             "{cloud}: {why}"
         );
-        assert_eq!(refusal_on(&without, Target::CloudVm, Some(cloud)), None, "{cloud}");
+        assert_eq!(refusal_on(&without, Target::CloudVm, Some(cloud)).unwrap(), None, "{cloud}");
     }
     Ok(())
 }

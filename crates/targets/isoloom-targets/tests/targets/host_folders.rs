@@ -6,10 +6,11 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Lab, generate, refusal, refusal_on};
 
-use crate::testing::{Outcome, file, valid};
+use crate::testing::{Outcome, file, valid_allowed};
 
 /// A desk with both forms (the OS's image idle, a fresh VM) mounting three folders of the
-/// computer: one of the project, one of the home folder (read-only), one absolute.
+/// computer: one of the project, one of the home folder (read-only), one absolute; the two
+/// read-write ones say so (a host folder is read-only unless `read_only: false`).
 const DESK: &str = "version: 1
 name: shared-desk
 networks: { lan: { cidr: 10.30.0.0/24 } }
@@ -18,20 +19,20 @@ machines:
     os: debian@12
     networks: { lan: 10 }
     host_folders:
-      - { from: shared, path: /srv/shared }
+      - { from: shared, path: /srv/shared, read_only: false }
       - { from: '~/notes', path: /home/notes, read_only: true }
-      - { from: /srv/drop, path: /srv/drop }
+      - { from: /srv/drop, path: /srv/drop, read_only: false }
 ";
 
 fn desk() -> Outcome<Lab> {
-    valid(DESK)
+    valid_allowed(DESK)
 }
 
 #[test]
 fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
     let lab = desk()?;
-    for t in [Target::Docker, Target::DockerVm, Target::Vagrant] {
-        assert_eq!(refusal(&lab, t), None, "{}", t.id());
+    for t in [Target::Docker, Target::Vagrant] {
+        assert_eq!(refusal(&lab, t).unwrap(), None, "{}", t.id());
     }
     for t in [
         Target::Hosted,
@@ -41,7 +42,7 @@ fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
         Target::Esxi,
         Target::CloudVm,
     ] {
-        let why = refusal(&lab, t).ok_or_else(|| format!("{} takes it", t.id()))?;
+        let why = refusal(&lab, t).unwrap().ok_or_else(|| format!("{} takes it", t.id()))?;
         assert!(
             why.contains("machine `desk` mounts a folder of the computer that runs the environment (`host_folders`)"),
             "{}: {why}",
@@ -52,51 +53,38 @@ fn only_the_targets_whose_machines_run_on_that_computer_take_it() -> Outcome {
 }
 
 #[test]
-fn an_existing_host_and_a_hybrid_lab_refuse_it_too() -> Outcome {
-    let external = valid(&format!(
-        "{DESK}overrides: {{ external: {{ machines: {{ desk: {{ ssh: {{ address: 192.0.2.10 }} }} }} }} }}\n"
-    ))?;
-    let existing = refusal(&external, Target::External).ok_or("external takes it")?;
-    assert!(existing.contains("`host_folders`"), "{existing}");
-    let hybrid = valid(&format!(
-        "{DESK}  web: {{ networks: {{ lan: 11 }}, app: {{ image: nginx }} }}\n  box: {{ os: debian@12, networks: {{ lan: 12 }}, ports: {{ web: 80 }}, app: {{ steps: [{{ run: b.sh }}] }} }}\n"
-    ))?;
-    let why = refusal(&hybrid, Target::Hybrid).ok_or("hybrid takes it")?;
-    assert!(why.contains("`host_folders`"), "{why}");
-    Ok(())
-}
-
-#[test]
 fn vagrant_refuses_it_on_the_providers_with_no_two_way_shared_folder() -> Outcome {
     let lab = desk()?;
     for p in ["virtualbox", "vmware_desktop", "parallels", "libvirt"] {
-        assert_eq!(refusal_on(&lab, Target::Vagrant, Some(p)), None, "{p}");
+        assert_eq!(refusal_on(&lab, Target::Vagrant, Some(p)).unwrap(), None, "{p}");
     }
-    let hyperv = refusal_on(&lab, Target::Vagrant, Some("hyperv")).ok_or("Hyper-V takes it")?;
+    let hyperv = refusal_on(&lab, Target::Vagrant, Some("hyperv")).unwrap().ok_or("Hyper-V takes it")?;
     assert!(hyperv.contains("`host_folders`") && hyperv.contains("SMB"), "{hyperv}");
-    let esxi = refusal_on(&lab, Target::Vagrant, Some("vmware_esxi")).ok_or("ESXi takes it")?;
+    let esxi = refusal_on(&lab, Target::Vagrant, Some("vmware_esxi")).unwrap().ok_or("ESXi takes it")?;
     assert!(esxi.contains("run on the ESXi host"), "{esxi}");
-    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).ok_or("QEMU takes a read-only one")?;
+    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).unwrap().ok_or("QEMU takes a read-only one")?;
     assert!(qemu.contains("read-only (`read_only`)"), "{qemu}");
-    let read_write = valid(&DESK.replace(", read_only: true", ""))?;
-    assert_eq!(refusal_on(&read_write, Target::Vagrant, Some("qemu")), None);
+    let read_write = valid_allowed(&DESK.replace("read_only: true", "read_only: false"))?;
+    assert_eq!(refusal_on(&read_write, Target::Vagrant, Some("qemu")).unwrap(), None);
     Ok(())
 }
 
 #[test]
 fn vagrant_refuses_qemu_for_any_vm_with_a_read_only_folder_not_only_the_first() -> Outcome {
-    let lab = valid(
+    let lab = valid_allowed(
         "version: 1
 name: two-desks
 networks: { lan: { cidr: 10.30.0.0/24 } }
 machines:
-  a: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared }] }
+  a: { os: debian@12, networks: { lan: 10 }, host_folders: [{ from: shared, path: /srv/shared, read_only: false }] }
   b: { os: debian@12, networks: { lan: 11 }, host_folders: [{ from: notes, path: /notes, read_only: true }] }
 ",
     )?;
-    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu")).ok_or("QEMU takes b's read-only folder")?;
+    let qemu = refusal_on(&lab, Target::Vagrant, Some("qemu"))
+        .unwrap()
+        .ok_or("QEMU takes b's read-only folder")?;
     assert!(qemu.contains("machine `b`") && qemu.contains("read-only (`read_only`)"), "{qemu}");
-    assert_eq!(refusal_on(&lab, Target::Vagrant, Some("virtualbox")), None);
+    assert_eq!(refusal_on(&lab, Target::Vagrant, Some("virtualbox")).unwrap(), None);
     Ok(())
 }
 
@@ -108,63 +96,5 @@ fn vagrants_vagrantfile_stops_up_on_a_provider_it_does_not_know() -> Outcome {
         vagrantfile.contains("Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless ["),
         "{vagrantfile}"
     );
-    Ok(())
-}
-
-#[test]
-fn docker_vm_refuses_it_on_esxi_and_proxmox_and_writes_no_proxmox_module() -> Outcome {
-    let lab = desk()?;
-    for p in ["virtualbox", "vmware_desktop", "parallels", "utm", "qemu", "libvirt"] {
-        assert_eq!(refusal_on(&lab, Target::DockerVm, Some(p)), None, "{p}");
-    }
-    for p in ["vmware_esxi", "proxmox"] {
-        let why = refusal_on(&lab, Target::DockerVm, Some(p)).ok_or_else(|| format!("{p} takes it"))?;
-        assert!(
-            why.contains("machine `desk` mounts a folder of the computer that runs the environment (`host_folders`)"),
-            "{why}"
-        );
-    }
-    let files = generate(&lab, Target::DockerVm)?;
-    assert!(!files.iter().any(|f| f.path.contains("docker-vm/proxmox/")), "no Proxmox module or manifest");
-    let manifest: serde_json::Value = serde_json::from_str(file(&files, "docker-vm/run.json")?)?;
-    let providers = manifest
-        .pointer("/identity/vagrant/providers")
-        .and_then(|p| p.as_array())
-        .ok_or("no providers")?;
-    let refused: Vec<&str> = providers
-        .iter()
-        .filter(|p| p.get("refusal").is_some_and(|r| !r.is_null()))
-        .filter_map(|p| p.get("id").and_then(|id| id.as_str()))
-        .collect();
-    assert_eq!(refused, ["vmware_esxi"]);
-    Ok(())
-}
-
-#[test]
-fn compose_in_the_vm_binds_each_folder_from_where_the_vm_shares_it() -> Outcome {
-    let files = generate(&desk()?, Target::DockerVm)?;
-    let manifest = file(&files, "docker-vm/run.json")?;
-    assert!(
-        manifest.contains(
-            "ISOLOOM_HOST_FOLDER_DESK_0=/mnt/isoloom/desk/0 ISOLOOM_HOST_FOLDER_DESK_1=/mnt/isoloom/desk/1 ISOLOOM_HOST_FOLDER_DESK_2=/mnt/isoloom/desk/2 docker compose"
-        ),
-        "{manifest}"
-    );
-    let compose = file(&files, "docker/compose.yml")?;
-    assert!(compose.contains("source: ${ISOLOOM_HOST_FOLDER_DESK_0:-../../shared}"), "{compose}");
-    let vagrantfile = file(&files, "docker-vm/Vagrantfile")?;
-    assert!(
-        vagrantfile.contains("o.vm.synced_folder File.expand_path(\"~/notes\", ROOT), \"/mnt/isoloom/desk/1\", type: \"qemu_virtiofs\", create: true\n"),
-        "read-write in the VM, read-only in its container:\n{vagrantfile}"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_spec_without_host_folders_keeps_docker_vms_proxmox_module() -> Outcome {
-    let lab = valid(DESK.split("    host_folders:").next().unwrap_or_default())?;
-    let files = generate(&lab, Target::DockerVm)?;
-    assert!(files.iter().any(|f| f.path.ends_with("docker-vm/proxmox/main.tf")));
-    assert!(!file(&files, "docker-vm/Vagrantfile")?.contains("synced_folder File.expand_path"));
     Ok(())
 }

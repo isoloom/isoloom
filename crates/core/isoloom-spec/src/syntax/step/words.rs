@@ -82,9 +82,9 @@ name_type!(
     /// a folder ends with `/`, `site/`).
     ProjectPath,
     "project path",
-    "^(?![/\\\\]|[A-Za-z]:[/\\\\])(?!(.*[/\\\\])?\\.\\.([/\\\\]|$))[^\\n]+$",
-    "a project path is relative to the project folder and stays inside it: no leading `/`, no `..` (`provision/web.sh`)",
-    |s| !s.is_empty() && !s.starts_with(['/', '\\']) && !drive(s) && !s.split(['/', '\\']).any(|part| part == "..") && !s.contains(['\n', '\0'])
+    "^(?!/|[A-Za-z]:)(?!(.*/)?\\.\\.(/|$))[^\\n\\\\]+$",
+    "a project path is relative to the project folder and stays inside it: no leading `/` or drive, no `..`, `/` between folders (`provision/web.sh`)",
+    |s| crate::project_path::plain(s).is_ok()
 );
 
 name_type!(
@@ -97,6 +97,22 @@ name_type!(
         .strip_prefix("https://")
         .is_some_and(|rest| !rest.starts_with('/') && !rest.is_empty() && !rest.contains(char::is_whitespace))
 );
+
+impl HttpsUrl {
+    /// The URL's host, as an origin names it: its authority without a user (`user@`) or a port
+    /// (`:8443`); an IPv6 address keeps its brackets (`https://[fd00::1]:8443/` -> `[fd00::1]`).
+    #[must_use]
+    pub fn host(&self) -> &str {
+        let rest = self.as_str().strip_prefix("https://").unwrap_or(self.as_str());
+        let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+        let host = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+        if host.starts_with('[') {
+            host.find(']').map_or(host, |end| host.get(..=end).unwrap_or(host))
+        } else {
+            host.split(':').next().unwrap_or(host)
+        }
+    }
+}
 
 name_type!(
     /// A SHA-256, as `sha256sum` prints it: 64 lowercase hex digits.

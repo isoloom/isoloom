@@ -32,35 +32,34 @@ fn targets_lists_the_refused_clouds_under_cloud_vm() -> Outcome {
 }
 
 #[test]
-fn targets_gives_the_tier_of_each_target_generated_and_its_evidence() -> Outcome {
-    let home = scratch("targets-tiers")?;
+fn targets_gives_the_validators_of_each_target_generated() -> Outcome {
+    let home = scratch("targets-validators")?;
     let text = isoloom(&home, &[&"targets", &example("hello-stack")])?;
     assert_eq!(text.code, Some(0), "{text:?}");
-    let (_, tiers) = text.stdout.split_once("\nTiers (").ok_or("no tiers after the listing")?;
-    assert!(tiers.lines().any(|l| l.starts_with("  docker ")), "{}", text.stdout);
+    let (_, validators) = text.stdout.split_once("\nValidated by (").ok_or("no validators after the listing")?;
+    assert!(validators.lines().any(|l| l.starts_with("  docker ")), "{}", text.stdout);
     let o = isoloom(&home, &[&"targets", &example("hello-stack"), &"--json"])?;
     let listed: serde_json::Value = serde_json::from_str(&o.stdout)?;
     let targets = listed.as_array().ok_or("not a list")?;
     assert!(targets.iter().any(|t| t["id"] == "vagrant"), "{listed}");
     for t in targets {
-        let entries = t["tiers"].as_array().ok_or("no tiers")?;
-        assert!(!entries.is_empty(), "{t}");
-        for e in entries {
-            assert!(matches!(e["tier"].as_u64(), Some(1..=3)), "{e}");
-            assert!(e["evidence"].as_str().is_some_and(|s| !s.is_empty()), "{e}");
-            assert_eq!(e["target"], t["id"], "{e}");
-        }
+        assert!(t["validators"].as_array().is_some_and(|v| !v.is_empty()), "{t}");
+        assert!(t["writes"].as_str().is_some_and(|s| !s.is_empty()), "{t}");
     }
     Ok(())
 }
 
 #[test]
-fn matrix_shows_each_field_against_each_target_with_the_tiers() -> Outcome {
+fn matrix_shows_each_field_against_each_target_with_the_validators() -> Outcome {
     let home = scratch("matrix")?;
     let text = isoloom(&home, &[&"matrix"])?;
     assert_eq!(text.code, Some(0), "{text:?}");
     assert!(text.stdout.starts_with("Capability matrix: "), "{}", text.stdout);
-    assert!(text.stdout.contains("\n  vagrant/libvirt "), "the tiers");
+    assert!(
+        text.stdout.lines().any(|l| l.starts_with("  vagrant ") && l.ends_with("  vagrant validate")),
+        "the validators: {}",
+        text.stdout
+    );
     assert!(text.stdout.contains("\nmachines.*.app.image: "), "a row");
     let json = isoloom(&home, &[&"matrix", &"--json"])?;
     let v: serde_json::Value = serde_json::from_str(&json.stdout)?;
@@ -181,12 +180,12 @@ fn check_tells_a_missing_file_from_one_it_cant_read() -> Outcome {
         std::fs::remove_file(&compose)?;
     }
     std::fs::create_dir(&compose)?;
-    std::fs::remove_file(dir.join(".isoloom/docker/run.json"))?;
+    std::fs::remove_file(dir.join(".isoloom/resolved.json"))?;
     let checked = isoloom(&dir, &[&"check", &dir])?;
     assert_eq!(checked.code, Some(1), "{checked:?}");
     assert!(checked.stdout.contains("✗ .isoloom/docker/compose.yml can't be read: "), "{}", checked.stdout);
     assert!(!checked.stdout.contains("compose.yml is missing"), "{}", checked.stdout);
-    assert!(checked.stdout.contains("✗ .isoloom/docker/run.json is missing"), "{}", checked.stdout);
+    assert!(checked.stdout.contains("✗ .isoloom/resolved.json is missing"), "{}", checked.stdout);
     Ok(())
 }
 
@@ -371,9 +370,7 @@ fn defaults_shows_the_image_table_and_the_command_lines_layers() -> Outcome {
 }
 
 #[test]
-fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
-    // The region the run manifest's `region` param defaulted to was the built-in one, which a
-    // runner gives Terraform (TF_VAR_region), undoing the person's.
+fn a_users_default_region_reaches_the_module() -> Outcome {
     let home = scratch("default-region-home")?;
     std::fs::write(home.join("defaults.yml"), "cloud: { aws: { region: eu-north-1 } }\n")?;
     let dir = scratch("default-region")?;
@@ -386,14 +383,6 @@ fn a_users_default_region_reaches_the_module_and_the_run_manifest() -> Outcome {
     assert_eq!(o.code, Some(0), "{o:?}");
     let module = std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/main.tf"))?;
     assert!(module.contains("default = \"eu-north-1\""), "{module}");
-    let manifest: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/run.json"))?)?;
-    let region = manifest["params"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|p| p["name"] == "region")
-        .ok_or("no region param")?;
-    assert_eq!(region["default"], "eu-north-1", "{region}");
     // `isoloom check` sees the same files.
     let checked = isoloom(&home, &[&"check", &dir, &"--target", &"cloud-vm"])?;
     assert_eq!(checked.code, Some(0), "{checked:?}");
@@ -415,18 +404,11 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     let first = isoloom(&home, &[&"generate", &dir])?;
     assert_eq!(first.code, Some(0), "{first:?}");
     let out = dir.join(".isoloom");
-    for written in [
-        "docker/compose.yml",
-        "kubernetes/environment.yaml",
-        "cloud-vm/gcp/main.tf",
-        "docker-vm/Vagrantfile",
-    ] {
+    for written in ["docker/compose.yml", "kubernetes/environment.yaml", "cloud-vm/gcp/main.tf"] {
         assert!(out.join(written).is_file(), "{written}");
     }
     // What a runner and its tools leave beside the generated files is theirs.
     std::fs::write(out.join("cloud-vm/gcp/.terraform.lock.hcl"), "lock\n")?;
-    std::fs::create_dir_all(out.join("docker-vm/.vagrant/machines"))?;
-    std::fs::write(out.join("docker-vm/.vagrant/machines/id"), "x\n")?;
     // The machine becomes Windows: no container form, no Windows on Google Cloud.
     std::fs::write(dir.join("isoloom.yml"), one_vm("windows-server@2022").replace("p.sh", "p.ps1"))?;
     std::fs::write(dir.join("p.ps1"), "$true\n")?;
@@ -454,9 +436,8 @@ fn generate_removes_what_it_no_longer_writes_and_check_reports_it() -> Outcome {
     ] {
         assert!(!out.join(gone).exists(), "{gone} is left");
     }
-    assert!(!out.join("cloud-vm/gcp/main.tf").exists() && !out.join("cloud-vm/gcp/run.json").exists());
+    assert!(!out.join("cloud-vm/gcp/main.tf").exists());
     assert!(out.join("cloud-vm/gcp/.terraform.lock.hcl").is_file(), "a tool's file is kept");
-    assert!(out.join("docker-vm/.vagrant/machines/id").is_file() && !out.join("docker-vm/Vagrantfile").exists());
     assert!(out.join("vagrant/Vagrantfile").is_file() && out.join("cloud-vm/aws/main.tf").is_file());
     let clean = isoloom(&home, &[&"check", &dir])?;
     assert_eq!(clean.code, Some(0), "{clean:?}");
@@ -543,6 +524,12 @@ fn listing(name: &str, entry: &str) -> Outcome<Scratch> {
 /// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `outside` be;
 /// `generate` writes nothing before it refuses (a generated file removed stays removed).
 fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Path) -> Outcome {
+    let listed = format!("`.isoloom/.generated` lists `{entry}`");
+    refuses_with(dir, outside, [listed.as_str(), listed.as_str()])
+}
+
+/// [`refuses_the_list`], each command (`generate`, then `check`) refusing with its reason.
+fn refuses_with(dir: &std::path::Path, outside: &std::path::Path, reasons: [&str; 2]) -> Outcome {
     // A home of the project's own: the tests calling this run at once.
     let project = dir.file_name().and_then(|n| n.to_str()).unwrap_or_default();
     let home = scratch(&format!("{project}-refused-home"))?;
@@ -550,10 +537,10 @@ fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Pat
     if compose.exists() {
         std::fs::remove_file(&compose)?;
     }
-    for command in ["generate", "check"] {
+    for (command, reason) in ["generate", "check"].into_iter().zip(reasons) {
         let o = isoloom(&home, &[&command, &dir])?;
         assert_eq!(o.code, Some(2), "{command}: {o:?}");
-        assert!(o.stderr.contains(&format!("`.isoloom/.generated` lists `{entry}`")), "{command}: {}", o.stderr);
+        assert!(o.stderr.contains(reason), "{command}: {}", o.stderr);
         assert!(outside.is_file(), "{command} removed {}", outside.display());
         assert!(!compose.exists(), "{command} wrote files before refusing the list");
     }
@@ -603,7 +590,9 @@ fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
     std::fs::remove_dir_all(dir.join(".isoloom"))?;
     std::fs::write(elsewhere.join(".generated"), list)?;
     std::os::unix::fs::symlink(&elsewhere, dir.join(".isoloom"))?;
-    refuses_the_list(&dir, entry, &outside)
+    // generate refuses the linked folder before it takes its turn there; check reads the list.
+    let listed = format!("`.isoloom/.generated` lists `{entry}`");
+    refuses_with(&dir, &outside, [".isoloom/.generated.lock is reached through a symbolic link", listed.as_str()])
 }
 
 /// A generated project (`docker`) whose `.isoloom/docker/<file>` is replaced by a link to
@@ -623,13 +612,13 @@ fn generate_and_check_refuse_to_write_through_a_linked_generated_file() -> Outco
     let elsewhere = scratch("linked-file-victim")?;
     let victim = elsewhere.join("keys");
     std::fs::write(&victim, "someone else's\n")?;
-    let dir = with_linked_output("linked-file", "run.json", &victim)?;
+    let dir = with_linked_output("linked-file", "compose.yml", &victim)?;
     let home = scratch("linked-file-refused-home")?;
     for command in ["generate", "check"] {
         let o = isoloom(&home, &[&command, &dir, &"--target", &"docker"])?;
         assert_eq!(o.code, Some(2), "{command}: {o:?}");
         assert!(
-            o.stderr.contains(".isoloom/docker/run.json is reached through a symbolic link"),
+            o.stderr.contains(".isoloom/docker/compose.yml is reached through a symbolic link"),
             "{command}: {}",
             o.stderr
         );
@@ -664,13 +653,13 @@ fn generate_replaces_each_file_rather_than_writing_into_it() -> Outcome {
     let compose = dir.join(".isoloom/docker/compose.yml");
     let written = std::fs::read_to_string(&compose)?;
     std::fs::write(&compose, "stale\n")?;
-    std::fs::write(dir.join(".isoloom/docker/compose.yml.isoloom-new"), "a half-written file left over\n")?;
     assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
     assert_eq!(std::fs::read_to_string(&compose)?, written);
-    assert!(
-        !dir.join(".isoloom/docker/compose.yml.isoloom-new").exists(),
-        "the fresh file is renamed into place"
-    );
+    let fresh: Vec<_> = std::fs::read_dir(dir.join(".isoloom/docker"))?
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .filter(|name| name.starts_with("compose.yml.isoloom-new"))
+        .collect();
+    assert_eq!(fresh, Vec::<String>::new(), "the fresh file is renamed into place");
     Ok(())
 }
 
@@ -820,7 +809,12 @@ fn generate_fails_on_a_template_or_check_script_it_cant_read_with_the_read_error
     std::fs::remove_file(no_script.join("checks/api-answers.sh"))?;
     let k = isoloom(&no_script, &[&"generate", &no_script, &"--target", &"kubernetes"])?;
     assert_ne!(k.code, Some(0), "{k:?}");
-    assert!(k.stderr.contains("checks/api-answers.sh") && k.stderr.contains(&missing), "{}", k.stderr);
+    // Generate checks the project's files first: a missing script is the spec's problem.
+    assert!(
+        k.stderr.contains("checks/api-answers.sh") && k.stderr.contains("doesn't exist in the project folder"),
+        "{}",
+        k.stderr
+    );
     // `validate` still lists it as a problem of the spec, not as an error.
     let v = isoloom(&no_script, &[&"validate", &no_script])?;
     assert_eq!(v.code, Some(1), "{v:?}");
@@ -840,5 +834,140 @@ fn profiles_checks_the_lab_generate_writes_its_defaults_tags_included() -> Outco
     let o = isoloom(&home, &[&"profiles", &dir])?;
     assert_eq!(o.code, Some(1), "{o:?}");
     assert!(o.stdout.contains("✗ p") && o.stdout.contains("`Team` and `team`"), "{}", o.stdout);
+    Ok(())
+}
+
+#[test]
+fn an_environment_value_reaches_every_format_as_written() -> Outcome {
+    let dir = project(
+        "env-as-written",
+        "version: 1\nname: written\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    environment: { APP_VERSION: 1.10, MASK: 0x10, BIG: 1e3 }\n",
+    )?;
+    let generated = isoloom(&dir, &[&"generate", &"-s", &"machines.web.environment.EXTRA=2.50", &dir])?;
+    assert_eq!(generated.code, Some(0), "{}", generated.stderr);
+    let read = |file: &str| std::fs::read_to_string(dir.join(".isoloom").join(file));
+    let written = [("APP_VERSION", "1.10"), ("MASK", "0x10"), ("BIG", "1e3"), ("EXTRA", "2.50")];
+    // Compose and Kubernetes read YAML: each value must be a string there, the text as written.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
+    for (k, v) in written {
+        assert_eq!(compose["services"]["web"]["environment"][k].as_str(), Some(v), "compose: {k}");
+    }
+    let manifests = read("kubernetes/environment.yaml")?;
+    let mut env = Vec::new();
+    for doc in manifests.split("---\n") {
+        let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(doc)?;
+        let containers = doc["spec"]["template"]["spec"]["containers"].as_sequence().cloned().unwrap_or_default();
+        for var in containers
+            .iter()
+            .filter(|c| c["name"].as_str() == Some("web"))
+            .flat_map(|c| c["env"].as_sequence().cloned().unwrap_or_default())
+        {
+            env.push((var["name"].as_str().map(str::to_owned), var["value"].as_str().map(str::to_owned)));
+        }
+    }
+    for (k, v) in written {
+        assert!(env.contains(&(Some(k.to_owned()), Some(v.to_owned()))), "kubernetes: {k} in {env:?}");
+    }
+    // The VM forms write each variable as `NAME=value` into the machine's settings script.
+    for file in ["vagrant/Vagrantfile", "proxmox/main.tf"] {
+        let text = read(file)?;
+        for (k, v) in written {
+            assert!(text.contains(&format!("{k}={v}")), "{file} has no `{k}={v}`");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn clones_publishing_a_free_host_port_are_generated_where_the_format_picks_one() -> Outcome {
+    let dir = project(
+        "free-host-ports",
+        "version: 1\nname: free\nnetworks: { lan: { cidr: 10.1.0.0/24 } }\nmachines:\n  web:\n    app: { image: nginx, steps: [{ packages: [nginx] }] }\n    os: debian@12\n    count: 2\n    networks: { lan: 10 }\n    ports: { web: { port: 80, publish: true } }\n",
+    )?;
+    let checked = isoloom(&dir, &[&"validate", &dir])?;
+    assert_eq!(checked.code, Some(0), "{}{}", checked.stdout, checked.stderr);
+    for target in ["docker", "vagrant"] {
+        let generated = isoloom(&dir, &[&"generate", &"--target", &target, &dir])?;
+        assert_eq!(generated.code, Some(0), "{target}: {}{}", generated.stdout, generated.stderr);
+    }
+    let read = |file: &str| std::fs::read_to_string(dir.join(".isoloom").join(file));
+    // Docker picks each clone's host port: none is written.
+    let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&read("docker/compose.yml")?)?;
+    for clone in ["web-01", "web-02"] {
+        let ports = compose["services"][clone]["ports"].as_sequence().cloned().unwrap_or_default();
+        let [port] = &ports[..] else {
+            panic!("{clone}: one published port: {ports:?}")
+        };
+        let port = port.as_str().unwrap_or_default();
+        assert!(port.ends_with(":${ISOLOOM_PUBLISH_FIXED:+80}:80"), "{clone}: {port}");
+    }
+    // Vagrant moves a taken host port to a free one.
+    let vagrantfile = read("vagrant/Vagrantfile")?;
+    let forwards: Vec<&str> = vagrantfile.lines().filter(|l| l.contains("\"forwarded_port\"")).collect();
+    assert_eq!(forwards.len(), 2, "{vagrantfile}");
+    assert!(forwards.iter().all(|l| l.contains("auto_correct: true")), "{forwards:?}");
+    // A target publishing every port at its number says so once, for the spec.
+    let refused = isoloom(&dir, &[&"generate", &"--target", &"kubernetes", &dir])?;
+    assert_ne!(refused.code, Some(0));
+    let said = format!("{}{}", refused.stdout, refused.stderr);
+    assert_eq!(said.matches("both publish on host port 80").count(), 1, "{said}");
+    assert!(said.contains("machines `web-01` and `web-02`"), "{said}");
+    Ok(())
+}
+
+/// Whether a process waits for the lock on `file`: Linux lists each blocked waiter in
+/// `/proc/locks` as `-> FLOCK …` on the file's device and inode.
+#[cfg(target_os = "linux")]
+fn waited_for(file: &std::path::Path) -> Outcome<bool> {
+    use std::os::unix::fs::MetadataExt as _;
+    let inode = format!(":{} ", std::fs::metadata(file)?.ino());
+    Ok(std::fs::read_to_string("/proc/locks")?
+        .lines()
+        .any(|l| l.contains("-> FLOCK") && l.contains(&inode)))
+}
+
+/// Two `generate`s in one project at once take turns from reading the list of what Isoloom
+/// wrote to writing it: one that waits reads the list the other left, so neither drops the
+/// other's entries.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_generate_waits_its_turn_and_keeps_the_entries_written_meanwhile() -> Outcome {
+    let home = scratch("turn-home")?;
+    let dir = project("turn", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    // Another generate's turn, held here.
+    let lock = dir.join(".isoloom/.generated.lock");
+    let turn = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(&lock)?;
+    turn.lock()?;
+    let mut waiting = std::process::Command::new(env!("CARGO_BIN_EXE_isoloom"))
+        .args(["generate", "--target", "vagrant"])
+        .arg(&*dir)
+        .env("ISOLOOM_HOME", &*home)
+        .env_remove("ISOLOOM_PROFILE")
+        .stdout(std::process::Stdio::null())
+        .spawn()?;
+    // It reaches the turn and waits there, before it reads the list.
+    let mut waits = false;
+    let started = std::time::Instant::now();
+    while started.elapsed() < std::time::Duration::from_secs(60) {
+        if waited_for(&lock)? {
+            waits = true;
+            break;
+        }
+        assert!(waiting.try_wait()?.is_none(), "generate went on while another held the turn");
+        std::thread::yield_now();
+    }
+    assert!(waits, "generate never waited for the turn");
+    // What the other one wrote meanwhile: a file of its own, listed.
+    std::fs::write(dir.join(".isoloom/docker/theirs.txt"), "")?;
+    let list = dir.join(".isoloom/.generated");
+    let written = std::fs::read_to_string(&list)?;
+    std::fs::write(&list, format!("{written}.isoloom/docker/theirs.txt\n"))?;
+    turn.unlock()?;
+    assert!(waiting.wait()?.success());
+    let after = std::fs::read_to_string(&list)?;
+    assert!(after.lines().any(|l| l == ".isoloom/docker/theirs.txt"), "{after}");
+    assert!(after.lines().any(|l| l == ".isoloom/vagrant/Vagrantfile"), "{after}");
     Ok(())
 }

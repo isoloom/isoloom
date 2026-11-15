@@ -6,11 +6,18 @@ use serde_json::{Value, json};
 
 use crate::syntax::Spec;
 
+/// The schema's address, written once for [`SCHEMA_URL`] and [`MODELINE`].
+macro_rules! schema_url {
+    () => {
+        "https://www.isoloom.com/schema/v1.json"
+    };
+}
+
 /// Where the schema is published.
-pub const SCHEMA_URL: &str = "https://www.isoloom.com/schema/v1.json";
+pub const SCHEMA_URL: &str = schema_url!();
 
 /// The first line that tells YAML editors (the YAML language server) which schema to use.
-pub const MODELINE: &str = "# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json";
+pub const MODELINE: &str = concat!("# yaml-language-server: $schema=", schema_url!());
 
 /// The schema, generated from the spec's types ([`crate::syntax`]) and completed with what
 /// `isoloom validate` checks that types alone don't say (name patterns, address formats).
@@ -48,7 +55,7 @@ fn names(s: &mut Value) {
     let kebab = "^[a-z][a-z0-9]*(-[a-z0-9]+)*$";
     set(s, &["properties", "name"], "pattern", json!("^[a-z0-9]+(-[a-z0-9]+)*$"));
     set(s, &["properties", "name"], "maxLength", json!(crate::validate::NAME_MAX));
-    let network = json!({ "pattern": kebab, "maxLength": isoloom_manifest::KEBAB_MAX });
+    let network = json!({ "pattern": kebab, "maxLength": crate::contract::KEBAB_MAX });
     set(s, &["properties", "networks"], "propertyNames", network);
     let machine = json!({ "pattern": kebab, "maxLength": crate::validate::MACHINE_NAME_MAX });
     set(s, &["properties", "machines"], "propertyNames", machine);
@@ -71,7 +78,8 @@ fn networks(s: &mut Value) {
         s,
         &["$defs", "Network", "properties", "vlans"],
         "propertyNames",
-        json!({ "pattern": "^[1-9][0-9]{0,3}$" }),
+        // Exactly 1 to 4094 (`vlans::VLAN_IDS`), as the validator refuses the rest.
+        json!({ "pattern": "^([1-9][0-9]{0,2}|[1-3][0-9]{3}|40[0-8][0-9]|409[0-4])$" }),
     );
     set(s, &["$defs", "Vlan", "properties", "cidr"], "pattern", json!(network));
     set(s, &["$defs", "Bridged", "properties", "vlan"], "minimum", json!(1));

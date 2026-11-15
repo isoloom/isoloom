@@ -89,6 +89,7 @@ override_resource {
 variables {
   allowed_cidr         = "203.0.113.7/32"
   ssh_public_key       = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItftest tf-test"
+  ssh_private_key_file = "/dev/null"
 }
 
 run "every_network_holds_its_range_inside_the_vpc_block" {
@@ -197,25 +198,21 @@ run "each_machine_admits_its_networks_ssh_and_its_reach_rules_only" {
   }
 }
 
-# The spec: lan has `internet: false` and `gateway: fw`. Until the run is sealed, lan's table
-# sends 0.0.0.0/0 to the internet gateway so its machines set themselves up. Once every machine is
-# ready the runner applies with `isoloom_sealed = true`: lan's default route becomes a route to
-# allowed_cidr alone, so the internet is closed at the network (root in the guest can't lift it),
-# while the runner's SSH and the published ports' replies still get out. lan still reaches the
-# other networks through fw either way.
+# The spec: lan has `internet: false` and `gateway: fw`. lan's table sends 0.0.0.0/0 to the
+# internet gateway so its machines set themselves up; once every machine is set up, the same apply
+# closes it with a network ACL on lan's subnet (made after the readiness waits): out to the
+# environment's networks and allowed_cidr alone, so the internet is closed at the network (root in
+# the guest can't lift it), while SSH and the published ports' replies still get out. lan still
+# reaches the other networks through fw.
 run "a_routed_network_without_internet_is_sealed_at_the_network_after_set_up" {
   command = plan
 
-  variables {
-    isoloom_sealed = true
-  }
-
   assert {
-    condition     = length([for r in aws_route_table.lan.route : r if r.cidr_block == "0.0.0.0/0"]) == 0
-    error_message = "once sealed, lan (internet: false, routed by fw) must have no default route to the internet"
+    condition     = [for r in aws_route_table.lan.route : r.gateway_id if r.cidr_block == "0.0.0.0/0"] == ["igw-env"]
+    error_message = "lan's table must reach the internet while its machines set themselves up: the ACL closes it after"
   }
   assert {
-    condition     = sort([for r in aws_route_table.lan.route : "${r.cidr_block} ${coalesce(r.gateway_id, r.network_interface_id)}"]) == sort(["203.0.113.7/32 igw-env", "10.70.0.0/24 eni-fw-lan", "10.70.10.0/24 eni-fw-lan"])
-    error_message = "once sealed, lan's way out is to allowed_cidr through the internet gateway; it still reaches the other networks through fw"
+    condition     = sort([for r in aws_network_acl.sealed.egress : r.cidr_block if r.action == "allow"]) == sort(["10.70.0.0/24", "10.70.10.0/24", "10.70.20.0/24", "203.0.113.7/32"])
+    error_message = "once sealed, lan goes out to the environment's networks and allowed_cidr only, never 0.0.0.0/0"
   }
 }

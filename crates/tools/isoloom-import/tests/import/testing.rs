@@ -24,13 +24,21 @@ pub(crate) fn spec(d: &Draft) -> Outcome<Spec> {
 /// problem, the draft parsed, checked and lowered for every target, and every file it names
 /// looked for in `dir`.
 pub(crate) fn validate_in(d: &Draft, dir: &Path) -> Outcome<Vec<String>> {
-    Ok(Lab::new(spec(d)?).problems_with_files(dir).iter().map(Problem::line).collect())
+    Ok(lab(d)?.problems_with_files(dir).iter().map(Problem::line).collect())
+}
+
+/// The draft's lab, allowed to reach the host as the Vagrantfile it comes from does (its synced
+/// folders and public networks): whether to allow that is whoever runs it's choice, not the
+/// import's.
+fn lab(d: &Draft) -> Outcome<Lab> {
+    use isoloom_spec::host_access::{Grants, HostAccess};
+    Ok(Lab::new(spec(d)?).with_host_access(Grants::of(HostAccess::ALL)))
 }
 
 /// What `isoloom validate --skip-files` shows for the draft: the files it names belong to a
 /// project the test doesn't have.
 pub(crate) fn validate(d: &Draft) -> Outcome<Vec<String>> {
-    Ok(Lab::new(spec(d)?).problems().iter().map(Problem::line).collect())
+    Ok(lab(d)?.problems().iter().map(Problem::line).collect())
 }
 
 /// Whether the draft has a note of `kind` at `at` whose text says `text`.

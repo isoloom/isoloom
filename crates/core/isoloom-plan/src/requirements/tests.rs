@@ -20,6 +20,7 @@ fn environment_wide() -> Vec<(Requirement, &'static str)> {
         (Requirement::PlaybookChecks, "Ansible checks (.yml)"),
         (Requirement::ExecWithoutContainer { check: "c1".into() }, "`exec` check \"c1\" needs `from:`"),
         (Requirement::MachineAliases, "machine `aliases`"),
+        (Requirement::Tools { tool: "shell".into() }, "tool `shell` (`tools:`)"),
         (Requirement::TrafficControl, "(`tc`)"),
         (Requirement::PrivateDns { domain: "lab.internal".into() }, "(`dns.private`, `lab.internal`)"),
         (
@@ -104,6 +105,21 @@ fn about_storage() -> Vec<(Requirement, &'static str)> {
             "machine `web`'s file `/etc/a` comes from the project with a `uid`, `gid` or `mode`",
         ),
         (Requirement::ExistingHostFiles { machine: web() }, "machine `web` has `files`"),
+        (
+            Requirement::ExistingHostSettings {
+                machine: web(),
+                field: "sysctls",
+            },
+            "machine `web` sets `sysctls`: Isoloom doesn't set up a host that already exists",
+        ),
+        (
+            Requirement::SharedHostPort {
+                first: "web-01".into(),
+                second: "web-02".into(),
+                port: 80,
+            },
+            "machines `web-01` and `web-02` both publish on host port 80 (`publish: true` asks for a free one)",
+        ),
         (
             Requirement::ExistingHostScriptCheck { check: "c1".into() },
             "check \"c1\" runs a project script, and an existing host has no copy of the project",
@@ -211,8 +227,8 @@ fn several_addresses_need_the_feature_of_the_machines_shape() {
 #[test]
 fn mixing_containers_and_vms_asks_for_a_volume_both_mount_and_a_vm_after_a_container() {
     let env = crate::testing::environment(
-        "version: 1\nname: t\nvolumes: { data: { owner: db } }\nmachines:\n  db: { app: { image: postgres }, volumes: { data: /d } }\n  vm: { os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d }, depends_on: [db] }\n  other: { app: { image: nginx }, depends_on: [db] }\n",
-        isoloom_spec::model::Target::Hybrid,
+        "version: 1\nname: t\nvolumes: { data: { owner: db } }\nmachines:\n  db: { app: { image: postgres }, volumes: { data: /d } }\n  vm: { os: debian@12, app: { steps: [{ run: a.sh }, reboot] }, volumes: { data: /d }, depends_on: [db] }\n  other: { app: { image: nginx }, depends_on: [db] }\noverrides: { proxmox: { machines: { db: { lxc: true }, other: { lxc: true } } } }\n",
+        isoloom_spec::model::Target::Proxmox,
     );
     let mixed: Vec<&Requirement> = env
         .requirements
@@ -265,18 +281,7 @@ fn a_refusal_of_a_vm_feature_names_no_target_and_points_at_the_matrix() {
     ] {
         let text = r.to_string();
         assert!(text.contains("`isoloom matrix` lists the targets that do"), "{text}");
-        for target in [
-            "Vagrant",
-            "Proxmox",
-            "ESXi",
-            "AWS",
-            "Google",
-            "Oracle",
-            "cloud",
-            "hybrid",
-            "Kubernetes",
-            "later",
-        ] {
+        for target in ["Vagrant", "Proxmox", "ESXi", "AWS", "Google", "Oracle", "cloud", "Kubernetes", "later"] {
             assert!(!text.contains(target), "{target} in {text}");
         }
     }

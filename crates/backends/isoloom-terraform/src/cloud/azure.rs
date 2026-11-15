@@ -17,7 +17,7 @@ use crate::module::variable::Variable;
 /// the region, the provider with the tags, and the one user every VM is given.
 pub(crate) const BASE: Base = Base {
     cloud: crate::cloud::Cloud::Azure,
-    usage: |folder| Usage::with_runner_key(folder, operator::ALLOWED),
+    usage: |folder| Usage::with_key(folder, operator::ALLOWED),
     variables: |region| variables(region).into(),
     provider,
     user: |_| vm::USER,
@@ -35,8 +35,8 @@ pub(crate) fn variables(region: &str) -> [Variable; 2] {
 }
 
 /// The provider, and the tags every resource carries (`local.tags`).
-pub(crate) fn provider(env: &Environment, m: &mut Module) -> Vec<(&'static str, Expression)> {
-    m.block(
+pub(crate) fn provider(env: &Environment, module: &mut Module) -> Vec<(&'static str, Expression)> {
+    module.block(
         Block::builder("provider")
             .add_label("azurerm")
             .add_block(Block::builder("features").build())

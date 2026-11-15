@@ -7,6 +7,7 @@ pub mod testing;
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
+use isoloom_test_support::{hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 use testing::{Outcome, plan};
 
 /// The plan of `yaml`, a valid spec, on `cloud-vm`.
@@ -41,81 +42,105 @@ machines:
     app: { steps: [{ run: web.sh }] }
 ";
 
+/// `cloud`'s module for `e`, parsed.
+fn parsed(cloud: Cloud, e: &Environment) -> Outcome<hcl::Body> {
+    Ok(hcl_body(&module(cloud, e)?))
+}
+
+/// The one `resource "<kind>" "<name>"` of `tf`.
+fn resource<'b>(tf: &'b hcl::Body, kind: &str, name: &str) -> &'b hcl::Body {
+    hcl_one(tf, kind, name)
+}
+
+/// Whether one of the strings `body` holds anywhere (its user data, its scripts) holds `what`.
+fn carries(body: &hcl::Body, what: &str) -> bool {
+    hcl_literals(body).iter().any(|s| s.contains(what))
+}
+
+/// The routes of AWS route table `net`: each `route` block's destination and target interface.
+fn aws_routes(tf: &hcl::Body, net: &str) -> Vec<(String, String)> {
+    hcl_nested(resource(tf, "aws_route_table", net), "route")
+        .iter()
+        .filter(|r| hcl_attribute(r.body(), "network_interface_id").is_some())
+        .map(|r| (hcl_text(r.body(), "cidr_block"), hcl_text(r.body(), "network_interface_id")))
+        .collect()
+}
+
 #[test]
 fn aws_routes_a_network_through_its_gateway_both_ways() -> Outcome {
-    let tf = module(Cloud::Aws, &env(EDGE)?)?;
+    let tf = parsed(Cloud::Aws, &env(EDGE)?)?;
     // One VPC block holds both networks, so routes to each can be more specific than it.
-    assert!(tf.contains("cidr_block = \"10.70.0.0/20\""), "{tf}");
-    assert!(!tf.contains("aws_vpc_ipv4_cidr_block_association"));
+    assert_eq!(hcl_text(resource(&tf, "aws_vpc", "env"), "cidr_block"), "10.70.0.0/20");
+    assert_eq!(hcl_names(&tf, "resource", "aws_vpc_ipv4_cidr_block_association"), Vec::<String>::new());
     // dmz -> out through fw's dmz interface, out -> dmz through its out interface.
-    let table = |net: &str| {
-        tf.split(&format!("resource \"aws_route_table\" \"{net}\""))
-            .nth(1)
-            .unwrap()
-            .split("\n}\n")
-            .next()
-            .unwrap()
-            .to_owned()
-    };
-    assert!(table("dmz").contains("network_interface_id = aws_network_interface.fw_dmz.id"));
-    assert!(table("out").contains("network_interface_id = aws_network_interface.fw_out.id"));
+    assert_eq!(
+        aws_routes(&tf, "dmz"),
+        [("10.70.0.0/24".to_owned(), "aws_network_interface.fw_dmz.id".to_owned())]
+    );
+    assert_eq!(
+        aws_routes(&tf, "out"),
+        [("10.70.10.0/24".to_owned(), "aws_network_interface.fw_out.id".to_owned())]
+    );
     // fw takes the router's address on dmz (AWS keeps .1), and the hosts files follow.
-    assert!(tf.contains("\"10.70.10.254\""));
-    assert!(tf.contains("10.70.10.254 fw"));
-    assert!(tf.contains("net.ipv4.ip_forward=1"));
+    assert_eq!(hcl_values(resource(&tf, "aws_network_interface", "fw_dmz"), "private_ips"), ["10.70.10.254"]);
+    let fw = resource(&tf, "aws_instance", "fw");
+    assert!(carries(fw, "10.70.10.254/24") && carries(fw, "net.ipv4.ip_forward=1"));
+    assert!(carries(resource(&tf, "aws_instance", "web"), "10.70.10.254 fw"));
     Ok(())
 }
 
 #[test]
 fn oracle_cloud_routes_a_network_through_its_gateway() -> Outcome {
-    let tf = module(Cloud::Oci, &env(EDGE)?)?;
-    assert!(tf.contains("data \"oci_core_private_ips\" \"fw_dmz\""), "{tf}");
-    assert!(tf.contains("resource \"oci_core_route_table_attachment\" \"dmz\""));
-    assert!(tf.contains("network_entity_id = data.oci_core_private_ips.fw_dmz.private_ips[0].id"));
+    let tf = parsed(Cloud::Oci, &env(EDGE)?)?;
+    assert_eq!(hcl_names(&tf, "data", "oci_core_private_ips"), ["fw_out", "fw_dmz"]);
+    assert_eq!(hcl_names(&tf, "resource", "oci_core_route_table_attachment"), ["out", "dmz"]);
+    let rules = hcl_nested(resource(&tf, "oci_core_route_table", "dmz"), "route_rules");
+    let via: Vec<(String, String)> = rules
+        .iter()
+        .map(|r| (hcl_text(r.body(), "destination"), hcl_text(r.body(), "network_entity_id")))
+        .collect();
+    assert!(
+        via.contains(&("10.70.0.0/24".to_owned(), "data.oci_core_private_ips.fw_dmz.private_ips[0].id".to_owned())),
+        "{via:?}"
+    );
     Ok(())
-}
-
-/// The block of `kind` named `name` in a module.
-fn block(tf: &str, kind: &str, name: &str) -> Outcome<String> {
-    let start = format!("resource \"{kind}\" \"{name}\"");
-    let after = tf.split(&start).nth(1).ok_or_else(|| format!("no {start}:\n{tf}"))?;
-    Ok(after.split("\n}\n").next().unwrap_or_default().to_owned())
 }
 
 #[test]
 fn azure_routes_a_network_through_its_gateway_both_ways() -> Outcome {
-    let tf = module(Cloud::Azure, &env(EDGE)?)?;
+    let tf = parsed(Cloud::Azure, &env(EDGE)?)?;
     // fw takes the router's address on dmz (Azure keeps .1 to .3), forwarding on its interfaces.
-    assert!(tf.contains("private_ip_address            = \"10.70.10.254\""), "{tf}");
-    assert!(block(&tf, "azurerm_network_interface", "fw_dmz")?.contains("ip_forwarding_enabled = true"));
+    let nic = resource(&tf, "azurerm_network_interface", "fw_dmz");
+    assert_eq!(hcl_text(nic, "ip_forwarding_enabled"), "true");
+    assert_eq!(hcl_values(nic, "private_ip_address"), ["10.70.10.254"]);
     // dmz -> out through fw's dmz address, out -> dmz through its out address.
-    let route = |id: &str| block(&tf, "azurerm_route", id);
-    assert!(route("dmz_out")?.contains("next_hop_in_ip_address = \"10.70.10.254\""));
-    assert!(route("out_dmz")?.contains("next_hop_in_ip_address = \"10.70.0.5\""));
-    assert!(route("out_dmz")?.contains("next_hop_type          = \"VirtualAppliance\""));
-    assert!(tf.contains("resource \"azurerm_subnet_route_table_association\" \"dmz\""));
-    assert!(tf.contains("10.70.10.254 fw"));
-    assert!(tf.contains("net.ipv4.ip_forward=1"));
+    let route = |id: &str| resource(&tf, "azurerm_route", id);
+    assert_eq!(hcl_text(route("dmz_out"), "next_hop_in_ip_address"), "10.70.10.254");
+    assert_eq!(hcl_text(route("out_dmz"), "next_hop_in_ip_address"), "10.70.0.5");
+    assert_eq!(hcl_text(route("out_dmz"), "next_hop_type"), "VirtualAppliance");
+    assert!(hcl_names(&tf, "resource", "azurerm_subnet_route_table_association").contains(&"dmz".to_owned()));
+    assert!(carries(resource(&tf, "azurerm_linux_virtual_machine", "web"), "10.70.10.254 fw"));
+    assert!(carries(resource(&tf, "azurerm_linux_virtual_machine", "fw"), "net.ipv4.ip_forward=1"));
     Ok(())
 }
 
 #[test]
 fn google_cloud_routes_a_network_through_its_gateway_in_a_vpc_of_its_own() -> Outcome {
-    let tf = module(Cloud::Gcp, &env(EDGE)?)?;
+    let tf = parsed(Cloud::Gcp, &env(EDGE)?)?;
     // Google keeps .1 and the router's .254: fw takes the highest free address on dmz.
-    assert!(tf.contains("network_ip = \"10.70.10.252\""), "{tf}");
-    assert!(tf.contains("10.70.10.252 fw"));
-    let fw = block(&tf, "google_compute_instance", "fw")?;
-    assert!(fw.contains("can_ip_forward = true"));
-    assert_eq!(fw.matches("network_interface {").count(), 2);
+    let fw = resource(&tf, "google_compute_instance", "fw");
+    assert_eq!(hcl_text(fw, "can_ip_forward"), "true");
+    let addresses: Vec<String> = hcl_nested(fw, "network_interface").iter().map(|n| hcl_text(n.body(), "network_ip")).collect();
+    assert_eq!(addresses, ["10.70.0.5", "10.70.10.252"]);
+    assert!(carries(resource(&tf, "google_compute_instance", "web"), "10.70.10.252 fw"));
     // Each VPC sends the other network to fw's address in it; dmz is peered with none.
-    let route = |id: &str| block(&tf, "google_compute_route", id);
-    assert!(route("dmz_out")?.contains("next_hop_ip = \"10.70.10.252\""));
-    assert!(route("dmz_out")?.contains("network     = google_compute_network.dmz.id"));
-    assert!(route("out_dmz")?.contains("next_hop_ip = \"10.70.0.5\""));
-    assert!(!tf.contains("google_compute_network_peering"));
+    let route = |id: &str| resource(&tf, "google_compute_route", id);
+    assert_eq!(hcl_text(route("dmz_out"), "next_hop_ip"), "10.70.10.252");
+    assert_eq!(hcl_text(route("dmz_out"), "network"), "google_compute_network.dmz.id");
+    assert_eq!(hcl_text(route("out_dmz"), "next_hop_ip"), "10.70.0.5");
+    assert_eq!(hcl_names(&tf, "resource", "google_compute_network_peering"), Vec::<String>::new());
     // Its second interface comes up by the MAC Google derives from its address.
-    assert!(tf.contains("42:01:0a:46:0a:fc"));
+    assert!(carries(fw, "42:01:0a:46:0a:fc"));
     Ok(())
 }
 
@@ -126,21 +151,15 @@ fn google_cloud_peers_the_networks_and_routes_a_routed_one_through_a_peer() -> O
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }",
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }",
     );
-    let tf = module(Cloud::Gcp, &env(&spec)?)?;
-    let peering = block(&tf, "google_compute_network_peering", "out_far")?;
-    assert!(
-        peering.contains("export_custom_routes = true") && peering.contains("import_custom_routes = true"),
-        "{peering}"
-    );
-    assert!(tf.contains("resource \"google_compute_network_peering\" \"far_out\""));
-    assert!(!tf.contains("google_compute_network_peering\" \"dmz_"));
-    assert!(!tf.contains("google_compute_route\" \"far_dmz\""));
-    assert!(route_to(&tf, "dmz_far")?.contains("next_hop_ip = \"10.70.10.252\""));
+    let tf = parsed(Cloud::Gcp, &env(&spec)?)?;
+    let peering = resource(&tf, "google_compute_network_peering", "out_far");
+    assert_eq!(hcl_text(peering, "export_custom_routes"), "true");
+    assert_eq!(hcl_text(peering, "import_custom_routes"), "true");
+    assert_eq!(hcl_names(&tf, "resource", "google_compute_network_peering"), ["out_far", "far_out"]);
+    let routes = hcl_names(&tf, "resource", "google_compute_route");
+    assert!(!routes.contains(&"far_dmz".to_owned()), "{routes:?}");
+    assert_eq!(hcl_text(resource(&tf, "google_compute_route", "dmz_far"), "next_hop_ip"), "10.70.10.252");
     Ok(())
-}
-
-fn route_to(tf: &str, id: &str) -> Outcome<String> {
-    block(tf, "google_compute_route", id)
 }
 
 #[test]
@@ -158,7 +177,8 @@ fn google_cloud_refuses_more_interfaces_than_a_vm_takes() -> Outcome {
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }",
         "  dmz: { cidr: 10.70.10.0/24, gateway: fw }\n  far: { cidr: 10.80.0.0/24 }",
     ))?;
-    assert!(block(&module(Cloud::Gcp, &three)?, "google_compute_instance", "fw")?.contains("e2-standard-4"));
+    let tf = parsed(Cloud::Gcp, &three)?;
+    assert_eq!(hcl_text(resource(&tf, "google_compute_instance", "fw"), "machine_type"), "e2-standard-4");
     Ok(())
 }
 
@@ -185,16 +205,52 @@ machines:
 #[test]
 fn google_cloud_sets_the_mtu_and_the_others_refuse_it() -> Outcome {
     let e = env(MTU)?;
-    assert!(module(Cloud::Gcp, &e)?.contains("mtu                     = 1400"));
+    let mtus = |planned: &Environment| -> Outcome<Vec<String>> {
+        let tf = parsed(Cloud::Gcp, planned)?;
+        Ok(hcl_names(&tf, "resource", "google_compute_network")
+            .iter()
+            .map(|n| hcl_text(resource(&tf, "google_compute_network", n), "mtu"))
+            .collect())
+    };
+    assert_eq!(mtus(&e)?, ["1400", "1500"]);
     assert!(refusal(Cloud::Aws, &e).unwrap().contains("no setting for a network's MTU"));
     // A VPC network each: each network its own MTU, in Google's range.
     let two = env(&MTU.replace("10.81.0.0/24 }", "10.81.0.0/24, mtu: 8896 }"))?;
-    let tf = module(Cloud::Gcp, &two)?;
-    assert!(tf.contains("= 1400") && tf.contains("= 8896"), "{tf}");
+    assert_eq!(mtus(&two)?, ["1400", "8896"]);
     let big = env(&MTU.replace("10.81.0.0/24 }", "10.81.0.0/24, mtu: 9000 }"))?;
     assert!(refusal(Cloud::Gcp, &big).unwrap().contains("1300 to 8896"));
     // Without one, Ethernet's 1500, as on every other target.
     let none = env(&MTU.replace(", mtu: 1400", ""))?;
-    assert!(module(Cloud::Gcp, &none)?.contains("= 1500"));
+    assert_eq!(mtus(&none)?, ["1500", "1500"]);
+    Ok(())
+}
+
+/// A machine's Azure security group numbers its allow rules from 100 in steps of 10 below the
+/// deny rule at 4000: a machine needing more than fit is refused, never given rules at or past
+/// the deny (which never apply) or past 4096 (which Azure refuses).
+#[test]
+fn azure_refuses_a_machine_with_more_allow_rules_than_fit_below_its_deny_rule() -> Outcome {
+    let spec = |ports: u16| {
+        let list: Vec<String> = (1..=ports).map(|p| (2000 + p).to_string()).collect();
+        format!(
+            "version: 1\nname: many\nnetworks:\n  a: {{ cidr: 10.70.0.0/24 }}\n  b: {{ cidr: 10.70.1.0/24 }}\nreach: [{{ from: a, to: b, ports: [{}] }}]\nmachines:\n  x: {{ networks: {{ a: 10 }}, os: debian@12, app: {{ steps: [{{ run: x.sh }}] }} }}\n  y: {{ networks: {{ b: 10 }}, os: debian@12, app: {{ steps: [{{ run: y.sh }}] }} }}\n",
+            list.join(", ")
+        )
+    };
+    // y: its network, SSH, then each port in TCP and UDP: 2 + 2 * 190 = 382 rules fit (390).
+    assert_eq!(refusal(Cloud::Azure, &env(&spec(190))?), None);
+    let tf = parsed(Cloud::Azure, &env(&spec(190))?)?;
+    let priorities: Vec<u64> = hcl_nested(resource(&tf, "azurerm_network_security_group", "y"), "security_rule")
+        .iter()
+        .filter(|r| hcl_text(r.body(), "access") == "Allow" && hcl_text(r.body(), "direction") == "Inbound")
+        .map(|r| hcl_text(r.body(), "priority").parse().unwrap_or(u64::MAX))
+        .collect();
+    assert!(priorities.iter().all(|p| *p < 4000) && priorities.len() == 382, "{priorities:?}");
+    // 2 + 2 * 200 = 402: past the deny rule.
+    let why = refusal(Cloud::Azure, &env(&spec(200))?).ok_or("Azure takes 402 rules")?;
+    assert!(
+        why.starts_with("machine `y` needs 402 inbound rules on Azure") && why.contains("holds 390"),
+        "{why}"
+    );
     Ok(())
 }

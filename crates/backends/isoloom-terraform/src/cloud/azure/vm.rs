@@ -7,7 +7,7 @@
 //!   other targets: a machine's networks reach it, `reach` rules open one network to another
 //!   (on their ports), the rest is closed.
 //! - Each machine is a VM at its address with a static public IP that sets itself up from its
-//!   user data (`crate::cloud::vm::hooks::user_data`), once the runner delivered the
+//!   user data (`crate::cloud::vm::hooks::user_data`), once Terraform brought in the
 //!   project over SSH as `isoloom` (Azure creates the administrator; it reserves `admin`). A
 //!   machine on several networks gets an interface on each (forwarding on, so replies leave from
 //!   the right one), brought up by MAC at every boot.
@@ -30,7 +30,7 @@ use isoloom_plan::{Environment, Vm};
 
 use crate::cloud::Cloud;
 use crate::cloud::vm::rules::{FIRST_THREE, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, SECURITY_GROUPS_TC, Size, Sizes, Subnets, Volumes};
-use crate::cloud::vm::{self, Driver, gateways, gpus::GpuSizes, own_image, windows};
+use crate::cloud::vm::{self, VmDriver, gateways, gpus::GpuSizes, own_image, windows};
 use crate::limits::Limits;
 use crate::module::providers;
 
@@ -78,6 +78,7 @@ const MACHINES: vm::Machines = vm::Machines {
     linux: machines::linux,
     windows: Some(machines::windows),
     controller: machines::controller,
+    instance: "azurerm_linux_virtual_machine",
 };
 
 /// The Azure Marketplace image of each OS: (publisher, offer, sku).
@@ -139,11 +140,12 @@ fn refusal(env: &Environment) -> Option<String> {
         .features(env)
         .or_else(|| RULES.subnets(env))
         .or_else(machine)
+        .or_else(|| machines::too_many_rules(env))
         .or_else(|| windows::udp_redirect(env))
 }
 
 /// Its `cloud-vm` driver.
-pub(crate) const DRIVER: Driver = Driver {
+pub(crate) const DRIVER: VmDriver = VmDriver {
     base: super::BASE,
     requires: (&[providers::AZURERM], &[providers::RANDOM, providers::LOCAL]),
     refusal,
@@ -151,12 +153,12 @@ pub(crate) const DRIVER: Driver = Driver {
 };
 
 /// The module's blocks after the providers, from the plan.
-fn write(env: &Environment, m: &mut Module) -> crate::Result<()> {
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
     let env = &*gateways::relocated(env);
-    network::blocks(env, m);
-    routing::blocks(env, m);
-    private_dns::write(env, m);
-    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, m)
+    network::blocks(env, module);
+    routing::blocks(env, module);
+    private_dns::write(env, module);
+    MACHINES.write_with_outputs(env, super::BASE.user, public_ip, module)
 }
 
 /// The address Terraform reaches a machine at (`id`: its resource name).

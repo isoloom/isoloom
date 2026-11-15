@@ -36,8 +36,18 @@ pub enum Error {
         #[source]
         source: serde_json::Error,
     },
+    /// A script the pods run leads out of the project folder (through a link), or isn't there:
+    /// it is never read.
+    #[error("{path} (copied into the Helm chart)")]
+    Outside {
+        /// The script, from the project folder.
+        path: String,
+        /// Where it leads instead, or why it isn't a path inside the project.
+        #[source]
+        why: isoloom_spec::project_path::Escape,
+    },
     /// A script the pods run exists in the project but can't be read.
-    #[error("{path} (copied into the Helm chart): {source}")]
+    #[error("{path} (copied into the Helm chart)")]
     Read {
         /// The script, from the project folder.
         path: String,
@@ -61,6 +71,7 @@ impl From<Error> for RenderError {
             Error::Unwritable { source } => RenderError::internal(target, UNWRITABLE, source),
             Error::Schema { source } => RenderError::internal(target, SCHEMA, source),
             Error::Read { path, source } => RenderError::internal(target, format!("{path} (copied into the Helm chart) can't be read"), source),
+            Error::Outside { path, why } => RenderError::internal(target, format!("{path} (copied into the Helm chart) isn't read"), why),
         }
     }
 }

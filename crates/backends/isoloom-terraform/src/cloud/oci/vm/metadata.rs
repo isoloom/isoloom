@@ -4,11 +4,16 @@
 
 use std::net::Ipv4Addr;
 
+use isoloom_spec::shell::quote;
+
 /// Shell printing what `pick` (a Python expression over `v`, one VNIC of IMDS's list) gives for
 /// the VNIC whose private address is `ip`, once it is attached (waited for up to 15 minutes).
 fn lookup(ip: Ipv4Addr, pick: &str) -> String {
+    let program = quote(&format!(
+        "import json, sys; print(next((str({pick}) for v in json.load(sys.stdin) if v.get(\"privateIp\") == \"{ip}\"), \"\"))"
+    ));
     format!(
-        "$(i=0; until v=$(curl -sf -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/vnics/ | python3 -c 'import json, sys; print(next((str({pick}) for v in json.load(sys.stdin) if v.get(\"privateIp\") == \"{ip}\"), \"\"))' 2>/dev/null) && [ -n \"$v\" ]; do i=$((i+5)); [ $i -lt 900 ] || break; sleep 5; done; echo \"$v\")"
+        "$(i=0; until v=$(curl -sf -H 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/vnics/ | python3 -c {program} 2>/dev/null) && [ -n \"$v\" ]; do i=$((i+5)); [ $i -lt 900 ] || break; sleep 5; done; echo \"$v\")"
     )
 }
 

@@ -1,5 +1,5 @@
 //! What the Vagrant target writes for one provider beyond the others: QEMU's hubs and disk
-//! sizes, UTM's missing private networks, VMware's nested virtualization, ESXi's architecture.
+//! sizes, UTM's vmnet networks and boxes, VMware's nested virtualization, ESXi's architecture.
 
 use isoloom_spec::Target;
 use isoloom_targets::{refusal, refusal_on};
@@ -35,7 +35,7 @@ fn connects_to(block: &str) -> Outcome<String> {
 #[test]
 fn qemu_links_three_vms_through_a_hub() -> Outcome {
     let spec = lab(THREE)?;
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("qemu")), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap(), None);
     let vf = vagrantfile(THREE)?;
     // Every VM connects to its own port of the network's hub, picked for the copy of the project.
     let ports: Vec<String> = ["a", "b", "c"]
@@ -58,7 +58,7 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
         assert!(!define(&vf, vm)?.contains("IsoloomQemu.stop("), "{}", define(&vf, vm)?);
     }
     // The hub is left running while another of its VMs keeps a Vagrant id.
-    assert!(vf.contains("return if left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }"));
+    assert!(vf.contains("stop(net) unless left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }"));
     // Other providers are untouched.
     assert!(!provider_block(&vf, "a", "virtualbox")?.contains("socket"));
     Ok(())
@@ -77,11 +77,11 @@ fn qemu_links_two_vms_through_a_hub_too_and_refuses_a_vm_on_two_networks() -> Ou
 
     let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10, dmz: 10 }\n    app: { steps: [{ run: p.sh }] }\n";
     let spec = lab(routed)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("qemu")).expect("a VM on two networks");
+    let why = refusal_on(&spec, Target::Vagrant, Some("qemu")).unwrap().expect("a VM on two networks");
     assert!(why.contains("`a` is on 2 networks, and QEMU gives a VM one"), "{why}");
     // Only QEMU: Vagrant on another provider, or whatever the provider, runs it.
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
-    assert_eq!(refusal(&spec, Target::Vagrant), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
+    assert_eq!(refusal(&spec, Target::Vagrant).unwrap(), None);
     // Still generated (for every other provider); the QEMU block says why it has no network.
     let routed_vf = vagrantfile(routed)?;
     assert!(provider_block(&routed_vf, "a", "qemu")?.contains("# No private network on QEMU: `a` is on 2 networks"));
@@ -99,86 +99,45 @@ fn qemu_sizes_the_disk_only_above_the_box() -> Outcome {
     Ok(())
 }
 
-/// A container lab: its docker-vm helper VM.
-const CONTAINERS: &str = "version: 1\nname: c\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  web:\n    networks: { lab: 10 }\n    ports: { site: { port: 80, protocol: http, publish: 8080 } }\n    app: { image: nginx }\n";
-
 #[test]
-fn docker_vm_boots_the_cloud_image_on_qemu_with_room_for_docker() -> Outcome {
-    let vf = generated(&lab(CONTAINERS)?, Target::DockerVm, "Vagrantfile")?;
-    // generic/debian12, libvirt's box, never comes up under vagrant-qemu: QEMU takes the Debian
-    // cloud image the Vagrant target's VMs take there, its 10 GB disk grown for Docker.
-    let qemu = between(&vf, "config.vm.provider \"qemu\"", "\n  end\n")?;
-    assert!(qemu.contains("do |v, o|"), "{qemu}");
-    assert!(qemu.contains("o.vm.box = \"cloud-image/debian-12\""), "{qemu}");
-    assert!(
-        qemu.contains("o.vm.box_version = \">= 0\""),
-        "the main box's pin isn't the cloud image's: {qemu}"
-    );
-    assert!(qemu.contains("v.disk_resize = IsoloomQemu.disk(\"cloud-image/debian-12\", 40)"), "{qemu}");
-    assert!(vf.contains("module IsoloomQemu"), "the disk helper is in the Vagrantfile");
-    assert!(vf.contains("config.vm.box = \"bento/debian-12\""), "the other providers keep their box");
-    Ok(())
-}
-
-/// Regression (#253, the Cyber CTF launcher's rig on an Apple Silicon Mac, VirtualBox 7.2.20):
-/// the docker-vm VM never booted, "Failed to construct device 'vga' instance #0
-/// (`VERR_PGM_RAM_CONFLICT`)". Its block asked for `VBoxVGA` (whose saved state VirtualBox 7.2
-/// restores) on every host, and VirtualBox's Arm platform can't build it. An Arm host keeps
-/// VirtualBox's default controller, as the Vagrant target's VMs do.
-#[test]
-fn docker_vm_on_virtualbox_asks_for_vboxvga_on_an_x86_host_only() -> Outcome {
-    let vf = generated(&lab(CONTAINERS)?, Target::DockerVm, "Vagrantfile")?;
-    let vbox = between(&vf, "config.vm.provider \"virtualbox\"", "\n  end\n")?;
-    assert!(
-        vbox.contains("v.customize [\"modifyvm\", :id, \"--graphicscontroller\", \"vboxvga\"] unless RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/"),
-        "{vbox}"
-    );
-    assert_eq!(vbox.matches("graphicscontroller").count(), 1, "{vbox}");
-    Ok(())
-}
-
-#[test]
-fn the_vagrant_target_has_no_utm_provider() -> Outcome {
-    // Every machine is on a network (validation asks it), and vagrant_utm gives a VM none: UTM
-    // could run no environment's VMs, so the Vagrantfile has no block for it, the run manifest
-    // doesn't offer it, and asking for it says so; the other providers run the environment.
+fn utm_runs_each_vm_on_its_networks_isolated_vmnet_ones() -> Outcome {
+    // vagrant_utm makes no adapter for a private network: each VM's adapters are QEMU arguments
+    // set before it boots (one isolated vmnet network per network), its addresses set once it
+    // answers.
     let spec = lab(THREE)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("utm")).ok_or("UTM taken")?;
-    assert!(
-        why.starts_with("the `vagrant` target has no `utm` provider: vagrant_utm gives a VM no private network"),
-        "{why}"
-    );
-    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("virtualbox")), None);
+    assert_eq!(refusal_on(&spec, Target::Vagrant, Some("utm")).unwrap(), None);
     let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
-    assert!(!vf.contains("\"utm\"") && !vf.contains("ISOLOOM_NAT_ROUTE"), "{vf}");
-    let manifest = isoloom_manifest::parse(&generated(&spec, Target::Vagrant, "vagrant/run.json")?)?;
-    let isoloom_manifest::Identity::Vagrant(v) = manifest.identity else {
-        return Err("a vagrant identity".into());
-    };
-    assert!(v.providers.iter().all(|p| p.id != isoloom_manifest::Provider::Utm), "{:?}", v.providers);
+    assert!(vf.contains("module IsoloomUtm"), "the preamble carries IsoloomUtm");
+    let a = provider_block(&vf, "a", "utm")?;
+    assert!(a.contains("o.vm.box = \"utm/bookworm\""), "{a}");
+    let vm = define(&vf, "a")?;
+    assert!(vm.contains("IsoloomUtm.attach(machine, [[\"lab\", \"02:15:"), "{vm}");
+    assert!(vm.contains(":\"VagrantPlugins::Utm::Action::CheckGuestAdditions\""), "{vm}");
+    Ok(())
+}
+
+#[test]
+fn utm_refuses_what_it_cant_give_saying_what_would() -> Outcome {
+    // An OS with no UTM box, data disks and a bridged network: each refused with its way out.
+    let no_box = lab(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@13, networks: { lab: 10 }, app: { steps: [{ run: p.sh }] } }\n",
+    )?;
+    let why = refusal_on(&no_box, Target::Vagrant, Some("utm")).unwrap().ok_or("debian 13 taken")?;
+    assert!(why.contains("no known UTM box") && why.contains("boxes.utm"), "{why}");
+    let disks = lab(
+        "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a: { os: debian@12, networks: { lab: 10 }, disks: { data: { size_gb: 2, mount: /data } }, app: { steps: [{ run: p.sh }] } }\n",
+    )?;
+    let disks_why = refusal_on(&disks, Target::Vagrant, Some("utm")).unwrap().ok_or("data disks taken")?;
+    assert!(disks_why.contains("data disks"), "{disks_why}");
     Ok(())
 }
 
 #[test]
 fn vmware_runs_a_machine_with_nested_virtualization() -> Outcome {
-    let spec = "version: 1\nname: t\nmachines:\n  a:\n    os: debian@12\n    hardware: { nested_virtualization: true }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    app: { steps: [{ run: p.sh }] }\n";
+    let spec = "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    hardware: { nested_virtualization: true }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n";
     let vf = vagrantfile(spec)?;
     assert!(provider_block(&vf, "a", "vmware_desktop")?.contains("v.vmx[\"vhv.enable\"] = \"TRUE\""));
     assert!(!provider_block(&vf, "b", "vmware_desktop")?.contains("vhv.enable"));
-    Ok(())
-}
-
-#[test]
-fn on_utm_the_docker_vm_hosts_default_route_leaves_the_emulated_network() -> Outcome {
-    let dvm = generated(&crate::testing::example("hello-stack")?, Target::DockerVm, "docker-vm/Vagrantfile")?;
-    assert!(dvm.contains("ISOLOOM_NAT_ROUTE = <<~'SH'\nset -eu\ngw=10.0.2.2\n"), "{dvm}");
-    let dvm_utm = between(&dvm, "config.vm.provider \"utm\"", "\n  end\n")?;
-    assert!(dvm_utm.contains("preserve_order: true, inline: ISOLOOM_NAT_ROUTE"), "{dvm_utm}");
-    let dvm_first = dvm
-        .lines()
-        .find(|l| l.trim_start().starts_with("config.vm.provision"))
-        .ok_or("no provisioner")?;
-    assert!(dvm_first.contains("\"nat-route\""), "{dvm_first}");
     Ok(())
 }
 
@@ -188,11 +147,13 @@ fn on_utm_the_docker_vm_hosts_default_route_leaves_the_emulated_network() -> Out
 fn esxi_refuses_an_arm64_machine() -> Outcome {
     let arm = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  box:\n    os: ubuntu@24.04\n    networks: { lab: 10 }\n    hardware: { arch: arm64 }\n    app: { steps: [{ run: p.sh }] }\n";
     let spec = lab(arm)?;
-    let why = refusal_on(&spec, Target::Vagrant, Some("vmware_esxi")).ok_or("ESXi takes an arm64 machine")?;
+    let why = refusal_on(&spec, Target::Vagrant, Some("vmware_esxi"))
+        .unwrap()
+        .ok_or("ESXi takes an arm64 machine")?;
     assert_eq!(why, "machine `box` is arm64 (`hardware.arch`), and ESXi runs x86-64 VMs only");
     for p in ["virtualbox", "vmware_desktop", "parallels", "libvirt", "qemu"] {
-        assert_eq!(refusal_on(&spec, Target::Vagrant, Some(p)), None, "{p}");
+        assert_eq!(refusal_on(&spec, Target::Vagrant, Some(p)).unwrap(), None, "{p}");
     }
-    assert_eq!(refusal_on(&lab(THREE)?, Target::Vagrant, Some("vmware_esxi")), None);
+    assert_eq!(refusal_on(&lab(THREE)?, Target::Vagrant, Some("vmware_esxi")).unwrap(), None);
     Ok(())
 }

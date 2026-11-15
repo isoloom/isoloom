@@ -20,9 +20,17 @@ fn windows_machines_use_winrm_and_powershell() -> Outcome {
     assert!(dc.contains("drivers\\\\etc\\\\hosts"), "the Windows hosts file: {dc}");
     // The project in C:\isoloom first, then each step run from there.
     let project = dc.find("m.vm.provision \"isoloom_project\", name: \"project\"").expect("the project step");
+    // Run once, until the script changes (a mark of its hash).
     let step = dc
-        .find("name: \"provision/dc.ps1\", inline: \"Set-Location C:\\\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/dc.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }\"")
-        .expect("the step, from the project");
+        .find("name: \"provision/dc.ps1\", inline: \"$isoloomSum = (Get-FileHash")
+        .expect("the step, run once");
+    let line = dc.get(step..).and_then(|s| s.lines().next()).unwrap_or_default();
+    assert!(
+        line.contains(
+            "Set-Location C:\\\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/dc.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
+        ),
+        "the step, from the project: {line}"
+    );
     assert!(project < step);
     let web = from(vf, "config.vm.define \"web\"")?;
     assert!(web.contains("m.vm.box = \"example/win2019\""), "the spec's image wins");

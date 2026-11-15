@@ -14,29 +14,28 @@ use crate::server::{router as server_router, slotted};
 
 /// A machine's snippet and VM: a cloud-init document on a cloud image, or on Windows a
 /// cloudbase-init script on a clone of the OS's template (see `windows`).
-pub(super) fn blocks(env: &Environment, planned: isoloom_plan::Vm<'_>, m: &mut Module) {
+pub(super) fn blocks(env: &Environment, planned: isoloom_plan::Vm<'_>, module: &mut Module) {
     let isoloom_plan::Vm { name, plan: mp, .. } = planned;
     let boot = if mp.is_windows() {
-        m.commented(
+        module.commented(
             &format!("Machine `{name}`: its set-up, run by cloudbase-init."),
             snippet_file(&ident(name), &format!("{name}.ps1"), cloudbase_init::user_data(env, (name, mp))),
         );
         windows::boot(planned)
     } else {
         let mut config = CloudConfig::new(name, reference("local.users"));
-        let domain = env.spec().machines.get(name).and_then(|machine| machine.dns.as_ref()?.domain.as_deref());
-        config.fqdn = domain.map(|d| format!("{name}.{d}"));
+        config.fqdn = crate::server::domain_of(env, name).map(|d| format!("{name}.{d}"));
         config.packages = ["nftables", "curl", "netcat-openbsd"].map(String::from).to_vec();
         if needs_project(env, (name, mp)) {
             config.file_lists.push(reference("local.project_files"));
         }
         config.files.extend(super::virtiofs::tag_files(env, name));
         cloud_init::machine(env, (name, mp), &mut config);
-        m.commented(&format!("Machine `{name}`."), snippet(&ident(name), name, config.document()));
+        module.commented(&format!("Machine `{name}`."), snippet(&ident(name), name, config.document()));
         super::image::boot(name, mp).unwrap_or_else(|| Boot::Image(super::arch::image_res(planned)))
     };
-    m.block(vm(env, name, mp, boot).block(env));
-    super::firewall::guest(env, name, super::firewall::Guest::Vm, m);
+    module.block(vm(env, name, mp, boot).block(env));
+    super::firewall::guest(env, name, super::firewall::Guest::Vm, module);
 }
 
 /// The VM of machine `name`, booting from `boot`: an interface and an address per network, the
@@ -60,7 +59,7 @@ fn vm(env: &Environment, name: &str, mp: &MachinePlan, boot: Boot) -> Vm {
         id: ident(name),
         snippet: ident(name),
         name: name.to_owned(),
-        size: (mp.size().cpus, mp.size().memory_mb, mp.size().disk_gb),
+        size: mp.size(),
         boot,
         tpm: mp.tpm.is_some(),
         own_boot: mp.boot.clone(),
@@ -103,11 +102,10 @@ fn needs_project(env: &Environment, (name, mp): (&str, &MachinePlan)) -> bool {
 /// The machine's resolvers (`crate::server::resolvers`). Its search domain is its own, else the
 /// private zone's (`dns.private`), whose names its hosts file carries.
 fn dns(env: &Environment, name: &str) -> Block {
-    let d = env.spec().machines.get(name).and_then(|m| m.dns.as_ref());
     let servers = crate::server::resolvers(env, Some(name)).into_iter().map(string);
     let mut b = Block::builder("dns").add_attribute(("servers", list(servers)));
     let zone = env.private_dns.as_ref().map(|z| z.domain.as_str());
-    if let Some(domain) = d.and_then(|d| d.domain.as_deref()).or(zone) {
+    if let Some(domain) = crate::server::domain_of(env, name).or(zone) {
         b = b.add_attribute(("domain", string(domain)));
     }
     b.build()
@@ -191,8 +189,8 @@ pub(super) struct Vm {
     pub(super) snippet: String,
     /// Its name on the server, after `iso<slot>-`.
     pub(super) name: String,
-    /// CPUs, memory in MB, disk in GB (a cloud image's disk).
-    pub(super) size: (u32, u32, u32),
+    /// Its CPUs, memory and disk (a cloud image's disk).
+    pub(super) size: isoloom_spec::MachineSize,
     /// What it boots from.
     pub(super) boot: Boot,
     /// Whether it has a virtual TPM 2.0 (its state on the VM datastore).
@@ -223,7 +221,7 @@ pub(super) struct Vm {
 impl Vm {
     /// The `proxmox_virtual_environment_vm` block.
     pub(super) fn block(mut self, env: &Environment) -> Block {
-        let (cores, memory, _) = self.size;
+        let (cores, memory) = (self.size.cpus, self.size.memory_mb);
         let mut b = resource("proxmox_virtual_environment_vm", &self.id)
             .add_attribute(("name", slotted(&format!("-{}", self.name))))
             .add_attribute(("node_name", reference("var.node")))
@@ -302,12 +300,12 @@ impl Vm {
         let mut out = Vec::new();
         match &self.boot {
             Boot::Image(image) => {
-                out.push(disk(Some(reference(&format!("proxmox_download_file.{image}.id"))), self.size.2));
+                out.push(disk(Some(reference(&format!("proxmox_download_file.{image}.id"))), self.size.disk_gb));
                 out.extend(self.arm.then(super::arch::efi_disk));
             }
             Boot::Clone(id) => {
                 out.push(super::image::clone(number((*id).into())));
-                out.push(disk(None, self.size.2));
+                out.push(disk(None, self.size.disk_gb));
             }
             Boot::Template { variable, disk: size, .. } => {
                 out.push(

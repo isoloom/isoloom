@@ -11,51 +11,47 @@ use crate::model::{Boot, BootDevice, Firmware, NetworkBoot, Spec, VmImage};
 
 /// Every machine's `vm.image` and `vm.boot`, then the controller's image, then the network
 /// boots that share a network.
-pub(super) fn check(spec: &Spec, p: &mut Problems) {
+pub(super) fn check(spec: &Spec, problems: &mut Problems) {
     for (name, m) in &spec.machines {
         let Some(vm) = &m.vm else { continue };
         let at = format!("machines.{name}.vm");
         if let Some(i) = &vm.image {
-            image(&format!("{at}.image"), i, p);
+            image(&format!("{at}.image"), i, problems);
         }
         if let Some(b) = &vm.boot {
-            boot(&format!("{at}.boot"), b, p);
+            boot(&format!("{at}.boot"), b, problems);
             if b.network.is_some() && m.networks.is_empty() {
-                p.add(
+                problems.add(
                     format!("{at}.boot.network"),
                     "a network boot is served on the machine's first network: give it one in `networks`",
                 );
             }
         }
     }
-    controller(spec, p);
-    shared_networks(spec, p);
+    controller(spec, problems);
+    shared_networks(spec, problems);
 }
 
 /// The references a machine's image gives, each in the form its target takes.
-fn image(at: &str, i: &VmImage, p: &mut Problems) {
-    boxes(at, i, p);
+fn image(at: &str, i: &VmImage, problems: &mut Problems) {
+    boxes(at, i, problems);
     if (i.box_url.is_some() || i.box_server_url.is_some()) && i.vagrant.is_none() {
-        p.add(
+        problems.add(
             format!("{at}.vagrant"),
             "name the box in `vagrant` too: Vagrant keeps the box it downloads from `box_url` (or finds on `box_server_url`) under that name",
         );
     }
     if let Some(u) = &i.box_url
-        && !is_url(u)
-        && (u.starts_with('/') || u.split('/').any(|s| s == ".."))
+        && !super::is_url(u)
+        && crate::project_path::plain(u).is_err()
     {
-        p.add(format!("{at}.box_url"), "a URL (https://, file://) or a .box file inside the project folder");
+        problems.add(format!("{at}.box_url"), "a URL (https://, file://) or a .box file inside the project folder");
     }
-    if let Some(u) = i.box_server_url.as_ref().filter(|u| !u.starts_with("http://") && !u.starts_with("https://")) {
-        p.add(format!("{at}.box_server_url"), format!("`{u}` isn't an http(s) URL"));
+    if let Some(u) = i.box_server_url.as_ref().filter(|u| !is_http_url(u)) {
+        problems.add(format!("{at}.box_server_url"), format!("`{u}` isn't an http(s) URL"));
     }
-    if let Some(x) = i
-        .proxmox
-        .as_ref()
-        .filter(|x| !template_id(x) && !x.starts_with("http://") && !x.starts_with("https://"))
-    {
-        p.add(
+    if let Some(x) = i.proxmox.as_ref().filter(|x| !template_id(x) && !is_http_url(x)) {
+        problems.add(
             format!("{at}.proxmox"),
             format!("`{x}` is neither a cloud image's http(s) URL nor a template VM's id (a number from 100)"),
         );
@@ -68,26 +64,26 @@ fn image(at: &str, i: &VmImage, p: &mut Problems) {
     ];
     for (field, value, prefix, what) in prefixed {
         if let Some(v) = value.as_ref().filter(|v| !v.starts_with(prefix)) {
-            p.add(format!("{at}.{field}"), format!("`{v}` isn't {what}"));
+            problems.add(format!("{at}.{field}"), format!("`{v}` isn't {what}"));
         }
     }
     for (field, value) in [("digitalocean", &i.digitalocean), ("linode", &i.linode)] {
         if value.as_ref().is_some_and(|v| v.trim().is_empty() || v.contains(char::is_whitespace)) {
-            p.add(format!("{at}.{field}"), "an image's slug or id, without spaces");
+            problems.add(format!("{at}.{field}"), "an image's slug or id, without spaces");
         }
     }
 }
 
 /// Each box an image names that isn't a box name.
-fn boxes(at: &str, i: &VmImage, p: &mut Problems) {
+fn boxes(at: &str, i: &VmImage, problems: &mut Problems) {
     for (field, value) in bad_boxes(i) {
-        p.add(format!("{at}.{field}"), format!("`{value}` isn't {BOX_NAME}"));
+        problems.add(format!("{at}.{field}"), format!("`{value}` isn't {BOX_NAME}"));
     }
 }
 
-fn is_url(s: &str) -> bool {
-    s.split_once("://")
-        .is_some_and(|(scheme, _)| !scheme.is_empty() && scheme.chars().all(|c| c.is_ascii_alphabetic()))
+/// Whether `s` is an `http://` or `https://` URL.
+fn is_http_url(s: &str) -> bool {
+    s.starts_with("http://") || s.starts_with("https://")
 }
 
 /// The VM ids Proxmox gives: 100 to 999999999 (below 100 are reserved).
@@ -99,70 +95,63 @@ fn template_id(s: &str) -> bool {
 }
 
 /// The boot's fields: host paths are absolute, each part has what it hangs on.
-fn boot(at: &str, b: &Boot, p: &mut Problems) {
-    let paths = [
-        ("kernel", &b.kernel),
-        ("initrd", &b.initrd),
-        ("dtb", &b.dtb),
-        ("loader", &b.loader),
-        ("nvram", &b.nvram),
-    ];
-    for (field, value) in paths {
-        if let Some(v) = value.as_ref().filter(|v| !v.starts_with('/')) {
-            p.add(format!("{at}.{field}"), format!("`{v}` must be an absolute path on the hypervisor's host"));
+fn boot(at: &str, b: &Boot, problems: &mut Problems) {
+    for (field, value) in b.host_files() {
+        if let Some(v) = value.filter(|v| !v.starts_with('/')) {
+            problems.add(format!("{at}.{field}"), format!("`{v}` must be an absolute path on the hypervisor's host"));
         }
     }
     for (field, set) in [("initrd", b.initrd.is_some()), ("cmdline", b.cmdline.is_some()), ("dtb", b.dtb.is_some())] {
         if set && b.kernel.is_none() {
-            p.add(format!("{at}.{field}"), format!("`{field}` goes with a `kernel`: give the kernel it boots"));
+            problems.add(format!("{at}.{field}"), format!("`{field}` goes with a `kernel`: give the kernel it boots"));
         }
     }
     if b.firmware == Some(Firmware::Bios) && (b.loader.is_some() || b.firmware_format.is_some()) {
-        p.add(
+        problems.add(
             format!("{at}.firmware"),
             "`loader` and `firmware_format` are a UEFI firmware's: `firmware: uefi`, or leave them out",
         );
     }
     if b.nvram.is_some() && b.loader.is_none() {
-        p.add(
+        problems.add(
             format!("{at}.nvram"),
             "`nvram` keeps a UEFI firmware's variables: give the firmware in `loader`",
         );
     }
     for (i, d) in b.order.iter().enumerate() {
         if b.order.iter().take(i).any(|earlier| earlier == d) {
-            p.add(format!("{at}.order[{i}]"), format!("`{}` is listed twice", d.id()));
+            problems.add(format!("{at}.order[{i}]"), format!("`{}` is listed twice", d.id()));
         }
     }
     if let Some(n) = &b.network {
-        network(&format!("{at}.network"), n, b, p);
+        network(&format!("{at}.network"), n, b, problems);
     }
 }
 
-fn network(at: &str, n: &NetworkBoot, b: &Boot, p: &mut Problems) {
+fn network(at: &str, n: &NetworkBoot, b: &Boot, problems: &mut Problems) {
     if !b.order.contains(&BootDevice::Network) {
-        p.add(at, "add `network` to `boot.order`, or the machine never boots from it");
+        problems.add(at, "add `network` to `boot.order`, or the machine never boots from it");
     }
     if n.tftp_root.is_none() && n.file.is_none() {
-        p.add(at, "give the TFTP folder (`tftp_root`) or the boot file (`file`) it serves");
+        problems.add(at, "give the TFTP folder (`tftp_root`) or the boot file (`file`) it serves");
     }
     if let Some(r) = n.tftp_root.as_ref().filter(|r| !r.starts_with('/')) {
-        p.add(format!("{at}.tftp_root"), format!("`{r}` must be an absolute path on the hypervisor's host"));
+        problems.add(format!("{at}.tftp_root"), format!("`{r}` must be an absolute path on the hypervisor's host"));
     }
     if let Some(s) = n.server.as_ref().filter(|s| s.parse::<Ipv4Addr>().is_err()) {
-        p.add(format!("{at}.server"), format!("`{s}` isn't an IPv4 address"));
+        problems.add(format!("{at}.server"), format!("`{s}` isn't an IPv4 address"));
     }
     if n.server.is_some() && n.file.is_none() {
-        p.add(format!("{at}.server"), "the server holds the boot `file`: give the file too");
+        problems.add(format!("{at}.server"), "the server holds the boot `file`: give the file too");
     }
 }
 
 /// The controller's image is a Vagrant box: the other targets build it from their own image.
-fn controller(spec: &Spec, p: &mut Problems) {
+fn controller(spec: &Spec, problems: &mut Problems) {
     let Some(i) = spec.controller.as_ref().and_then(|c| c.image.as_ref()) else {
         return;
     };
-    boxes("controller.image", i, p);
+    boxes("controller.image", i, problems);
     let others = [
         ("box_url", i.box_url.is_some()),
         ("box_server_url", i.box_server_url.is_some()),
@@ -175,7 +164,7 @@ fn controller(spec: &Spec, p: &mut Problems) {
         ("oci", i.oci.is_some()),
     ];
     for (field, _) in others.iter().filter(|(_, set)| *set) {
-        p.add(
+        problems.add(
             format!("controller.image.{field}"),
             "the controller's image is a Vagrant box (`vagrant`, `vagrant_version`): every other target builds it from Debian",
         );
@@ -184,7 +173,7 @@ fn controller(spec: &Spec, p: &mut Problems) {
 
 /// A network's DHCP and TFTP server is the network's own: the machines whose network boot is
 /// served on the same network must agree on it.
-fn shared_networks(spec: &Spec, p: &mut Problems) {
+fn shared_networks(spec: &Spec, problems: &mut Problems) {
     let mut served: HashMap<&str, (&str, &NetworkBoot)> = HashMap::new();
     for (name, m) in &spec.machines {
         let Some(n) = m.vm.as_ref().and_then(|v| v.boot.as_ref()).and_then(|b| b.network.as_ref()) else {
@@ -192,7 +181,7 @@ fn shared_networks(spec: &Spec, p: &mut Problems) {
         };
         let Some(net) = m.networks.keys().next() else { continue };
         match served.get(net.as_str()) {
-            Some((other, theirs)) if *theirs != n => p.add(
+            Some((other, theirs)) if *theirs != n => problems.add(
                 format!("machines.{name}.vm.boot.network"),
                 format!("network `{net}` already serves `{other}`'s network boot: one TFTP folder and boot file per network"),
             ),

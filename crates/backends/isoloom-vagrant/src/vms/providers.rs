@@ -3,7 +3,7 @@
 
 use std::net::Ipv4Addr;
 
-use crate::boxes::{self, Choice, MainBox};
+use crate::boxes;
 use crate::console;
 use isoloom_spec::model::{Arch, Boot};
 use isoloom_spec::windows::Tpm;
@@ -11,6 +11,7 @@ use isoloom_spec::windows::Tpm;
 use super::hyperv::{self, HyperV};
 use super::provider::Provider;
 use super::qemu::{HubPort, Link};
+use super::utm::{self, Utm};
 use super::{boot, nested, windows};
 use crate::ruby::{Call, Ruby, Value};
 use crate::vagrantfile;
@@ -35,14 +36,6 @@ impl Size {
             cpus: c.map_or(isoloom_plan::Controller::CPUS, |c| c.cpus),
             mem: c.map_or(isoloom_plan::Controller::MEMORY_MB, |c| c.memory_mb),
             disk: c.and_then(|c| c.disk_gb),
-        }
-    }
-
-    /// Its CPUs and memory, as a run manifest gives a machine's.
-    pub(crate) fn resources(self) -> isoloom_manifest::Resources {
-        isoloom_manifest::Resources {
-            cpus: Some(self.cpus),
-            memory_mb: Some(self.mem),
         }
     }
 
@@ -91,9 +84,9 @@ impl<'a> Qemu<'a> {
 #[derive(Debug, Clone)]
 pub(crate) struct Guest<'a> {
     /// Its display name.
-    pub(crate) label: String,
-    /// Its name on ESXi and Hyper-V (`<env>-<machine>`).
-    pub(crate) vm_name: String,
+    pub(crate) label: isoloom_plan::HostName,
+    /// Its name on ESXi and Hyper-V (`<env>-<key>-<machine>`).
+    pub(crate) vm_name: isoloom_plan::HostName,
     /// Its size.
     pub(crate) size: Size,
     /// The ESXi port group of each network it is on, in order, by its index in
@@ -107,6 +100,8 @@ pub(crate) struct Guest<'a> {
     pub(crate) qemu: Qemu<'a>,
     /// How Hyper-V runs it.
     pub(crate) hyperv: HyperV<'a>,
+    /// How UTM runs it.
+    pub(crate) utm: Utm<'a>,
     /// Its virtual TPM, where the provider gives one (VirtualBox, libvirt; Hyper-V's is in
     /// `hyperv`).
     pub(crate) tpm: Option<Tpm>,
@@ -122,22 +117,6 @@ pub(crate) struct Guest<'a> {
     /// Its machine's name, when it is one of the environment's: it gets a graphical console
     /// ([`crate::console`]) where the provider gives one. Isoloom's own VMs get none.
     pub(crate) console: Option<&'a str>,
-}
-
-impl Guest<'_> {
-    /// The boxes the VM boots, provider by provider: `main` ([`MainBox`]), then the box each
-    /// provider block of this guest boots instead, as [`blocks`] writes them.
-    pub(crate) fn choice<'b>(&'b self, main: MainBox<'b>) -> Choice<'b> {
-        Choice {
-            main,
-            libvirt: self.libvirt_box,
-            qemu: self.qemu.boxed,
-            cpu: self.qemu.arch,
-            hyperv: Some(&self.hyperv.boxed),
-            esxi: self.esxi_box,
-            utm: None,
-        }
-    }
 }
 
 /// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
@@ -185,21 +164,22 @@ pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::VmwareEsxi), params, |r| esxi(r, g));
     libvirt(r, g);
     hyperv::block(r, &g.vm_name, g.size, &g.hyperv);
+    utm::block(r, &g.label, &g.vm_name, g.size, &g.utm);
     if g.nested {
         nested::refuse_elsewhere(r);
     }
 }
 
 /// `m.vm.provider "<id>"`: the head of a provider's block.
-fn provider(p: Provider<'_>) -> Call {
+fn provider(p: Provider) -> Call {
     Call::new("m.vm.provider").arg(Value::str(p.id()))
 }
 
 /// VirtualBox and Parallels: a name, CPUs, memory and linked clones, then what only that
 /// provider sets (`more`).
-fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, more: impl FnOnce(&mut Ruby)) {
+fn desktop(r: &mut Ruby, p: Provider, g: &Guest, more: impl FnOnce(&mut Ruby)) {
     r.block(provider(p), "v", |r| {
-        r.assign("v.name", Value::str(&g.label));
+        r.assign("v.name", crate::vagrantfile::host_name(&g.label));
         r.assign("v.linked_clone", true);
         r.assign("v.cpus", g.size.cpus);
         r.assign("v.memory", g.size.mem);
@@ -213,7 +193,7 @@ fn desktop(r: &mut Ruby, p: Provider<'_>, g: &Guest, more: impl FnOnce(&mut Ruby
 /// VMware Workstation and Fusion: a display name, CPUs and memory, in the VM's `.vmx`.
 fn vmware(r: &mut Ruby, g: &Guest) {
     r.block(provider(Provider::VmwareDesktop), "v", |r| {
-        r.assign("v.vmx[\"displayName\"]", Value::str(&g.label));
+        r.assign("v.vmx[\"displayName\"]", crate::vagrantfile::host_name(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
         if g.nested {
@@ -364,7 +344,7 @@ fn esxi(r: &mut Ruby, g: &Guest) {
     let nets = Value::array(g.port_groups.iter().map(|&i| Value::raw(i.to_string())));
     vagrantfile::esxi_host(r);
     r.assign("v.esxi_virtual_network", Value::raw(format!("esxi_networks({nets})")));
-    r.assign("v.guest_name", Value::str(&g.vm_name));
+    r.assign("v.guest_name", crate::vagrantfile::host_name(&g.vm_name));
     if let Some(os) = g.esxi_guestos {
         r.assign("v.guest_guestos", Value::str(os));
     }

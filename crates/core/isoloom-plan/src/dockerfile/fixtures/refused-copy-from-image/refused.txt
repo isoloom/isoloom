@@ -1,0 +1,2 @@
+refused: build/refused-copy-from-image/Dockerfile line 2 (`COPY`): `--from=mlocati/php-extension-installer:2` copies out of another image, which the VM doesn't have
+fix: fetch or install what it copies in a `RUN`, or give the machine `os` and `app.steps`

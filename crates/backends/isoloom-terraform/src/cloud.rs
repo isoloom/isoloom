@@ -1,6 +1,6 @@
 //! The clouds: the [`Cloud`]s the modules run on, what every cloud module shares (its head: the
 //! operator's variables, the provider, the environment's instance; the auto-stop), the targets
-//! on them (`cloud-vm`, `cloud-docker`, `cloud-services`), and each cloud's own folder: its
+//! on them (`cloud-vm`, `cloud-docker`), and each cloud's own folder: its
 //! pieces for both targets, and its driver of each (`<cloud>::vm::DRIVER`,
 //! `<cloud>::docker::DRIVER`), which holds only what the cloud does its own way.
 
@@ -12,10 +12,8 @@ pub(crate) mod docker;
 pub(crate) mod gcp;
 pub(crate) mod instance;
 pub(crate) mod linode;
-pub(crate) mod manifest;
 pub(crate) mod oci;
 pub(crate) mod operator;
-pub(crate) mod services;
 pub(crate) mod user_data_limit;
 pub(crate) mod vm;
 
@@ -116,7 +114,7 @@ pub(crate) struct Base {
     pub(crate) variables: fn(&str) -> Vec<Variable>,
     /// Its provider's configuration.
     pub(crate) provider: ProviderConfig,
-    /// The user the runner's key logs in as on a machine of this OS, from the cloud's image
+    /// The user the operator's key logs in as on a machine of this OS, from the cloud's image
     /// table (it has `sudo`, or is root).
     pub(crate) user: fn(&str) -> &'static str,
 }
@@ -151,10 +149,10 @@ impl Base {
 
 /// A cloud module's start after its `terraform` block, the same on every cloud and target: the
 /// cloud's `variables`, the operator's, then its provider and the environment's id and locals.
-pub(crate) fn head(env: &Environment, m: &mut Module, variables: Vec<Variable>, provider: ProviderConfig, copy: ProjectCopy) {
-    m.blocks(variables.into_iter().chain(operator::host_reaching()).map(Variable::block));
-    let locals = provider(env, m);
-    m.blocks(instance::id_and_locals(env, locals, copy != ProjectCopy::Runner));
+pub(crate) fn head(env: &Environment, module: &mut Module, variables: Vec<Variable>, provider: ProviderConfig, copy: ProjectCopy) {
+    module.blocks(variables.into_iter().chain(operator::host_reaching()).map(Variable::block));
+    let locals = provider(env, module);
+    module.blocks(instance::id_and_locals(env, locals, copy));
 }
 
 impl fmt::Display for Cloud {

@@ -117,6 +117,19 @@ pub struct When {
     /// A setting `with:` leaves out, with no default.
     #[serde(default)]
     pub unset: Option<SettingName>,
+    /// `string` settings and the value each has (`{ server: apache }`).
+    #[serde(default)]
+    pub is: Option<indexmap::IndexMap<SettingName, String>>,
+}
+
+impl When {
+    /// Whether its conditions on the machine and the release hold for `release` on `os` (its
+    /// conditions on the settings aside): what resolving a step and listing its fetches share.
+    pub(crate) fn holds_on(&self, os: OsRef, release: &crate::entry::Release) -> bool {
+        self.family.as_ref().is_none_or(|f| f.iter().any(|f| f.as_str() == os.os().family))
+            && self.os.as_ref().is_none_or(|l| l.contains(&os))
+            && self.release.as_ref().is_none_or(|l| l.iter().any(|word| release.is(word)))
+    }
 }
 
 /// A distribution's name as a machine's `os:` writes it, before the `@` (`debian`, `rocky`): one

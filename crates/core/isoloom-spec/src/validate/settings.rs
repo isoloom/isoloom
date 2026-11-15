@@ -15,27 +15,33 @@ pub(crate) const CONTAINER_SYSCTLS: &[&str] = &[
     "fs.mqueue.",
 ];
 
-/// The machine's settings, each checked in turn; a Windows machine has neither sysctls nor ulimits.
-pub(super) fn machine(name: &str, m: &Machine, p: &mut Problems) {
+/// The machine's settings, each checked in turn; a Windows machine has neither sysctls, ulimits
+/// nor memory-backed mounts.
+pub(super) fn machine(name: &str, m: &Machine, problems: &mut Problems) {
     let at = |field: &str, key: &str| format!("machines.{name}.{field}.{key}");
     for k in m.environment.keys() {
         if !is_variable(k) {
-            p.add(at("environment", k), "a variable name: letters, digits and _, not starting with a digit");
+            problems.add(at("environment", k), "a variable name: letters, digits and _, not starting with a digit");
         }
     }
-    sysctls(m, &|k| at("sysctls", k), p);
+    sysctls(m, &|k| at("sysctls", k), problems);
     for (k, u) in &m.ulimits {
         if !crate::model::ULIMITS.contains(&k.as_str()) {
-            p.add(at("ulimits", k), format!("one of {}", crate::model::ULIMITS.join(", ")));
+            problems.add(at("ulimits", k), format!("one of {}", crate::model::ULIMITS.join(", ")));
         }
         if u.soft() > u.hard() {
-            p.add(at("ulimits", k), "the soft limit can't be above the hard one");
+            problems.add(at("ulimits", k), "the soft limit can't be above the hard one");
         }
     }
     if m.vm.as_ref().is_some_and(|v| crate::images::is_windows(&v.os)) {
-        for (field, set) in [("sysctls", !m.sysctls.is_empty()), ("ulimits", !m.ulimits.is_empty())] {
+        for (field, set) in [
+            ("sysctls", !m.sysctls.is_empty()),
+            ("ulimits", !m.ulimits.is_empty()),
+            ("tmpfs", !m.tmpfs.is_empty()),
+            ("dns.options", m.dns.as_ref().is_some_and(|d| !d.options.is_empty())),
+        ] {
             if set {
-                p.add(format!("machines.{name}.{field}"), "Linux only: a Windows machine has none");
+                problems.add(format!("machines.{name}.{field}"), "Linux only: a Windows machine has none");
             }
         }
     }
@@ -49,18 +55,18 @@ fn kernel_parameter(k: &str) -> bool {
 }
 
 /// Kernel parameters, namespaced ones only on a container, each with a one-line value.
-fn sysctls(m: &Machine, at: &dyn Fn(&str) -> String, p: &mut Problems) {
+fn sysctls(m: &Machine, at: &dyn Fn(&str) -> String, problems: &mut Problems) {
     for (k, v) in &m.sysctls {
         if !kernel_parameter(k) {
-            p.add(at(k), "a kernel parameter, e.g. net.core.somaxconn");
+            problems.add(at(k), "a kernel parameter, e.g. net.core.somaxconn");
         } else if m.docker.is_some() && !CONTAINER_SYSCTLS.iter().any(|pre| k.starts_with(pre)) {
-            p.add(
+            problems.add(
                 at(k),
                 "a container can only set the namespaced ones (net.*, kernel.shm*, kernel.msg*, kernel.sem, fs.mqueue.*): run it on a VM target, which sets any",
             );
         }
         if v.trim().is_empty() || v.contains('\n') {
-            p.add(at(k), "a value on one line");
+            problems.add(at(k), "a value on one line");
         }
     }
 }
@@ -82,6 +88,25 @@ mod tests {
         let container = "environment: { _A1: x }, sysctls: { net.ipv4.tcp_syncookies: '1', net.ipv4.conf.br-lan.forwarding: '1', kernel.shmmax: '1' }, ulimits: { nofile: { soft: 1024, hard: 1024 }, nproc: 64 }";
         assert_eq!(of(CONTAINER, container), Vec::<String>::new());
         assert_eq!(of("vm: { os: debian@12 }", "sysctls: { vm.swappiness: '10' }"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_windows_machine_has_no_linux_settings() {
+        assert_eq!(
+            of("vm: { os: windows-server@2022 }", "sysctls: { vm.swappiness: '10' }, tmpfs: [/cache]"),
+            [
+                "machines.a.sysctls: Linux only: a Windows machine has none",
+                "machines.a.tmpfs: Linux only: a Windows machine has none"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_windows_machine_takes_no_resolver_options() {
+        assert_eq!(
+            of("vm: { os: windows-server@2022 }", "dns: { servers: [10.0.0.53], options: [rotate] }"),
+            ["machines.a.dns.options: Linux only: a Windows machine has none"]
+        );
     }
 
     #[test]

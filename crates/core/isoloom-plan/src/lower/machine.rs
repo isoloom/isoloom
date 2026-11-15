@@ -3,10 +3,8 @@
 //! `vm:` blocks, each built from the recipe that gives it ([`super::forms`]).
 
 use indexmap::IndexMap;
-use isoloom_spec::model::{self, BaseImage, DockerImpl, Generated, HttpCheck, MachineFile, MachineSecret, Protocol, SecretMount, VmImpl};
-use isoloom_spec::syntax::{
-    self, Code, EnvValue, FieldPath, FileSource, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm,
-};
+use isoloom_spec::model::{self, BaseImage, DockerImpl, Generated, HttpCheck, Protocol, VmImpl};
+use isoloom_spec::syntax::{self, Code, EnvValue, FieldPath, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm};
 
 use isoloom_spec::model::Shape;
 
@@ -14,6 +12,10 @@ use super::forms::{self, Container, Service, Vm};
 use super::overrides;
 use super::trail::Trail;
 use super::{Lowering, Scope};
+
+mod split;
+
+use split::files;
 
 /// A lowered machine, the inputs its files read (the secret each becomes → the input), and what
 /// couldn't be lowered, at the field the author wrote.
@@ -37,6 +39,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     let m = m.as_ref();
     let (files, secrets, inputs) = files(name, m, trail);
     trail.machine(name, m);
+    trail.overrides(l.source, name);
     let at = FieldPath::new("machines").key(name);
     let (ports, unnumbered) = ports(&at, m);
     problems.extend(unnumbered);
@@ -83,7 +86,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     out.docker = docker;
     out.external = overrides::external(l.source, name);
     out.configuration = configuration(l, m, service, image);
-    problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service));
+    problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service, l.services.daemons()));
     // On Proxmox, a machine run as an LXC container is that container only.
     if out.docker.as_ref().is_some_and(|d| d.lxc) {
         out.vm = None;
@@ -95,9 +98,7 @@ pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, tra
     }
 }
 
-/// Which image a machine's container is: the catalogue entry's own, or one built for it. A flag
-/// (`official: bool`) threaded through three functions before, one caller passing a bare
-/// `false` (Clean Code F3, 2026-11-13).
+/// Which image a machine's container is: the catalogue entry's own, or one built for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ContainerImage {
     /// The entry's published image, as is: its platforms, variables and configuration are its.
@@ -143,9 +144,9 @@ fn image_environment(l: &Lowering<'_>, image: ContainerImage, service: Service<'
 }
 
 /// Whether the target runs a machine with a container form as a container (`docker` and the
-/// container targets; `hybrid` too).
+/// container targets).
 fn runs_containers(l: &Lowering<'_>) -> bool {
-    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker | Shape::Either))
+    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker))
 }
 
 /// The inputs its environment reads.
@@ -178,11 +179,17 @@ fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, im
 /// can't carry at all, at its `service`, so the plan resolves every configuration of an environment that
 /// lowered clean ([`crate::configure::Recipe::of`]). An app's own steps are refused per target,
 /// at each step (`super::refusals`).
-fn unresolved(at: &FieldPath, c: Option<&model::Configuration>, ports: &[model::Port], service: Service<'_>) -> Vec<Problem> {
+fn unresolved(
+    at: &FieldPath,
+    c: Option<&model::Configuration>,
+    ports: &[model::Port],
+    service: Service<'_>,
+    daemons: &crate::configure::DaemonTable,
+) -> Vec<Problem> {
     let (Some(c), Some(Ok(resolved))) = (c, service) else {
         return Vec::new();
     };
-    let Err(unportable) = crate::configure::Recipe::of(c, ports, &crate::configure::DaemonTable::common()) else {
+    let Err(unportable) = crate::configure::Recipe::of(c, ports, daemons) else {
         return Vec::new();
     };
     let entries: Vec<&str> = resolved.iter().map(|r| r.entry.as_str()).collect();
@@ -204,7 +211,7 @@ fn serves(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>) -> bool {
     let Some(c) = configuration(l, m, service, ContainerImage::Own) else {
         return false;
     };
-    crate::configure::Recipe::of(&c, &[], &crate::configure::DaemonTable::common()).is_ok_and(|r| !r.daemons.is_empty())
+    crate::configure::Recipe::of(&c, &[], l.services.daemons()).is_ok_and(|r| !r.daemons.is_empty())
 }
 
 /// Each network's first address, and the further ones where a list gives several.
@@ -258,11 +265,11 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
                 return None;
             };
             let port = number.get();
-            let (publish, fixed) = match p.publish {
-                None => (None, false),
-                Some(Publish::Free) => (Some(port), false),
-                Some(Publish::Preferred(h)) => (Some(h.get()), false),
-                Some(Publish::Fixed(h)) => (Some(h.get()), true),
+            let (publish, fixed, free) = match p.publish {
+                None => (None, false, false),
+                Some(Publish::Free) => (Some(port), false, true),
+                Some(Publish::Preferred(h)) => (Some(h.get()), false, false),
+                Some(Publish::Fixed(h)) => (Some(h.get()), true, false),
             };
             Some(model::Port {
                 port,
@@ -271,8 +278,10 @@ fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>
                 tls: p.protocol.is_tls(),
                 publish,
                 fixed,
+                free,
                 dormant: p.dormant,
                 protocol: if p.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp },
+                login: p.login.clone(),
             })
         })
         .collect();
@@ -317,53 +326,6 @@ fn healthcheck(at: &FieldPath, m: &syntax::Machine, h: &syntax::Healthcheck) -> 
     (Some(lowered), unknown)
 }
 
-/// The machine's files split by source: configuration as files, values as secret files (an
-/// input's as the secret `input-<name>`), and the inputs read that way.
-fn files(name: &str, m: &syntax::Machine, trail: &mut Trail) -> (Vec<MachineFile>, Vec<MachineSecret>, Vec<(String, String)>) {
-    let windows = m.os.is_some_and(syntax::OsRef::is_windows);
-    let (mut files, mut secrets, mut inputs) = (Vec::new(), Vec::new(), Vec::new());
-    for (i, f) in m.files.iter().enumerate() {
-        let (source, content) = match &f.source {
-            FileSource::Source(p) => (Some(p.clone()), None),
-            FileSource::Content(c) => (None, Some(c.clone())),
-            FileSource::Input(input) => {
-                let secret = input_secret(input.as_str());
-                inputs.push((secret.clone(), input.to_string()));
-                trail.file(name, "secrets", secrets.len(), i);
-                secrets.push(value_file(&secret, f, windows));
-                continue;
-            }
-            FileSource::Secret(secret) => {
-                trail.file(name, "secrets", secrets.len(), i);
-                secrets.push(value_file(secret, f, windows));
-                continue;
-            }
-        };
-        trail.file(name, "files", files.len(), i);
-        files.push(MachineFile {
-            path: f.path.clone(),
-            source,
-            content,
-            uid: f.uid,
-            gid: f.gid,
-            mode: f.mode.map(|mode| mode.to_string()),
-        });
-    }
-    (files, secrets, inputs)
-}
-
-/// A value's file: the secret at its path, root's and `0400` unless the spec says (no mode on
-/// Windows).
-fn value_file(secret: &str, f: &syntax::File, windows: bool) -> MachineSecret {
-    MachineSecret::Mount(SecretMount {
-        source: secret.to_owned(),
-        target: Some(f.path.clone()),
-        uid: f.uid,
-        gid: f.gid,
-        mode: (!windows).then(|| f.mode_or_default()),
-    })
-}
-
 /// The container form, as a `docker:` block.
 fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_>) -> Option<DockerImpl> {
     let (source, scope) = (l.source, l.scope);
@@ -374,7 +336,7 @@ fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_
     d.lxc = overrides::lxc(source, name, scope);
     // No container form: the target refuses the machine there (`refusals`), or the lab lowers
     // it with the forms it has.
-    match forms::container(m, service).ok()? {
+    match forms::container(m, service, l.services.daemons()).ok()? {
         Container::Supplied => return None,
         Container::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
         Container::Recipe(Recipe::Build(b)) => {
