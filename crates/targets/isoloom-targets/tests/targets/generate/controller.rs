@@ -6,7 +6,12 @@ use isoloom_targets::Lab;
 
 use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
 
-use crate::testing::{Outcome, example, from, generated, lab, problems, source};
+use crate::testing::{Outcome, define, example, from, generated, lab, problems, provisioners, set_up, source, vagrantfile};
+
+/// The statements of `block` and the blocks inside it equal to `statement`.
+fn count(block: &isoloom_test_support::RubyBlock, statement: &str) -> usize {
+    block.every_statement().iter().filter(|s| **s == statement).count()
+}
 
 #[test]
 fn cloud_vm_gives_a_machine_on_several_networks_an_interface_on_each() -> Outcome {
@@ -55,13 +60,23 @@ fn cloud_vm_runs_the_environments_playbooks_from_a_controller() -> Outcome {
     );
     // Once every machine's own set-up is done (its ready file, over SSH with the controller's
     // key), it runs the playbook with the groups and vars.
+    let script = set_up(&tf, "isoloom_controller")?;
     let (web, cache) = (
-        tf.find("running: waiting for web").ok_or("web")?,
-        tf.find("running: waiting for cache").ok_or("cache")?,
+        script.find("running: waiting for web").ok_or("web")?,
+        script.find("running: waiting for cache").ok_or("cache")?,
     );
-    let playbook = tf.find("ansible-playbook -i /etc/isoloom/inventory.ini -i ").ok_or("playbook")?;
-    assert!(web < playbook && cache < playbook, "{tf}");
-    assert!(tf.contains("/opt/isoloom/ansible/groups.ini") && tf.contains("[webservers]"), "{tf}");
+    let playbook = script.find("ansible-playbook -i /etc/isoloom/inventory.ini -i ").ok_or("playbook")?;
+    assert!(web < playbook && cache < playbook, "{script}");
+    // The inventory it writes (base64-encoded by Terraform) has the spec's group; the project's
+    // own groups file goes beside it.
+    let inventory = script
+        .split("base64encode(\"")
+        .nth(1)
+        .and_then(|rest| rest.split("\")}").next())
+        .ok_or("no inventory")?
+        .replace("\\n", "\n");
+    assert!(inventory.lines().any(|l| l == "[webservers]"), "{inventory}");
+    assert!(script.contains("-i '\\''/opt/isoloom/ansible/groups.ini'\\''"), "{script}");
     Ok(())
 }
 
@@ -84,27 +99,38 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() -> Outcome {
     // ansible-pair asks for 768 MB.
     let mut src = source("ansible-pair")?;
     let spec = Lab::new(src.clone());
-    let vagrantfile = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    let ctl = from(&vagrantfile, "config.vm.define \"isoloom-controller\"")?;
-    assert!(
-        ctl.contains("m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : \"generic/alpine319\""),
-        "{ctl}"
+    let vf = vagrantfile(&spec)?;
+    let ctl = define(&vf, "isoloom-controller");
+    assert_eq!(
+        ctl.statements("m.vm.box = "),
+        ["m.vm.box = RbConfig::CONFIG[\"host_cpu\"] =~ /arm|aarch64/ ? \"bento/debian-12\" : \"generic/alpine319\""]
     );
-    assert!(ctl.contains("o.vm.box = \"generic/alpine319\""), "libvirt has Alpine on both architectures");
-    assert!(ctl.contains("v.memory = 768"));
-    assert!(ctl.contains("command -v apk"));
+    let libvirt = ctl.block("m.vm.provider \"libvirt\"");
+    assert_eq!(
+        libvirt.statements("o.vm.box = "),
+        ["o.vm.box = \"generic/alpine319\""],
+        "libvirt has Alpine on both architectures"
+    );
+    assert!(count(ctl, "v.memory = 768") > 0, "{ctl:?}");
+    assert!(ctl.every_statement().iter().any(|s| s.contains("command -v apk")), "{ctl:?}");
     // Without `controller:`: 1 CPU, 512 MB, on every target with a controller.
     src.controller = None;
     let small_lab = Lab::new(src.clone());
-    let small = generated(&small_lab, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    let small_ctl = from(&small, "config.vm.define \"isoloom-controller\"")?;
-    assert!(small_ctl.contains("v.cpus = 1\n      v.memory = 512"), "{small_ctl}");
-    assert!(small_ctl.contains("v.guest_memsize = 512"));
-    let aws = generated(&small_lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    let controller = from(&aws, "resource \"aws_instance\" \"isoloom_controller\"")?;
-    assert!(controller.contains("instance_type    = \"t3.micro\""), "{controller}");
-    let proxmox = generated(&small_lab, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    assert!(proxmox.contains("dedicated = 512"));
+    let small = vagrantfile(&small_lab)?;
+    let small_ctl = define(&small, "isoloom-controller");
+    let virtualbox = small_ctl.block("m.vm.provider \"virtualbox\"");
+    assert_eq!(
+        (virtualbox.statements("v.cpus = "), virtualbox.statements("v.memory = ")),
+        (vec!["v.cpus = 1"], vec!["v.memory = 512"])
+    );
+    assert_eq!(count(small_ctl, "v.guest_memsize = 512"), 1, "{small_ctl:?}");
+    let aws = hcl_body(&generated(&small_lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?);
+    assert_eq!(hcl_text(hcl_one(&aws, "aws_instance", "isoloom_controller"), "instance_type"), "t3.micro");
+    let proxmox = hcl_body(&generated(&small_lab, Target::Proxmox, ".isoloom/proxmox/main.tf")?);
+    assert_eq!(
+        hcl_values(hcl_one(&proxmox, "proxmox_virtual_environment_vm", "isoloom_controller"), "dedicated"),
+        ["512"]
+    );
     // A box of one's own, pinned.
     let other = parse(
         "version: 1\nname: t\nnetworks: {}\nmachines: {}\ncontroller: { resources: { cpus: 2 } }\noverrides: { vagrant: { controller: { box: bento/debian-12, box_version: \"202407.22.0\" } } }\n",
@@ -112,24 +138,33 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() -> Outcome {
     .unwrap();
     src.controller = other.controller;
     src.overrides = other.overrides;
-    let pinned = generated(&Lab::new(src), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(pinned.contains("m.vm.box = \"bento/debian-12\"\n    m.vm.box_version = \"202407.22.0\""));
-    assert!(pinned.contains("v.cpus = 2"));
+    let pinned = vagrantfile(&Lab::new(src))?;
+    let pinned_ctl = define(&pinned, "isoloom-controller");
+    assert_eq!(
+        pinned_ctl.statements("m.vm.box"),
+        ["m.vm.box = \"bento/debian-12\"", "m.vm.box_version = \"202407.22.0\""]
+    );
+    assert!(count(pinned_ctl, "v.cpus = 2") > 0, "{pinned_ctl:?}");
     Ok(())
 }
 
 #[test]
 fn the_controller_halts_after_provisioning_unless_kept_running() -> Outcome {
     let mut src = source("ansible-pair")?;
-    let vagrantfile = generated(&Lab::new(src.clone()), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    let ctl = from(&vagrantfile, "config.vm.define \"isoloom-controller\"")?;
+    let text = generated(&Lab::new(src.clone()), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
+    let ctl = from(&text, "config.vm.define \"isoloom-controller\"")?;
     // After the playbooks, before the on-demand checks; marked so a check run waits it out.
     let (ansible, halt) = (ctl.find("name: \"ansible\"").unwrap(), ctl.find("name: \"halt\"").unwrap());
     assert!(ansible < halt, "{ctl}");
-    assert!(ctl.contains("touch /run/isoloom-halting; (sleep 5; poweroff)"));
+    let file = vagrantfile(&Lab::new(src.clone()))?;
+    let halt_steps = define(&file, "isoloom-controller").statements("m.vm.provision \"shell\", name: \"halt\"");
+    assert!(
+        matches!(halt_steps.as_slice(), [one] if one.contains("touch /run/isoloom-halting; (sleep 5; poweroff)")),
+        "{halt_steps:?}"
+    );
     src.controller.get_or_insert_default().keep_running = true;
-    let kept = generated(&Lab::new(src), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(!kept.contains("name: \"halt\""));
+    let kept = vagrantfile(&Lab::new(src))?;
+    assert!(!provisioners(define(&kept, "isoloom-controller")).contains(&"halt".to_owned()));
     Ok(())
 }
 
@@ -184,9 +219,17 @@ fn the_controller_retries_unreachable_hosts_from_the_retry_file() -> Outcome {
 #[test]
 fn host_vars_go_on_each_machines_inventory_line_with_their_types() -> Outcome {
     let spec = example("ansible-pair")?;
-    let pair = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(pair.contains("cache ansible_host=10.63.0.20 maxmemory='\"64mb\"'"), "{pair}");
-    assert!(pair.contains("web ansible_host=10.63.0.10\n"), "{pair}");
+    let pair = vagrantfile(&spec)?;
+    let inventory: Vec<String> = define(&pair, "isoloom-controller")
+        .every_statement()
+        .iter()
+        .flat_map(|s| s.lines().map(|l| l.trim().to_owned()).collect::<Vec<_>>())
+        .collect();
+    assert!(
+        inventory.iter().any(|l| l == "cache ansible_host=10.63.0.20 maxmemory='\"64mb\"'"),
+        "{inventory:?}"
+    );
+    assert!(inventory.iter().any(|l| l == "web ansible_host=10.63.0.10"), "{inventory:?}");
     // Python literals, single-quoted: Ansible reads these back with their types (checked with
     // ansible-inventory 2.x).
     let typed = lab(

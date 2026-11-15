@@ -4,7 +4,68 @@
 use isoloom_spec::{Target, parse};
 use isoloom_targets::Lab;
 
-use crate::testing::{Outcome, generated, lab, problems};
+use isoloom_test_support::{hcl_body, hcl_literals, hcl_one, manifest, yaml_documents, yaml_values};
+
+use crate::testing::{Outcome, define, generated, lab, problems, vagrantfile};
+
+/// Whether a statement of any VM's `config.vm.define` block holds `text`.
+fn any_define_holds(vf: &isoloom_test_support::RubyBlock, text: &str) -> bool {
+    vf.find("config.vm.define \"")
+        .iter()
+        .any(|d| d.every_statement().iter().any(|s| s.contains(text)))
+}
+
+/// The readiness probes of every Deployment's containers, as YAML.
+fn readiness_probes(docs: &[serde_yaml_ng::Value]) -> Vec<String> {
+    docs.iter()
+        .filter(|d| d.get("kind").and_then(serde_yaml_ng::Value::as_str) == Some("Deployment"))
+        .flat_map(|d| {
+            d.get("spec")
+                .and_then(|s| s.get("template"))
+                .and_then(|t| t.get("spec"))
+                .and_then(|s| s.get("containers"))
+                .and_then(serde_yaml_ng::Value::as_sequence)
+                .cloned()
+                .unwrap_or_default()
+        })
+        .map(|c| {
+            c.get("readinessProbe")
+                .map(|p| serde_yaml_ng::to_string(p).unwrap_or_default())
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+/// Kubernetes: the dormant port is declared and in the Service, but not in the readiness probe
+/// or the wait of the machines depending on it.
+fn kubernetes_declares_the_dormant_port_and_waits_for_80(spec: &Lab) -> Outcome {
+    let env = generated(spec, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
+    let docs = yaml_documents(&env);
+    assert!(
+        yaml_values(manifest(&docs, "Deployment", "web"), "containerPort").contains(&"4444".to_owned()),
+        "{env}"
+    );
+    assert!(yaml_values(manifest(&docs, "Service", "web"), "name").contains(&"p4444".to_owned()), "{env}");
+    let init = manifest(&docs, "Deployment", "app")
+        .get("spec")
+        .and_then(|s| s.get("template"))
+        .and_then(|t| t.get("spec"))
+        .and_then(|s| s.get("initContainers"))
+        .ok_or("app has no initContainers")?;
+    let waits = serde_yaml_ng::to_string(init)?;
+    assert!(waits.contains("until nc -z web 80; do sleep 2; done"), "{waits}");
+    assert!(readiness_probes(&docs).iter().all(|p| !p.contains("4444")), "{env}");
+    Ok(())
+}
+
+/// VMs: app waits for web on 80 only.
+fn vms_wait_for_80_only(spec: &Lab) -> Outcome {
+    let vf = vagrantfile(spec)?;
+    let waits = define(&vf, "app").statements("m.vm.provision \"shell\", name: \"wait for web\"");
+    assert!(matches!(waits.as_slice(), [wait] if wait.contains("</dev/tcp/web/80")), "{waits:?}");
+    assert!(!any_define_holds(&vf, "/dev/tcp/web/4444"), "{vf:?}");
+    Ok(())
+}
 
 #[test]
 fn a_dormant_service_is_declared_but_never_waited_for() -> Outcome {
@@ -35,16 +96,8 @@ fn a_dormant_service_is_declared_but_never_waited_for() -> Outcome {
     let check = serde_yaml_ng::to_string(&svc("isoloom-check-app")["depends_on"]).unwrap();
     assert!(check.contains("web:") && !check.contains("shell:"), "{check}");
 
-    // Kubernetes: the port is declared and in the Service, but not in the readiness probe or
-    // the wait of the machines depending on it.
-    let env = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/environment.yaml")?;
-    assert!(env.contains("containerPort: 4444") && env.contains("name: p4444"), "{env}");
-    assert!(env.contains("until nc -z web 80; do sleep 2; done"), "{env}");
-    assert!(!env.contains("127.0.0.1 4444"), "{env}");
-
-    // VMs: app waits for web on 80 only.
-    let vf = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(vf.contains("</dev/tcp/web/80") && !vf.contains("/dev/tcp/web/4444"), "{vf}");
+    kubernetes_declares_the_dormant_port_and_waits_for_80(&spec)?;
+    vms_wait_for_80_only(&spec)?;
 
     // No derived check expects it to answer.
     let plan = isoloom_plan::checks::plan(&spec.spec());
@@ -117,7 +170,9 @@ fn a_udp_and_a_tcp_port_on_one_number_stay_apart_by_name() -> Outcome {
     assert_eq!(c["services"]["dns"]["labels"]["isoloom.port.dns-udp"].as_str(), Some("udp:53"));
     assert_eq!(c["services"]["dns"]["labels"]["isoloom.port.dns"].as_str(), Some("tcp:53"));
     let aws = generated(&named, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert!(aws.contains("\"dns/dns-udp\"") && aws.contains("\"dns/dns\""), "{aws}");
+    let mut keys = crate::testing::published_keys(&hcl_body(&aws));
+    keys.sort();
+    assert_eq!(keys, ["dns/dns", "dns/dns-udp"], "{aws}");
     // The same name twice is no map: the YAML says so.
     let twice = parse(
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
@@ -157,27 +212,33 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
     for name in ["p53-udp", "p53", "p10053-udp"] {
         assert!(service_ports.iter().any(|p| p == name), "{name}: {service_ports:?}");
     }
-    assert!(!env.contains("127.0.0.1 514"), "{env}");
+    assert!(readiness_probes(&docs).iter().all(|p| !p.contains("514")), "{env}");
 
     // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
-    let vf = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(
-        vf.contains("guest: 53, host: ENV.fetch(\"ISOTHRUM_HOST_PORT_")
-            && vf.contains("_53_UDP\", ISOLOOM_HOSTPORTS.fetch(")
-            && vf.contains(", 10053)).to_i, host_ip: \"127.0.0.1\", protocol: \"udp\", auto_correct: true # not on libvirt"),
-        "{vf}"
-    );
-    assert!(!vf.contains("/dev/tcp/syslog/514"), "{vf}");
+    let vf = vagrantfile(&spec)?;
+    let forwards = define(&vf, "dns").statements("m.vm.network \"forwarded_port\", guest: 53,");
+    let forward = "m.vm.network \"forwarded_port\", guest: 53, host: ENV.fetch(\"ISOTHRUM_HOST_PORT_DNS_53_UDP\", ISOLOOM_HOSTPORTS.fetch(\"dns/dns\", 10053)).to_i, host_ip: \"127.0.0.1\", protocol: \"udp\", auto_correct: true # not on libvirt";
+    assert!(matches!(forwards.as_slice(), [one] if one.starts_with(forward)), "{forwards:?}");
+    assert!(!any_define_holds(&vf, "/dev/tcp/syslog/514"), "{vf:?}");
 
     // Proxmox: the router forwards the published port as UDP.
     let tf = generated(&spec, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    assert!(tf.contains("udp dport 1514 dnat ip to 10.9.0.6:514"), "{tf}");
-    assert!(tf.contains("meta l4proto { tcp, udp } th dport { 53 } accept"), "{tf}");
+    let router = hcl_literals(hcl_one(&hcl_body(&tf), "proxmox_virtual_environment_file", "isoloom_router"));
+    let ruleset = router
+        .iter()
+        .find(|l| l.starts_with("flush ruleset\n"))
+        .ok_or("no ruleset in the router's set-up")?;
+    let rules: Vec<&str> = ruleset.lines().map(str::trim).collect();
+    assert!(rules.iter().any(|r| r.ends_with("udp dport 1514 dnat ip to 10.9.0.6:514")), "{ruleset}");
+    assert!(
+        rules.iter().any(|r| r.ends_with("meta l4proto { tcp, udp } th dport { 53 } accept")),
+        "{ruleset}"
+    );
 
     // The clouds: published as UDP.
     let aws = generated(&spec, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
     let body = isoloom_test_support::hcl_body(&aws);
-    let rules: Vec<(String, String, String)> = isoloom_test_support::hcl_blocks(&body, "resource", &["aws_security_group"])
+    let ingress: Vec<(String, String, String)> = isoloom_test_support::hcl_blocks(&body, "resource", &["aws_security_group"])
         .iter()
         .flat_map(|g| isoloom_test_support::hcl_nested(g.body(), "ingress"))
         .map(|r| {
@@ -185,7 +246,7 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
             (field("from_port"), field("to_port"), field("protocol"))
         })
         .collect();
-    assert!(rules.contains(&("1514".into(), "1514".into(), "udp".into())), "{rules:?}");
+    assert!(ingress.contains(&("1514".into(), "1514".into(), "udp".into())), "{ingress:?}");
     Ok(())
 }
 

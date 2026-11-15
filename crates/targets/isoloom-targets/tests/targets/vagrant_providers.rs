@@ -4,7 +4,14 @@
 use isoloom_spec::Target;
 use isoloom_targets::{refusal, refusal_on};
 
+use isoloom_test_support::{RubyBlock, ruby_blocks};
+
 use crate::testing::{Outcome, between, from, generated, lab};
+
+/// Whether a statement of `block` or the blocks inside it holds `text`.
+fn holds(block: &RubyBlock, text: &str) -> bool {
+    block.every_statement().iter().any(|s| s.contains(text))
+}
 
 /// Three Debian VMs on one network, the first sized.
 const THREE: &str = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10 }\n    resources: { disk_gb: 40 }\n    app: { steps: [{ run: p.sh }] }\n  b:\n    os: debian@12\n    networks: { lab: 11 }\n    app: { steps: [{ run: p.sh }] }\n  c:\n    os: debian@12\n    networks: { lab: 12 }\n    app: { steps: [{ run: p.sh }] }\n";
@@ -43,8 +50,13 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
         .map(|vm| connects_to(provider_block(&vf, vm, "qemu")?))
         .collect::<Outcome<_>>()?;
     assert_eq!(ports, ["QEMU_HUBS[\"lab\"][\"a\"]", "QEMU_HUBS[\"lab\"][\"b\"]", "QEMU_HUBS[\"lab\"][\"c\"]"]);
-    assert!(vf.contains("QEMU_HUBS = IsoloomQemu.ports({ \"lab\" => [\"a\", \"b\", \"c\"] })"), "{vf}");
-    assert!(vf.contains("module IsoloomQemu"));
+    let file = ruby_blocks(&vf);
+    assert_eq!(
+        file.statements("QEMU_HUBS = "),
+        ["QEMU_HUBS = IsoloomQemu.ports({ \"lab\" => [\"a\", \"b\", \"c\"] })"],
+        "{vf}"
+    );
+    let helper = file.block("module IsoloomQemu");
     // Every VM starts the hub before QEMU starts it, unless it runs on those ports (only QEMU runs this
     // action), and every VM's destroy releases it: the hub stops once the network's last VM
     // is destroyed, whichever that is, so `vagrant destroy <vm>` leaves it to the others.
@@ -58,7 +70,9 @@ fn qemu_links_three_vms_through_a_hub() -> Outcome {
         assert!(!define(&vf, vm)?.contains("IsoloomQemu.stop("), "{}", define(&vf, vm)?);
     }
     // The hub is left running while another of its VMs keeps a Vagrant id.
-    assert!(vf.contains("stop(net) unless left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }"));
+    let release_fn = helper.block("def self.release");
+    let stop = "stop(net) unless left.any? { |vm| env.local_data_path.join(\"machines\", vm, \"qemu\", \"id\").file? }";
+    assert_eq!(release_fn.every_statement().iter().filter(|s| **s == stop).count(), 1, "{release_fn:?}");
     // Other providers are untouched.
     assert!(!provider_block(&vf, "a", "virtualbox")?.contains("socket"));
     Ok(())
@@ -71,9 +85,10 @@ fn qemu_links_two_vms_through_a_hub_too_and_refuses_a_vm_on_two_networks() -> Ou
     let vf = vagrantfile(two)?;
     assert_eq!(connects_to(provider_block(&vf, "a", "qemu")?)?, "QEMU_HUBS[\"lab\"][\"a\"]");
     assert_eq!(connects_to(provider_block(&vf, "b", "qemu")?)?, "QEMU_HUBS[\"lab\"][\"b\"]");
-    assert!(!vf.contains("v.socket_opts = \"listen="), "no socket pair: {vf}");
-    assert!(!vf.contains("isoloom-access"), "no port kept for a VM the lab doesn't declare: {vf}");
-    assert!(vf.contains("module IsoloomQemu"), "the hub needs the helper");
+    let file = ruby_blocks(&vf);
+    assert!(!holds(&file, "v.socket_opts = \"listen="), "no socket pair: {vf}");
+    assert!(!holds(&file, "isoloom-access"), "no port kept for a VM the lab doesn't declare: {vf}");
+    assert_eq!(file.find("module IsoloomQemu").len(), 1, "the hub needs the helper");
 
     let routed = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\n  dmz: { cidr: 10.8.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lab: 10, dmz: 10 }\n    app: { steps: [{ run: p.sh }] }\n";
     let spec = lab(routed)?;
@@ -95,7 +110,8 @@ fn qemu_sizes_the_disk_only_above_the_box() -> Outcome {
     let a = provider_block(&vf, "a", "qemu")?;
     assert!(a.contains("v.disk_resize = IsoloomQemu.disk(\"cloud-image/debian-12\", 40)"), "{a}");
     assert!(!provider_block(&vf, "b", "qemu")?.contains("disk_resize"));
-    assert!(vf.contains("gb * 1024**3 > sizes.max ? \"#{gb}G\" : nil"));
+    let disk = ruby_blocks(&vf).block("module IsoloomQemu").block("def self.disk").clone();
+    assert!(holds(&disk, "gb * 1024**3 > sizes.max ? \"#{gb}G\" : nil"), "{disk:?}");
     Ok(())
 }
 
@@ -107,7 +123,7 @@ fn utm_runs_each_vm_on_its_networks_isolated_vmnet_ones() -> Outcome {
     let spec = lab(THREE)?;
     assert_eq!(refusal_on(&spec, Target::Vagrant, Some("utm")).unwrap(), None);
     let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
-    assert!(vf.contains("module IsoloomUtm"), "the preamble carries IsoloomUtm");
+    assert_eq!(ruby_blocks(&vf).find("module IsoloomUtm").len(), 1, "the preamble carries IsoloomUtm");
     let a = provider_block(&vf, "a", "utm")?;
     assert!(a.contains("o.vm.box = \"utm/bookworm\""), "{a}");
     let vm = define(&vf, "a")?;

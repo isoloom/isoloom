@@ -4,6 +4,7 @@
 
 use isoloom_spec::Target;
 use isoloom_targets::generate;
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_one, hcl_resource, hcl_text, hcl_values};
 
 use crate::testing::{Outcome, lab};
 
@@ -31,17 +32,17 @@ machines:
 ",
     )?;
     let tf = &files.iter().find(|f| f.path == DO).expect("a digitalocean file (refusal is None)").contents;
-    assert!(tf.contains("resource \"digitalocean_droplet\" \"web\""), "the droplet");
-    assert!(tf.contains("resource \"digitalocean_firewall\" \"web\""), "the firewall");
-    assert!(tf.contains("image     = \"debian-12-x64\""), "the Debian 12 droplet image");
-    assert!(tf.contains("output \"ip\""), "the ip output");
-    assert!(tf.contains("value = \"/var/lib/isoloom/ready\""), "the ready_file output");
+    let body = hcl_body(tf);
+    let droplet = hcl_one(&body, "digitalocean_droplet", "web");
+    assert_eq!(hcl_text(droplet, "image"), "debian-12-x64", "the Debian 12 droplet image");
+    let firewall = hcl_one(&body, "digitalocean_firewall", "web");
+    crate::testing::assert_cloud_outputs(&body);
     // The published port opens for allowed_cidr and is listed in the published output.
-    assert!(tf.contains("port_range       = \"8080\""), "the published port");
-    assert!(
-        tf.contains("\"web/web\" = \"${digitalocean_droplet.web.ipv4_address}:8080\""),
-        "the published map"
-    );
+    assert!(hcl_values(firewall, "port_range").contains(&"8080".to_owned()), "the published port: {tf}");
+    let published = hcl_blocks(&body, "output", &["published"]);
+    let map: Vec<String> = published.iter().flat_map(|o| hcl_literals(o.body())).collect();
+    assert_eq!(map, ["${digitalocean_droplet.web.ipv4_address}:8080"], "the published map: {tf}");
+    assert_eq!(crate::testing::published_keys(&body), ["web/web"], "the published map: {tf}");
     Ok(())
 }
 
@@ -90,9 +91,9 @@ fn sized(resources: &str) -> Outcome<Result<String, String>> {
 fn a_droplet_size_fits_the_disk_too_and_a_disk_beyond_the_largest_is_refused() -> Outcome {
     // 1 GB of memory fits the smallest droplet; a 50 GB disk takes the next one (60 GB).
     let tf = sized("{ memory_mb: 1024, disk_gb: 50 }")?.map_err(|e| format!("refused: {e}"))?;
-    assert!(tf.contains("size      = \"s-2vcpu-2gb\""), "{tf}");
+    assert_eq!(hcl_text(&hcl_resource(&tf, "digitalocean_droplet", "web"), "size"), "s-2vcpu-2gb", "{tf}");
     let small = sized("{ memory_mb: 1024 }")?.map_err(|e| format!("refused: {e}"))?;
-    assert!(small.contains("size      = \"s-1vcpu-1gb\""), "{small}");
+    assert_eq!(hcl_text(&hcl_resource(&small, "digitalocean_droplet", "web"), "size"), "s-1vcpu-1gb", "{small}");
     let refused = sized("{ memory_mb: 1024, disk_gb: 400 }")?.err().ok_or("a 400 GB disk isn't refused")?;
     assert_eq!(
         refused,

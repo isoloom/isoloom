@@ -64,6 +64,37 @@ pub fn yaml_keys_at(value: &serde_yaml_ng::Value, path: &str) -> Vec<String> {
     }
 }
 
+/// The values of every key `key` anywhere in `value` (every `image` of a manifest's containers,
+/// init containers included), each scalar as text, in document order: a key read by name, never
+/// by a line that holds `key:`.
+#[must_use]
+pub fn yaml_values(value: &serde_yaml_ng::Value, key: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    collect(value, key, &mut out);
+    out
+}
+
+fn collect(value: &serde_yaml_ng::Value, key: &str, out: &mut Vec<String>) {
+    match value {
+        serde_yaml_ng::Value::Mapping(map) => {
+            for (k, v) in map {
+                if k.as_str() == Some(key) {
+                    match v {
+                        serde_yaml_ng::Value::String(s) => out.push(s.clone()),
+                        serde_yaml_ng::Value::Number(n) => out.push(n.to_string()),
+                        serde_yaml_ng::Value::Bool(b) => out.push(b.to_string()),
+                        _ => {}
+                    }
+                }
+                collect(v, key, out);
+            }
+        }
+        serde_yaml_ng::Value::Sequence(items) => items.iter().for_each(|v| collect(v, key, out)),
+        serde_yaml_ng::Value::Tagged(tagged) => collect(&tagged.value, key, out),
+        _ => {}
+    }
+}
+
 /// `path`'s keys: split at `.`, a backquoted key whole.
 fn yaml_keys(path: &str) -> Vec<String> {
     let mut keys = Vec::new();

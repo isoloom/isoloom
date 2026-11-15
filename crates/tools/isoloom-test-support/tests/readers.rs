@@ -3,7 +3,7 @@
 
 use isoloom_test_support::{
     assert_every, hcl_blocks, hcl_body, hcl_names, hcl_one, hcl_text, hcl_values, manifest, manifest_names, ruby_blocks, yaml, yaml_at, yaml_documents,
-    yaml_keys_at, yaml_str, yaml_strs,
+    yaml_keys_at, yaml_str, yaml_strs, yaml_values,
 };
 
 const TF: &str = r#"
@@ -36,6 +36,10 @@ fn yaml_is_read_by_path_lists_and_keys() {
     assert_eq!(yaml_str(&c, "services.web.labels.`isoloom.port.web`"), "tcp:80");
     assert_eq!(yaml_keys_at(&c, "services.web"), ["image", "ports", "labels"]);
     assert!(yaml_at(&c, "services.db").is_none());
+    // A key anywhere, by name: every container's image, init containers included.
+    let pod = yaml("spec:\n  initContainers: [{ name: a, image: busybox }]\n  containers: [{ name: b, image: nginx, env: [{ name: image, value: x }] }]\n");
+    assert_eq!(yaml_values(&pod, "image"), ["busybox", "nginx"]);
+    assert_eq!(yaml_values(&pod, "name"), ["a", "b", "image"]);
 }
 
 #[test]

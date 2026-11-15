@@ -4,7 +4,9 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
-use crate::testing::{Outcome, between, example, from, generated, lab};
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_text, ruby_blocks};
+
+use crate::testing::{Outcome, between, define, example, from, generated, lab};
 
 #[test]
 fn windows_machines_use_winrm_and_powershell() -> Outcome {
@@ -13,11 +15,17 @@ fn windows_machines_use_winrm_and_powershell() -> Outcome {
     )?;
     assert_eq!(spec.problems(), vec![]);
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
+    let file = ruby_blocks(vf);
+    let dc01 = define(&file, "dc01");
+    assert_eq!(dc01.statements("m.vm.box = "), ["m.vm.box = \"StefanScherer/windows_2019\""]);
+    assert_eq!(dc01.statements("m.vm.box_version = "), ["m.vm.box_version = \"2021.05.15\""]);
+    assert_eq!(dc01.statements("m.vm.communicator = "), ["m.vm.communicator = \"winrm\""]);
+    let hosts = dc01.statements("m.vm.provision \"shell\", name: \"hosts\"");
+    assert!(
+        matches!(hosts.as_slice(), [one] if one.contains("drivers\\\\etc\\\\hosts")),
+        "the Windows hosts file: {hosts:?}"
+    );
     let dc = between(vf, "config.vm.define \"dc01\"", "config.vm.define \"web\"")?;
-    assert!(dc.contains("m.vm.box = \"StefanScherer/windows_2019\""));
-    assert!(dc.contains("m.vm.box_version = \"2021.05.15\""));
-    assert!(dc.contains("m.vm.communicator = \"winrm\""));
-    assert!(dc.contains("drivers\\\\etc\\\\hosts"), "the Windows hosts file: {dc}");
     // The project in C:\isoloom first, then each step run from there.
     let project = dc.find("m.vm.provision \"isoloom_project\", name: \"project\"").expect("the project step");
     // Run once, until the script changes (a mark of its hash).
@@ -32,10 +40,14 @@ fn windows_machines_use_winrm_and_powershell() -> Outcome {
         "the step, from the project: {line}"
     );
     assert!(project < step);
-    let web = from(vf, "config.vm.define \"web\"")?;
-    assert!(web.contains("m.vm.box = \"example/win2019\""), "the spec's image wins");
-    assert!(web.contains("m.vm.box_version = \"1.0\""));
-    assert!(web.contains("Test-NetConnection 'dc01' -Port $p"));
+    let web = define(&file, "web");
+    assert_eq!(web.statements("m.vm.box = "), ["m.vm.box = \"example/win2019\""], "the spec's image wins");
+    assert_eq!(web.statements("m.vm.box_version = "), ["m.vm.box_version = \"1.0\""]);
+    let waits = web.statements("m.vm.provision \"shell\", name: \"wait for dc01\"");
+    assert!(
+        matches!(waits.as_slice(), [one] if one.contains("Test-NetConnection 'dc01' -Port $p")),
+        "{waits:?}"
+    );
     Ok(())
 }
 
@@ -44,16 +56,36 @@ fn cloud_vm_runs_windows_over_winrm_with_its_name() -> Outcome {
     let spec = example("windows-hello")?;
     let tf = generated(&spec, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
     // Amazon's image, no key pair (AWS refuses ED25519 on Windows), WinRM with a generated password.
-    assert!(tf.contains("Windows_Server-2019-English-Full-Base-*"));
-    assert!(tf.contains("resource \"random_password\" \"windows\""));
-    assert!(tf.contains("type     = \"winrm\""));
+    let body = hcl_body(&tf);
+    let images: Vec<String> = hcl_blocks(&body, "data", &["aws_ami"])
+        .iter()
+        .flat_map(|d| isoloom_test_support::hcl_values(d.body(), "values"))
+        .collect();
+    assert!(images.iter().any(|v| v == "Windows_Server-2019-English-Full-Base-*"), "{images:?}");
+    assert_eq!(hcl_names(&body, "resource", "random_password"), ["windows"]);
+    // Every connection Terraform opens: over WinRM to the Windows machine, else through the
+    // controller (a Windows-only environment: the controller runs the checks).
+    let connections: Vec<(String, String)> = body
+        .blocks()
+        .filter(|b| b.identifier() == "resource")
+        .flat_map(|b| {
+            hcl_nested(b.body(), "connection")
+                .into_iter()
+                .chain(b.body().blocks().flat_map(|p| hcl_nested(p.body(), "connection")))
+        })
+        .map(|c| (hcl_text(c.body(), "type"), hcl_text(c.body(), "host")))
+        .collect();
+    assert!(connections.iter().any(|(kind, _)| kind == "winrm"), "{connections:?}");
+    assert!(
+        connections.iter().any(|(_, host)| host == "aws_eip.isoloom_controller.public_ip"),
+        "{connections:?}"
+    );
     // Renamed and restarted before its set-up, which checks the name.
-    assert!(tf.contains("resource \"time_sleep\" \"web01_restart\""));
-    assert!(tf.contains("still named"));
+    assert_eq!(hcl_names(&body, "resource", "time_sleep"), ["web01_restart"]);
+    let literals = hcl_literals(&body);
+    assert!(literals.iter().any(|l| l.contains("still named")), "the set-up checks the name");
     // The run's end as a scheduled task (a pending shutdown would block the rename's restart).
-    assert!(tf.contains("isoloom-expiry"));
-    // A Windows-only environment: the controller runs the checks.
-    assert!(tf.contains("host     = aws_eip.isoloom_controller.public_ip"), "{tf}");
+    assert!(literals.iter().any(|l| l.contains("isoloom-expiry")), "the expiry's task");
     Ok(())
 }
 
