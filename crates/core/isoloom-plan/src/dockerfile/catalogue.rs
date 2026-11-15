@@ -51,8 +51,8 @@ pub(super) fn resolve(op: &EntryOp, env: Option<&[(String, String)]>, file: &str
         op.release,
         Value::Object(with.into_iter().collect())
     );
-    let spec = syntax::parse(&yaml).map_err(|p| refused(reasons(&p)))?;
-    let resolved = catalogue.resolve(&spec, "m").map_err(|p| refused(reasons(&p)))?;
+    let spec = syntax::parse(&yaml).map_err(|p| refused(syntax::one_line(&p)))?;
+    let resolved = catalogue.resolve(&spec, "m").map_err(|p| refused(syntax::one_line(&p)))?;
     let r = resolved
         .into_iter()
         .next()
@@ -162,11 +162,6 @@ fn recipe(entry: &str, r: Resolved) -> Result<Recipe, String> {
         out.written.push(written);
     }
     Ok(out)
-}
-
-/// Problems, as one line.
-fn reasons(problems: &[syntax::Problem]) -> String {
-    problems.iter().map(|p| format!("{}: {}", p.path, p.reason)).collect::<Vec<_>>().join("; ")
 }
 
 #[cfg(test)]

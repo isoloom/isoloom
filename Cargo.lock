@@ -895,7 +895,6 @@ dependencies = [
  "isoloom-spec",
  "isoloom-test-support",
  "proptest",
- "sha2",
  "tempfile",
  "thiserror",
 ]

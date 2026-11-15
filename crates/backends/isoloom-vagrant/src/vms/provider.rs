@@ -69,6 +69,18 @@ pub(crate) enum Nested {
     None,
 }
 
+/// Whose a provider's networks are, which says whether an instance can have its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NetworksOf {
+    /// Each copy of the environment has networks of its own (VirtualBox's internal networks,
+    /// Hyper-V's private switches, QEMU's hubs, UTM's vmnet networks, ESXi's port groups).
+    EachCopy,
+    /// A network is this computer's, one per address block (libvirt's bridges, VMware's vmnets,
+    /// Parallels' host-only networks), so an instance can't have one beside the environment as
+    /// written.
+    Computer,
+}
+
 /// How a provider boots a machine that boots its own way (`hardware.boot`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OwnBoot {
@@ -82,10 +94,6 @@ pub(crate) enum OwnBoot {
 
 /// Everything Isoloom knows of one provider.
 #[derive(Debug, Clone, Copy)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "a provider's row of the table: each switch is a yes or no Isoloom knows of it, read on its own"
-)]
 pub(crate) struct Profile {
     /// The name Vagrant knows it by (`vagrant up --provider <id>`, `config.vm.provider`).
     pub(crate) id: &'static str,
@@ -99,12 +107,8 @@ pub(crate) struct Profile {
     pub(crate) attaches_disks: bool,
     /// Whether Isoloom bridges a network under it; `false` refuses a bridged network.
     pub(crate) bridges: bool,
-    /// Whether each copy of the environment has networks of its own under it (VirtualBox's
-    /// internal networks, Hyper-V's private switches, QEMU's hubs, UTM's vmnet networks,
-    /// ESXi's port groups); `false` where a network is this computer's, one per address block
-    /// (libvirt's bridges, VMware's vmnets, Parallels' host-only networks), so an instance
-    /// can't have one beside the environment as written.
-    pub(crate) own_networks: bool,
+    /// Whose its networks are: each copy's own, or this computer's.
+    pub(crate) networks_of: NetworksOf,
     /// What else it refuses of the environment's networks and boxes (QEMU's links, Hyper-V's
     /// and UTM's boxes).
     pub(crate) networks: Option<fn(&Environment) -> Option<String>>,
@@ -135,7 +139,7 @@ const DESKTOP: Profile = Profile {
     tpm: false,
     attaches_disks: true,
     bridges: true,
-    own_networks: true,
+    networks_of: NetworksOf::EachCopy,
     networks: None,
     boot: OwnBoot::BoxAsIs,
     remote_arch: None,
@@ -189,7 +193,7 @@ impl Provider {
                     ro_option: "mount_options",
                 },
                 nested: Nested::Vmx,
-                own_networks: false,
+                networks_of: NetworksOf::Computer,
                 ..DESKTOP
             },
             Provider::HyperV => Profile {
@@ -212,7 +216,7 @@ impl Provider {
                     ro_option: "mount_options",
                 },
                 attaches_disks: false,
-                own_networks: false,
+                networks_of: NetworksOf::Computer,
                 nested: Nested::Customize("set", "--nested-virt"),
                 ..DESKTOP
             },
@@ -225,7 +229,7 @@ impl Provider {
                 },
                 tpm: true,
                 bridges: false,
-                own_networks: false,
+                networks_of: NetworksOf::Computer,
                 boot: OwnBoot::Own,
                 nested: Nested::Flag("nested"),
                 ..DESKTOP
@@ -307,7 +311,7 @@ pub fn provider_refusal(env: &Environment, provider: &str) -> Option<String> {
 fn instance_refusal(env: &Environment, provider: Provider) -> Option<String> {
     let n = env.instance?;
     let profile = provider.profile();
-    if profile.own_networks {
+    if profile.networks_of == NetworksOf::EachCopy {
         return None;
     }
     let spec = env.spec();
@@ -322,10 +326,10 @@ fn instance_refusal(env: &Environment, provider: Provider) -> Option<String> {
     ))
 }
 
-/// The providers whose networks are this computer's ([`Profile::own_networks`]), as Vagrant
+/// The providers whose networks are this computer's ([`NetworksOf::Computer`]), as Vagrant
 /// names them.
 pub(crate) fn sharing_networks() -> Vec<&'static str> {
-    Provider::profiles().filter(|p| !p.own_networks).map(|p| p.id).collect()
+    Provider::profiles().filter(|p| p.networks_of == NetworksOf::Computer).map(|p| p.id).collect()
 }
 
 /// A VM ESXi can't run: one of another architecture than the ESXi host's ([`ESXI_ARCH`]).

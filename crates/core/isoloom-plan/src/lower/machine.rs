@@ -3,10 +3,8 @@
 //! `vm:` blocks, each built from the recipe that gives it ([`super::forms`]).
 
 use indexmap::IndexMap;
-use isoloom_spec::model::{self, BaseImage, DockerImpl, Generated, HttpCheck, MachineFile, MachineSecret, Protocol, SecretMount, VmImpl};
-use isoloom_spec::syntax::{
-    self, Code, EnvValue, FieldPath, FileSource, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm,
-};
+use isoloom_spec::model::{self, BaseImage, DockerImpl, Generated, HttpCheck, Protocol, VmImpl};
+use isoloom_spec::syntax::{self, Code, EnvValue, FieldPath, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm};
 
 use isoloom_spec::model::Shape;
 
@@ -14,6 +12,10 @@ use super::forms::{self, Container, Service, Vm};
 use super::overrides;
 use super::trail::Trail;
 use super::{Lowering, Scope};
+
+mod split;
+
+use split::files;
 
 /// A lowered machine, the inputs its files read (the secret each becomes → the input), and what
 /// couldn't be lowered, at the field the author wrote.
@@ -322,53 +324,6 @@ fn healthcheck(at: &FieldPath, m: &syntax::Machine, h: &syntax::Healthcheck) -> 
         start_period: h.start_period.clone(),
     };
     (Some(lowered), unknown)
-}
-
-/// The machine's files split by source: configuration as files, values as secret files (an
-/// input's as the secret `input-<name>`), and the inputs read that way.
-fn files(name: &str, m: &syntax::Machine, trail: &mut Trail) -> (Vec<MachineFile>, Vec<MachineSecret>, Vec<(String, String)>) {
-    let windows = m.os.is_some_and(syntax::OsRef::is_windows);
-    let (mut files, mut secrets, mut inputs) = (Vec::new(), Vec::new(), Vec::new());
-    for (i, f) in m.files.iter().enumerate() {
-        let (source, content) = match &f.source {
-            FileSource::Source(p) => (Some(p.clone()), None),
-            FileSource::Content(c) => (None, Some(c.clone())),
-            FileSource::Input(input) => {
-                let secret = input_secret(input.as_str());
-                inputs.push((secret.clone(), input.to_string()));
-                trail.file(name, "secrets", secrets.len(), i);
-                secrets.push(value_file(&secret, f, windows));
-                continue;
-            }
-            FileSource::Secret(secret) => {
-                trail.file(name, "secrets", secrets.len(), i);
-                secrets.push(value_file(secret, f, windows));
-                continue;
-            }
-        };
-        trail.file(name, "files", files.len(), i);
-        files.push(MachineFile {
-            path: f.path.clone(),
-            source,
-            content,
-            uid: f.uid,
-            gid: f.gid,
-            mode: f.mode.map(|mode| mode.to_string()),
-        });
-    }
-    (files, secrets, inputs)
-}
-
-/// A value's file: the secret at its path, root's and `0400` unless the spec says (no mode on
-/// Windows).
-fn value_file(secret: &str, f: &syntax::File, windows: bool) -> MachineSecret {
-    MachineSecret::Mount(SecretMount {
-        source: secret.to_owned(),
-        target: Some(f.path.clone()),
-        uid: f.uid,
-        gid: f.gid,
-        mode: (!windows).then(|| f.mode_or_default()),
-    })
 }
 
 /// The container form, as a `docker:` block.

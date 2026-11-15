@@ -265,18 +265,25 @@ mod tests {
         assert!(found[0].contains("add it to the core order"), "{found:?}");
     }
 
-    /// The workspace itself, as `cargo metadata` describes it.
-    #[test]
-    fn the_workspace_keeps_its_dependencies_one_way() {
+    /// The workspace's `cargo metadata --format-version 1 --offline`, with `extra` arguments.
+    fn metadata(extra: &[&str]) -> Value {
         let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
         let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../Cargo.toml");
         let out = std::process::Command::new(cargo)
-            .args(["metadata", "--format-version", "1", "--no-deps", "--offline", "--manifest-path"])
+            .args(["metadata", "--format-version", "1", "--offline"])
+            .args(extra)
+            .arg("--manifest-path")
             .arg(manifest)
             .output()
             .expect("cargo metadata runs");
         assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-        let metadata: Value = serde_json::from_slice(&out.stdout).expect("cargo metadata prints JSON");
+        serde_json::from_slice(&out.stdout).expect("cargo metadata prints JSON")
+    }
+
+    /// The workspace itself, as `cargo metadata` describes it.
+    #[test]
+    fn the_workspace_keeps_its_dependencies_one_way() {
+        let metadata = metadata(&["--no-deps"]);
         assert!(metadata["packages"].as_array().is_some_and(|p| p.len() > 10), "the workspace's crates");
         let found = violations(&metadata);
         assert!(found.is_empty(), "{}", found.join("\n"));
@@ -319,15 +326,7 @@ mod tests {
     /// transitively.
     #[test]
     fn isoloom_never_depends_on_the_runner() {
-        let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../Cargo.toml");
-        let out = std::process::Command::new(cargo)
-            .args(["metadata", "--format-version", "1", "--offline", "--manifest-path"])
-            .arg(manifest)
-            .output()
-            .expect("cargo metadata runs");
-        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-        let metadata: Value = serde_json::from_slice(&out.stdout).expect("cargo metadata prints JSON");
+        let metadata = metadata(&[]);
         assert!(metadata["resolve"]["nodes"].as_array().is_some_and(|n| n.len() > 50), "the resolved graph");
         let found = runner_crates(&metadata);
         assert!(found.is_empty(), "{}", found.join("\n"));

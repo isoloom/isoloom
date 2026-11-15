@@ -38,13 +38,8 @@ pub(super) fn check(c: &Catalogue, entry: &Entry) -> Vec<Finding> {
 /// Resolves `entry`'s `release` on `os` with `with`: the problems' reasons when it fails.
 fn resolve(c: &Catalogue, entry: &Entry, release: &Release, os: OsRef, with: &IndexMap<String, Value>) -> Result<(), String> {
     let yaml = lab(entry, release, os, with)?;
-    let spec = syntax::parse(&yaml).map_err(|p| reasons(&p))?;
-    c.resolve(&spec, MACHINE).map(|_| ()).map_err(|p| reasons(&p))
-}
-
-/// Problems, as one line.
-fn reasons(problems: &[syntax::Problem]) -> String {
-    problems.iter().map(|p| format!("{}: {}", p.path, p.reason)).collect::<Vec<_>>().join("; ")
+    let spec = syntax::parse(&yaml).map_err(|p| syntax::one_line(&p))?;
+    c.resolve(&spec, MACHINE).map(|_| ()).map_err(|p| syntax::one_line(&p))
 }
 
 /// An environment of the service machine and its peer, written as a spec.

@@ -171,14 +171,7 @@ pub fn of(spec: &Spec) -> Vec<HostReach> {
             out.push(reach(HostAccess::Devices, format!("{at}.devices[{i}]")));
         }
         if let Some(b) = m.vm.as_ref().and_then(|v| v.boot.as_ref()) {
-            let files = [
-                ("kernel", &b.kernel),
-                ("initrd", &b.initrd),
-                ("dtb", &b.dtb),
-                ("loader", &b.loader),
-                ("nvram", &b.nvram),
-            ];
-            for (field, _) in files.iter().filter(|(_, v)| v.is_some()) {
+            for (field, _) in b.host_files().iter().filter(|(_, v)| v.is_some()) {
                 out.push(reach(HostAccess::BootFiles, format!("{at}.vm.boot.{field}")));
             }
             if b.network.as_ref().is_some_and(|n| n.tftp_root.is_some()) {

@@ -51,6 +51,18 @@ pub struct Boot {
 }
 
 impl Boot {
+    /// The files of the hypervisor's host it names, by field (`network.tftp_root` aside), each
+    /// `None` when unset.
+    pub(crate) fn host_files(&self) -> [(&'static str, Option<&String>); 5] {
+        [
+            ("kernel", self.kernel.as_ref()),
+            ("initrd", self.initrd.as_ref()),
+            ("dtb", self.dtb.as_ref()),
+            ("loader", self.loader.as_ref()),
+            ("nvram", self.nvram.as_ref()),
+        ]
+    }
+
     /// The fields set besides `firmware_format` and `firmware: uefi`, by name: what Vagrant's
     /// QEMU provider can't boot (it boots the box's disk through its own UEFI firmware).
     #[must_use]
