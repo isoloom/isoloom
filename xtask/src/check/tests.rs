@@ -111,3 +111,29 @@ fn a_windows_binary_importing_the_visual_cpp_runtime_is_named() {
     assert_eq!(super::vc_runtime_imports(listing), ["VCRUNTIME140.dll", "msvcp140.dll"]);
     assert_eq!(super::vc_runtime_imports("  DLL Name: KERNEL32.dll\n"), Vec::<String>::new());
 }
+
+/// The `cargo xtask check --only` lists a workflow runs, as step names.
+fn workflow_steps(file: &str) -> std::collections::BTreeSet<String> {
+    let text = std::fs::read_to_string(crate::repo::root().join(".github/workflows").join(file)).unwrap();
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("- run: cargo run -q -p xtask --locked -- check --only "))
+        .flat_map(|list| list.split(','))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// gate.yml runs every step `cargo xtask check` has (main and a release tag get the whole check),
+/// and ci.yml runs the short list on pull requests into dev: CI and the command can't drift.
+#[test]
+fn the_gate_runs_every_step_and_ci_the_short_list() {
+    let gate = workflow_steps("gate.yml");
+    let missing: Vec<&str> = STEPS.iter().map(|s| s.name).filter(|n| !gate.contains(*n)).collect();
+    assert_eq!(missing, Vec::<&str>::new(), "steps gate.yml doesn't run");
+    let unknown: Vec<&String> = gate.iter().filter(|n| !STEPS.iter().any(|s| s.name == n.as_str())).collect();
+    assert_eq!(unknown, Vec::<&String>::new(), "gate.yml names steps cargo xtask check doesn't have");
+    let ci = std::fs::read_to_string(crate::repo::root().join(".github/workflows/ci.yml")).unwrap();
+    assert!(
+        ci.contains("check ${{ matrix.check }}") && ci.contains("check: --fast"),
+        "ci.yml runs the short list"
+    );
+}

@@ -1,35 +1,317 @@
 name: Gate
 
-# The test + quality-ratchet gate a release tag must pass before anything is published. Called
-# through `needs` by publish-crates.yml (crates.io) and release.yml (the release binaries), so a tag
-# that fails rustfmt, clippy, the workspace tests, the API docs or the ratchet publishes nothing.
-# Reusable (workflow_call), so a release workflow calls it rather than repeat it. CI on pushes and
-# pull requests is ci.yml.
+# Everything `cargo xtask check` has, one job a step or a few: before main (pull requests into
+# main, pushes to main) and on a release tag, where publish-crates.yml and release.yml call it
+# (workflow_call) and publish nothing unless it passes. Pull requests into dev run the short list
+# (ci.yml).
+#
+# A job here only installs its step's tools and runs `cargo xtask check --only <steps>`
+# (xtask/src/check.rs), the command a contributor runs: the two can't drift, and xtask's tests
+# hold this file to running every step.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: gate-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  gate:
-    name: Tests and the quality ratchet
+  test:
+    name: Clippy and the tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest@0.9.148
+      - run: cargo run -q -p xtask --locked -- check --only lockfile,clippy,test
+
+  fmt:
+    name: rustfmt
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The toolchain (its channel, rustfmt and clippy) is pinned by rust-toolchain.toml.
+      - run: rustup toolchain install --profile minimal
+      - run: cargo run -q -p xtask --locked -- check --only fmt
+
+  windows-gnu:
+    name: Clippy for Windows (the cfg(windows) code)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: rustup toolchain install --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          # A tag's run reads the cache main wrote; it never writes one.
-          save-if: false
-      # The ratchet counts what cargo-machete reports; the tests run under cargo-nextest.
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
+      - run: cargo run -q -p xtask --locked -- check --only windows-gnu
+
+  quality:
+    name: Quality ratchet, generated docs, fuzz targets, API docs and examples
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The ratchet counts what cargo-machete reports, so it needs it installed.
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
-          tool: cargo-machete@0.9.2,cargo-nextest@0.9.148
-      # The steps of `cargo xtask check` (xtask/src/check.rs) the release path must pass: rustfmt,
-      # clippy, the workspace tests, the API docs with every link resolved, and the
-      # engineering-standard ratchet (xtask/baselines/quality-baseline.json).
-      - run: cargo run -q -p xtask --locked -- check --only lockfile,fmt,clippy,test,doc,quality
+          tool: cargo-machete@0.9.2
+      - run: cargo run -q -p xtask --locked -- check --only quality,regenerate,fuzz,doc,examples
+
+  deny:
+    name: cargo-deny (advisories, licences, bans, sources)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-deny@0.20.2
+      - run: cargo run -q -p xtask --locked -- check --only deny
+
+  machete:
+    name: Unused dependencies
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-machete@0.9.2
+      - run: cargo run -q -p xtask --locked -- check --only machete
+
+  typos:
+    name: Spelling
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: typos@1.52.2
+      - run: cargo run -q -p xtask --locked -- check --only typos
+
+  links:
+    name: Links between the docs (offline)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: lychee@0.24.2
+      - run: cargo run -q -p xtask --locked -- check --only links
+
+  hooks:
+    name: Git hooks
+    # The hooks (.githooks/, .github/CONTRIBUTING.md "Git hooks"): shellcheck over them, then their
+    # test in a throwaway repository, with the gitleaks the pre-push runs.
+    runs-on: ubuntu-24.04
+    env:
+      GITLEAKS_VERSION: "8.30.0"
+      GITLEAKS_SHA256: "79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      # The pinned release tarball, its sha256 checked before it runs (from the release's
+      # gitleaks_<version>_checksums.txt). Bump the version and the checksum together.
+      - name: gitleaks
+        run: |
+          tarball="$RUNNER_TEMP/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$tarball" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum -c -
+          tar -xzf "$tarball" -C "$RUNNER_TEMP" gitleaks
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - run: cargo run -q -p xtask --locked -- check --only hooks
+
+  semver:
+    name: SemVer against the last release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The release type comes from crates.io's latest isoloom-spec (xtask/src/check.rs).
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-semver-checks@0.51.0
+      - run: cargo run -q -p xtask --locked -- check --only semver
+
+  msrv:
+    name: The published crates on the workspace's rust-version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The toolchain the workspace's rust-version names (keep the two equal).
+      - run: rustup toolchain install 1.89 --profile minimal
+      - run: cargo run -q -p xtask --locked -- check --only msrv
+
+  determinism:
+    name: Deterministic generation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo run -q -p xtask --locked -- check --only determinism
+
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # wasm-pack uses a wasm-bindgen on PATH when its version is the one Cargo.lock locks, so
+      # both come from install-action, which checks each download's SHA-256.
+      - name: wasm-bindgen version (from Cargo.lock)
+        id: bindgen
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "wasm-bindgen") | .version')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: wasm-pack@0.13.1,wasm-bindgen@${{ steps.bindgen.outputs.version }}
+      - run: cargo run -q -p xtask --locked -- check --only wasm,wasm-test
+
+  terraform:
+    name: Terraform validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - run: cargo run -q -p xtask --locked -- check --only terraform
+
+  tf-test:
+    name: Terraform module tests (mocked providers)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo run -q -p xtask --locked -- check --only tf-test
+
+  validators:
+    name: Validators on every target's output
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo run -q -p xtask --locked -- check --only validators
+
+  import:
+    name: Import a Compose file, then validate the draft
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo run -q -p xtask --locked -- check --only import
+
+  windows-binary:
+    name: Windows binary needs no Visual C++ runtime
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: rustup component add llvm-tools
+      - run: cargo run -q -p xtask --locked -- check --only windows-binary
