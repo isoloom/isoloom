@@ -890,7 +890,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.66.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-configured-app-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("web/http", 8086), host_ip: "127.0.0.1", auto_correct: true
+    m.vm.network "forwarded_port", guest: 80, host: ENV.fetch("ISOTHRUM_HOST_PORT_WEB_80_TCP", ISOLOOM_HOSTPORTS.fetch("web/http", 8086)).to_i, host_ip: "127.0.0.1", auto_correct: true
     m.vm.provider "virtualbox" do |v|
       v.name = "configured-app-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
@@ -1031,11 +1031,11 @@ Vagrant.configure("2") do |config|
           fi
           /etc/isoloom/env-net.sh
         SH
-        IsoloomHyperV.ports(machine, [[80, ISOLOOM_HOSTPORTS.fetch("web/http", 8086)]])
+        IsoloomHyperV.ports(machine, [[80, ENV.fetch("ISOTHRUM_HOST_PORT_WEB_80_TCP", ISOLOOM_HOSTPORTS.fetch("web/http", 8086)).to_i]])
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("web/http", 8086)]]); IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, ENV.fetch("ISOTHRUM_HOST_PORT_WEB_80_TCP", ISOLOOM_HOSTPORTS.fetch("web/http", 8086)).to_i]]); IsoloomHyperV.prune(["isoloom-configured-app-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provider "utm" do |v, o|
       o.vm.box = "utm/bookworm"

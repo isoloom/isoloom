@@ -79,7 +79,10 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     assert!(vf.contains("10.60.0.10"));
     // The runner picks each forward a free host port; the per-instance shift is the default it
     // falls back to, so two instances can both forward even without a runner choosing.
-    assert!(vf.contains("guest: 80, host: ISOLOOM_HOSTPORTS.fetch(") && vf.contains(", 8180)"), "{vf}");
+    assert!(
+        vf.contains("guest: 80, host: ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(") && vf.contains(", 8180)).to_i"),
+        "{vf}"
+    );
     // The project copy leaves every instance folder behind.
     assert!(vf.contains("IsoloomProject::COPY_RULES = \"/.isoloom*\n"), "{vf}");
     Ok(())

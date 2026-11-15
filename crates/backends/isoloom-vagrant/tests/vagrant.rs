@@ -169,7 +169,7 @@ fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
 #[test]
 fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     let file = vagrantfile("solo-web")?;
-    let host = "ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)";
+    let host = "ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)).to_i";
     assert!(file.contains(&format!("forwarded_port\", guest: 80, host: {host},")), "the forward");
     assert!(file.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")), "the relay at start");
     assert!(file.contains(&format!("IsoloomHyperV.unports([[80, {host}]])")), "the relay gone with the VM");
@@ -1464,6 +1464,44 @@ fn every_vmware_adapter_on_a_network_has_a_pci_slot_of_its_own() -> Outcome {
                 "{example}: {name}: {slots:?}"
             );
         }
+    }
+    Ok(())
+}
+
+/// A port Isothrum keeps across operations comes back where it was: the forward (and Hyper-V's
+/// relay) read `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first, then the runner's choice for
+/// this run, then the published number, `auto_correct` kept.
+#[test]
+fn a_kept_host_port_wins_over_the_runs_choice_and_the_published_one() -> Outcome {
+    if !ruby_runs() {
+        eprintln!("skipped: needs ruby");
+        return Ok(());
+    }
+    let file = vagrantfile("solo-web")?;
+    let r = isoloom_test_support::ruby_blocks(&file);
+    let web = r.block("config.vm.define \"web\"");
+    let forwards = web.statements("m.vm.network \"forwarded_port\"");
+    assert!(
+        forwards
+            .iter()
+            .any(|f| f.contains("host: ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ") && f.ends_with("auto_correct: true")),
+        "{forwards:?}"
+    );
+    let scratch = tempfile::Builder::new().prefix("isoloom-kept-ports-").tempdir()?;
+    let chosen = r#"{"web/web": 28080}"#;
+    for (kept, run, wanted) in [(Some("18080"), Some(chosen), 18080), (None, Some(chosen), 28080), (None, None, 8080)] {
+        let (vagrantfile, mut ruby) = loadable("solo-web", scratch.path())?;
+        ruby.arg("-e").arg(HYPERV_TRIGGERS_RB).arg(vagrantfile).arg("web");
+        match kept {
+            Some(port) => ruby.env("ISOTHRUM_HOST_PORT_WEB_80_TCP", port),
+            None => ruby.env_remove("ISOTHRUM_HOST_PORT_WEB_80_TCP"),
+        };
+        match run {
+            Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
+            None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
+        };
+        let out = printed(ruby)?;
+        assert!(out.lines().any(|l| l == format!("forward 80 {wanted}")), "{kept:?} {run:?}: {out}");
     }
     Ok(())
 }

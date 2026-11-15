@@ -1335,7 +1335,7 @@ Vagrant.configure("2") do |config|
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "10.67.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-configured-windows-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-configured-windows-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.network "forwarded_port", guest: 80, host: ISOLOOM_HOSTPORTS.fetch("iis/http", 8087), host_ip: "127.0.0.1", auto_correct: true
+    m.vm.network "forwarded_port", guest: 80, host: ENV.fetch("ISOTHRUM_HOST_PORT_IIS_80_TCP", ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)).to_i, host_ip: "127.0.0.1", auto_correct: true
     m.vm.provider "virtualbox" do |v|
       v.name = "configured-windows-#{ISOLOOM_KEY} - iis"
       v.linked_clone = true
@@ -1449,11 +1449,11 @@ Vagrant.configure("2") do |config|
             'environment network: ' + $n.ip + ' on ' + $c.Description
           }
         PS1
-        IsoloomHyperV.ports(machine, [[80, ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)]])
+        IsoloomHyperV.ports(machine, [[80, ENV.fetch("ISOTHRUM_HOST_PORT_IIS_80_TCP", ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)).to_i]])
       end
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::DeleteVM", type: :action do |t|
-      t.ruby { |_, _| IsoloomHyperV.unports([[80, ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)]]); IsoloomHyperV.prune(["isoloom-configured-windows-#{ISOLOOM_KEY}-lab"]) }
+      t.ruby { |_, _| IsoloomHyperV.unports([[80, ENV.fetch("ISOTHRUM_HOST_PORT_IIS_80_TCP", ISOLOOM_HOSTPORTS.fetch("iis/http", 8087)).to_i]]); IsoloomHyperV.prune(["isoloom-configured-windows-#{ISOLOOM_KEY}-lab"]) }
     end
     m.vm.provider "utm" do |v, o|
       # No UTM box is known for this OS: give one with `overrides.vagrant.machines.<machine>.boxes.utm`.

@@ -12,6 +12,14 @@ stable spec format.
 
 ### Added
 
+- **A Vagrant environment's ports stay where they were across a park and a resume.** Each
+  forwarded port that isn't fixed reads `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first (the
+  machine's name upper-cased, every other character `_`; the guest port; `TCP` or `UDP`), the
+  host port the runner kept from an earlier operation, then the run's choice
+  (`ISOLOOM_HOSTPORTS`), then its published number, with `auto_correct` kept. Hyper-V's relay
+  takes the same number. qemu, UTM and VMware forward afresh at each start, so a resumed
+  environment's URLs no longer move.
+
 - **UTM runs an environment's VMs again, each on its networks (the `vagrant` target's `utm`
   provider).** vagrant_utm (0.2.0) makes no adapter for a private network and sets no address,
   so the Vagrantfile does both: each network is an isolated vmnet network (QEMU's `vmnet-host`

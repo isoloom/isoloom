@@ -77,12 +77,22 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
     runner
 }
 
-/// Machine `name`'s published ports, each with its host number ([`vagrantfile::chosen_host`]),
-/// written once here: its forward and Hyper-V's relay of it both take that one.
+/// Machine `name`'s published ports, each with its host number, written once here: its forward
+/// and Hyper-V's relay of it both take that one. A port the runner may move keeps the one it had
+/// when the runner says so ([`vagrantfile::kept_or_chosen_host`]); a fixed one is its own number
+/// or nothing ([`vagrantfile::chosen_host`]).
 fn published<'a>(name: &str, mp: &'a MachinePlan) -> Vec<(&'a PublishedPort, Value)> {
     mp.ports
         .iter()
-        .map(|p| (p, vagrantfile::chosen_host(&format!("{name}/{}", p.name), p.publish)))
+        .map(|p| {
+            let key = format!("{name}/{}", p.name);
+            let host = if p.fixed {
+                vagrantfile::chosen_host(&key, p.publish)
+            } else {
+                vagrantfile::kept_or_chosen_host(name, p.port, p.protocol, &key, p.publish)
+            };
+            (p, host)
+        })
         .collect()
 }
 
