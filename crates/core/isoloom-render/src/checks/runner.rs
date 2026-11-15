@@ -98,22 +98,72 @@ fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
     }
 }
 
-/// The directive shellcheck needs on the line before each of `lines` that single-quotes what
-/// looks like an expansion (a `$name`, `$(`, `${` or a backticked text): the spec's own text (an
-/// `exec` command, a header, the text to find), quoted on purpose so this script never expands
-/// it; only an `exec` command's own shell does.
+/// The directive shellcheck needs on the line before each statement of `lines` that
+/// single-quotes what looks like an expansion (a `$name`, `$(`, `${` or a backticked text): the
+/// spec's own text (an `exec` command, a header, the text to find), quoted on purpose so this
+/// script never expands it; only an `exec` command's own shell does. A statement is one or more
+/// lines: a quoted value may hold line breaks, and nothing is ever written inside it, so the
+/// value reaches the check as written.
 fn with_directives(lines: &str) -> String {
-    lines
-        .lines()
-        .map(|line| {
-            if single_quoted(line).into_iter().any(looks_expanded) {
-                let indent: String = line.chars().take_while(|c| c.is_whitespace()).collect();
-                format!("{indent}# shellcheck disable=SC2016 # the check's own text, quoted as written\n{line}\n")
-            } else {
-                format!("{line}\n")
+    let mut out = String::new();
+    let mut statement = String::new();
+    let mut open = Quote::None;
+    for line in lines.lines() {
+        statement.push_str(line);
+        statement.push('\n');
+        open = open.after(line);
+        if open != Quote::None {
+            continue;
+        }
+        if single_quoted(&statement).into_iter().any(looks_expanded) {
+            let indent: String = statement.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+            out.push_str(&indent);
+            out.push_str("# shellcheck disable=SC2016 # the check's own text, quoted as written\n");
+        }
+        out.push_str(&statement);
+        statement.clear();
+    }
+    // Text left in an open quote is written as it is, with no directive inside it.
+    out.push_str(&statement);
+    out
+}
+
+/// The quote an sh line leaves open at its end.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Quote {
+    /// None: the line ends a statement.
+    None,
+    /// A single-quoted string, which only `'` ends.
+    Single,
+    /// A double-quoted string.
+    Double,
+}
+
+impl Quote {
+    /// The quote open after `line`, read from `self`. A `#` that starts a word outside quotes
+    /// starts a comment, whose quotes are text.
+    fn after(self, line: &str) -> Quote {
+        let mut state = self;
+        let mut chars = line.chars();
+        let mut word_start = true;
+        while let Some(c) = chars.next() {
+            if state == Quote::None && c == '#' && word_start {
+                break;
             }
-        })
-        .collect()
+            word_start = state == Quote::None && c.is_whitespace();
+            state = match (state, c) {
+                (Quote::Single, '\'') | (Quote::Double, '"') => Quote::None,
+                (Quote::None, '\'') => Quote::Single,
+                (Quote::None, '"') => Quote::Double,
+                (Quote::None | Quote::Double, '\\') => {
+                    chars.next();
+                    state
+                }
+                (other, _) => other,
+            };
+        }
+        state
+    }
 }
 
 /// The single-quoted parts of an sh line, outside double quotes (`'a'\\''b'` is `a`, then `b`).

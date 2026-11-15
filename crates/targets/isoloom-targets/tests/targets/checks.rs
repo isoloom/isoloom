@@ -7,6 +7,8 @@ use isoloom_spec::parse;
 use crate::testing::{Outcome, example, lab};
 
 #[cfg(unix)]
+mod hostile;
+#[cfg(unix)]
 mod probes;
 mod runner;
 
