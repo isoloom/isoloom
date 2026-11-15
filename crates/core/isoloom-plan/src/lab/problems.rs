@@ -1,4 +1,4 @@
-//! Where a lab's problems are reported: each at the field the author wrote (a counted machine's,
+//! Where a [`Lab`]'s problems are reported: each at the field the author wrote (a counted machine's,
 //! an override block's), once, and none that only follows from a machine already refused.
 
 use isoloom_spec::model::Target;

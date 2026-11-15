@@ -1,4 +1,4 @@
-//! A Vagrantfile's networks, imported: a private network becomes a lab network with the
+//! A Vagrantfile's networks, imported: a private network becomes an environment network with the
 //! machine's address on it, a public one a bridge to the computer's LAN.
 
 use std::net::Ipv4Addr;
