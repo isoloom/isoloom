@@ -884,9 +884,9 @@ Vagrant.configure("2") do |config|
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.70.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
@@ -1099,7 +1099,7 @@ Vagrant.configure("2") do |config|
   config.vm.define "intranet" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "intranet"
-    m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.linked_clone = true
@@ -1426,7 +1426,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "staff", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "staff"
-    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.linked_clone = true
@@ -1743,7 +1743,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "guest" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "guest"
-    m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.linked_clone = true
@@ -2024,8 +2024,8 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "admin" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "admin"
-    m.vm.network "private_network", ip: "10.70.10.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.10.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.linked_clone = true

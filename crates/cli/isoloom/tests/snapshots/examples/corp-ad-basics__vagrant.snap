@@ -1370,9 +1370,9 @@ Vagrant.configure("2") do |config|
   config.vm.define "isoloom-router" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "isoloom-router"
-    m.vm.network "private_network", ip: "10.40.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
@@ -1594,7 +1594,7 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "10.40.20.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
@@ -1762,7 +1762,7 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "10.40.20.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
@@ -1935,7 +1935,7 @@ Vagrant.configure("2") do |config|
     m.winrm.basic_auth_only = true
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
-    m.vm.network "private_network", ip: "10.40.20.22", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.22", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.disk :disk, size: "60GB", primary: true
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
@@ -2099,8 +2099,8 @@ Vagrant.configure("2") do |config|
   config.vm.define "web01" do |m|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web01"
-    m.vm.network "private_network", ip: "10.40.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
@@ -2386,7 +2386,7 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "user", autostart: false do |m|
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
-    m.vm.network "private_network", ip: "10.40.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
@@ -2667,9 +2667,9 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
   config.vm.define "isoloom-controller" do |m|
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
-    m.vm.network "private_network", ip: "10.40.10.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.20.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__dhcp_enabled: false
-    m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.10.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.20.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true

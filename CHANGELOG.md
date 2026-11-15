@@ -132,6 +132,15 @@ stable spec format.
 
 ### Fixed
 
+- **A VM on libvirt starts even where another network holds its network's block.** vagrant-libvirt
+  looks a private network with an address up by its block first: on a computer where another
+  network already had the block (another copy of the environment, another environment on the same
+  block, one a run left behind), it made no network of the Vagrantfile's name and the VM didn't
+  start ("Network not found"). Each network is now `veryisolated` (`libvirt__forward_mode`), looked
+  up and made by its name, the VMs on it alone, no address of the host on it and no way out through
+  it, as on VirtualBox and Hyper-V; a network that serves a network boot keeps the host's address
+  there for its DHCP and TFTP.
+
 - **Proxmox refuses `nested_virtualization` on an arm64 VM (#324),** whose CPU QEMU emulates, so it
   can't nest.
 - **A Linux VM mounts its `tmpfs` entries (#322),** in fstab and at once (or remounts a path that

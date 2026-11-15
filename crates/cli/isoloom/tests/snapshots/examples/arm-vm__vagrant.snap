@@ -1012,7 +1012,7 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/ubuntu-24.04"
     m.vm.box_architecture = "arm64"
     m.vm.hostname = "box"
-    m.vm.network "private_network", ip: "10.70.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-arm-vm-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-arm-vm-#{ISOLOOM_KEY}-lab", libvirt__dhcp_enabled: false
+    m.vm.network "private_network", ip: "10.70.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-arm-vm-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-arm-vm-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.provider "virtualbox" do |v|
       v.name = "arm-vm-#{ISOLOOM_KEY} - box"
       v.linked_clone = true
