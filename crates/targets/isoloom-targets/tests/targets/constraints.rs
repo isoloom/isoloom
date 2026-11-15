@@ -7,6 +7,8 @@ use isoloom_spec::model::Constraints;
 use isoloom_spec::{Target, load, parse};
 use isoloom_targets::{Lab, generate};
 
+use isoloom_test_support::{yaml, yaml_documents, yaml_values};
+
 use crate::testing::{Outcome, between, examples, generated as file, valid};
 
 const CONSTRAINTS: &str = "
@@ -56,13 +58,20 @@ fn images_go_through_their_registry_mirror() {
 #[test]
 fn compose_pulls_through_the_mirror_and_machines_get_the_proxy() -> Outcome {
     let compose = file(&constrained()?, Target::Docker, "docker/compose.yml")?;
-    assert!(compose.contains("image: registry.corp/dockerhub/library/redis:7-alpine"), "the spec's images");
+    let images = yaml_values(&yaml(&compose), "image");
     assert!(
-        compose.contains(&format!("image: registry.corp/dockerhub/library/{UTILITY_IMAGE}")),
-        "Isoloom's own"
+        images.iter().any(|i| i == "registry.corp/dockerhub/library/redis:7-alpine"),
+        "the spec's images: {images:?}"
     );
-    assert!(compose.contains("image: localhost/isoloom/segmented-web"), "a built image is local, not pulled");
-    assert!(!compose.contains("image: redis:7-alpine") && !compose.contains(&format!("image: {UTILITY_IMAGE}")));
+    assert!(
+        images.contains(&format!("registry.corp/dockerhub/library/{UTILITY_IMAGE}")),
+        "Isoloom's own: {images:?}"
+    );
+    assert!(
+        images.iter().any(|i| i == "localhost/isoloom/segmented-web"),
+        "a built image is local, not pulled: {images:?}"
+    );
+    assert!(!images.iter().any(|i| i.starts_with("redis:") || i.starts_with(UTILITY_IMAGE)), "{images:?}");
     // The built machine: proxy and mirrors as build arguments and environment.
     let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&compose).unwrap();
     let web = &doc["services"]["web"];
@@ -90,10 +99,26 @@ fn compose_pulls_through_the_mirror_and_machines_get_the_proxy() -> Outcome {
 #[test]
 fn kubernetes_pulls_through_the_mirror_and_containers_get_the_proxy() -> Outcome {
     let spec = constrained()?;
-    let all: String = generate(&spec, Target::Kubernetes).unwrap().into_iter().map(|f| f.contents).collect();
-    assert!(all.contains("image: registry.corp/dockerhub/library/redis:7-alpine"));
-    assert!(all.contains("image: localhost/isoloom/segmented-web"));
-    assert!(all.contains("name: HTTP_PROXY") && all.contains("value: http://proxy.corp:3128"), "{all}");
+    let docs = yaml_documents(&file(&spec, Target::Kubernetes, "kubernetes/environment.yaml")?);
+    let images: Vec<String> = docs.iter().flat_map(|d| yaml_values(d, "image")).collect();
+    assert!(images.iter().any(|i| i == "registry.corp/dockerhub/library/redis:7-alpine"), "{images:?}");
+    assert!(images.iter().any(|i| i == "localhost/isoloom/segmented-web"), "{images:?}");
+    assert!(
+        images.iter().all(|i| i.starts_with("registry.corp/") || i.starts_with("localhost/")),
+        "{images:?}"
+    );
+    // A container's environment holds the proxy, as a `name`/`value` pair.
+    let proxies: Vec<serde_yaml_ng::Value> = docs
+        .iter()
+        .flat_map(|d| d["spec"]["template"]["spec"]["containers"].as_sequence().cloned().unwrap_or_default())
+        .flat_map(|c| c["env"].as_sequence().cloned().unwrap_or_default())
+        .filter(|e| e["name"].as_str() == Some("HTTP_PROXY"))
+        .map(|e| e["value"].clone())
+        .collect();
+    assert!(
+        !proxies.is_empty() && proxies.iter().all(|v| v.as_str() == Some("http://proxy.corp:3128")),
+        "{proxies:?}"
+    );
     Ok(())
 }
 
@@ -303,14 +328,16 @@ fn a_windows_vm_imports_the_certificate_authority_into_its_root_store() -> Outco
 fn containers_have_the_certificate_authority_and_built_images_trust_it() -> Outcome {
     let lab = with_ca()?;
     let compose = file(&lab, Target::Docker, "docker/compose.yml")?;
-    assert!(compose.contains("file: ../../certs/corp-ca.pem"), "{compose}");
-    assert_eq!(
-        compose.matches("target: /usr/local/share/ca-certificates/isoloom-0.crt").count(),
-        3,
-        "{compose}"
-    );
-    let k8s = file(&lab, Target::Kubernetes, "kubernetes/environment.yaml")?;
-    assert!(k8s.contains("/usr/local/share/ca-certificates/isoloom-0.crt"), "{k8s}");
+    let doc = yaml(&compose);
+    assert!(yaml_values(&doc, "file").iter().any(|f| f == "../../certs/corp-ca.pem"), "{compose}");
+    let mounted = yaml_values(&doc, "target")
+        .into_iter()
+        .filter(|t| t == "/usr/local/share/ca-certificates/isoloom-0.crt")
+        .count();
+    assert_eq!(mounted, 3, "{compose}");
+    let k8s = yaml_documents(&file(&lab, Target::Kubernetes, "kubernetes/environment.yaml")?);
+    let mounts: Vec<String> = k8s.iter().flat_map(|d| yaml_values(d, "mountPath")).collect();
+    assert!(mounts.iter().any(|m| m == "/usr/local/share/ca-certificates/isoloom-0.crt"), "{mounts:?}");
     // An image Isoloom builds from steps trusts it at build time, before any step downloads.
     let steps = valid(
         "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lan: 10 }, app: { steps: [{ packages: [curl] }] } }\nconstraints:\n  ca_certificates: [corp.pem]\n",

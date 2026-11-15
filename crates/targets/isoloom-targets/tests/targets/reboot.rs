@@ -121,18 +121,23 @@ fn proxmox_without_a_reboot_is_unchanged() -> Outcome {
 #[test]
 fn the_clouds_resume_the_set_up_after_each_reboot() -> Outcome {
     for cloud in ["aws", "azure"] {
-        let tf = file(Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
+        let module = file(Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
         // The machine sets itself up from its user data: no Terraform connection to it.
-        assert!(!tf.contains("resource \"terraform_data\" \"box\""), "{cloud}");
+        let body = isoloom_test_support::hcl_body(&module);
+        assert!(
+            isoloom_test_support::hcl_blocks(&body, "resource", &["terraform_data", "box"]).is_empty(),
+            "{cloud}"
+        );
+        let tf = crate::testing::set_up(&module, "box")?;
         assert!(tf.contains("isoloom-setup.service"), "{cloud}");
         // Two restarts, each the end of a part its unit runs after the next boot.
         assert_eq!(tf.matches("systemctl reboot").count(), 2, "{cloud}");
-        assert_eq!(tf.matches("if [ \\\"$part\\\" = ").count(), 3, "{cloud}");
+        assert_eq!(tf.matches("if [ \"$part\" = ").count(), 3, "{cloud}");
         // The first part brings its second interface up; every later boot (a restart between
         // parts, or any restart once the set-up is ready) brings it up again before the parts.
         // The expiry is scheduled again at every boot, before anything else.
         assert_eq!(tf.matches("sudo ip addr add 10.70.1.10/24").count(), 2, "{cloud}");
-        let again = at(&tf, "ready ] || [ \\\"$part\\\" != 1 ]; then")?;
+        let again = at(&tf, "ready ] || [ \"$part\" != 1 ]; then")?;
         assert!(again < at(&tf, "sudo ip addr add 10.70.1.10/24")?, "{cloud}");
         assert!(at(&tf, "shutdown -h")? < at(&tf, "part=$(cat")?, "{cloud}");
         assert!(!tf.contains("systemctl disable isoloom-setup.service"), "{cloud}");
@@ -140,7 +145,7 @@ fn the_clouds_resume_the_set_up_after_each_reboot() -> Outcome {
         let reboots: Vec<usize> = tf.match_indices("systemctl reboot").map(|(i, _)| i).collect();
         let kernel = at(&tf, "kernel.sh")?;
         assert!(kernel < reboots[0] && reboots[0] < at(&tf, "middle.sh")? && at(&tf, "middle.sh")? < reboots[1]);
-        assert!(reboots[1] < at(&tf, "last.sh")? && at(&tf, "last.sh")? < at(&tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?);
+        assert!(reboots[1] < at(&tf, "last.sh")? && at(&tf, "last.sh")? < at(&tf, "echo ready > /var/lib/isoloom/ready\nrm -f")?);
     }
     Ok(())
 }
@@ -153,15 +158,16 @@ fn every_cloud_driver_splits_the_set_up_at_a_reboot() -> Outcome {
     )?;
     let files = generate(&spec, Target::CloudVm).unwrap();
     for cloud in ["aws", "azure", "gcp", "linode", "oci", "digitalocean"] {
-        let tf = &files
+        let module = &files
             .iter()
             .find(|f| f.path.ends_with(&format!("cloud-vm/{cloud}/main.tf")))
             .unwrap_or_else(|| panic!("{cloud}"))
             .contents;
+        let tf = &crate::testing::set_up(module, "box")?;
         assert_eq!(tf.matches("systemctl reboot").count(), 1, "{cloud}");
         let reboot = at(tf, "systemctl reboot")?;
         assert!(at(tf, "kernel.sh")? < reboot && reboot < at(tf, "last.sh")?, "{cloud}");
-        assert!(at(tf, "last.sh")? < at(tf, "echo ready > /var/lib/isoloom/ready\\nrm -f")?, "{cloud}");
+        assert!(at(tf, "last.sh")? < at(tf, "echo ready > /var/lib/isoloom/ready\nrm -f")?, "{cloud}");
     }
     Ok(())
 }

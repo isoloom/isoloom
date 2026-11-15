@@ -3,7 +3,19 @@
 
 use isoloom_spec::Target;
 
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_nested, hcl_one, hcl_text, hcl_values};
+
 use crate::testing::{Outcome, generated, lab};
+
+/// `text` without its whitespace: an HCL expression however the reader lays it out.
+fn compact(text: &str) -> String {
+    text.split_whitespace().collect()
+}
+
+/// Whether one literal of `values` holds `text` (a script line of a user data template).
+fn holds(values: &[String], text: &str) -> bool {
+    values.iter().any(|v| v.contains(text))
+}
 
 #[test]
 fn a_kali_machine_boots_kalis_own_image_pinned_to_its_product() -> Outcome {
@@ -15,20 +27,22 @@ machines:
   workstation: { os: kali@rolling, access: true, networks: { lan: 20 } }
 ")?;
     let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    // Compared with the alignment's spaces squeezed: `ami = …`, whatever the block's widest name.
-    let tf = tf.split(' ').filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
-    assert!(tf.contains("data \"aws_ami\" \"kali\""), "{tf}");
+    let body = hcl_body(&tf);
+    let ami = hcl_blocks(&body, "data", &["aws_ami", "kali"]);
+    let ami = ami.first().ok_or_else(|| format!("no data.aws_ami.kali: {tf}"))?.body();
+    assert_eq!(hcl_values(ami, "owners"), ["aws-marketplace"], "{tf}");
     assert!(
-        tf.contains("owners      = [\"aws-marketplace\"]") || tf.contains("owners = [\"aws-marketplace\"]"),
-        "{tf}"
+        hcl_values(ami, "values").contains(&"7lgvy7mt78lgoi4lant0znp5h".to_owned()),
+        "pinned to Kali's product: {tf}"
     );
-    assert!(tf.contains("values = [\"7lgvy7mt78lgoi4lant0znp5h\"]"), "pinned to Kali's product: {tf}");
-    assert!(tf.contains("ami = data.aws_ami.kali.id"), "{tf}");
-    assert!(tf.contains("output \"ssh_user_workstation\" {\n value = \"kali\""), "{tf}");
+    let vm = hcl_one(&body, "aws_instance", "workstation");
+    assert_eq!(hcl_text(vm, "ami"), "data.aws_ami.kali.id", "{tf}");
+    let user = hcl_blocks(&body, "output", &["ssh_user_workstation"]);
+    assert_eq!(user.first().map(|o| hcl_text(o.body(), "value")).as_deref(), Some("kali"), "{tf}");
     // Named after itself, not after its image (Kali's names itself `kali`).
-    assert!(tf.contains("hostnamectl set-hostname workstation"), "{tf}");
+    assert!(holds(&hcl_values(vm, "user_data_base64"), "hostnamectl set-hostname workstation"), "{tf}");
     // Kali's image is a 25 GB snapshot: AWS refuses a smaller root volume (the default is 20).
-    assert!(tf.contains("volume_size = 25"), "{tf}");
+    assert_eq!(hcl_values(vm, "volume_size"), ["25"], "{tf}");
     Ok(())
 }
 
@@ -43,15 +57,19 @@ machines:
   web: { os: debian@12, networks: { lan: 10 } }
 ")?;
     let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert!(tf.contains("lifecycle {\n    ignore_changes = [user_data_base64]\n  }"), "{tf}");
+    let body = hcl_body(&tf);
+    let vm = hcl_one(&body, "aws_instance", "web");
+    let lifecycles = hcl_nested(vm, "lifecycle");
+    assert_eq!(
+        lifecycles.iter().map(|l| compact(&hcl_text(l.body(), "ignore_changes"))).collect::<Vec<_>>(),
+        ["[user_data_base64]"],
+        "{tf}"
+    );
+    assert!(
+        lifecycles.iter().all(|l| hcl_nested(l.body(), "precondition").is_empty()),
+        "no TPM, no precondition: {tf}"
+    );
     Ok(())
-}
-
-/// The `lifecycle` blocks of `tf`'s resource `head` (Terraform takes one per resource).
-fn lifecycles(tf: &str, head: &str) -> Outcome<usize> {
-    let block = tf.split(head).nth(1).ok_or_else(|| format!("no {head}"))?;
-    let block = block.split("\n}\n").next().unwrap_or_default();
-    Ok(block.matches("\n  lifecycle {").count())
 }
 
 /// A machine that asks for a TPM and sets itself up once: both in the instance's one `lifecycle`
@@ -59,14 +77,17 @@ fn lifecycles(tf: &str, head: &str) -> Outcome<usize> {
 #[test]
 fn an_aws_machine_with_a_tpm_has_one_lifecycle_block() -> Outcome {
     let tf = generated(&crate::testing::example("tuned-web")?, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert_eq!(lifecycles(&tf, "resource \"aws_instance\" \"web\" {")?, 1, "{tf}");
-    let block = crate::testing::between(&tf, "resource \"aws_instance\" \"web\" {", "\n}\n")?;
-    let lifecycle = crate::testing::from(block, "\n  lifecycle {")?;
-    assert!(
-        lifecycle.starts_with("\n  lifecycle {\n    ignore_changes = [user_data_base64]\n    precondition {"),
-        "{lifecycle}"
-    );
-    assert!(lifecycle.contains("data.aws_ami.debian_12.tpm_support == \"v2.0\""), "{lifecycle}");
+    let body = hcl_body(&tf);
+    let lifecycles = hcl_nested(hcl_one(&body, "aws_instance", "web"), "lifecycle");
+    let [lifecycle] = lifecycles.as_slice() else {
+        return Err(format!("{} lifecycle blocks: {tf}", lifecycles.len()).into());
+    };
+    assert_eq!(compact(&hcl_text(lifecycle.body(), "ignore_changes")), "[user_data_base64]", "{tf}");
+    let conditions: Vec<String> = hcl_nested(lifecycle.body(), "precondition")
+        .iter()
+        .map(|p| hcl_text(p.body(), "condition"))
+        .collect();
+    assert_eq!(conditions, ["data.aws_ami.debian_12.tpm_support == \"v2.0\""], "{tf}");
     Ok(())
 }
 
@@ -80,9 +101,7 @@ machines:
   workstation: { os: kali@rolling, access: true, networks: { lan: 20 }, resources: { disk_gb: 40 } }
 ")?;
     let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    let tf = tf.split(' ').filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
-    assert!(tf.contains("volume_size = 40"), "{tf}");
-    assert!(!tf.contains("volume_size = 25"), "{tf}");
+    assert_eq!(hcl_values(&hcl_body(&tf), "volume_size"), ["40"], "{tf}");
     Ok(())
 }
 
@@ -97,8 +116,19 @@ machines:
   web: { os: debian@12, networks: { lan: 10 } }
 ")?;
     let tf = generated(&lab, Target::CloudVm, ".isoloom/cloud-vm/azure/main.tf")?;
-    assert!(tf.contains("hostnamectl set-hostname web"), "{tf}");
+    let vm = hcl_one(&hcl_body(&tf), "azurerm_linux_virtual_machine", "web").clone();
+    assert!(holds(&hcl_values(&vm, "custom_data"), "hostnamectl set-hostname web"), "{tf}");
     let windows = generated(&crate::testing::example("windows-hello")?, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?;
-    assert!(!windows.contains("hostnamectl"), "{windows}");
+    let body = hcl_body(&windows);
+    for name in isoloom_test_support::hcl_names(&body, "resource", "aws_instance") {
+        assert!(
+            !holds(&hcl_values(hcl_one(&body, "aws_instance", &name), "user_data"), "hostnamectl"),
+            "{name}: {windows}"
+        );
+        assert!(
+            !holds(&hcl_values(hcl_one(&body, "aws_instance", &name), "user_data_base64"), "hostnamectl"),
+            "{name}: {windows}"
+        );
+    }
     Ok(())
 }

@@ -166,6 +166,32 @@ pub(crate) fn provisioners(vm: &isoloom_test_support::RubyBlock) -> Vec<String> 
         .collect()
 }
 
+/// The set-up script a cloud machine runs from its user data (`#!/bin/sh`, Isoloom's own), read
+/// from its resources (those named `machine`) whatever attribute the cloud takes it in
+/// (`user_data_base64`, `custom_data`, `metadata_startup_script`, a `metadata` block or map).
+pub(crate) fn set_up(tf: &str, machine: &str) -> Outcome<String> {
+    let body = isoloom_test_support::hcl_body(tf);
+    let found: Vec<String> = body
+        .blocks()
+        .filter(|b| b.identifier() == "resource" && b.labels().get(1).is_some_and(|l| l.as_str() == machine))
+        .flat_map(|b| isoloom_test_support::hcl_literals(b.body()))
+        .filter(|l| l.starts_with("#!/bin/sh\n# Isoloom: this machine sets itself up"))
+        .collect();
+    match found.as_slice() {
+        [one] => Ok(one.clone()),
+        _ => Err(format!("{} set-up scripts for `{machine}` in:\n{tf}", found.len()).into()),
+    }
+}
+
+/// The keys of a module's `published` output (`"<machine>/<port>"`), in order.
+pub(crate) fn published_keys(body: &isoloom_test_support::hcl::Body) -> Vec<String> {
+    let outputs = isoloom_test_support::hcl_blocks(body, "output", &["published"]);
+    match outputs.first().and_then(|o| isoloom_test_support::hcl_attribute(o.body(), "value")) {
+        Some(isoloom_test_support::hcl::Expression::Object(object)) => object.keys().map(|k| k.to_string().trim_matches('"').to_owned()).collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// The outputs every cloud's module has, shaped as AWS's are: `ip`, and `ready_file` at the
 /// machines' ready file.
 pub(crate) fn assert_cloud_outputs(body: &isoloom_test_support::hcl::Body) {
