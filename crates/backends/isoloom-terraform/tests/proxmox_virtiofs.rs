@@ -3,6 +3,7 @@
 
 pub mod testing;
 
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 use std::path::Path;
 
 use isoloom_plan::Lab;
@@ -12,6 +13,15 @@ use isoloom_terraform::ProxmoxBackend;
 use testing::{Outcome, example, file};
 
 /// The module of `spec`, a lowered spec of `lab`, checked valid.
+/// Every VM's `virtiofs` block of the parsed module.
+fn virtiofs(body: &hcl::Body) -> Vec<&hcl::Body> {
+    hcl_blocks(body, "resource", &["proxmox_virtual_environment_vm"])
+        .into_iter()
+        .flat_map(|vm| hcl_nested(vm.body(), "virtiofs"))
+        .map(hcl::Block::body)
+        .collect()
+}
+
 fn render(lab: &Lab, spec: &Spec) -> Outcome<String> {
     let problems = isoloom_spec::validate(spec);
     if !problems.is_empty() {
@@ -58,16 +68,25 @@ fn the_module_creates_the_mapping_and_each_vm_mounts_it() -> Outcome {
         let (lab, spec) = shared_files()?;
         render(&lab, &spec)?
     };
-    assert!(tf.contains("resource \"proxmox_hardware_mapping_dir\" \"shared\""), "{tf}");
-    assert!(tf.contains("\"iso${var.slot}-shared\""), "{tf}");
-    assert!(tf.contains("path = \"${var.virtiofs_root}/shared-files/shared\""), "{tf}");
-    assert!(tf.contains("variable \"virtiofs_root\""), "{tf}");
+    let body = hcl_body(&tf);
+    let mapping = hcl_one(&body, "proxmox_hardware_mapping_dir", "shared");
+    assert_eq!(hcl_values(mapping, "name"), ["iso${var.slot}-shared"]);
+    // Its one path, on the node: the volume's folder under the server's virtiofs root.
+    assert!(hcl_literals(mapping).iter().any(|l| l == "${var.virtiofs_root}/shared-files/shared"), "{tf}");
+    assert_eq!(hcl_blocks(&body, "variable", &["virtiofs_root"]).len(), 1);
     // Both VMs, the owner too: no NFS any more.
-    assert_eq!(tf.matches("mapping      = proxmox_hardware_mapping_dir.shared.name").count(), 2, "{tf}");
-    assert!(tf.contains("cache        = \"auto\""), "{tf}");
-    assert!(tf.contains("content     = proxmox_hardware_mapping_dir.shared.name"), "{tf}");
-    assert!(!tf.contains("exportfs") && !tf.contains("nfs"), "{tf}");
-    assert!(tf.contains("virtiofs defaults,nofail"), "{tf}");
+    let mounts = virtiofs(&body);
+    assert_eq!(mounts.len(), 2, "{mounts:?}");
+    for m in &mounts {
+        assert_eq!(hcl_text(m, "mapping"), "proxmox_hardware_mapping_dir.shared.name");
+        assert_eq!(hcl_text(m, "cache"), "auto");
+    }
+    let scripts: Vec<String> = hcl_literals(&body).into_iter().filter(|l| l.contains('\n')).collect();
+    assert!(scripts.iter().all(|s| !s.contains("exportfs") && !s.contains("nfs")), "{scripts:?}");
+    assert!(
+        scripts.iter().any(|s| s.lines().any(|l| l.contains(" virtiofs defaults,nofail"))),
+        "{scripts:?}"
+    );
     Ok(())
 }
 
@@ -82,13 +101,20 @@ fn a_named_mapping_is_used_as_it_is() -> Outcome {
         acl: true,
     });
     let tf = render(&lab, &spec)?;
-    assert!(!tf.contains("proxmox_hardware_mapping_dir"), "{tf}");
-    assert!(!tf.contains("virtiofs_root"), "{tf}");
-    assert!(tf.contains("mapping      = \"lab-shared\""), "{tf}");
-    assert!(tf.contains("cache        = \"never\""), "{tf}");
-    assert!(tf.contains("direct_io    = true"), "{tf}");
-    // ACLs imply extended attributes.
-    assert!(tf.contains("expose_xattr = true") && tf.contains("expose_acl   = true"), "{tf}");
+    let body = hcl_body(&tf);
+    assert!(hcl_names(&body, "resource", "proxmox_hardware_mapping_dir").is_empty(), "{tf}");
+    assert!(hcl_blocks(&body, "variable", &["virtiofs_root"]).is_empty(), "{tf}");
+    let mounts = virtiofs(&body);
+    assert_eq!(mounts.len(), 2, "both VMs mount it");
+    for m in &mounts {
+        let field = |k: &str| hcl_text(m, k);
+        assert_eq!(
+            (field("mapping"), field("cache"), field("direct_io")),
+            ("lab-shared".into(), "never".into(), "true".into())
+        );
+        // ACLs imply extended attributes.
+        assert_eq!((field("expose_xattr"), field("expose_acl")), ("true".into(), "true".into()));
+    }
     Ok(())
 }
 
