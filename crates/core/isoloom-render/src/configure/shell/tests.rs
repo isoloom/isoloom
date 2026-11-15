@@ -239,7 +239,7 @@ fn the_library_and_a_script_parse_as_sh() {
 /// or a user in the URL would pin an origin apt never matches.
 #[cfg(unix)]
 #[test]
-fn the_librarys_url_host_leaves_out_a_user_and_a_port() {
+fn the_library_url_host_leaves_out_a_user_and_a_port() {
     for (url, host) in [
         ("https://repo.example.com/deb", "repo.example.com"),
         ("https://repo.example.com:8443/deb", "repo.example.com"),

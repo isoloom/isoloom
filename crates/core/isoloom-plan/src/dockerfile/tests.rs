@@ -90,6 +90,22 @@ fn a_refusal_names_the_file_the_line_and_the_instruction() {
     assert!(unknown.contains("isoloom bases fetch"), "{unknown}");
 }
 
+/// `text` as the Dockerfile of `build/db`, with no argument and no `os`.
+fn db(text: &str) -> Build<'_> {
+    Build {
+        path: "build/db/Dockerfile",
+        text,
+        context: "build/db",
+        args: &[],
+        os: None,
+    }
+}
+
+/// The translation of [`db`]`(text)`.
+fn translated_db(text: &str) -> Translation {
+    translate(&db(text), &Sources::default()).unwrap()
+}
+
 /// The translation's YAML writes the catalogue entry's recipe for `release` out as steps (no
 /// `catalogue:` line a spec can't hold).
 fn written_out(t: &Translation, release: &str) {
@@ -158,36 +174,23 @@ fn the_machines_own_os_picks_where_a_service_installs() {
 
 #[test]
 fn a_postgres_image_installs_the_exact_release_with_the_images_defaults() {
-    let build = Build {
-        path: "build/db/Dockerfile",
-        text: "FROM postgres:10.5\nENV POSTGRES_PASSWORD=s3cret\nCOPY init.sql /docker-entrypoint-initdb.d/\n",
-        context: "build/db",
-        args: &[],
-        os: None,
-    };
-    let t = translate(&build, &Sources::default()).unwrap();
+    let t = translated_db("FROM postgres:10.5\nENV POSTGRES_PASSWORD=s3cret\nCOPY init.sql /docker-entrypoint-initdb.d/\n");
     assert_eq!(t.os.to_string(), "ubuntu@18.04");
     written_out(&t, "10.5");
     assert!(t.files.values().any(|v| v == "s3cret"), "{:?}", t.files.keys());
     // Without a password the image refuses to start: so does the translation.
-    let bare = Build {
-        text: "FROM postgres:16\n",
-        ..build
-    };
-    assert!(translate(&bare, &Sources::default()).unwrap_err().to_string().contains("POSTGRES_PASSWORD"));
+    assert!(
+        translate(&db("FROM postgres:16\n"), &Sources::default())
+            .unwrap_err()
+            .to_string()
+            .contains("POSTGRES_PASSWORD")
+    );
 }
 
 #[test]
 fn a_catalogue_image_brings_its_entry_recipe_with_the_images_settings() {
     let text = std::fs::read_to_string(fixtures().join("mysql-catalogue/Dockerfile")).unwrap();
-    let build = Build {
-        path: "build/db/Dockerfile",
-        text: &text,
-        context: "build/db",
-        args: &[],
-        os: None,
-    };
-    let t = translate(&build, &Sources::default()).unwrap();
+    let t = translated_db(&text);
     assert_eq!(t.os.to_string(), "debian@11");
     written_out(&t, "5.7.44");
     let files: Vec<&str> = t.files.keys().map(ProjectPath::as_str).collect();
@@ -224,24 +227,14 @@ fn a_php_image_installs_its_series_release_and_its_variants_server() {
 
 #[test]
 fn a_mongo_image_installs_the_exact_build_and_its_service_reads_the_images_environment() {
-    let build = Build {
-        path: "build/db/Dockerfile",
-        text: "FROM mongo:4.0.4\nENV MONGO_INITDB_ROOT_USERNAME=admin MONGO_INITDB_ROOT_PASSWORD=s3cret\nCOPY seed.js /docker-entrypoint-initdb.d/\n",
-        context: "build/db",
-        args: &[],
-        os: None,
-    };
-    let t = translate(&build, &Sources::default()).unwrap();
+    let t =
+        translated_db("FROM mongo:4.0.4\nENV MONGO_INITDB_ROOT_USERNAME=admin MONGO_INITDB_ROOT_PASSWORD=s3cret\nCOPY seed.js /docker-entrypoint-initdb.d/\n");
     assert_eq!(t.os.to_string(), "ubuntu@18.04");
     written_out(&t, "4.0.4");
     // The entry's own service runs, and reads the environment the Dockerfile set.
     assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
     assert!(t.yaml.contains(IMAGE_ENV), "{}", t.yaml);
-    let latest = Build {
-        text: "FROM mongo:7\n",
-        ..build
-    };
-    let newest = translate(&latest, &Sources::default()).unwrap();
+    let newest = translate(&db("FROM mongo:7\n"), &Sources::default()).unwrap();
     written_out(&newest, "7.0.28");
 }
 
@@ -265,7 +258,7 @@ fn a_jenkins_image_installs_the_lts_release_and_runs_the_dockerfiles_steps_as_je
 }
 
 #[test]
-fn a_file_copied_out_of_composers_image_is_its_catalogue_entrys() {
+fn a_file_copied_out_of_composers_image_is_the_catalogue_entry_for_it() {
     let text = std::fs::read_to_string(fixtures().join("composer-copy/Dockerfile")).unwrap();
     let build = Build {
         path: "build/web/Dockerfile",

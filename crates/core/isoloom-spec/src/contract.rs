@@ -74,7 +74,7 @@ pub const SSH_PROXY_COMMAND: &str = "ISOLOOM_SSH_PROXY_COMMAND";
 pub const HOSTPORTS: &str = "ISOLOOM_HOSTPORTS";
 
 /// The variable holding the graphical consoles the runner chooses for a Vagrant run's VMs
-/// ([`crate::ConsoleSource::Runner`]), as a JSON object `{"<machine>": {"port": <loopback port>,
+/// (a console the runner chooses), as a JSON object `{"<machine>": {"port": <loopback port>,
 /// "password": "<8 characters>"}}`: the Vagrantfile reads it, and turns on a machine's console
 /// only when the machine is in it. It holds passwords: a runner gives it to the run's own Vagrant
 /// processes only, never to a command an embedder runs.
@@ -107,12 +107,12 @@ pub fn secret_variable(name: &str) -> String {
 
 /// The variable the access machine's Compose service reads its image from (its default, the
 /// resolved access image, is the Compose `${VAR:-default}` fallback). The runner sets it to the
-/// image it was given when it hot-adds the machine ([`crate::access`]).
+/// image it was given when it hot-adds the machine ([`crate::images::Access`]).
 pub const ACCESS_IMAGE: &str = "ISOLOOM_ACCESS_IMAGE";
 
 /// The variable the access machine's Vagrant VM reads its box name from (its default is the
 /// `ENV.fetch` fallback). The runner sets it to the box it was given when it hot-adds the
-/// machine ([`crate::access`]).
+/// machine ([`crate::images::Access`]).
 pub const ACCESS_BOX: &str = "ISOLOOM_ACCESS_BOX";
 
 /// The folder on a Linux machine its guest-delivered secrets are kept in, one root-only file per
