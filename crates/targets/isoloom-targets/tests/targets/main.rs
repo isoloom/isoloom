@@ -53,6 +53,7 @@ mod tags;
 mod tc;
 mod testing;
 mod tools;
+mod true_forms;
 mod trunks;
 mod vagrant_providers;
 mod windows_names;

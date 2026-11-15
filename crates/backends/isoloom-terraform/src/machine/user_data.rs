@@ -103,7 +103,10 @@ pub(crate) fn project_wait() -> Tracked {
 fn tracked(t: &Tracked) -> Template {
     let mut line = Template::text(format!("{}; {{ ", ready_mark(&ReadyLine::running(&t.label))));
     line.append(t.command.clone());
-    line.push_text(format!("; }} || {{ {}; exit 1; }}", ready_mark(&ReadyLine::failed(&t.label))));
+    // A command that ends its own last line (a multi-line `if … fi`) closes the group on the
+    // next: a line that starts with `;` is a syntax error.
+    let close = if t.command.ends_with_newline() { "}" } else { "; }" };
+    line.push_text(format!("{close} || {{ {}; exit 1; }}", ready_mark(&ReadyLine::failed(&t.label))));
     line
 }
 
@@ -223,6 +226,18 @@ pub(crate) fn capped(s: &SetUp, who: &str, cap: Capped) -> Result<Expression> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A step whose command is several lines (the published ports' `if … fi`) is still one group
+    /// the shell reads: `{ …\nfi\n} || …`, never `fi\n; }`.
+    #[cfg(unix)]
+    #[test]
+    fn a_step_of_several_lines_ends_its_group_on_a_line_of_its_own() {
+        for command in ["true", "if true; then\n  :\nfi\n"] {
+            let script = text(&tracked(&Tracked::new("step", Template::text(command))));
+            let parsed = std::process::Command::new("sh").args(["-n", "-c", &script]).status().expect("sh runs");
+            assert!(parsed.success(), "{script}");
+        }
+    }
 
     fn text(t: &Template) -> String {
         t.pieces()
