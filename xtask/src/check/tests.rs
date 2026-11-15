@@ -104,3 +104,10 @@ fn the_api_crates_are_the_workspaces_in_their_group_folders() {
         assert_eq!(found.len(), 1, "`{name}` is at crates/<group>/{name}/Cargo.toml: {found:?}");
     }
 }
+
+#[test]
+fn a_windows_binary_importing_the_visual_cpp_runtime_is_named() {
+    let listing = "  DLL Name: KERNEL32.dll\n  DLL Name: VCRUNTIME140.dll\n  DLL Name: msvcp140.dll\n  DLL Name: ws2_32.dll\n";
+    assert_eq!(super::vc_runtime_imports(listing), ["VCRUNTIME140.dll", "msvcp140.dll"]);
+    assert_eq!(super::vc_runtime_imports("  DLL Name: KERNEL32.dll\n"), Vec::<String>::new());
+}
