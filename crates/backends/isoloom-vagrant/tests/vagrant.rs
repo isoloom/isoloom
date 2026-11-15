@@ -51,6 +51,17 @@ fn parsed(yaml: &str) -> Outcome<Environment> {
     Ok(lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None)?)
 }
 
+/// Fails naming the first of `tools` that doesn't run here: the test is ignored by default (a
+/// player's machine lacks it) and `cargo xtask test` runs it, so a missing tool says so.
+fn needs(tools: &[&str]) -> Outcome {
+    for tool in tools {
+        if !Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success()) {
+            return Err(format!("needs `{tool}` on PATH").into());
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn hello_stack() -> Outcome {
     insta::assert_snapshot!(vagrantfile("hello-stack")?);
@@ -276,11 +287,6 @@ fn printed(mut ruby: Command) -> Outcome<String> {
     Ok(String::from_utf8(out.stdout)?.replace("\r\n", "\n"))
 }
 
-/// Whether `ruby` runs here (CI has it); a test that needs it says it is skipped otherwise.
-fn ruby_runs() -> bool {
-    Command::new("ruby").arg("-v").output().is_ok_and(|o| o.status.success())
-}
-
 /// What [`HYPERV_TRIGGERS_RB`] prints for machine `machine` of `example`'s Vagrantfile, with
 /// `ISOLOOM_HOSTPORTS` set to `hostports` (unset when `None`). The Vagrantfile loads from its
 /// rendered outputs, the example's folder its project.
@@ -304,11 +310,9 @@ fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Out
 /// the runner's choice both take the preferred one. The Ruby itself runs here when `ruby` is on
 /// the PATH (CI has it).
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn the_hyperv_relay_listens_on_the_host_port_the_forward_takes() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let relay = |port: u16| format!("listenaddress=127.0.0.1 listenport={port} connectaddress=192.0.2.10 connectport=80");
     let gone = |port: u16| format!("netsh interface portproxy delete v4tov4 listenaddress=127.0.0.1 listenport={port} | Out-Null; $global:LASTEXITCODE = 0");
     for (hostports, port) in [(Some(r#"{"web/web":53544}"#), 53544), (None, 8080)] {
@@ -451,11 +455,9 @@ fn a_hub_left_running_is_stopped_and_fails_its_test() -> Outcome {
 /// start its hub (the first held 39761 and 39762). Each copy's ports are distinct, in
 /// 20000-39999, and kept from one read of its Vagrantfile to the next.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn two_copies_of_one_environment_get_disjoint_qemu_hub_ports() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = HubScratch::new("isoloom-qemu-hubs-")?;
     for example in ["solo-web", "segmented"] {
         let mut copies = Vec::new();
@@ -477,11 +479,9 @@ fn two_copies_of_one_environment_get_disjoint_qemu_hub_ports() -> Outcome {
 /// A copy's hub that runs keeps its ports, even taken (it holds them); one that doesn't run gets a
 /// port that is free in place of one that something else holds.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn a_running_hub_keeps_its_ports_and_a_held_port_is_passed_over() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = HubScratch::new("isoloom-qemu-held-")?;
     let (ports, vagrantfile) = qemu_hub_ports("solo-web", scratch.path(), false)?;
     let held = std::net::TcpListener::bind(("127.0.0.1", ports[0].1))?;
@@ -565,11 +565,9 @@ fn vm_ports(out: &str) -> Vec<(String, u16)> {
 /// starts with spare ports; a VM that joins takes one, the others keep theirs, and the hub runs
 /// on.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = HubScratch::new("isoloom-qemu-join-")?;
     // A first start: the VMs' ports and spare ones beyond them, all listened on, all recorded.
     let (out, record) = qemu_hub("solo-web", scratch.path(), "app", false)?;
@@ -615,11 +613,9 @@ fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() 
 /// is the ports by VM alone) is not restarted under its VMs: the start is refused, with the way
 /// out.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn a_running_qemu_hub_without_a_spare_port_refuses_a_joining_vm_rather_than_restart() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = HubScratch::new("isoloom-qemu-full-")?;
     let (out, record) = qemu_hub("solo-web", scratch.path(), "app", false)?;
     let ports = vm_ports(&out);
@@ -724,11 +720,9 @@ puts "destroyed #{IsoloomQemu.running(net).inspect} #{Dir.children(IsoloomQemu.h
 /// last VM is destroyed.
 #[cfg(unix)]
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn an_environment_on_qemu_is_destroyed_after_a_vm_joined_and_left_its_network() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = HubScratch::new("isoloom-qemu-visit-")?;
     let (vagrantfile, mut ruby) = loadable("solo-web", &scratch.path().join("project"))?;
     ruby.arg("-e").arg(QEMU_HUB_VISIT_RB).arg(&vagrantfile).arg(scratch.path().join("machines"));
@@ -782,11 +776,9 @@ puts "started #{$started} stopped #{$stopped} running #{!IsoloomQemu.running(net
 /// connected to it. A network's hub is decided under its lock: one start, the other VM joining it.
 #[cfg(unix)]
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn vms_starting_at_once_on_qemu_share_one_hub() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = tempfile::Builder::new().prefix("isoloom-qemu-race-").tempdir()?;
     let (vagrantfile, mut ruby) = loadable("solo-web", scratch.path())?;
     ruby.arg("-e").arg(QEMU_HUB_RACE_RB).arg(&vagrantfile);
@@ -849,11 +841,9 @@ fn virtiofs_args(help: &str) -> Outcome<Vec<String>> {
 /// map; with one that doesn't, no argument is added, so it still starts.
 #[cfg(unix)]
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let translating = virtiofs_args("    --translate-uid <type>:<source base>:<target base>:<count>")?;
     let (ids, args) = translating.split_first().ok_or("no output")?;
     let (uid, gid) = ids.split_once(' ').ok_or("no ids")?;
@@ -937,11 +927,9 @@ fn vagrant_host_names(example: &str, dir: &Path, key: Option<&str>) -> Outcome<s
 /// network or libvirt prefix name on any provider: each name carries the copy's key, the runner's
 /// (`ISOLOOM_KEY`) or, run by hand, one made from the copy's folder, the same at every read.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn two_copies_of_one_environment_never_share_a_name_on_the_host() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = tempfile::Builder::new().prefix("isoloom-copy-names-").tempdir()?;
     for example in ["solo-web", "segmented"] {
         let (one, two) = (scratch.path().join(example).join("one"), scratch.path().join(example).join("two"));
@@ -1090,11 +1078,9 @@ fn the_readiness_check_is_each_machines_last_provisioner_and_its_failure_fails_v
 
 /// A key the runner gives that isn't one is refused when the Vagrantfile loads, never put in a name.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn a_malformed_key_is_refused() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let scratch = tempfile::Builder::new().prefix("isoloom-bad-key-").tempdir()?;
     let err = vagrant_host_names("solo-web", scratch.path(), Some("Bad Key")).unwrap_err().to_string();
     assert!(err.contains("ISOLOOM_KEY"), "{err}");
@@ -1383,11 +1369,9 @@ fn utm_adapters(example: &str) -> Outcome<(Vec<Triple>, Vec<Triple>)> {
 /// supplier-portal-api (three VMs on one network, the controller among them). The Ruby itself
 /// runs here when `ruby` is on the PATH (CI has it).
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn every_vm_of_a_network_gets_a_card_on_the_same_vmnet_network_on_utm() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     for example in ["segmented", "supplier-portal-api"] {
         let env = plan(example)?;
         let (cards, addresses) = utm_adapters(example)?;
@@ -1456,11 +1440,9 @@ fn every_vmware_adapter_on_a_network_has_a_pci_slot_of_its_own() -> Outcome {
 /// relay) read `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first, then the runner's choice for
 /// this run, then the published number, `auto_correct` kept.
 #[test]
+#[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
 fn a_kept_host_port_wins_over_the_runs_choice_and_the_published_one() -> Outcome {
-    if !ruby_runs() {
-        eprintln!("skipped: needs ruby");
-        return Ok(());
-    }
+    needs(&["ruby"])?;
     let file = vagrantfile("solo-web")?;
     let r = isoloom_test_support::ruby_blocks(&file);
     let web = r.block("config.vm.define \"web\"");

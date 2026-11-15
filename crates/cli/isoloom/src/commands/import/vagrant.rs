@@ -163,13 +163,11 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "needs ruby: records a Vagrantfile with the host's Ruby; `cargo xtask test` runs it"]
     fn what_a_vagrantfile_prints_never_reaches_the_recording() -> Outcome {
         let (_dir, script, file) = folder("puts", "puts \"hello\"\nVagrant.configure(\"2\") { |c| c.vm.box = \"debian/bookworm64\" }\n")?;
         let recorded = record_with(&["ruby"], &script, &file);
-        match recorded {
-            Err(CliError::ToolMissing { .. }) => eprintln!("skipped: needs ruby"),
-            other => assert!(other.is_ok(), "{other:?}"),
-        }
+        assert!(recorded.is_ok(), "{recorded:?}");
         Ok(())
     }
 }

@@ -14,6 +14,17 @@ use isoloom_spec::Target;
 
 use crate::testing::{Outcome, example, generated as file};
 
+/// Fails naming the first of `tools` that doesn't run here: the test is ignored by default (a
+/// player's machine lacks it) and `cargo xtask test` runs it, so a missing tool says so.
+fn needs(tools: &[&str]) -> Outcome {
+    for tool in tools {
+        if !Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success()) {
+            return Err(format!("needs `{tool}` on PATH").into());
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
     let vagrant = file(&example("hello-stack")?, Target::Vagrant, "vagrant/Vagrantfile")?;
@@ -26,10 +37,6 @@ fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
     // Every other step: the rules of a machine reading none of the outputs.
     assert!(vagrant.contains("IsoloomProject::COPY_RULES = \"/.isoloom*\n.git/\n"), "{vagrant}");
     Ok(())
-}
-
-fn have(tool: &str) -> bool {
-    Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success())
 }
 
 /// Vagrant runs a Vagrantfile on its own embedded Ruby (3.x). The `ruby` standing in for it here
@@ -115,11 +122,9 @@ fn tricky_project(dir: &Path) -> Outcome<(PathBuf, String)> {
 
 #[cfg(unix)]
 #[test]
+#[ignore = "needs ruby and tar: archives the project with the Vagrantfile's Ruby, then lists it with tar; `cargo xtask test` runs it"]
 fn the_archive_keeps_links_as_links_and_survives_a_loop() -> Outcome {
-    if !have("ruby") || !have("tar") {
-        eprintln!("skipped: needs ruby and tar");
-        return Ok(());
-    }
+    needs(&["ruby", "tar"])?;
     let dir = scratch("project-tar")?;
     let dir = dir.path();
     let (root, long) = tricky_project(dir)?;
@@ -160,11 +165,9 @@ fn unpacks_as_packed(dir: &Path, long: &str) -> Outcome {
 }
 
 #[test]
+#[ignore = "needs ruby and tar: archives the project with the Vagrantfile's Ruby, then lists it with tar; `cargo xtask test` runs it"]
 fn isoloomignore_leaves_paths_out() -> Outcome {
-    if !have("ruby") || !have("tar") {
-        eprintln!("skipped: needs ruby and tar");
-        return Ok(());
-    }
+    needs(&["ruby", "tar"])?;
     let dir = scratch("isoloomignore")?;
     let dir = dir.path();
     let root = dir.join("project");
@@ -256,11 +259,9 @@ fn windows_machines_get_the_project_before_their_steps() -> Outcome {
 /// The Windows extractor (`untar.ps1`), run by PowerShell where it's installed (GitHub's runners
 /// have `pwsh`): the Vagrantfile Ruby's archive, and a host tar's with a top folder to strip.
 #[test]
+#[ignore = "needs ruby, tar and pwsh: the Windows extractor runs under PowerShell; `cargo xtask test` runs it"]
 fn the_windows_extractor_unpacks_the_archive() -> Outcome {
-    if !have("ruby") || !have("tar") || !have("pwsh") {
-        eprintln!("skipped: needs ruby, tar and pwsh");
-        return Ok(());
-    }
+    needs(&["ruby", "tar", "pwsh"])?;
     let dir = scratch("untar")?;
     let dir = dir.path();
     let root = dir.join("project");
