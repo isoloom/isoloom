@@ -48,12 +48,11 @@ it. The comment at the top of the generated `compose.yml` lists these commands f
 and the variables it reads: each input by its own name (`${NAME}`, empty when unset), each
 secret as `ISOLOOM_SECRET_<NAME>`, from Compose's environment (the shell's, else `.env`).
 
-Or let a runner run the same Compose file, which does all of the above and reports each check:
+Or let a runner run the same Compose file (Isothrum takes the target's folder as it is), then run the checks as above:
 
 ```sh
-isothrum up . --target docker
-isothrum check . --target docker
-isothrum down . --target docker
+isothrum up .isoloom/docker
+isothrum down .isoloom/docker
 ```
 
 ## Published ports

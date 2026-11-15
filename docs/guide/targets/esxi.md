@@ -71,13 +71,12 @@ the environment is ready. The checks are scripts under `.isoloom/esxi/checks/`, 
 machine the `checks` output names, through the router (`ssh -J isoloom@<ip> isoloom@<host> sh -s <
 .isoloom/esxi/checks/<position>.sh`).
 
-Or with a runner, which gives the module its slot and key and runs the checks (it runs Terraform, `ovftool` and `ssh` from the machine it runs on;
+Or with a runner, which gives the module its slot and key (it runs Terraform, `ovftool` and `ssh` from the machine it runs on;
 a Windows machine's secrets are refused on ESXi):
 
 ```sh
-isothrum up . --target esxi
-isothrum check . --target esxi
-isothrum down . --target esxi
+isothrum up .isoloom/esxi
+isothrum down .isoloom/esxi
 ```
 
 ## Security notes

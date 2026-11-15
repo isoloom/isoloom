@@ -99,8 +99,8 @@ docker compose -f .isoloom/docker/compose.yml --profile check run --rm isoloom-c
 docker compose -f .isoloom/docker/compose.yml down -v
 ```
 
-Or let the runner do it, checks included: `isothrum up . --target docker`, `isothrum check .
---target docker`, `isothrum down . --target docker`. The
+Or let a runner run the same files: `isothrum up .isoloom/docker`, then `isothrum down
+.isoloom/docker`. The
 [getting-started guide](docs/guide/getting-started.md) walks through each step.
 
 A spec looks like this ([every field](docs/spec.md)):

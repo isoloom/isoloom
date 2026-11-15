@@ -104,20 +104,18 @@ docker compose -f .isoloom/docker/compose.yml down -v
 
 ## 6. Run it with Isothrum
 
-A runner runs the same Compose file and does all of the above for you: it checks the tools' versions,
-brings the environment up, waits until it is ready, runs every check (from each machine's
-position too), and removes everything at the end. [Isothrum](https://github.com/Isothrum/isothrum)
+A runner runs the same Compose file for you: it checks the tools' versions, brings the
+environment up, waits until it is ready, and removes everything at the end. [Isothrum](https://github.com/Isothrum/isothrum)
 is the reference runner; install it from its releases or with `cargo install --locked
 isothrum-cli`.
 
 ```sh
-isothrum up . --target docker
-isothrum check . --target docker
-isothrum down . --target docker
+isothrum up .isoloom/docker
+isothrum down .isoloom/docker
 ```
 
-`isothrum up` prints the published URLs and the spec's `message`. `isothrum check` exits 1 when a
-check fails.
+`isothrum up` takes the target's folder, the native files as Isoloom wrote them, and prints the
+published URLs; the checks run as the Compose file's header says (step 5).
 
 ## 7. Change it
 
