@@ -9,6 +9,7 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{EsxiBackend, ProxmoxBackend};
+use isoloom_test_support::{hcl_attribute, hcl_blocks, hcl_body, hcl_names, hcl_nested, hcl_one, hcl_text};
 use testing::{Outcome, example, file, planned};
 
 fn proxmox(name: &str) -> Outcome<String> {
@@ -19,6 +20,24 @@ fn proxmox(name: &str) -> Outcome<String> {
 fn esxi(name: &str) -> Outcome<String> {
     let env: Environment = planned(&example(name)?, Target::Esxi)?;
     Ok(file(&EsxiBackend.render(&env)?, "esxi/main.tf")?.to_owned())
+}
+
+/// The references attribute `key` of `body` lists (`depends_on`, `replace_triggered_by`), as HCL
+/// writes them.
+fn references(body: &hcl::Body, key: &str) -> Vec<String> {
+    match hcl_attribute(body, key) {
+        Some(hcl::Expression::Array(items)) => items.iter().map(ToString::to_string).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Attribute `key` of the postcondition in `resource`'s lifecycle (`condition`,
+/// `error_message`), as HCL writes it.
+fn postcondition(resource: &hcl::Body, key: &str) -> Outcome<String> {
+    let lifecycle = hcl_nested(resource, "lifecycle");
+    let post = lifecycle.first().map(|l| hcl_nested(l.body(), "postcondition")).unwrap_or_default();
+    let post = post.first().ok_or("no postcondition")?;
+    Ok(hcl_attribute(post.body(), key).ok_or_else(|| format!("no {key}"))?.to_string())
 }
 
 /// The block of `tf` that starts with `head`, up to the next top-level block (empty when there
@@ -34,13 +53,14 @@ fn a_destroy_applies_the_sdn_deletions_once_the_zone_is_gone() -> Outcome {
     // Regression: `destroy` removed the SDN applier before the zone and VNets, so their deletion
     // stayed pending on the server (the zone and its bridge were still there).
     let tf = proxmox("segmented")?;
-    let finalizer = block(&tf, "resource \"proxmox_sdn_applier\" \"finalizer\"");
-    assert!(finalizer.starts_with("resource"), "a finalizer applier: {tf}");
-    let zone = block(&tf, "resource \"proxmox_sdn_zone_simple\" \"env\"");
-    assert!(zone.contains("depends_on = [proxmox_sdn_applier.finalizer]"), "{zone}");
-    let applier = block(&tf, "resource \"proxmox_sdn_applier\" \"env\"");
-    assert!(applier.contains("replace_triggered_by"), "{applier}");
-    assert!(applier.contains("proxmox_sdn_zone_simple.env"), "{applier}");
+    let body = hcl_body(&tf);
+    assert_eq!(hcl_names(&body, "resource", "proxmox_sdn_applier"), ["finalizer", "env"], "a finalizer applier");
+    let zone = hcl_one(&body, "proxmox_sdn_zone_simple", "env");
+    assert_eq!(references(zone, "depends_on"), ["proxmox_sdn_applier.finalizer"]);
+    let applier = hcl_one(&body, "proxmox_sdn_applier", "env");
+    let lifecycle = hcl_nested(applier, "lifecycle");
+    let triggers = lifecycle.first().map(|l| references(l.body(), "replace_triggered_by")).unwrap_or_default();
+    assert!(triggers.iter().any(|t| t.starts_with("proxmox_sdn_zone_simple.env")), "{triggers:?}");
     Ok(())
 }
 
@@ -49,9 +69,11 @@ fn the_node_has_no_default_name() -> Outcome {
     // Regression: `node` defaulted to `pve`, while a server's first node can be named anything
     // (a connection test passed on a test server, then the launch failed).
     let tf = proxmox("hello-stack")?;
-    let node = block(&tf, "variable \"node\"");
-    assert!(!node.contains("default"), "{node}");
-    assert!(node.contains("validation"), "an empty node is refused: {node}");
+    let body = hcl_body(&tf);
+    let node = hcl_blocks(&body, "variable", &["node"]);
+    let node = node.first().ok_or("no node variable")?.body();
+    assert!(hcl_attribute(node, "default").is_none(), "no default");
+    assert_eq!(hcl_nested(node, "validation").len(), 1, "an empty node is refused");
     Ok(())
 }
 
@@ -60,13 +82,15 @@ fn a_router_that_cant_report_its_address_fails_within_minutes_and_says_why() -> 
     // Regression: with no DNS or internet on its uplink, the router's guest agent never installs,
     // and the apply waited the provider's 15 minutes, then failed on an empty list's index.
     let tf = proxmox("hello-stack")?;
-    let router = block(&tf, "resource \"proxmox_virtual_environment_vm\" \"isoloom_router\"");
-    assert!(router.contains("timeout = \"8m\""), "{router}");
-    assert!(router.contains("wait_for_ip"), "{router}");
-    assert!(router.contains("stop_on_destroy = true"), "a destroy never waits on a missing agent: {router}");
-    assert!(router.contains("postcondition"), "{router}");
-    assert!(router.contains("no DHCP"), "{router}");
-    assert!(router.contains("qemu-guest-agent"), "{router}");
+    let body = hcl_body(&tf);
+    let router = hcl_one(&body, "proxmox_virtual_environment_vm", "isoloom_router");
+    let agent = hcl_nested(router, "agent");
+    let agent = agent.first().ok_or("no agent block")?.body();
+    assert_eq!(hcl_text(agent, "timeout"), "8m");
+    assert_eq!(hcl_nested(agent, "wait_for_ip").len(), 1);
+    assert_eq!(hcl_text(router, "stop_on_destroy"), "true", "a destroy never waits on a missing agent");
+    let why = postcondition(router, "error_message")?;
+    assert!(why.contains("no DHCP") && why.contains("qemu-guest-agent"), "{why}");
     Ok(())
 }
 
@@ -75,7 +99,13 @@ fn a_router_that_never_reported_an_address_can_still_be_destroyed() -> Outcome {
     // Found on the real server: after the postcondition failed, `destroy` stopped on "Invalid
     // index" (the router's address list is empty in the state), leaving the lab behind.
     let tf = proxmox("hello-stack")?;
-    assert!(tf.contains("router_address = try(["), "{tf}");
+    let body = hcl_body(&tf);
+    let locals = hcl_blocks(&body, "locals", &[]);
+    let address = locals
+        .iter()
+        .find_map(|l| hcl_attribute(l.body(), "router_address"))
+        .ok_or("no router_address")?;
+    assert!(matches!(address, hcl::Expression::FuncCall(f) if f.name.name.as_str() == "try"), "{address}");
     Ok(())
 }
 
@@ -84,10 +114,13 @@ fn an_esxi_router_uplink_without_dhcp_fails_instead_of_giving_its_lab_address() 
     // Regression: with no DHCP on the uplink port group, VMware Tools reported the router's lab
     // address (10.80.0.254 there), and the module output it as the lab's address.
     let tf = esxi("hello-stack")?;
-    let router = block(&tf, "resource \"esxi_guest\" \"isoloom_router\"");
-    assert!(router.contains("postcondition"), "{router}");
-    assert!(router.contains("10.60.0.254"), "the lab address is told apart: {router}");
-    assert!(router.contains("no DHCP"), "{router}");
+    let body = hcl_body(&tf);
+    let router = hcl_one(&body, "esxi_guest", "isoloom_router");
+    let why = postcondition(router, "error_message")?;
+    assert!(why.contains("no DHCP"), "{why}");
+    // The condition tells the lab address apart from the uplink's.
+    let condition = postcondition(router, "condition")?;
+    assert!(condition.contains("!contains([\"10.60.0.254\"], self.ip_address)"), "{condition}");
     Ok(())
 }
 
@@ -95,9 +128,13 @@ fn an_esxi_router_uplink_without_dhcp_fails_instead_of_giving_its_lab_address() 
 fn the_lab_host_address_is_the_ip_output() -> Outcome {
     // The runner reads `ip` on every Terraform target; the server modules said `address`.
     for tf in [proxmox("hello-stack")?, esxi("hello-stack")?] {
-        assert!(tf.contains("output \"ip\""), "{tf}");
-        assert!(!tf.contains("output \"address\""), "{tf}");
-        assert!(tf.contains("output \"ready_file\""), "{tf}");
+        let outputs: Vec<String> = hcl_body(&tf)
+            .blocks()
+            .filter(|b| b.identifier() == "output")
+            .filter_map(|b| b.labels().first().map(|l| l.as_str().to_owned()))
+            .collect();
+        assert!(outputs.iter().any(|o| o == "ip") && outputs.iter().any(|o| o == "ready_file"), "{outputs:?}");
+        assert!(!outputs.iter().any(|o| o == "address"), "{outputs:?}");
     }
     Ok(())
 }
