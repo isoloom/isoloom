@@ -11,6 +11,8 @@ mod machines;
 mod message;
 mod networks;
 pub(crate) mod ports;
+#[cfg(feature = "paas")]
+mod services;
 mod targets;
 
 use isoloom_plan::Lab;
@@ -108,6 +110,8 @@ fn snapshot(lab: &Lab, spec: &Spec, instance: Option<u8>) -> Value {
     out.insert("published".into(), ports::published(spec).into());
     out.insert("targets".into(), targets::section(lab));
     out.insert("checks".into(), checks::section(spec));
+    #[cfg(feature = "paas")]
+    out.extend(services::entries(lab).into_iter().map(|(k, v)| (k.to_owned(), v)));
     // The message, with its placeholders filled from everything above.
     let mut snapshot = Value::Object(out);
     if let Some(m) = &spec.message {

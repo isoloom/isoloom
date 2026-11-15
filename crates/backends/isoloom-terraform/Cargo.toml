@@ -22,6 +22,10 @@ serde_json.workspace = true
 indexmap.workspace = true
 thiserror.workspace = true
 
+[features]
+# The platform level (`services:`): a draft, off by default.
+paas = ["isoloom-plan/paas", "isoloom-spec/paas"]
+
 [dev-dependencies]
 isoloom-render = { workspace = true, features = ["test-support"] }
 isoloom-test-support.workspace = true

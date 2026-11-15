@@ -23,6 +23,10 @@ serde_json.workspace = true
 serde_path_to_error.workspace = true
 saphyr-parser.workspace = true
 
+[features]
+# The platform level (`services:`): a draft, off by default.
+paas = []
+
 [dev-dependencies]
 insta.workspace = true
 proptest.workspace = true

@@ -59,6 +59,16 @@ impl Module {
         }
     }
 
+    /// Its top-level blocks, to change in place (the platform level gives a client machine its
+    /// identity this way, in its own module).
+    #[cfg(feature = "paas")]
+    pub(crate) fn blocks_mut(&mut self) -> impl Iterator<Item = &mut Block> {
+        self.sections.iter_mut().filter_map(|s| match s {
+            Section::Block { block, .. } => Some(block),
+            Section::Fragment(_) => None,
+        })
+    }
+
     /// Adds a fixed fragment of HCL, written as it is: the project's lists a module reads
     /// (`isoloom_render::project::lists`), which the rendering layer writes as HCL text.
     pub(crate) fn fragment(&mut self, hcl: &str) {

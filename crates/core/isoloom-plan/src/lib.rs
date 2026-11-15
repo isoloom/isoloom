@@ -52,6 +52,8 @@ pub mod machine_files;
 pub mod more_addresses;
 mod names;
 mod outside;
+#[cfg(feature = "paas")]
+pub mod paas;
 pub mod private_dns;
 pub mod process;
 mod published;

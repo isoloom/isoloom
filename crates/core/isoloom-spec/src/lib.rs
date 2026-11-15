@@ -38,6 +38,8 @@ mod load;
 pub mod model;
 pub mod net;
 pub mod os;
+#[cfg(feature = "paas")]
+pub mod paas;
 pub mod path;
 pub mod placeholders;
 pub mod probe;

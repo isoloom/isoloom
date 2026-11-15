@@ -155,6 +155,11 @@ pub struct Spec {
     /// What the place it runs in imposes: an HTTP proxy, registry and package mirrors, time
     /// servers.
     pub constraints: Option<Constraints>,
+    /// Services beside the machines (the platform level), by kebab-case name: each a `kind`
+    /// (`postgres`, `object-storage`) every target renders its own way, or refuses.
+    #[cfg(feature = "paas")]
+    #[schemars(default)]
+    pub services: IndexMap<String, crate::paas::Service>,
     /// Base machine name → its clones, for machines that had a `count`. Filled when parsing.
     #[schemars(skip)]
     pub clones: IndexMap<String, Vec<String>>,

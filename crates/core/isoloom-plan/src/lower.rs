@@ -80,6 +80,8 @@ fn inputs(source: &syntax::Spec) -> Vec<model::Input> {
 /// Lowers `source` for `scope`, its catalogue services resolved in `catalogue`.
 #[must_use]
 pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowered {
+    #[cfg(feature = "paas")]
+    let source: &syntax::Spec = &crate::paas::source_for(source, scope);
     let mut trail = Trail::default();
     let mut secrets = source.secrets.clone();
     let mut machines = IndexMap::new();
@@ -115,9 +117,13 @@ pub fn lower(source: &syntax::Spec, catalogue: &Catalogue, scope: Scope) -> Lowe
     spec.message.clone_from(&source.message);
     spec.tags.clone_from(&source.tags);
     spec.tools.clone_from(&source.tools);
+    #[cfg(feature = "paas")]
+    spec.services.clone_from(&source.services);
     spec.clones.clone_from(&source.clones);
     machine::resolve_dns(&mut spec, scope);
     let refusals = scope.target().map(|t| refusals::of(source, &services, t)).unwrap_or_default();
+    #[cfg(feature = "paas")]
+    let refusals = [refusals, crate::paas::refusals(source, scope)].concat();
     trail.inputs(source);
     // VLANs written under their LAN become networks of their own, as the backends expect.
     let spec = match isoloom_spec::vlans::flatten(spec.clone()) {
