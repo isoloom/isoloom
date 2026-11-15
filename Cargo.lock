@@ -744,6 +744,7 @@ dependencies = [
  "indexmap",
  "isoloom-plan",
  "isoloom-spec",
+ "isoloom-test-support",
  "proptest",
  "serde",
  "serde_json",

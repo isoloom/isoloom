@@ -25,6 +25,7 @@ indexmap.workspace = true
 [dev-dependencies]
 # The drafts are checked as `isoloom validate` checks a spec: parsed, then lowered per target.
 isoloom-plan.workspace = true
+isoloom-test-support.workspace = true
 proptest.workspace = true
 
 [lints]

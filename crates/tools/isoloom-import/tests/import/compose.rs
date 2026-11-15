@@ -4,7 +4,7 @@
 use isoloom_import::{NoteKind, compose::draft};
 use isoloom_spec::syntax::{EnvValue, Octets};
 
-use crate::testing::{Outcome, fixture, has, image, ports, spec, validate, validate_in};
+use crate::testing::{Outcome, fixture, has, image, ports, spec, validate, validate_in, value_at, values_at};
 
 /// The shop fixture's draft.
 fn shop() -> Outcome<isoloom_import::Draft> {
@@ -75,7 +75,7 @@ fn everything_else_is_a_note_with_its_reason() -> Outcome {
 fn renames_point_at_the_settings_that_still_use_the_old_name() -> Outcome {
     let compose = "services:\n  db.main:\n    image: postgres:16\n    expose: [5432]\n  app:\n    image: app\n    environment: { DB_HOST: db.main }\n";
     let d = draft(compose, "x", "compose.yaml")?;
-    assert!(d.yaml.contains("  db-main:"));
+    assert!(spec(&d)?.machines.contains_key("db-main"), "{}", d.yaml);
     assert!(has(&d, NoteKind::Changed, "services.db.main", "the environment of app still says `db.main`"));
     Ok(())
 }
@@ -145,7 +145,7 @@ fn a_mount_path_the_spec_cant_hold_is_kept_for_validate_to_name() -> Outcome {
     // Compose mounts at a path with a space; a machine's paths can't hold one (the Docker short
     // syntax and the VMs' `mkdir -p` split on it), so the draft says it and validate names it.
     let d = draft("services:\n  a:\n    image: x\n    volumes: [\"logs:/var/my logs\"]\n", "x", "compose.yaml")?;
-    assert!(d.yaml.contains("volumes: { logs: \"/var/my logs\" }"), "{}", d.yaml);
+    assert_eq!(value_at(&d, "machines.a.volumes.logs"), "/var/my logs");
     let problems = validate(&d)?;
     assert!(problems.iter().any(|p| p.starts_with("machines.a.volumes.logs:")), "{problems:?}");
     Ok(())
@@ -222,8 +222,8 @@ fn a_build_with_text_yaml_would_misread_is_quoted() -> Outcome {
     let compose = "services:\n  web:\n    build:\n      context: \"web app\"\n      dockerfile: \"Dockerfile.prod\"\n      args: { GREETING: \"a: b # c\" }\n";
     let d = draft(compose, "x", "compose.yaml")?;
     let spec = spec(&d)?;
-    assert!(d.yaml.contains("context: \"web app\""), "{}", d.yaml);
-    assert!(d.yaml.contains("GREETING: \"a: b # c\""), "{}", d.yaml);
+    assert_eq!(value_at(&d, "machines.web.app.build.context"), "web app", "{}", d.yaml);
+    assert_eq!(value_at(&d, "machines.web.app.build.args.GREETING"), "a: b # c", "{}", d.yaml);
     assert!(spec.machines.contains_key("web"));
     Ok(())
 }
@@ -249,7 +249,13 @@ fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Out
         "compose.yml",
     )?;
     assert_eq!(validate(&d)?, Vec::<String>::new(), "{}", d.yaml);
-    assert!(d.yaml.contains("hardware: { gpus: { count: 2, driver: nvidia } }"), "{}", d.yaml);
+    assert_eq!(
+        (
+            value_at(&d, "machines.train.hardware.gpus.count"),
+            value_at(&d, "machines.train.hardware.gpus.driver")
+        ),
+        ("2".to_owned(), "nvidia".to_owned())
+    );
     let at = "services.train.deploy";
     assert!(has(&d, NoteKind::NotInSpec, &format!("{at}.resources.limits"), "pids"), "{:?}", d.notes);
     assert!(
@@ -268,7 +274,7 @@ fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Out
         "ml",
         "compose.yml",
     )?;
-    assert!(all.yaml.contains("hardware: { gpus: all }"), "{}", all.yaml);
+    assert_eq!(value_at(&all, "machines.t.hardware.gpus"), "all");
     assert!(all.notes.iter().all(|n| !n.at.contains("deploy")), "{:?}", all.notes);
     Ok(())
 }
@@ -287,11 +293,11 @@ fn a_second_gpu_device_and_a_count_that_isnt_one_are_noted_not_dropped() -> Outc
     deploy: { resources: { reservations: { devices: [{ count: some, capabilities: [gpu] }] } } }
 ";
     let two = draft(yaml, "ml", "compose.yml")?;
-    assert!(two.yaml.contains("hardware: { gpus: { ids: [\"0\"] } }"), "the first one kept: {}", two.yaml);
+    assert_eq!(values_at(&two, "machines.train.hardware.gpus.ids"), ["0"], "the first one kept");
     let devices = "services.train.deploy.resources.reservations.devices";
     let second = format!("{devices}[1]");
     assert!(has(&two, NoteKind::Changed, &second, "one GPU request"), "{:?}", two.notes);
-    assert!(two.yaml.contains("hardware: { gpus: all }"), "{}", two.yaml);
+    assert_eq!(value_at(&two, "machines.infer.hardware.gpus"), "all");
     let count = "services.infer.deploy.resources.reservations.devices[0].count";
     assert!(has(&two, NoteKind::Changed, count, "`some` is neither a number nor `all`"), "{:?}", two.notes);
     assert_eq!(validate(&two)?, Vec::<String>::new(), "{}", two.yaml);

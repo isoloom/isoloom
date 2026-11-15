@@ -141,6 +141,10 @@ mod tests {
     fn two_machines_named_alike_are_numbered() {
         let machines = [machine("vm", &[]), machine("vm", &[])];
         let yaml = Placement::new(&machines, &IndexMap::new()).write(&machines, "lab", "main.tf");
-        assert!(yaml.contains("\n  vm:\n") && yaml.contains("\n  vm-2:\n"), "{yaml}");
+        assert_eq!(
+            isoloom_test_support::yaml_keys_at(&isoloom_test_support::yaml(&yaml), "machines"),
+            ["vm", "vm-2"],
+            "{yaml}"
+        );
     }
 }
