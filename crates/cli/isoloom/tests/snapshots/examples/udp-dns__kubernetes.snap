@@ -47,6 +47,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/kubernetes/kustomization.yaml
 .isoloom/resolved.json
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/docker/build/client/Dockerfile: identical in the `docker` snapshot

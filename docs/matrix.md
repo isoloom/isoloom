@@ -68,9 +68,9 @@ Each target's files are checked by the official validators of their formats (`ca
 | `machines.*.files[].source` | a project file placed on the machine | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `machines.*.files[].content` | a file written in the spec | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | `machines.*.files[].mode` | a project file with its own owner or mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| `machines.*.files[].input` | an input's value as a file (a token) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `machines.*.files[].secret` | a secret's value as a file | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `machines.*.files[].uid` | a secret's file with its own owner | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `machines.*.volumes` | data kept until the environment is destroyed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `volumes` | a volume two machines share | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
 | `volumes` | a volume a container and a VM share (an LXC container on Proxmox) | – | – | – | – | – | – | – | – | – | – | – | – | ✗ | – | – | – | – | – | – | – | – |
@@ -336,18 +336,6 @@ Each target's files are checked by the official validators of their formats (`ca
 ### `machines.*.files[].mode`
 
 - `external`: capability `existing-host-files`: machine `m` has `files`: Isoloom doesn't write on an existing host, so place them with a `provision:` playbook
-
-### `machines.*.files[].input`
-
-- `external`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
-
-### `machines.*.files[].secret`
-
-- `external`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
-
-### `machines.*.files[].uid`
-
-- `external`: capability `secrets`: machine `m` gets `secrets` (a secret's or an input's value as a file), and nothing delivers them into a machine on this target
 
 ### `volumes`
 

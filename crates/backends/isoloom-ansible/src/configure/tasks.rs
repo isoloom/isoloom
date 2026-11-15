@@ -116,14 +116,8 @@ fn apt_repository(p: &RepositoryPlan, sha: &Value, notify: &[String]) -> Vec<Val
             .into_value(),
     ];
     if let Some(priority) = p.priority {
-        let host = p
-            .url
-            .to_string()
-            .trim_start_matches("https://")
-            .split('/')
-            .next()
-            .unwrap_or_default()
-            .to_owned();
+        // The origin apt matches is the URL's host alone: a port or a user in it pins nothing.
+        let host = p.url.host();
         let pref = format!("Package: *\nPin: origin {host}\nPin-Priority: {priority}\n");
         out.push(
             Task::new(format!("{}'s priority", p.name))

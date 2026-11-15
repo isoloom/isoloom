@@ -47,7 +47,66 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - catalogue: mariadb@10.6.3 on ubuntu@22.04
+  - template:
+      from: catalogue/mariadb/values/0
+      to: /run/isoloom/with/password
+      mode: '0600'
+  - template:
+      from: catalogue/mariadb/values/1
+      to: /run/isoloom/with/user_password
+      mode: '0600'
+  - packages:
+    - ca-certificates
+    - libaio1
+    - libnuma1
+    - libncurses6
+    - procps
+  - file:
+      path: /var/cache/isoloom/mariadb.tar.gz
+      url: https://archive.mariadb.org/mariadb-10.6.3/bintar-linux-systemd-x86_64/mariadb-10.6.3-linux-systemd-x86_64.tar.gz
+      sha256: 3bcfadba0083b6e97ce6c6350091b25bf4e9a91774dfa2a1c1f9e1abcd80fb6e
+  - command: sh -c 'mkdir -p /usr/local/mysql && tar -xzf /var/cache/isoloom/mariadb.tar.gz --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf "$b" /usr/local/bin/; done'
+    creates: /usr/local/mysql/bin/mariadbd
+  - group:
+      name: mysql
+      system: true
+  - user:
+      name: mysql
+      group: mysql
+      system: true
+      home: /var/lib/mysql
+      shell: /bin/false
+  - file:
+      path: /var/lib/mysql
+      state: directory
+      owner: mysql
+      group: mysql
+      mode: '0750'
+  - file:
+      path: /docker-entrypoint-initdb.d
+      state: directory
+      mode: '0755'
+  - file:
+      path: /etc/mysql/conf.d
+      state: directory
+      mode: '0755'
+  - template:
+      from: catalogue/mariadb/.isoloom/catalogue/mariadb/files/my.cnf
+      to: /etc/my.cnf
+      mode: '0644'
+  - template:
+      from: catalogue/mariadb/.isoloom/catalogue/mariadb/files/isoloom.env
+      to: /etc/mysql/isoloom.env
+      mode: '0600'
+  - template:
+      from: catalogue/mariadb/.isoloom/catalogue/mariadb/files/docker-entrypoint.sh
+      to: /usr/local/bin/docker-entrypoint.sh
+      mode: '0755'
+  - service:
+      name: mariadb
+      run:
+      - /usr/local/bin/docker-entrypoint.sh
+      - mariadbd
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

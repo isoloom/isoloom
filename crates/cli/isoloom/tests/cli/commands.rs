@@ -524,6 +524,12 @@ fn listing(name: &str, entry: &str) -> Outcome<Scratch> {
 /// `generate` and `check` on `dir` both refuse its list, naming `entry`, and leave `outside` be;
 /// `generate` writes nothing before it refuses (a generated file removed stays removed).
 fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Path) -> Outcome {
+    let listed = format!("`.isoloom/.generated` lists `{entry}`");
+    refuses_with(dir, outside, [listed.as_str(), listed.as_str()])
+}
+
+/// [`refuses_the_list`], each command (`generate`, then `check`) refusing with its reason.
+fn refuses_with(dir: &std::path::Path, outside: &std::path::Path, reasons: [&str; 2]) -> Outcome {
     // A home of the project's own: the tests calling this run at once.
     let project = dir.file_name().and_then(|n| n.to_str()).unwrap_or_default();
     let home = scratch(&format!("{project}-refused-home"))?;
@@ -531,10 +537,10 @@ fn refuses_the_list(dir: &std::path::Path, entry: &str, outside: &std::path::Pat
     if compose.exists() {
         std::fs::remove_file(&compose)?;
     }
-    for command in ["generate", "check"] {
+    for (command, reason) in ["generate", "check"].into_iter().zip(reasons) {
         let o = isoloom(&home, &[&command, &dir])?;
         assert_eq!(o.code, Some(2), "{command}: {o:?}");
-        assert!(o.stderr.contains(&format!("`.isoloom/.generated` lists `{entry}`")), "{command}: {}", o.stderr);
+        assert!(o.stderr.contains(reason), "{command}: {}", o.stderr);
         assert!(outside.is_file(), "{command} removed {}", outside.display());
         assert!(!compose.exists(), "{command} wrote files before refusing the list");
     }
@@ -584,7 +590,9 @@ fn generate_refuses_to_remove_through_a_linked_output_folder() -> Outcome {
     std::fs::remove_dir_all(dir.join(".isoloom"))?;
     std::fs::write(elsewhere.join(".generated"), list)?;
     std::os::unix::fs::symlink(&elsewhere, dir.join(".isoloom"))?;
-    refuses_the_list(&dir, entry, &outside)
+    // generate refuses the linked folder before it takes its turn there; check reads the list.
+    let listed = format!("`.isoloom/.generated` lists `{entry}`");
+    refuses_with(&dir, &outside, [".isoloom/.generated.lock is reached through a symbolic link", listed.as_str()])
 }
 
 /// A generated project (`docker`) whose `.isoloom/docker/<file>` is replaced by a link to
@@ -904,5 +912,62 @@ fn clones_publishing_a_free_host_port_are_generated_where_the_format_picks_one()
     let said = format!("{}{}", refused.stdout, refused.stderr);
     assert_eq!(said.matches("both publish on host port 80").count(), 1, "{said}");
     assert!(said.contains("machines `web-01` and `web-02`"), "{said}");
+    Ok(())
+}
+
+/// Whether a process waits for the lock on `file`: Linux lists each blocked waiter in
+/// `/proc/locks` as `-> FLOCK …` on the file's device and inode.
+#[cfg(target_os = "linux")]
+fn waited_for(file: &std::path::Path) -> Outcome<bool> {
+    use std::os::unix::fs::MetadataExt as _;
+    let inode = format!(":{} ", std::fs::metadata(file)?.ino());
+    Ok(std::fs::read_to_string("/proc/locks")?
+        .lines()
+        .any(|l| l.contains("-> FLOCK") && l.contains(&inode)))
+}
+
+/// Two `generate`s in one project at once take turns from reading the list of what Isoloom
+/// wrote to writing it: one that waits reads the list the other left, so neither drops the
+/// other's entries.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_generate_waits_its_turn_and_keeps_the_entries_written_meanwhile() -> Outcome {
+    let home = scratch("turn-home")?;
+    let dir = project("turn", &one_vm("debian@12"))?;
+    std::fs::write(dir.join("p.sh"), "true\n")?;
+    assert_eq!(isoloom(&home, &[&"generate", &dir, &"--target", &"docker"])?.code, Some(0));
+    // Another generate's turn, held here.
+    let lock = dir.join(".isoloom/.generated.lock");
+    let turn = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(&lock)?;
+    turn.lock()?;
+    let mut waiting = std::process::Command::new(env!("CARGO_BIN_EXE_isoloom"))
+        .args(["generate", "--target", "vagrant"])
+        .arg(&*dir)
+        .env("ISOLOOM_HOME", &*home)
+        .env_remove("ISOLOOM_PROFILE")
+        .stdout(std::process::Stdio::null())
+        .spawn()?;
+    // It reaches the turn and waits there, before it reads the list.
+    let mut waits = false;
+    let started = std::time::Instant::now();
+    while started.elapsed() < std::time::Duration::from_secs(60) {
+        if waited_for(&lock)? {
+            waits = true;
+            break;
+        }
+        assert!(waiting.try_wait()?.is_none(), "generate went on while another held the turn");
+        std::thread::yield_now();
+    }
+    assert!(waits, "generate never waited for the turn");
+    // What the other one wrote meanwhile: a file of its own, listed.
+    std::fs::write(dir.join(".isoloom/docker/theirs.txt"), "")?;
+    let list = dir.join(".isoloom/.generated");
+    let written = std::fs::read_to_string(&list)?;
+    std::fs::write(&list, format!("{written}.isoloom/docker/theirs.txt\n"))?;
+    turn.unlock()?;
+    assert!(waiting.wait()?.success());
+    let after = std::fs::read_to_string(&list)?;
+    assert!(after.lines().any(|l| l == ".isoloom/docker/theirs.txt"), "{after}");
+    assert!(after.lines().any(|l| l == ".isoloom/vagrant/Vagrantfile"), "{after}");
     Ok(())
 }

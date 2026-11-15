@@ -34,8 +34,9 @@ pub(crate) struct StepError {
 }
 
 impl Context<'_> {
-    /// Phase `phase`'s steps, resolved, its templates' texts added to `files`.
-    pub(crate) fn phase(&self, phase: &'static str, steps: &[EntryStep], files: &mut BTreeMap<ProjectPath, String>) -> Result<Vec<Step>, StepError> {
+    /// Phase `phase`'s steps, resolved, each with its form as a spec writes it, its templates'
+    /// texts added to `files`.
+    pub(crate) fn phase(&self, phase: &'static str, steps: &[EntryStep], files: &mut BTreeMap<ProjectPath, String>) -> Result<Vec<(Step, Value)>, StepError> {
         let mut out = Vec::new();
         for (index, step) in steps.iter().enumerate() {
             let fail = |reason: String| StepError { phase, index, reason };
@@ -53,7 +54,7 @@ impl Context<'_> {
                 let body = self.pinned(body).map_err(fail)?;
                 let label = item.map(|_| n + 1);
                 let body = self.rendered(body, &values, label, files).map_err(fail)?;
-                out.push(serde_json::from_value::<Step>(body).map_err(|e| fail(e.to_string()))?);
+                out.push((serde_json::from_value::<Step>(body.clone()).map_err(|e| fail(e.to_string()))?, body));
             }
         }
         Ok(out)

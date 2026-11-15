@@ -62,8 +62,9 @@ pub(super) struct Surface {
     pub image: Option<OfficialImage>,
     pub ports: IndexMap<PortName, ResolvedPort>,
     pub value_files: Vec<ValueFile>,
-    /// The `start` steps that give each owned value file to its owner.
-    pub owners: Vec<Step>,
+    /// The `start` steps that give each owned value file to its owner, each with its form as a
+    /// spec writes it.
+    pub owners: Vec<(Step, serde_json::Value)>,
 }
 
 impl Surface {
@@ -182,11 +183,11 @@ fn collect<'a>(value: &'a SettingValue, out: &mut Vec<(&'a Password, &'a str)>) 
     }
 }
 
-/// The `start` step giving value file `path` to `owner`, unless it already has it.
-fn owner_step(path: &str, owner: &UserName) -> Result<Step, String> {
+/// The `start` step giving value file `path` to `owner`, unless it already has it, with its form.
+fn owner_step(path: &str, owner: &UserName) -> Result<(Step, serde_json::Value), String> {
     let step = serde_json::json!({
         "command": ["chown", owner.as_str(), path],
         "unless": format!("[ \"$(stat -c %U {path})\" = {owner} ]"),
     });
-    serde_json::from_value(step).map_err(|e| e.to_string())
+    Ok((serde_json::from_value(step.clone()).map_err(|e| e.to_string())?, step))
 }

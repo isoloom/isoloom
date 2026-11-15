@@ -140,6 +140,7 @@ fn refusal(env: &Environment) -> Option<String> {
         .features(env)
         .or_else(|| RULES.subnets(env))
         .or_else(machine)
+        .or_else(|| machines::too_many_rules(env))
         .or_else(|| windows::udp_redirect(env))
 }
 

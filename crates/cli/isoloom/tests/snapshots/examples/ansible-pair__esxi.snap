@@ -21,6 +21,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/esxi/main.tf
 .isoloom/resolved.json
 
+## .isoloom/.generated.lock: identical in the `vagrant` snapshot
+
 ## .isoloom/.gitignore: identical in the `vagrant` snapshot
 
 ## .isoloom/esxi/checks/cache.sh

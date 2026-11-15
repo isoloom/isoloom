@@ -19,6 +19,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 .isoloom/vagrant/checks/client.sh
 .isoloom/vagrant/checks/dns.sh
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/resolved.json: identical in the `docker` snapshot

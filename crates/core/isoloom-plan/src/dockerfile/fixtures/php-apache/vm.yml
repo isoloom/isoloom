@@ -47,7 +47,67 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - catalogue: php@8.5.12 on debian@12
+  - packages:
+    - ca-certificates
+  - repository:
+      name: sury-php
+      url: https://packages.sury.org/php
+      key:
+        url: https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x15058500A0235D97F5D10063B188E2B695BD4743
+        sha256: 023b08fdf09fcf0a123ebef0b247765bad2481327bbdee3599bf7bbae3ae2061
+      priority: 900
+  - packages:
+    - name: php8.5-cli
+      version: 8.5.12-3+0~deb.sury.org.1+debian12
+    - name: php8.5-common
+      version: 8.5.12-3+0~deb.sury.org.1+debian12
+  - packages:
+    - apache2
+  - packages:
+    - name: libapache2-mod-php8.5
+      version: 8.5.12-3+0~deb.sury.org.1+debian12
+  - file:
+      path: /usr/local/etc/php/conf.d
+      state: directory
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/php.ini
+      to: /usr/local/etc/php/php.ini
+      mode: '0644'
+  - command: sh -c 'for f in development production; do cp /usr/lib/php/8.5/php.ini-$f /usr/local/etc/php/ 2>/dev/null || true; done; for s in cli apache2 fpm; do [ -d /etc/php/8.5/$s ] && ln -sf /usr/local/etc/php/php.ini /etc/php/8.5/$s/php.ini; done; true'
+    creates: /usr/local/etc/php/php.ini-production
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-ext-install
+      to: /usr/local/bin/docker-php-ext-install
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-ext-enable
+      to: /usr/local/bin/docker-php-ext-enable
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-ext-configure
+      to: /usr/local/bin/docker-php-ext-configure
+      mode: '0755'
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/docker-php-source
+      to: /usr/local/bin/docker-php-source
+      mode: '0755'
+  - command: sh -c 'a2dismod -q mpm_event || true; a2enmod -q mpm_prefork php8.5 && rm -f /var/www/html/index.html'
+    creates: /etc/apache2/mods-enabled/php8.5.load
+  - template:
+      from: catalogue/php/.isoloom/catalogue/php/files/apache2-foreground
+      to: /usr/local/bin/apache2-foreground
+      mode: '0755'
+  - file:
+      path: /var/www/html
+      state: directory
+      owner: www-data
+      group: www-data
+      mode: '0755'
+  - service:
+      name: apache2
+      run:
+      - /usr/local/bin/apache2-foreground
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

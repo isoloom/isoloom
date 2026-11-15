@@ -63,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/main/packaging/inst
 On Windows, download `isoloom-x86_64-pc-windows-msvc.zip` from the
 [releases page](https://github.com/isoloom/isoloom/releases) and check it against `SHA256SUMS`.
 
-With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall), or from source (Rust 1.88 or
+With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall), or from source (Rust 1.89 or
 later):
 
 ```sh

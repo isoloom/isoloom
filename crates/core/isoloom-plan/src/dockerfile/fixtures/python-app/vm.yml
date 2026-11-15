@@ -47,7 +47,15 @@ app:
       fi
       mkdir -p /var/lib/isoloom/dockerfile && touch /var/lib/isoloom/dockerfile/002
     creates: /var/lib/isoloom/dockerfile/002
-  - catalogue: python@3.8.20 on debian@12
+  - packages:
+    - ca-certificates
+    - build-essential
+  - file:
+      path: /var/cache/isoloom/python.tar.gz
+      url: https://github.com/astral-sh/python-build-standalone/releases/download/20241002/cpython-3.8.20%2B20241002-x86_64-unknown-linux-gnu-install_only.tar.gz
+      sha256: 285e141c36f88b2e9357654c5f77d1f8fb29cc25132698fe35bb30d787f38e87
+  - command: sh -c 'tar -xzf /var/cache/isoloom/python.tar.gz --strip-components=1 -C /usr/local && ln -sf python3 /usr/local/bin/python && ln -sf pip3 /usr/local/bin/pip'
+    creates: /usr/local/bin/python
   - command: |
       set -e
       export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

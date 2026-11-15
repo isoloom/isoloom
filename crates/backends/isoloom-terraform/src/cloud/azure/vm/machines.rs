@@ -9,7 +9,7 @@ use crate::machine::controller::WinrmAuth;
 use indexmap::IndexMap;
 use isoloom_plan::{Environment, MachinePlan, Vm};
 
-use super::network::{Nic, Nsg, nic, nic_id, placed, public_ip};
+use super::network::{MAX_ALLOWS, Nic, Nsg, nic, nic_id, placed, public_ip};
 use super::{RULES, USER, image, public_ip as address_of};
 use crate::Result;
 use crate::cloud::auto_stop;
@@ -144,13 +144,32 @@ pub(in crate::cloud::azure) fn source_image(os: &str, tpm: bool) -> Block {
         .build()
 }
 
+/// Why a machine's security group can't hold its rules, if one can't: a machine with more allow
+/// rules than fit below the group's deny rule ([`MAX_ALLOWS`]) would have rules at or past it,
+/// which never apply (and past priority 4096, Azure refuses the plan).
+pub(in crate::cloud::azure) fn too_many_rules(env: &Environment) -> Option<String> {
+    env.machines.iter().filter_map(|(name, mp)| Vm::of(name, mp)).find_map(|Vm { name, plan: mp, .. }| {
+        let allows = rules(env, (name, mp), mp.is_windows()).allows();
+        (allows > MAX_ALLOWS).then(|| {
+            format!(
+                "machine `{name}` needs {allows} inbound rules on Azure (its networks, its set-up, each `reach` port in TCP and UDP, and its published ports), and a network security group holds {MAX_ALLOWS} below the rule that denies the rest of the virtual network: open fewer ports to it"
+            )
+        })
+    })
+}
+
 /// Who may reach a machine: its own networks, its set-up from `allowed_cidr` (SSH, or WinRM on
 /// Windows), the networks `reach` opens to it (on their ports, TCP and UDP), and its published
 /// ports from `allowed_cidr`.
-fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Block {
+fn group(env: &Environment, machine: (&str, &MachinePlan), windows: bool) -> Block {
+    rules(env, machine, windows).build()
+}
+
+/// The allow rules of a machine's security group, in order ([`group`]).
+fn rules(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Nsg {
     let allowed = || reference("var.allowed_cidr");
     let mut g = Nsg::new(&ident(name), name);
-    let Some(m) = env.spec().machines.get(name) else { return g.build() };
+    let Some(m) = env.spec().machines.get(name) else { return g };
     for (n, p) in reach::own(env, m) {
         g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
         if let Some(v6) = &p.ipv6 {
@@ -181,7 +200,7 @@ fn group(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> 
         };
         g = g.allow(&rule, protocol, &p.publish.to_string(), allowed());
     }
-    g.build()
+    g
 }
 
 /// A Windows machine: its security group, public IP, interface and VM (its name, the

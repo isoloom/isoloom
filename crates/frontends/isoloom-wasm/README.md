@@ -57,4 +57,4 @@ None.
 - API: <https://docs.rs/isoloom-wasm>
 - Guides and reference: <https://github.com/isoloom/isoloom/tree/main/docs>
 
-Minimum Rust: 1.88. Licence: Apache-2.0.
+Minimum Rust: 1.89. Licence: Apache-2.0.

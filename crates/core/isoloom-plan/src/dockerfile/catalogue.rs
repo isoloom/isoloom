@@ -22,6 +22,8 @@ use super::translate::EntryOp;
 pub(super) struct Recipe {
     /// Its steps, in order: the value files, then install, configure and start.
     pub steps: Vec<Step>,
+    /// The same steps, each as a spec writes it (the explicit VM form's `app.steps`).
+    pub written: Vec<Value>,
     /// The texts of the templates its steps place, by the path a step's `from` names.
     pub files: BTreeMap<ProjectPath, String>,
     /// The services its steps define or start: the VM's own when the image's command is the entry's.
@@ -136,19 +138,28 @@ fn recipe(entry: &str, r: Resolved) -> Result<Recipe, String> {
         if let (Some(owner), Some(map)) = (&vf.owner, t.as_object_mut()) {
             map.insert("owner".to_owned(), json!(owner.as_str()));
         }
-        out.steps.push(serde_json::from_value(json!({ "template": t })).map_err(|e| e.to_string())?);
+        let written = json!({ "template": t });
+        out.steps.push(serde_json::from_value(written.clone()).map_err(|e| e.to_string())?);
+        out.written.push(written);
         out.files.insert(from, value.clone());
     }
     for (from, text) in r.files {
         out.files.insert(moved(&from)?, text);
     }
-    for mut step in r.install.into_iter().chain(r.configure).chain(r.start) {
+    for (mut step, mut written) in r.install.into_iter().chain(r.configure).chain(r.start).zip(r.written) {
         match &mut step {
-            Step::Template(t) => t.from = moved(&t.from)?,
+            Step::Template(t) => {
+                t.from = moved(&t.from)?;
+                // The written form names the template where the translation puts it too.
+                if let Some(from) = written.pointer_mut("/template/from") {
+                    *from = json!(t.from.as_str());
+                }
+            }
             Step::Service(s) => out.units.push(s.name().to_string()),
             _ => {}
         }
         out.steps.push(step);
+        out.written.push(written);
     }
     Ok(out)
 }

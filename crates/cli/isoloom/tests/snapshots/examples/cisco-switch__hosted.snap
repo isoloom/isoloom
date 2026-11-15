@@ -17,6 +17,8 @@ source: crates/cli/isoloom/tests/example_snapshots.rs
 
 ## .isoloom/.generated: identical in the `docker` snapshot
 
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
 ## .isoloom/.gitignore: identical in the `docker` snapshot
 
 ## .isoloom/docker/appliances/sw1/NETMAP: identical in the `docker` snapshot
