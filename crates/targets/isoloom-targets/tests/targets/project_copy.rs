@@ -18,7 +18,11 @@ use crate::testing::{Outcome, example, generated as file};
 /// player's machine lacks it) and `cargo xtask test` runs it, so a missing tool says so.
 fn needs(tools: &[&str]) -> Outcome {
     for tool in tools {
-        if !Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success()) {
+        // Looked up, not started: a tool that starts leaves its own files (PowerShell's pipe in
+        // the temporary folder) for the test run's leftover guard to find.
+        let found = std::env::var_os("PATH")
+            .is_some_and(|path| std::env::split_paths(&path).any(|d| d.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX)).is_file()));
+        if !found {
             return Err(format!("needs `{tool}` on PATH").into());
         }
     }
@@ -298,7 +302,14 @@ fn the_windows_extractor_unpacks_the_archive() -> Outcome {
             dest.display(),
             ps1.display()
         );
-        let out = Command::new("pwsh").args(["-NoProfile", "-Command", &script]).output().unwrap();
+        // PowerShell makes its host pipe in the temporary folder: this test's own, gone with it.
+        let out = Command::new("pwsh")
+            .args(["-NoProfile", "-Command", &script])
+            .env("TMPDIR", dir)
+            .env("TMP", dir)
+            .env("TEMP", dir)
+            .output()
+            .unwrap();
         assert!(out.status.success(), "{name}: {}", String::from_utf8_lossy(&out.stderr));
         assert_eq!(std::fs::read_to_string(dest.join("sub/b c.txt")).unwrap(), "b", "{name}");
         assert_eq!(std::fs::read_to_string(dest.join("ünï.txt")).unwrap(), "u", "{name}");
