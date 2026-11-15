@@ -56,4 +56,5 @@ mod tools;
 mod true_forms;
 mod trunks;
 mod vagrant_providers;
+mod vagrantfile;
 mod windows_names;
