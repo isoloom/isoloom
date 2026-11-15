@@ -143,12 +143,12 @@ fn a_compacted_topic_is_refused_on_event_hubs_standard_and_msk() {
 fn more_than_32_partitions_are_refused_on_event_hubs_standard() {
     let found = refused_by(&bus("{ orders: { partitions: 33 } }"));
     assert_eq!(found, [("azure", "services.bus.topics.orders.partitions".to_owned(), Code::Refused, true)]);
-    assert!(refused_by(&bus("{ orders: { partitions: 32 } }")).is_empty());
+    assert_eq!(refused_by(&bus("{ orders: { partitions: 32 } }")), []);
 }
 
 #[test]
 fn topics_of_several_partition_counts_are_refused_on_msk() {
     let found = refused_by(&bus("{ orders: { partitions: 3 }, audit: { partitions: 1 } }"));
     assert_eq!(found, [("aws", "services.bus.topics".to_owned(), Code::Refused, true)]);
-    assert!(refused_by(&bus("{ orders: { partitions: 3 }, audit: { partitions: 3 } }")).is_empty());
+    assert_eq!(refused_by(&bus("{ orders: { partitions: 3 }, audit: { partitions: 3 } }")), []);
 }

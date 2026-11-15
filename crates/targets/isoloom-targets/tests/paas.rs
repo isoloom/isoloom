@@ -35,6 +35,7 @@ fn compose_runs_each_service_as_a_service_of_the_project() {
     );
     assert!(compose.contains("DATABASE_HOST: db.shop.internal"), "{compose}");
     assert!(compose.contains("STORAGE_BUCKET_FILE: /etc/isoloom/services/files/bucket"), "{compose}");
+    assert!(compose.contains("STORAGE_WAIT: /etc/isoloom/services/wait-for"), "{compose}");
     // SeaweedFS and Kafka come from their pinned releases, in images Isoloom builds.
     for pinned in ["seaweedfs/releases/download/4.53", "kafka_2.13-4.3.2.tgz"] {
         assert!(files.iter().any(|f| f.contents.contains(pinned)), "{pinned}");
@@ -80,6 +81,9 @@ fn the_resolved_output_carries_the_services_facts() {
     assert_eq!(db["published"]["allow_input"], "PLAYER_IP");
     assert_eq!(resolved["services_zone"]["turned_on_by_services"], true);
     assert_eq!(resolved["services"]["files"]["clients"]["web"]["environment"]["STORAGE_AUTH"], "keys");
+    let wait = &resolved["services"]["bus"]["clients"]["web"]["wait"];
+    assert_eq!(wait["helper"], "/etc/isoloom/services/wait-for", "{wait}");
+    assert_eq!(wait["default_timeout_s"], 300, "{wait}");
     insta::assert_snapshot!("shop_resolved_services", serde_json::to_string_pretty(&resolved["services"]).unwrap());
 }
 
@@ -94,9 +98,9 @@ fn a_spec_of_services_alone_generates_and_publishes_its_database() {
     assert!(aws.contains("publicly_accessible    = true") && aws.contains("var.PLAYER_IP"), "{aws}");
 }
 
-/// Writes the shop's and the services-only spec's files for the container target, a server and
-/// the clouds into `ISOLOOM_PAAS_OUT/<example>/`, for the formats' own validators (`docker
-/// compose config`, `terraform validate`), run by hand:
+/// Writes the shop's and the services-only spec's files for the container targets (Compose and
+/// Kubernetes), a server and the clouds into `ISOLOOM_PAAS_OUT/<example>/`, for the formats' own validators (`docker
+/// compose config`, `kubeconform`, `terraform validate`), run by hand:
 /// `ISOLOOM_PAAS_OUT=<dir> cargo test -p isoloom-targets --features paas --test paas -- --ignored`.
 #[test]
 #[ignore = "writes files for the validators, run by hand"]
@@ -105,7 +109,7 @@ fn write_the_examples_for_the_validators() {
     for (name, yaml) in [("shop", SHOP), ("data-only", DATA_ONLY)] {
         let dir = std::path::PathBuf::from(&out).join(name);
         let l = lab(yaml);
-        for target in [Target::Docker, Target::Proxmox, Target::CloudVm] {
+        for target in [Target::Docker, Target::Kubernetes, Target::Proxmox, Target::CloudVm] {
             for f in generate(&l, target).unwrap() {
                 let path = dir.join(&f.path);
                 std::fs::create_dir_all(path.parent().unwrap()).unwrap();

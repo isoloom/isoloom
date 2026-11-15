@@ -40,6 +40,10 @@ pub(crate) fn refusal(cloud: Cloud, env: &Environment) -> Option<String> {
         return Some(format!("{}'s managed services aren't rendered yet (`services:`)", cloud.name()));
     }
     for (name, s) in services {
+        if let Some(limit) = isoloom_spec::paas::cloud_limits(name, s).into_iter().find(|l| l.cloud == cloud.id()) {
+            let p = limit.problem;
+            return Some(p.fix.as_ref().map_or_else(|| p.line(), |fix| format!("{}: {fix}", p.line())));
+        }
         if cloud == Cloud::Azure
             && let Service::ObjectStorage(o) = s
             && o.api == Api::S3
@@ -241,14 +245,12 @@ fn variables(cloud: Cloud, env: &Environment) -> Vec<Variable> {
     out
 }
 
-/// The blocks of the networks the service and its clients are on, each once.
-fn client_blocks(env: &Environment, at: &Each<'_>) -> Vec<String> {
-    let mut nets: Vec<&str> = vec![at.network];
-    for client in at.service.clients().keys() {
-        if let Some(mp) = env.spec().machines.get(client) {
-            nets.extend(mp.networks.keys().map(String::as_str));
-        }
-    }
+/// The blocks a service's own ingress lets in, as the spec defines its access and nothing
+/// else: its network's, and those of the networks `reach` lets reach it. (Published, its
+/// allow-list too, which the clouds add themselves.)
+fn reached_from(env: &Environment, at: &Each<'_>) -> Vec<String> {
+    let spec = env.spec();
+    let nets = std::iter::once(at.network).chain(spec.reach.iter().filter(|r| r.to == at.network).map(|r| r.from.as_str()));
     let mut out: Vec<String> = Vec::new();
     for net in nets {
         if let Some(plan) = env.networks.get(net) {

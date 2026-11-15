@@ -48,7 +48,7 @@ resource "aws_security_group" "isoloom_service_db" {
   name   = "${local.name}-service-db"
   vpc_id = aws_vpc.env.id
   ingress {
-    description = "from the networks of its clients"
+    description = "from what the spec lets reach it"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
@@ -137,14 +137,14 @@ resource "aws_security_group" "isoloom_service_bus" {
   name   = "${local.name}-service-bus"
   vpc_id = aws_vpc.env.id
   ingress {
-    description = "from the networks of its clients"
+    description = "from what the spec lets reach it"
     from_port   = 9096
     to_port     = 9096
     protocol    = "tcp"
     cidr_blocks = ["10.30.0.0/24"]
   }
   ingress {
-    description = "from the networks of its clients"
+    description = "from what the spec lets reach it"
     from_port   = 9098
     to_port     = 9098
     protocol    = "tcp"

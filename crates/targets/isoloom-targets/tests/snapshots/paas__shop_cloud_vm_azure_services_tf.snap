@@ -116,7 +116,7 @@ resource "azurerm_eventhub" "bus_orders" {
 resource "azurerm_eventhub" "bus_audit" {
   name              = "audit"
   namespace_id      = azurerm_eventhub_namespace.bus.id
-  partition_count   = 1
+  partition_count   = 3
   message_retention = 1
 }
 

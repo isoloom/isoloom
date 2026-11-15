@@ -5,7 +5,11 @@
 # Apache Kafka), on AWS, Azure and Google Cloud the cloud's own managed service. The shop reads
 # the same variables and files everywhere: the database at db.shop.internal (the services turn
 # the private zone on), its password as a file; the bucket's and the brokers' facts as files
-# under /etc/isoloom/services/, which a cloud delivers once it has made them.
+# under /etc/isoloom/services/, which a cloud delivers once it has made them, after the shop's
+# own set-up. So the shop waits for a fact's file, with a timeout, before it reads it:
+#
+#   sh "$STORAGE_WAIT" "$STORAGE_BUCKET_FILE" 300 && bucket=$(cat "$STORAGE_BUCKET_FILE")
+#   sh "$BUS_WAIT" "$BUS_BOOTSTRAP_FILE" 300 && brokers=$(cat "$BUS_BOOTSTRAP_FILE")
 #
 # Not one of the examples every target generates: it needs Isoloom built with `--features paas`.
 version: 1
@@ -53,7 +57,7 @@ services:
     api: platform               # each platform's own API (Azure has no S3): STORAGE_API_FILE says which
     networks: { lab: 41 }
     credentials: { access_key: files-key, secret_key: files-secret }
-    # STORAGE_AUTH, and STORAGE_ENDPOINT_FILE, _BUCKET_FILE, _REGION_FILE, _API_FILE,
+    # STORAGE_AUTH, STORAGE_WAIT (the wait helper), and STORAGE_ENDPOINT_FILE, _BUCKET_FILE, _REGION_FILE, _API_FILE,
     # _ACCESS_KEY_FILE, _SECRET_KEY_FILE. `access: identity` instead gives a cloud client its
     # platform identity and no key (refused off the clouds).
     clients: { web: { env_prefix: STORAGE } }
@@ -61,9 +65,11 @@ services:
   bus:
     kind: kafka
     networks: { lab: 42 }
-    topics: { orders: { partitions: 3 }, audit: {} }
+    # One partition count for all (MSK makes every topic with one), none compacted (Event Hubs
+    # Standard and MSK compact nothing), at most 32 (Event Hubs Standard).
+    topics: { orders: { partitions: 3 }, audit: { partitions: 3 } }
     credentials: { user: bus-user, password: bus-password }
-    # BUS_AUTH, and BUS_BOOTSTRAP_FILE, _SECURITY_PROTOCOL_FILE, _SASL_MECHANISM_FILE, _USER_FILE,
+    # BUS_AUTH, BUS_WAIT, and BUS_BOOTSTRAP_FILE, _SECURITY_PROTOCOL_FILE, _SASL_MECHANISM_FILE, _USER_FILE,
     # _PASSWORD_FILE.
     clients: { web: {} }
 

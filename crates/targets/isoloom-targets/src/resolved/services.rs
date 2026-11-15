@@ -2,11 +2,11 @@
 //! it reads a machine's. Its kind, its name in the zone (its Service name on Kubernetes) and its port; how each target renders it
 //! (`machine`: a machine of the same name, in `machines`, with its published port there;
 //! `managed`: the cloud's own, its facts in the module's outputs; or why it is refused); its
-//! allow-list input when published; and each client's contract: its environment and the files it
-//! reads, the same on every target.
+//! allow-list input when published; and each client's contract: its environment, the files it
+//! reads, the same on every target, and the helper it waits for them with.
 
 use isoloom_plan::Lab;
-use isoloom_plan::paas::{fact_path, file_facts};
+use isoloom_plan::paas::{WAIT_DEFAULT_S, WAIT_HELPER, fact_path, file_facts};
 use isoloom_spec::model::Target;
 use isoloom_spec::paas::{Access, Placement, Service, placement};
 use serde_json::{Map, Value, json};
@@ -62,7 +62,13 @@ fn service(spec: &isoloom_spec::model::Spec, name: &str, host: &str, s: &Service
                 .map(|f| json!({ "variable": format!("{prefix}{}", f.var), "path": fact_path(name, f.file), "credential": f.secret }))
                 .collect();
             let access = if how.access == Access::Identity { "identity" } else { "keys" };
-            (client.clone(), json!({ "access": access, "environment": environment, "files": files }))
+            // On a cloud a service's files land after the client's set-up: it waits for each.
+            let wait = matches!(s, Service::ObjectStorage(_) | Service::Kafka(_))
+                .then(|| json!({ "helper": WAIT_HELPER, "default_timeout_s": WAIT_DEFAULT_S, "usage": "wait-for FILE [SECONDS]" }));
+            (
+                client.clone(),
+                json!({ "access": access, "environment": environment, "files": files, "wait": wait }),
+            )
         })
         .collect();
     json!({

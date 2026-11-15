@@ -42,7 +42,8 @@ expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
             "path": "/etc/isoloom/services/db/password",
             "credential": true
           }
-        ]
+        ],
+        "wait": null
       }
     }
   },
@@ -71,6 +72,7 @@ expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
         "access": "keys",
         "environment": {
           "STORAGE_AUTH": "keys",
+          "STORAGE_WAIT": "/etc/isoloom/services/wait-for",
           "STORAGE_ENDPOINT_FILE": "/etc/isoloom/services/files/endpoint",
           "STORAGE_BUCKET_FILE": "/etc/isoloom/services/files/bucket",
           "STORAGE_REGION_FILE": "/etc/isoloom/services/files/region",
@@ -109,7 +111,12 @@ expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
             "path": "/etc/isoloom/services/files/secret-key",
             "credential": true
           }
-        ]
+        ],
+        "wait": {
+          "helper": "/etc/isoloom/services/wait-for",
+          "default_timeout_s": 300,
+          "usage": "wait-for FILE [SECONDS]"
+        }
       }
     }
   },
@@ -138,6 +145,7 @@ expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
         "access": "keys",
         "environment": {
           "BUS_AUTH": "keys",
+          "BUS_WAIT": "/etc/isoloom/services/wait-for",
           "BUS_BOOTSTRAP_FILE": "/etc/isoloom/services/bus/bootstrap",
           "BUS_SECURITY_PROTOCOL_FILE": "/etc/isoloom/services/bus/security-protocol",
           "BUS_SASL_MECHANISM_FILE": "/etc/isoloom/services/bus/sasl-mechanism",
@@ -170,7 +178,12 @@ expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
             "path": "/etc/isoloom/services/bus/password",
             "credential": true
           }
-        ]
+        ],
+        "wait": {
+          "helper": "/etc/isoloom/services/wait-for",
+          "default_timeout_s": 300,
+          "usage": "wait-for FILE [SECONDS]"
+        }
       }
     }
   }

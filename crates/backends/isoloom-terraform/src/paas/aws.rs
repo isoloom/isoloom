@@ -7,7 +7,7 @@
 use isoloom_plan::Environment;
 use isoloom_spec::paas::{Access, Kafka, ObjectStorage, Postgres, Service};
 
-use super::{Each, bucket_name, client_blocks, named, secret, tier};
+use super::{Each, bucket_name, named, reached_from, secret, tier};
 use crate::hcl_builder::{Block, Expression, Module, Template, boolean, call, index, list, number, object, reference, string};
 use crate::module::{ResourceRef, ident, output};
 
@@ -74,8 +74,8 @@ fn subnet_ids() -> Expression {
     list(SUBNETS.map(|(n, _, _)| ResourceRef::new("aws_subnet", n).attr("id")))
 }
 
-/// A security group letting `ports` in from the networks of the service's clients (and from the
-/// allow-list when it is published).
+/// A security group letting `ports` in from what the spec lets reach the service: its network,
+/// the networks `reach` lets reach it, and the allow-list when it is published.
 fn security_group(env: &Environment, at: &Each<'_>, ports: &[u64], m: &mut Module) -> ResourceRef {
     let sg = ResourceRef::new("aws_security_group", &format!("isoloom_service_{}", at.name));
     let mut b = sg
@@ -83,13 +83,13 @@ fn security_group(env: &Environment, at: &Each<'_>, ports: &[u64], m: &mut Modul
         .add_attribute(("name", named(&format!("service-{}", at.name))))
         .add_attribute(("vpc_id", reference("aws_vpc.env.id")));
     for port in ports {
-        let mut from: Vec<Expression> = client_blocks(env, at).into_iter().map(string).collect();
+        let mut from: Vec<Expression> = reached_from(env, at).into_iter().map(string).collect();
         if let Some(p) = at.service.publish() {
             from.push(reference(&format!("var.{}", p.allow)));
         }
         b = b.add_block(
             Block::builder("ingress")
-                .add_attribute(("description", string("from the networks of its clients")))
+                .add_attribute(("description", string("from what the spec lets reach it")))
                 .add_attribute(("from_port", number(*port)))
                 .add_attribute(("to_port", number(*port)))
                 .add_attribute(("protocol", string("tcp")))

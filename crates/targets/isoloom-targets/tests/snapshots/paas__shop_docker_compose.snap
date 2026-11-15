@@ -39,6 +39,7 @@ services:
       DATABASE_SSLMODE: prefer
       DATABASE_PASSWORD_FILE: /etc/isoloom/services/db/password
       STORAGE_AUTH: keys
+      STORAGE_WAIT: /etc/isoloom/services/wait-for
       STORAGE_ENDPOINT_FILE: /etc/isoloom/services/files/endpoint
       STORAGE_BUCKET_FILE: /etc/isoloom/services/files/bucket
       STORAGE_REGION_FILE: /etc/isoloom/services/files/region
@@ -46,6 +47,7 @@ services:
       STORAGE_ACCESS_KEY_FILE: /etc/isoloom/services/files/access-key
       STORAGE_SECRET_KEY_FILE: /etc/isoloom/services/files/secret-key
       BUS_AUTH: keys
+      BUS_WAIT: /etc/isoloom/services/wait-for
       BUS_BOOTSTRAP_FILE: /etc/isoloom/services/bus/bootstrap
       BUS_SECURITY_PROTOCOL_FILE: /etc/isoloom/services/bus/security-protocol
       BUS_SASL_MECHANISM_FILE: /etc/isoloom/services/bus/sasl-mechanism
@@ -73,24 +75,27 @@ services:
       mode: '0400'
     configs:
     - source: web-file-0
+      target: /etc/isoloom/services/wait-for
+      mode: '0755'
+    - source: web-file-1
       target: /etc/isoloom/services/files/endpoint
       mode: '0644'
-    - source: web-file-1
+    - source: web-file-2
       target: /etc/isoloom/services/files/bucket
       mode: '0644'
-    - source: web-file-2
+    - source: web-file-3
       target: /etc/isoloom/services/files/region
       mode: '0644'
-    - source: web-file-3
+    - source: web-file-4
       target: /etc/isoloom/services/files/api
       mode: '0644'
-    - source: web-file-4
+    - source: web-file-5
       target: /etc/isoloom/services/bus/bootstrap
       mode: '0644'
-    - source: web-file-5
+    - source: web-file-6
       target: /etc/isoloom/services/bus/security-protocol
       mode: '0644'
-    - source: web-file-6
+    - source: web-file-7
       target: /etc/isoloom/services/bus/sasl-mechanism
       mode: '0644'
     healthcheck:
@@ -430,16 +435,26 @@ secrets:
     environment: ISOLOOM_SECRET_BUS_PASSWORD
 configs:
   web-file-0:
-    content: http://files.shop.internal:8333
+    content: |
+      #!/bin/sh
+      # wait-for FILE [SECONDS]: until FILE exists and isn't empty (a service's fact, which a cloud
+      # delivers once it has made the service), at most SECONDS (default 300). Exits 1 on the timeout.
+      f=$${1:?usage: wait-for FILE [SECONDS]}; t=$${2:-300}; i=0
+      while [ ! -s "$$f" ]; do
+        [ "$$i" -lt "$$t" ] || { echo "wait-for: $$f didn't appear in $$t s" >&2; exit 1; }
+        sleep 1; i=$$((i + 1))
+      done
   web-file-1:
-    content: uploads
+    content: http://files.shop.internal:8333
   web-file-2:
-    content: us-east-1
+    content: uploads
   web-file-3:
-    content: s3
+    content: us-east-1
   web-file-4:
-    content: bus.shop.internal:9092
+    content: s3
   web-file-5:
-    content: SASL_PLAINTEXT
+    content: bus.shop.internal:9092
   web-file-6:
+    content: SASL_PLAINTEXT
+  web-file-7:
     content: SCRAM-SHA-512

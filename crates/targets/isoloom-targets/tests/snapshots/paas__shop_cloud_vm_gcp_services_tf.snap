@@ -167,6 +167,7 @@ resource "google_managed_kafka_topic" "bus_orders" {
   location           = var.region
   partition_count    = 3
   replication_factor = 3
+  configs            = { "cleanup.policy" = "delete" }
 }
 
 resource "google_managed_kafka_topic" "bus_audit" {
@@ -174,8 +175,9 @@ resource "google_managed_kafka_topic" "bus_audit" {
   topic_id           = "audit"
   cluster            = google_managed_kafka_cluster.bus.cluster_id
   location           = var.region
-  partition_count    = 1
+  partition_count    = 3
   replication_factor = 3
+  configs            = { "cleanup.policy" = "delete" }
 }
 
 resource "google_service_account" "isoloom_service_bus" {

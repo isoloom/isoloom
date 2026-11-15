@@ -10,7 +10,7 @@ use isoloom_spec::paas::{Access, Api, Kafka, ObjectStorage, Postgres, Service};
 
 use super::{Each, bucket_name, named, secret, tier};
 use crate::hcl_builder::{
-    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, attr, binary, boolean, call, conditional, index, list, number, reference, string,
+    BinaryOperator, Block, BlockBuilder, Expression, Module, Template, attr, binary, boolean, call, conditional, index, list, number, object, reference, string,
 };
 use crate::module::{ResourceRef, ident, output};
 
@@ -213,6 +213,7 @@ fn kafka(at: &Each<'_>, k: &Kafka, m: &mut Module) {
                 .add_attribute(("location", reference("var.region")))
                 .add_attribute(("partition_count", number(u64::from(t.partitions))))
                 .add_attribute(("replication_factor", number(3)))
+                .add_attribute(("configs", object([("cleanup.policy", string(t.cleanup.id()))])))
                 .build(),
         );
     }
