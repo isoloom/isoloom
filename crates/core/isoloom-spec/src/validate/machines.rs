@@ -50,7 +50,7 @@ pub(super) fn appliances(spec: &Spec, problems: &mut Problems) {
             problems.add(format!("{at}.docker"), "a network appliance runs its own OS: no `idle` or `init`");
         }
         if let Some(c) = &d.config
-            && (c.starts_with('/') || c.split('/').any(|segment| segment == ".."))
+            && crate::project_path::plain(c).is_err()
         {
             problems.add(format!("{at}.docker.config"), "a path in the project");
         }
