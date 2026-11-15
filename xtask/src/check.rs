@@ -9,7 +9,9 @@
 //! is skipped quietly. The tools: cargo-nextest, cargo-deny, cargo-machete, cargo-semver-checks,
 //! typos, lychee, shellcheck, gitleaks, wasm-pack, terraform, Docker (`tf-test`), the toolchain
 //! of the workspace's `rust-version` (`msrv`), the `x86_64-pc-windows-gnu` target with a MinGW
-//! C compiler on `PATH` (`windows-gnu`) and nightly (`fuzz`).
+//! C compiler on `PATH` (`windows-gnu`), nightly (`fuzz`), the validators' image (`validators`),
+//! Docker (`import`), and on Windows the `llvm-tools` component (`windows-binary`, which runs on
+//! Windows only and says `n/a` elsewhere).
 
 mod outputs;
 #[cfg(test)]
@@ -46,6 +48,9 @@ pub(crate) struct Step {
     pub(crate) about: &'static str,
     run: fn(&Path) -> Res<bool>,
     retry: bool,
+    /// The one OS it runs on (`std::env::consts::OS`), when it needs that OS: elsewhere its outcome
+    /// is `n/a`, said in the summary, neither a pass nor a failure.
+    only_on: Option<&'static str>,
 }
 
 const fn step(name: &'static str, fast: bool, about: &'static str, run: fn(&Path) -> Res<bool>) -> Step {
@@ -55,6 +60,7 @@ const fn step(name: &'static str, fast: bool, about: &'static str, run: fn(&Path
         about,
         run,
         retry: false,
+        only_on: None,
     }
 }
 
@@ -141,6 +147,27 @@ pub(crate) const STEPS: &[Step] = &[
         "every generated Terraform module is valid for its providers",
         outputs::terraform,
     ),
+    step(
+        "validators",
+        false,
+        "every target's generated files, checked by their validators in the pinned image (`cargo xtask verify`)",
+        |root| xtask(root, &["verify"]),
+    ),
+    step(
+        "import",
+        false,
+        "a Compose file imported and generated: the draft's Compose file is valid for Compose",
+        import,
+    ),
+    Step {
+        only_on: Some("windows"),
+        ..step(
+            "windows-binary",
+            false,
+            "the Windows executable as released (C runtime linked in) needs no Visual C++ runtime DLL",
+            windows_binary,
+        )
+    },
 ];
 
 /// Runs the chosen steps; fails when one did.
@@ -161,7 +188,7 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
     for (name, outcome) in &outcomes {
         println!("{name:<12} {outcome}");
     }
-    let green = outcomes.iter().all(|(_, o)| o.starts_with("ok"));
+    let green = outcomes.iter().all(|(_, o)| o.starts_with("ok") || o.starts_with("n/a"));
     println!("== check {}", if green { "green" } else { "red" });
     Ok(process::exit_code(green))
 }
@@ -184,6 +211,10 @@ pub(crate) fn chosen(a: &Args) -> Res<Vec<&'static Step>> {
 
 /// Runs one step (twice when it may be retried and was red): its outcome and how long it took.
 fn attempt(s: &Step, root: &Path) -> String {
+    if let Some(os) = s.only_on.filter(|os| *os != std::env::consts::OS) {
+        println!("== check {}: n/a here, it runs on {os} only", s.name);
+        return format!("n/a ({os} only)");
+    }
     let start = Instant::now();
     let mut outcome = once(s, root);
     if !outcome && s.retry {
@@ -250,6 +281,80 @@ fn hooks(root: &Path) -> Res<bool> {
     let mut args = vec!["-x"];
     args.extend(scripts.iter().map(String::as_str));
     Ok(tool(root, "shellcheck", &args)? && tool(root, "bash", &[".githooks/test.sh"])?)
+}
+
+/// A Compose file imported (the fixture shop), generated for Docker, and the draft's Compose file
+/// valid for `docker compose config`, in a scratch folder removed afterwards.
+fn import(root: &Path) -> Res<bool> {
+    let shop = std::env::temp_dir().join(format!("isoloom-check-import-{}", std::process::id()));
+    std::fs::create_dir_all(&shop)?;
+    let checked = import_into(root, &shop);
+    std::fs::remove_dir_all(&shop).ok();
+    checked
+}
+
+fn import_into(root: &Path, shop: &Path) -> Res<bool> {
+    let compose = shop.join("docker-compose.yml");
+    std::fs::copy(
+        root.join("crates/tools/isoloom-import/tests/fixtures/compose-shop/docker-compose.yml"),
+        &compose,
+    )?;
+    let isoloom = |args: &[&str]| cargo(root, &[&["run", "-q", "--locked", "-p", "isoloom", "--"][..], args].concat());
+    if !isoloom(&["import", "compose", &compose.to_string_lossy()])? || !isoloom(&["generate", &shop.to_string_lossy(), "--target", "docker"])? {
+        return Ok(false);
+    }
+    let mut cmd = Command::new("docker");
+    cmd.args(["compose", "-f"])
+        .arg(shop.join(".isoloom/docker/compose.yml"))
+        .args(["config", "-q"])
+        .env("API_TOKEN", "t0k")
+        .current_dir(root);
+    process::passed(&mut cmd).map_err(|e| format!("{e} (is Docker installed?)").into())
+}
+
+/// The release's Windows executable (the C runtime linked in, as release.yml builds it), then its
+/// imports read with the toolchain's `llvm-objdump`: none of the Visual C++ runtime's DLLs
+/// (`VCRUNTIME*.dll`, `MSVCP*.dll`), so a Windows without the redistributable starts it (GitHub's
+/// runners have it: only the imports tell).
+fn windows_binary(root: &Path) -> Res<bool> {
+    let mut build = process::cargo(root);
+    build
+        .args(["build", "--release", "--locked", "-p", "isoloom", "--target", "x86_64-pc-windows-msvc"])
+        .env("CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS", "-C target-feature=+crt-static");
+    if !process::passed(&mut build)? {
+        return Ok(false);
+    }
+    let sysroot = Command::new("rustc").args(["--print", "sysroot"]).current_dir(root).output()?;
+    let objdump = Path::new(String::from_utf8_lossy(&sysroot.stdout).trim()).join("lib/rustlib/x86_64-pc-windows-msvc/bin/llvm-objdump.exe");
+    let target = std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), std::path::PathBuf::from);
+    let exe = target.join("x86_64-pc-windows-msvc/release/isoloom.exe");
+    let out = Command::new(&objdump)
+        .arg("-p")
+        .arg(&exe)
+        .output()
+        .map_err(|e| format!("{}: {e} (rustup component add llvm-tools)", objdump.display()))?;
+    let runtime = vc_runtime_imports(&String::from_utf8_lossy(&out.stdout));
+    if !runtime.is_empty() {
+        eprintln!(
+            "{} imports {}: a Windows without the Visual C++ Redistributable can't start it (link the C runtime in: -C target-feature=+crt-static)",
+            exe.display(),
+            runtime.join(", ")
+        );
+    }
+    Ok(out.status.success() && runtime.is_empty())
+}
+
+/// The Visual C++ runtime's DLLs among the imports `llvm-objdump -p` lists (`DLL Name: <dll>`).
+pub(crate) fn vc_runtime_imports(listing: &str) -> Vec<String> {
+    listing
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("DLL Name:"))
+        .map(|d| d.trim().to_owned())
+        .filter(|d| {
+            let lower = d.to_ascii_lowercase();
+            (lower.starts_with("vcruntime") || lower.starts_with("msvcp")) && Path::new(&lower).extension().is_some_and(|e| e.eq_ignore_ascii_case("dll"))
+        })
+        .collect()
 }
 
 fn regenerate(root: &Path) -> Res<bool> {
