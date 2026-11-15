@@ -4,8 +4,9 @@ Everyone follows the [code of conduct](CODE_OF_CONDUCT.md), and a vulnerability 
 
 ## Gates
 
-One command runs every check a change must pass, the same one CI runs (each CI job runs some of
-its steps with `--only`):
+One command runs every check a change must pass, the same one CI runs: a pull request into `dev`
+gets the short list (`ci.yml`, `--fast` on Linux, macOS and Windows), and `main` and a release tag
+every step (`gate.yml`, a job a step or a few, each with `--only`):
 
 ```sh
 cargo xtask check          # every step; the summary names each one's outcome, any red one fails it
@@ -214,8 +215,8 @@ release, both from one tag `vX.Y.Z`. Only maintainers push release tags
 | The 13 published crates | [`publish-crates.yml`](workflows/publish-crates.yml) | crates.io, through Trusted Publishing (OIDC, no stored token) |
 | The `isoloom` binaries for five targets, the SBOM, `SHA256SUMS`, its Sigstore signature, build provenance | [`release.yml`](workflows/release.yml) | the GitHub release of the tag |
 
-Both start with the release gate ([`gate.yml`](workflows/gate.yml): rustfmt, clippy,
-the tests, the API docs, the quality ratchet). A tag that fails it publishes nothing.
+Both start with the gate ([`gate.yml`](workflows/gate.yml): every step of `cargo xtask check`,
+as before main). A tag that fails it publishes nothing.
 
 `release.yml` then:
 
