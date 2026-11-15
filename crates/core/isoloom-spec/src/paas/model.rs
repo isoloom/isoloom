@@ -49,6 +49,32 @@ pub struct Topic {
     /// Its partitions.
     #[serde(default = "one")]
     pub partitions: u16,
+    /// What happens to old records: deleted after the retention (`delete`, the default), or
+    /// compacted to the last record of each key (`compact`).
+    #[serde(default)]
+    pub cleanup: Cleanup,
+}
+
+/// A topic's cleanup policy (Kafka's `cleanup.policy`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Cleanup {
+    /// Records deleted after the retention.
+    #[default]
+    Delete,
+    /// The last record of each key kept.
+    Compact,
+}
+
+impl Cleanup {
+    /// The policy as Kafka writes it.
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            Cleanup::Delete => "delete",
+            Cleanup::Compact => "compact",
+        }
+    }
 }
 
 /// A Kafka login, each a spec secret's name.

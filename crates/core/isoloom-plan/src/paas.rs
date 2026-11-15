@@ -23,6 +23,10 @@ use serde_json::{Value, json};
 
 use crate::lower::Scope;
 
+mod scripts;
+
+pub use scripts::{SCRAM_ITERATIONS, WAIT_DEFAULT_S, WAIT_HELPER, kafka_config, seaweedfs_config, wait_helper};
+
 /// Where a client finds a service's files, one folder per service.
 pub const SERVICES_DIR: &str = "/etc/isoloom/services";
 
@@ -179,6 +183,13 @@ fn give(m: &mut syntax::Machine, (name, host): (&str, &str), service: &Service, 
         }
         Service::ObjectStorage(_) | Service::Kafka(_) => {
             env("AUTH", if how.access == Access::Identity { "identity" } else { "keys" }.to_owned());
+            // On a cloud its files land after the client's set-up: the client waits for them.
+            env("WAIT", WAIT_HELPER.to_owned());
+        }
+    }
+    if matches!(service, Service::ObjectStorage(_) | Service::Kafka(_)) && !m.files.iter().any(|f| f.path == WAIT_HELPER) {
+        if let Some(file) = read(json!({ "path": WAIT_HELPER, "content": wait_helper(), "mode": "0755" })) {
+            m.files.push(file);
         }
     }
     let facts = file_facts(service, how.access);
@@ -270,14 +281,20 @@ fn unpacked((url, sha256): (&str, &str), archive: &str, unpack: &str, creates: &
     ]
 }
 
+/// What service `name`'s `SeaweedFS` runs: its configuration written from its keys, then the server.
+fn seaweedfs_start(name: &str) -> String {
+    let dir = fact_path(name, "");
+    format!(
+        "mkdir -p /var/lib/seaweedfs\nset -eu\n{config}exec /usr/local/bin/weed server -dir=/var/lib/seaweedfs -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/run/seaweedfs/s3.json",
+        config = scripts::seaweedfs_config(dir.trim_end_matches('/'), "/run/seaweedfs/s3.json"),
+    )
+}
+
 /// `SeaweedFS`'s server and its S3 gateway, checking the spec's keys (its configuration written
 /// from their files at each start), its data in a volume. It creates a bucket on its first
 /// upload, its identity being an admin.
 fn object_storage(name: &str, o: &ObjectStorage) -> Value {
-    let dir = fact_path(name, "");
-    let start = format!(
-        "set -eu\nmkdir -p /var/lib/seaweedfs /run/seaweedfs\numask 077\nprintf '{{\"identities\":[{{\"name\":\"app\",\"credentials\":[{{\"accessKey\":\"%s\",\"secretKey\":\"%s\"}}],\"actions\":[\"Admin\",\"Read\",\"Write\",\"List\",\"Tagging\"]}}]}}' \"$(cat {dir}access-key)\" \"$(cat {dir}secret-key)\" > /run/seaweedfs/s3.json\nexec /usr/local/bin/weed server -dir=/var/lib/seaweedfs -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/run/seaweedfs/s3.json"
-    );
+    let start = seaweedfs_start(name);
     let [download, unpack] = unpacked(
         SEAWEEDFS,
         "/opt/isoloom/seaweedfs.tar.gz",
@@ -303,16 +320,27 @@ fn object_storage(name: &str, o: &ObjectStorage) -> Value {
     })
 }
 
+/// What service `name`'s Kafka at `host` runs: its configurations written from its login, its
+/// storage formatted once, its topics made once it answers, then the broker.
+fn kafka_start(name: &str, host: &str, k: &Kafka) -> String {
+    let dir = fact_path(name, "");
+    let topics: Vec<String> = k
+        .topics
+        .iter()
+        .map(|(t, topic)| format!("{t}:{}:{}", topic.partitions, topic.cleanup.id()))
+        .collect();
+    let start = format!(
+        "set -eu\nk=/var/lib/kafka; c=$k/server.properties\n{config}[ -f $k/data/meta.properties ] || /opt/kafka/bin/kafka-storage.sh format -t \"$(/opt/kafka/bin/kafka-storage.sh random-uuid)\" -c $c --add-scram \"$(cat $k/scram.arg)\"\n(for t in {topics}; do n=${{t%%:*}}; r=${{t#*:}}; n_p=${{r%%:*}}; cl=${{r#*:}}; i=0; until /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --command-config $k/client.properties --create --if-not-exists --topic \"$n\" --partitions \"$n_p\" --config cleanup.policy=\"$cl\" >/dev/null 2>&1; do i=$((i+1)); [ $i -lt 90 ] || break; sleep 2; done; done) &\nexport KAFKA_HEAP_OPTS='-Xms512m -Xmx512m'\nexec /opt/kafka/bin/kafka-server-start.sh $c",
+        config = scripts::kafka_config(dir.trim_end_matches('/'), host, "/var/lib/kafka"),
+        topics = topics.join(" "),
+    );
+    start
+}
+
 /// Apache Kafka in `KRaft` mode, one node (broker and controller), its SASL/SCRAM login the spec's
 /// secrets (formatted into its storage at its first start), its topics made once it answers.
 fn kafka(name: &str, host: &str, k: &Kafka) -> Value {
-    let dir = fact_path(name, "");
-    let topics: Vec<String> = k.topics.iter().map(|(t, topic)| format!("{t}:{}", topic.partitions)).collect();
-    let jaas = "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"$u\" password=\"$p\";";
-    let start = format!(
-        "set -eu\nu=$(cat {dir}user); p=$(cat {dir}password)\nk=/var/lib/kafka; c=$k/server.properties\nmkdir -p $k/data\numask 077\ncat > $c <<EOF\nprocess.roles=broker,controller\nnode.id=1\ncontroller.quorum.voters=1@127.0.0.1:9093\nlisteners=SASL_PLAINTEXT://0.0.0.0:9092,CONTROLLER://127.0.0.1:9093\nadvertised.listeners=SASL_PLAINTEXT://{host}:9092\nlistener.security.protocol.map=SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT\ncontroller.listener.names=CONTROLLER\ninter.broker.listener.name=SASL_PLAINTEXT\nsasl.enabled.mechanisms=SCRAM-SHA-512\nsasl.mechanism.inter.broker.protocol=SCRAM-SHA-512\nlistener.name.sasl_plaintext.scram-sha-512.sasl.jaas.config={jaas}\nlog.dirs=$k/data\noffsets.topic.replication.factor=1\ntransaction.state.log.replication.factor=1\ntransaction.state.log.min.isr=1\nauto.create.topics.enable=false\nEOF\ncat > $k/client.properties <<EOF\nsecurity.protocol=SASL_PLAINTEXT\nsasl.mechanism=SCRAM-SHA-512\nsasl.jaas.config={jaas}\nEOF\n[ -f $k/data/meta.properties ] || /opt/kafka/bin/kafka-storage.sh format -t \"$(/opt/kafka/bin/kafka-storage.sh random-uuid)\" -c $c --add-scram \"SCRAM-SHA-512=[name=$u,password=$p]\"\n(for t in {topics}; do n=${{t%%:*}}; n_p=${{t#*:}}; i=0; until /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --command-config $k/client.properties --create --if-not-exists --topic \"$n\" --partitions \"$n_p\" >/dev/null 2>&1; do i=$((i+1)); [ $i -lt 90 ] || break; sleep 2; done; done) &\nexport KAFKA_HEAP_OPTS='-Xms512m -Xmx512m'\nexec /opt/kafka/bin/kafka-server-start.sh $c",
-        topics = topics.join(" "),
-    );
+    let start = kafka_start(name, host, k);
     let [download, unpack] = unpacked(
         KAFKA,
         "/opt/isoloom/kafka.tgz",
@@ -330,7 +358,7 @@ fn kafka(name: &str, host: &str, k: &Kafka) -> Value {
             { "path": fact_path(name, "password"), "secret": k.credentials.password },
         ],
         "app": { "steps": [
-            { "packages": ["ca-certificates", "curl", "openjdk-17-jre-headless"] },
+            { "packages": ["ca-certificates", "curl", "openssl", "openjdk-17-jre-headless"] },
             download,
             unpack,
             { "service": { "name": "kafka", "run": ["/bin/sh", "-c", start] } },

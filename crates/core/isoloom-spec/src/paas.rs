@@ -10,11 +10,13 @@
 //! what differs per platform), which a cloud delivers once it has made the service.
 
 mod check;
+mod limits;
 mod model;
 mod placement;
 
 pub use check::check;
-pub use model::{Access, Api, Client, Credentials, Kafka, KafkaCredentials, ObjectStorage, Postgres, Publish, Service, Size, Topic};
+pub use limits::{CloudLimit, EVENT_HUBS_MAX_PARTITIONS, cloud_limits};
+pub use model::{Access, Api, Cleanup, Client, Credentials, Kafka, KafkaCredentials, ObjectStorage, Postgres, Publish, Service, Size, Topic};
 pub use placement::{Placement, placement};
 
 #[cfg(test)]

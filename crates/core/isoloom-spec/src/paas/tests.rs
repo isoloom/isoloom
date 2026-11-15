@@ -107,3 +107,48 @@ fn the_schema_has_the_services_and_their_kinds() {
         assert!(schema.contains(word), "{word} missing from the schema");
     }
 }
+
+/// The `bus` Kafka service with `topics`.
+fn bus(topics: &str) -> Service {
+    let spec = parsed(&format!(
+        "services:\n  bus: {{ kind: kafka, networks: {{ lab: 42 }}, credentials: {{ user: files-key, password: files-secret }}, topics: {topics} }}\n"
+    ))
+    .unwrap();
+    spec.services["bus"].clone()
+}
+
+/// The clouds refusing `service`, each with its problem's path, code and fix.
+fn refused_by(service: &Service) -> Vec<(&'static str, String, Code, bool)> {
+    cloud_limits("bus", service)
+        .into_iter()
+        .map(|l| (l.cloud, l.problem.path.to_string(), l.problem.code, l.problem.fix.is_some()))
+        .collect()
+}
+
+#[test]
+fn a_compacted_topic_is_refused_on_event_hubs_standard_and_msk() {
+    let found = refused_by(&bus("{ ledger: { cleanup: compact } }"));
+    assert!(
+        found.contains(&("azure", "services.bus.topics.ledger.cleanup".to_owned(), Code::Refused, true)),
+        "{found:?}"
+    );
+    assert!(
+        found.contains(&("aws", "services.bus.topics.ledger.cleanup".to_owned(), Code::Refused, true)),
+        "{found:?}"
+    );
+    assert!(!found.iter().any(|(c, ..)| *c == "gcp"), "Managed Kafka compacts");
+}
+
+#[test]
+fn more_than_32_partitions_are_refused_on_event_hubs_standard() {
+    let found = refused_by(&bus("{ orders: { partitions: 33 } }"));
+    assert_eq!(found, [("azure", "services.bus.topics.orders.partitions".to_owned(), Code::Refused, true)]);
+    assert!(refused_by(&bus("{ orders: { partitions: 32 } }")).is_empty());
+}
+
+#[test]
+fn topics_of_several_partition_counts_are_refused_on_msk() {
+    let found = refused_by(&bus("{ orders: { partitions: 3 }, audit: { partitions: 1 } }"));
+    assert_eq!(found, [("aws", "services.bus.topics".to_owned(), Code::Refused, true)]);
+    assert!(refused_by(&bus("{ orders: { partitions: 3 }, audit: { partitions: 3 } }")).is_empty());
+}
