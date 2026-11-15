@@ -55,7 +55,11 @@ fn parsed(yaml: &str) -> Outcome<Environment> {
 /// player's machine lacks it) and `cargo xtask test` runs it, so a missing tool says so.
 fn needs(tools: &[&str]) -> Outcome {
     for tool in tools {
-        if !Command::new(tool).arg("--version").output().is_ok_and(|o| o.status.success()) {
+        // Looked up, not started: a tool that starts leaves its own files (PowerShell's pipe in
+        // the temporary folder) for the test run's leftover guard to find.
+        let found = std::env::var_os("PATH")
+            .is_some_and(|path| std::env::split_paths(&path).any(|d| d.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX)).is_file()));
+        if !found {
             return Err(format!("needs `{tool}` on PATH").into());
         }
     }
