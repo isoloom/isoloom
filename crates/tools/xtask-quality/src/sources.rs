@@ -162,6 +162,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "needs cargo: reads the workspace with `cargo metadata` (a player's machine has no toolchain); `cargo xtask test` runs it"]
     fn the_crates_are_read_from_cargo_metadata() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("Cargo.toml"), "[workspace]\nmembers = [\"crates/a\"]\nresolver = \"2\"\n").unwrap();

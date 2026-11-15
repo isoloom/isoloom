@@ -3,6 +3,11 @@
 //! nextest doesn't run, with `cargo test --doc`. Both run, so a failure in one doesn't hide the
 //! other.
 //!
+//! The ignored tests run too (`--run-ignored all`): a test is ignored when it needs a tool a
+//! player's machine doesn't have (`#[ignore = "needs cargo: ..."]`), so the test programs run
+//! as they are on a fresh machine (`./ws test --on vm:debian` in the products' workspace) list
+//! it as ignored, with its reason, instead of failing; here, with the toolchain, it runs.
+//!
 //! Both run with the temporary folder (`TMPDIR`, and `TMP` and `TEMP` on Windows) pointed at a
 //! fresh folder of this run's, and the task fails when a test left anything in it: a test's
 //! scratch folder is a `tempfile::TempDir`, removed when the test ends, so nothing piles up in
@@ -47,7 +52,12 @@ pub(crate) fn run(a: &Args) -> Res<ExitCode> {
 /// The tests, then the doctests unless a filter was given, with `temp` as their temporary
 /// folder: whether all passed.
 fn tests(root: &Path, a: &Args, temp: &Path) -> Res<bool> {
-    let tests = process::passed(in_temp(process::cargo(root).args(["nextest", "run", "--workspace"]).args(&a.nextest), temp))?;
+    let tests = process::passed(in_temp(
+        process::cargo(root)
+            .args(["nextest", "run", "--workspace", "--run-ignored", "all"])
+            .args(&a.nextest),
+        temp,
+    ))?;
     if !a.nextest.is_empty() {
         return Ok(tests);
     }

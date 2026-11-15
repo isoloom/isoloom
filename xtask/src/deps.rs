@@ -282,6 +282,7 @@ mod tests {
 
     /// The workspace itself, as `cargo metadata` describes it.
     #[test]
+    #[ignore = "needs cargo: reads the workspace with `cargo metadata` (a player's machine has no toolchain); `cargo xtask test` runs it"]
     fn the_workspace_keeps_its_dependencies_one_way() {
         let metadata = metadata(&["--no-deps"]);
         assert!(metadata["packages"].as_array().is_some_and(|p| p.len() > 10), "the workspace's crates");
@@ -325,6 +326,7 @@ mod tests {
     /// The product boundary: nothing in Isoloom's resolved graph is the runner's, not even
     /// transitively.
     #[test]
+    #[ignore = "needs cargo: reads the workspace with `cargo metadata` (a player's machine has no toolchain); `cargo xtask test` runs it"]
     fn isoloom_never_depends_on_the_runner() {
         let metadata = metadata(&[]);
         assert!(metadata["resolve"]["nodes"].as_array().is_some_and(|n| n.len() > 50), "the resolved graph");
