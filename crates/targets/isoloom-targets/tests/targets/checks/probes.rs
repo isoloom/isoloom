@@ -50,7 +50,8 @@ impl Drop for Server {
 }
 
 /// A server on 127.0.0.1 answering each connection with `answer` (of the line it read, when
-/// `wait_line`) after `delay_ms`, then holding the connection open a while (as a service does).
+/// `wait_line`) after `delay_ms`, then holding the connection open (as a service does) until the
+/// client closes it or the test drops the server.
 fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<Server> {
     let l = std::net::TcpListener::bind("127.0.0.1:0")?;
     let port = l.local_addr()?.port();
@@ -64,7 +65,8 @@ fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<
             }
             // A connection that drops is the check's to report, not the server's.
             if let Ok(c) = c {
-                connections.push(std::thread::spawn(move || answer_one(c, wait_line, delay_ms, answer).ok()));
+                let held = Arc::clone(&stopped);
+                connections.push(std::thread::spawn(move || answer_one(c, wait_line, delay_ms, answer, &held).ok()));
             }
         }
         for c in connections {
@@ -79,9 +81,10 @@ fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<
 }
 
 /// One connection of [`serve`]: the line read when `wait_line`, the answer after `delay_ms`,
-/// then the connection held open as a service holds it: until the client closes it, or a few
-/// seconds at most, so the thread ends with the check and not 8 s later.
-fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> std::io::Result<()> {
+/// then the connection held open as a service holds it: until the client closes it, or `stop`
+/// (the test dropping the server), never on a clock of its own that a check's window could
+/// outlast on a slow host.
+fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer: fn(&str) -> String, stop: &AtomicBool) -> std::io::Result<()> {
     use std::io::{BufRead, BufReader, Read, Write};
     let mut line = String::new();
     if wait_line {
@@ -89,9 +92,17 @@ fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer
     }
     std::thread::sleep(std::time::Duration::from_millis(delay_ms));
     c.write_all(answer(line.trim_end_matches('\n')).as_bytes())?;
-    c.set_read_timeout(Some(std::time::Duration::from_secs(3)))?;
+    // A short timeout only to look at `stop` between reads.
+    c.set_read_timeout(Some(std::time::Duration::from_millis(100)))?;
     let mut sink = [0_u8; 64];
-    while matches!(c.read(&mut sink), Ok(n) if n > 0) {}
+    while !stop.load(Ordering::SeqCst) {
+        match c.read(&mut sink) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
+            Err(e) => return Err(e),
+        }
+    }
     Ok(())
 }
 

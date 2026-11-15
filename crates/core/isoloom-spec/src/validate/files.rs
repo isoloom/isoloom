@@ -248,7 +248,10 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
         fs::create_dir_all(dir.join("real"))?;
         fs::write(dir.join("real/a.ini"), "")?;
         std::os::unix::fs::symlink("/etc", dir.join("ctx"))?;
-        std::os::unix::fs::symlink("/etc/hostname", dir.join("conf.ini"))?;
+        // A file outside the project that every OS has: the test's own.
+        let outside = crate::testing::folder("files-linked-outside")?;
+        fs::write(outside.path().join("conf.ini"), "")?;
+        std::os::unix::fs::symlink(outside.path().join("conf.ini"), dir.join("conf.ini"))?;
         std::os::unix::fs::symlink("real/a.ini", dir.join("own.ini"))?;
         std::os::unix::fs::symlink("/etc", dir.join("data"))?;
         let spec = model(&lab(machine))?;
