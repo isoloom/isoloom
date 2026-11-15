@@ -54,10 +54,10 @@ fn hostile_check_text_is_data_in_every_targets_check_runner() -> Outcome {
     // The tools a runner calls answer, and every text tool it uses is the host's own.
     bin.stand_in("curl", "echo '<html>page</html>'")?
         .stand_in("wget", "echo '<html>page</html>'")?
-        .stand_in("sleep", ":")?;
-    bin.link_real(&[
-        "sh", "cat", "grep", "head", "tail", "printf", "date", "tr", "sed", "mktemp", "rm", "touch", "env", "timeout",
-    ])?;
+        .stand_in("sleep", ":")?
+        // `timeout <seconds> <command>...` runs the command (macOS has no `timeout` of its own).
+        .stand_in("timeout", "shift; exec \"$@\"")?;
+    bin.link_real(&["sh", "cat", "grep", "head", "tail", "printf", "date", "tr", "sed", "mktemp", "rm", "touch", "env"])?;
     let mut runners = 0;
     for target in [
         Target::Docker,
