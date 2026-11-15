@@ -868,12 +868,15 @@ fn qemus_virtiofsd_squashes_every_other_guest_account_where_it_translates_ids() 
 #[test]
 fn each_network_is_named_with_the_copy_key() -> Outcome {
     let env = plan("segmented")?;
-    let file = vagrantfile("segmented")?;
-    for name in env.networks.keys() {
-        let keyed = format!("{}segmented-#{{ISOLOOM_KEY}}-{name}", isoloom_spec::contract::RESERVED_PREFIX);
-        assert!(file.contains(&format!("virtualbox__intnet: \"{keyed}\"")), "{keyed}");
-        assert!(file.contains(&format!("libvirt__network_name: \"{keyed}\"")), "{keyed}");
+    let networks = libvirt_networks(&vagrantfile("segmented")?);
+    let keyed = |name: &str| format!("{}segmented-#{{ISOLOOM_KEY}}-{name}", isoloom_spec::contract::RESERVED_PREFIX);
+    // Every VM's every private network is named so, by both providers.
+    for (vm, kw) in &networks {
+        assert_eq!(field(kw, "virtualbox__intnet"), field(kw, "libvirt__network_name"), "{vm}: {kw:?}");
     }
+    let named: std::collections::BTreeSet<&str> = networks.iter().map(|(_, kw)| field(kw, "libvirt__network_name")).collect();
+    let wanted: std::collections::BTreeSet<String> = env.networks.keys().map(|n| keyed(n)).collect();
+    assert_eq!(named, wanted.iter().map(String::as_str).collect());
     Ok(())
 }
 
