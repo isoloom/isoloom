@@ -267,6 +267,17 @@ mod tests {
         serde_yaml_ng::to_string(value).unwrap()
     }
 
+    /// Each of `volumes` as Compose reads it: a short mount's text, a long one's YAML.
+    fn mounts(volumes: &[crate::file::Mount]) -> Vec<String> {
+        volumes
+            .iter()
+            .map(|m| match m {
+                crate::file::Mount::Short(short) => short.clone(),
+                long @ crate::file::Mount::Long(_) => yaml(long),
+            })
+            .collect()
+    }
+
     #[test]
     fn an_init_job_of_a_machine_that_builds_its_image_builds_it_too_so_no_pull_asks_a_registry_for_it() {
         let file = file_of(
@@ -292,7 +303,7 @@ mod tests {
         }
         assert_eq!(file.services["isoloom-probe"].entrypoint, ["/bin/cp", "/bin/busybox", "/probe/busybox"]);
         assert!(!file.services.keys().any(|s| s.starts_with("isoloom-probe-")), "{:?}", file.services.keys());
-        assert!(yaml(&file.services["web"].volumes).contains("isoloom-probe:/.isoloom-probe:ro"));
+        assert!(mounts(&file.services["web"].volumes).contains(&"isoloom-probe:/.isoloom-probe:ro".to_owned()));
     }
 
     #[test]
@@ -316,16 +327,13 @@ mod tests {
         ] {
             assert!(script.contains(wanted), "{wanted}: {script}");
         }
-        assert!(yaml(probe).contains("isoloom-probe:/isoloom-host-probe:ro"), "{}", yaml(probe));
-        assert!(
-            yaml(&probe.depends_on).contains("isoloom-probe"),
-            "after the host's probe: {}",
-            yaml(&probe.depends_on)
-        );
+        // Its own volume to fill, and the host's probe read-only, relabelled for SELinux.
+        assert_eq!(mounts(&probe.volumes), ["isoloom-probe-amd64:/probe", "isoloom-probe:/isoloom-host-probe:ro,z"]);
+        assert_eq!(probe.depends_on.keys().collect::<Vec<_>>(), ["isoloom-probe"], "after the host's probe");
         // The host's own probe is there for the pinned one to run, unpinned.
         assert_eq!(file.services["isoloom-probe"].platform, None);
         assert!(file.services["isoloom-probe-arm64"].entrypoint[3].contains("which machine api needs"));
-        assert!(yaml(&file.services["web"].volumes).contains("isoloom-probe-amd64:/.isoloom-probe:ro"));
+        assert!(mounts(&file.services["web"].volumes).contains(&"isoloom-probe-amd64:/.isoloom-probe:ro".to_owned()));
         let volumes: Vec<&String> = file.volumes.keys().collect();
         assert_eq!(volumes, ["isoloom-probe", "isoloom-probe-amd64", "isoloom-probe-arm64"]);
     }
