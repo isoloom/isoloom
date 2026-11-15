@@ -256,5 +256,19 @@ fn every_example_on_every_target() -> Outcome {
             }
         }
     });
+    // Every snapshot of the folder is one this test asserts: one left by a removed example or
+    // target would never fail again.
+    let asserted: std::collections::BTreeSet<String> = generated
+        .iter()
+        .flat_map(|e| e.snapshots.iter().map(move |(target, _)| format!("{}__{}.snap", e.name, target.id())))
+        .collect();
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots/examples");
+    let mut unreferenced: Vec<String> = std::fs::read_dir(&folder)?
+        .filter_map(Result::ok)
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|name| Path::new(name).extension().is_some_and(|x| x == "snap") && !asserted.contains(name))
+        .collect();
+    unreferenced.sort();
+    assert_eq!(unreferenced, Vec::<String>::new(), "snapshots no test asserts: remove them");
     Ok(())
 }
