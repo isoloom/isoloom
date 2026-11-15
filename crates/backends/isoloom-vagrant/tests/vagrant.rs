@@ -179,12 +179,11 @@ fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     Ok(())
 }
 
-/// Loads a generated Vagrantfile (`ARGV[0]`) on a stand-in for Vagrant that records what it says,
-/// then fires machine `ARGV[1]`'s Hyper-V triggers after `WaitForIPAddress` and `DeleteVM` on a
-/// VM at 192.0.2.10, Hyper-V's PowerShell recorded instead of run. Prints each forwarded port
-/// (`forward <guest> <host>`) and each PowerShell script (`ps <script>`). Vagrant's own Ruby is
-/// 3.x; macOS's `ruby` is 2.6, which lacks `filter_map`, so it gets one.
-const HYPERV_TRIGGERS_RB: &str = r#"
+/// A stand-in for Vagrant that records what a generated Vagrantfile (`ARGV[0]`) says, then loads
+/// it: each VM's forwarded ports (`$forwards`) and typed action triggers (`$triggers`, by VM, the
+/// action's name and when). Vagrant's own Ruby is 3.x; macOS's `ruby` is 2.6, which lacks
+/// `filter_map`, so it gets one.
+const VAGRANT_STAND_IN_RB: &str = r#"
 Enumerable.module_eval { def filter_map; each_with_object([]) { |x, out| v = yield(x); out << v if v }; end } unless Enumerable.method_defined?(:filter_map)
 $forwards = []
 $triggers = {}
@@ -218,6 +217,13 @@ module Vagrant
   def self.user_data_path; "/nonexistent"; end
 end
 load ARGV[0]
+"#;
+
+/// After [`VAGRANT_STAND_IN_RB`]: fires machine `ARGV[1]`'s Hyper-V triggers after
+/// `WaitForIPAddress` and `DeleteVM` on a VM at 192.0.2.10, Hyper-V's PowerShell recorded instead
+/// of run. Prints each forwarded port (`forward <guest> <host>`) and each PowerShell script
+/// (`ps <script>`).
+const HYPERV_TRIGGERS_RB: &str = r#"
 IsoloomHyperV.define_singleton_method(:ps) { |script| $ps << script; "" }
 IsoloomHyperV.define_singleton_method(:address) { |*_| nil }
 ui = Object.new
@@ -281,7 +287,10 @@ fn ruby_runs() -> bool {
 fn hyperv_triggers(example: &str, machine: &str, hostports: Option<&str>) -> Outcome<String> {
     let scratch = tempfile::Builder::new().prefix("isoloom-hyperv-ports-").tempdir()?;
     let (vagrantfile, mut ruby) = loadable(example, scratch.path())?;
-    ruby.arg("-e").arg(HYPERV_TRIGGERS_RB).arg(vagrantfile).arg(machine);
+    ruby.arg("-e")
+        .arg([VAGRANT_STAND_IN_RB, HYPERV_TRIGGERS_RB].concat())
+        .arg(vagrantfile)
+        .arg(machine);
     match hostports {
         Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),
         None => ruby.env_remove("ISOLOOM_HOSTPORTS"),
@@ -1295,39 +1304,11 @@ fn keywords_read_strings_with_interpolations_and_bare_values() {
     assert_eq!(field(&kw, "libvirt__dhcp_enabled"), "false");
 }
 
-/// Loads a generated Vagrantfile (`ARGV[0]`) on the stand-in for Vagrant, then fires every VM's
-/// UTM triggers: before `Boot` (the adapters, the `osascript` call recorded instead of run) and
+/// After [`VAGRANT_STAND_IN_RB`]: fires every VM's UTM triggers: before `Boot` (the adapters, the `osascript` call recorded instead of run) and
 /// after `CheckGuestAdditions` (the guest's addresses, its script recorded). Prints each QEMU
 /// argument the adapters set (`arg <vm> <argument>`) and each address the guest sets
 /// (`address <vm> <mac> <address>`).
 const UTM_TRIGGERS_RB: &str = r#"
-$triggers = {}
-class Rec
-  def initialize(path = []); @path = path; end
-  def respond_to_missing?(*); true; end
-  def method_missing(name, *args, &blk)
-    $machine = args[0] if name == :define
-    if @path.last == :trigger
-      t = Trigger.new
-      blk.call(t)
-      $triggers[[$machine, args[0].to_s.split("::").last, name]] = t.code
-      return nil
-    end
-    blk.call(*Array.new([blk.arity, 1].max) { Rec.new }) if blk
-    Rec.new(@path + [name])
-  end
-end
-class Trigger
-  attr_reader :code
-  def ruby(&blk); @code = blk; end
-end
-module Vagrant
-  module Util; end
-  module Errors; class VagrantError < StandardError; end; end
-  def self.configure(_version); yield Rec.new; end
-  def self.user_data_path; "/nonexistent"; end
-end
-load ARGV[0]
 require "open3"
 $vm = nil
 ok = Struct.new(:success?).new(true)
@@ -1357,7 +1338,7 @@ type Triple = (String, String, String);
 fn utm_adapters(example: &str) -> Outcome<(Vec<Triple>, Vec<Triple>)> {
     let scratch = tempfile::Builder::new().prefix("isoloom-utm-nics-").tempdir()?;
     let (vagrantfile, mut ruby) = loadable(example, scratch.path())?;
-    ruby.arg("-e").arg(UTM_TRIGGERS_RB).arg(vagrantfile);
+    ruby.arg("-e").arg([VAGRANT_STAND_IN_RB, UTM_TRIGGERS_RB].concat()).arg(vagrantfile);
     let out = printed(ruby)?;
     // Each VM's netdevs (id → network id), then its cards (netdev, MAC).
     let mut netdevs = std::collections::BTreeMap::new();
@@ -1494,7 +1475,10 @@ fn a_kept_host_port_wins_over_the_runs_choice_and_the_published_one() -> Outcome
     let chosen = r#"{"web/web": 28080}"#;
     for (kept, run, wanted) in [(Some("18080"), Some(chosen), 18080), (None, Some(chosen), 28080), (None, None, 8080)] {
         let (vagrantfile, mut ruby) = loadable("solo-web", scratch.path())?;
-        ruby.arg("-e").arg(HYPERV_TRIGGERS_RB).arg(vagrantfile).arg("web");
+        ruby.arg("-e")
+            .arg([VAGRANT_STAND_IN_RB, HYPERV_TRIGGERS_RB].concat())
+            .arg(vagrantfile)
+            .arg("web");
         match kept {
             Some(port) => ruby.env("ISOTHRUM_HOST_PORT_WEB_80_TCP", port),
             None => ruby.env_remove("ISOTHRUM_HOST_PORT_WEB_80_TCP"),

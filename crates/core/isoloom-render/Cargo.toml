@@ -30,6 +30,7 @@ flate2 = { workspace = true, features = ["zlib-rs"] }
 test-support = []
 
 [dev-dependencies]
+isoloom-test-support.workspace = true
 proptest.workspace = true
 serde_yaml_ng.workspace = true
 insta.workspace = true

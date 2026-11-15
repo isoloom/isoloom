@@ -6,7 +6,7 @@
 use isoloom_spec::{Target, parse};
 use isoloom_targets::{Lab, generate};
 
-use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
+use isoloom_test_support::{hcl, hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
 
 use crate::testing::{Outcome, web_and_db};
 
@@ -43,9 +43,7 @@ fn single_network_linux_lab_pins_each_machine_on_a_vpc_subnet() -> Outcome {
         assert_eq!(linodes, [format!("linode_instance.{machine}.id")]);
     }
     // The expected outputs, shaped like the other clouds'.
-    assert_eq!(hcl_blocks(&body, "output", &["ip"]).len(), 1);
-    let ready = hcl_blocks(&body, "output", &["ready_file"]);
-    assert_eq!(ready.first().map(|o| hcl_text(o.body(), "value")).as_deref(), Some("/var/lib/isoloom/ready"));
+    crate::testing::assert_cloud_outputs(&body);
     Ok(())
 }
 

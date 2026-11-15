@@ -8,7 +8,7 @@ use std::error::Error;
 use isoloom_plan::{Capabilities, Environment, Lab};
 use isoloom_render::backend::check;
 use isoloom_render::inventory::{self, Access, vars};
-use isoloom_render::{checks, header, powershell, stable_hash};
+use isoloom_render::{header, powershell, stable_hash};
 use isoloom_spec::model::Target;
 
 /// A test's outcome: a failed step is its report.
@@ -22,21 +22,6 @@ fn planned(target: Target) -> Outcome<Environment> {
     Ok(lab.plan(&lab.for_target(target), target, None)?)
 }
 
-/// An inventory's groups as Ansible reads them: each group's lines, comments and blanks left out.
-fn groups(text: &str) -> BTreeMap<String, Vec<String>> {
-    let mut out: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut group = String::new();
-    for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
-        if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
-            name.clone_into(&mut group);
-            out.entry(group.clone()).or_default();
-        } else {
-            out.entry(group.clone()).or_default().push(line.to_owned());
-        }
-    }
-    out
-}
-
 #[test]
 fn the_inventory_lists_each_vm_at_its_first_address_with_the_targets_access() -> Outcome {
     let env = planned(Target::Vagrant)?;
@@ -44,7 +29,7 @@ fn the_inventory_lists_each_vm_at_its_first_address_with_the_targets_access() ->
     assert_eq!(hosts, [("web", "10.9.0.10".to_owned()), ("db", "10.9.0.20".to_owned())]);
     let access = Access::new(vars(&[("ansible_user", "vagrant")]), Vec::new(), |h| vars(&[("isoloom_name", h.name)]));
     let text = inventory::render(&env, &access);
-    let groups = groups(&text);
+    let groups = isoloom_test_support::ini_groups(&text);
     assert_eq!(
         groups.get("linux").map(Vec::as_slice),
         Some(
@@ -87,7 +72,7 @@ fn a_check_scripts_command_runs_it_from_the_project_even_with_a_space_in_its_pat
     let project = tempfile::Builder::new().prefix("isoloom-render-project-").tempdir()?;
     std::fs::create_dir_all(project.path().join("my checks"))?;
     std::fs::write(project.path().join("my checks/up.sh"), "pwd; echo up\n")?;
-    let command = checks::script_command_in(&project.path().to_string_lossy(), "my checks/up.sh");
+    let command = isoloom_render::checks::script_command_in(&project.path().to_string_lossy(), "my checks/up.sh");
     let out = std::process::Command::new("sh").arg("-c").arg(&command).output()?;
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let printed = String::from_utf8(out.stdout)?;

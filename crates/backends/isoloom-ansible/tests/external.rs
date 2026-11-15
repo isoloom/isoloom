@@ -40,20 +40,18 @@ type Host = (String, BTreeMap<String, String>);
 
 /// An inventory as Ansible reads it: each group's hosts, each with its variables.
 fn inventory(text: &str) -> BTreeMap<String, Vec<Host>> {
-    let mut groups: BTreeMap<String, Vec<Host>> = BTreeMap::new();
-    let mut group = String::new();
-    for line in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
-        if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
-            name.clone_into(&mut group);
-            groups.entry(group.clone()).or_default();
-            continue;
-        }
+    let host = |line: &String| {
         let mut words = line.split_whitespace();
-        let host = words.next().unwrap_or_default().to_owned();
-        let vars = words.filter_map(|w| w.split_once('=')).map(|(k, v)| (k.to_owned(), v.to_owned())).collect();
-        groups.entry(group.clone()).or_default().push((host, vars));
-    }
-    groups
+        let name = words.next().unwrap_or_default().to_owned();
+        (
+            name,
+            words.filter_map(|w| w.split_once('=')).map(|(k, v)| (k.to_owned(), v.to_owned())).collect(),
+        )
+    };
+    isoloom_test_support::ini_groups(text)
+        .into_iter()
+        .map(|(group, lines)| (group, lines.iter().map(host).collect()))
+        .collect()
 }
 
 #[test]

@@ -784,6 +784,7 @@ dependencies = [
  "insta",
  "isoloom-plan",
  "isoloom-spec",
+ "isoloom-test-support",
  "proptest",
  "serde_json",
  "serde_yaml_ng",

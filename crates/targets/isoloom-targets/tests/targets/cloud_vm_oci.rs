@@ -3,7 +3,7 @@
 
 use isoloom_spec::Target;
 
-use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_values};
 
 use crate::testing::{Outcome, generated, lab, web_and_db};
 
@@ -44,9 +44,7 @@ fn single_network_linux_lab_builds_oci_instances_at_fixed_addresses() -> Outcome
     assert_eq!(hcl_names(&body, "resource", "oci_core_security_list"), ["lab"]);
     assert!(hcl_values(&body, "min").contains(&"8080".to_owned()), "{tf}");
     // The module outputs, the same shape the AWS driver gives.
-    assert_eq!(hcl_blocks(&body, "output", &["ip"]).len(), 1);
-    let ready = hcl_blocks(&body, "output", &["ready_file"]);
-    assert_eq!(ready.first().map(|o| hcl_text(o.body(), "value")).as_deref(), Some("/var/lib/isoloom/ready"));
+    crate::testing::assert_cloud_outputs(&body);
     Ok(())
 }
 

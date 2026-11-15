@@ -164,24 +164,21 @@ fn decoded(text: &str) -> String {
 /// The text gzip-compressed and base64-encoded in `encoded`, or `None` when it isn't that.
 fn gunzip_base64(encoded: &str) -> Option<String> {
     use std::io::Read as _;
-    let value = |c: u8| match c {
-        b'A'..=b'Z' => Some(c - b'A'),
-        b'a'..=b'z' => Some(c - b'a' + 26),
-        b'0'..=b'9' => Some(c - b'0' + 52),
-        b'+' => Some(62),
-        b'/' => Some(63),
-        _ => None,
-    };
-    let mut bytes = Vec::with_capacity(encoded.len() / 4 * 3);
-    let (mut acc, mut bits) = (0_u32, 0_u32);
-    for c in encoded.bytes().take_while(|c| *c != b'=') {
-        acc = (acc << 6) | u32::from(value(c)?);
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            bytes.push(u8::try_from((acc >> bits) & 0xff).ok()?);
-        }
-    }
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let sextets: Option<Vec<u8>> = encoded
+        .trim_end_matches('=')
+        .bytes()
+        .map(|c| ALPHABET.iter().position(|a| *a == c).and_then(|i| u8::try_from(i).ok()))
+        .collect();
+    // Four sextets are three bytes; a last group of two or three sextets is one or two.
+    let bytes: Vec<u8> = sextets?
+        .chunks(4)
+        .flat_map(|g| {
+            let n = g.iter().fold(0_u32, |n, s| (n << 6) | u32::from(*s)) << (6 * (4 - g.len()));
+            let [_, a, b, c] = n.to_be_bytes();
+            [a, b, c].into_iter().take(g.len().saturating_sub(1))
+        })
+        .collect();
     let mut text = String::new();
     flate2::read::GzDecoder::new(bytes.as_slice()).read_to_string(&mut text).ok()?;
     Some(text)
