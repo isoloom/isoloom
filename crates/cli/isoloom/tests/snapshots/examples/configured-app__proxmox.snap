@@ -619,7 +619,7 @@ resource "proxmox_virtual_environment_file" "web" {
           path        = "/var/lib/isoloom/configure/configure-0.sh"
           encoding    = "gz+b64"
           permissions = "0700"
-          content     = "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"
+          content     = "<gzip 1>"
         }
       ])
       runcmd = [
@@ -718,7 +718,7 @@ resource "proxmox_virtual_environment_file" "api" {
           path        = "/var/lib/isoloom/configure/configure-0.sh"
           encoding    = "gz+b64"
           permissions = "0700"
-          content     = "H4sIAAAAAAAC/81YbVPbSBL+7l/RCBNjCiFwkr0tKOU2u2T3qNpLqpbL5QPFuYQ0slSWNUIzgniJ//t1z4veLAjZy4dzUtjSdPc8/Ux3T8/sjwST4LJqlAqecb6ah0mQL1i0P4WHEQALEw6OGTsFMwjjAwcH0xiuwM3BGT9cXH74/cOHf85/+cfb97+9Oz91Nw5cn4FMWI6CAKtllJbgFgOye94BCr94Aafwxhn3BmmaOB1tanhxkGbD2BATvHkxw4GSyarM4aSlVqyMUsxLwCdIcwgK6S7Q+yiPYV2t8Hl5BhFXeNG1kK9WQR6Be4egUQWtexG78/Iqy2D25sVJyz0LZvyAgntkdeOYAQPmWD2iK4BT5IzYa3kETs6hCMJlsGCAs+JXCRdaAJY5vxewb+AeEt5DAnxIiKdOy8s0FzLIsnr15nmwYv74Yba35x9s6MUdK0XKcx9/h4FgMJ4REwf+wbQZQ/ndA38DZ2fARBDWoicoqrxAJFPj3S6IhGVZmLBwCVEqgpuM+Ze/zI5PfsCxqFgu3NuKleuJAH6fo/8si8Qh5FwSeVp5Io6MtXkS3CHe/UYP3E/gxv5k/HApA1mJDYwf/q1xbia0LuShg8tRL80UvnxpIkDb1fiVdXLXMTwBX0JNGTjIAbqMf612iwH6YKz/SVManjDAaaortepkenfQLMa239Uy5s7O1A+Kvi+0nJZSnVW9mTqxhkGFEezeguveJ4EsSn6XRkw0dPQC1YZoJljfglFxW3MNK6vIbcGm0PsGwCiOnMQcS803wSS9LBVYotzWSg0sO3K4KFmhfPpP3ylwHvGiu9hUU2i5txLKplOx8scEUyRpLOu80OWknxm2ulRFFEiGuG6xxtV+nb/7+eLt+/mvf3x4/69378/9nOdpLlkZhDLFILXKNqLctTLgujm3PLglowrF8ogW/qcOm62JrKUwY0FOVbbEdS9j8O6C0svSGw8FPGJYeAdfCUxVOkXBQlsk6WOp6CSaEkqb1QddYdRW42q0lDQkpiqTax6o7Dh2fqPYV1OCHaFWiprSSh9TszsMDhBl5TQ/JNkMb0e8iscgivRKhAHWvdrsM0PKVHnRjqn9Zpvql68t0hvCt6q+9aUmCU0NkdfsQVS8dh1Myls4xnJG4dFsVz37jfWflOXu/mWE0nyBGzHQOxY5PV96LQY4lgvVTzQUiSSYvf7BEKQfBO7PzvgELUJYoUcRTPCfG3c3+UoaJV2SYlSZOdqvK9gB9/fOC6fhXU+iZpjqer09NKOhdl1rUaXqSqvH2cdfVIKsWpN3CgA+hoX2Rz1vsXlfplJROXsulWimxYRkny0Vc7kqMMJWS8lWRT+6ihKrTgyTPTHRSLADIwUFsUUr2NeEmYwKtRv7479Tu7XSVCuJpv2iaFNSbWCBlGUd+tgRsNIfU8s2X5S8QpwvO22llqgXTO8xSrK7ElZ7P8XMXLQ0t7Ipfco+rhshBjeEvY82GHb8tmBrUmz4sKNxk9awjtBe+7G1VEoYeAyayz4m6982pt+6mAaICJNFWRhMZvh5mJTwo5he9ei+D3KJbeKrXazir/b2rnaOr7GH34zqbqCNOuigflDKp+7xpt8khMmKR3qyQcwDqFGBNaAN7M5xIeTF2oRbr4k98KZNye5NoCPeZmcrFVT46rfO+KVj0b7uNvvtfcNsTldUspTJ6+1sJ1ACe2Is9llEcdTL9VhXr8hUr+Fj1ewZq0xFwrC0Hxo86F2c4jHnCNwVfrNCJnCCeQP3CRYeuPj10kerASYWbkQsl+W6PiTN45KvfLTi4bKqod0jzxx85pLjCJ48vM3AqA4ttWGRjX6Nti878dGmAa1v95gtMtQ40sE+p7IOnyFCSLDbG7baz14B1KAGjRvdfpgoyW6gdBTVLtwEa8kwaUo5jypmYvbJ47UpirTJ9E/NeMhozFZ5Kjs5MLM5MNnd8cRNmnu8YHkZumWVT7aSgfYScDwmQy9FS0eR90Rm9MVKjic99ef4b69f95tve+wjhL5SFWuB+1RkvtHEkWDlXRraJZljhvj1eWzHbDykbzJLCQzs3lpm2DdrYDCJ6opGlk0Re9R8syoReMhmz5+tkNWvQ5lBFLAVz7Gpz3gQDZ5Wen2k4aXT8Hx90lpbi6hmjmxn3QsPjAVjv39I67qn42ZwBjNUT2Cyqndpg0WPosUQAWhTQMJKdgq6KGYsxpsCri4LQp7LIMW9Ey8TRFUQPsHLrRsi41qbGLWwPk3WQRq3+E+Fy3K6vaDe/rZKmdkBWkfMztq1Vk7fenTVnrF5oYNGNXI6RaQHyxwJ2+YfQSIkL75lepIverP3m1pEs/OXaWr0tNLTHA1BNJM5j8N5mp42OVha6y1vmA6U0HOpfBgoy4OWzXhtuxfiZphuTU+2glVniW2IjbdYvzABzcWBwDYTIhYHVSZxVw7ul5Sgla9mmyBs34cKHnQrD86aCQc2k+lXQ9+2m5bhXm1qAOD5NmKZ9q7G8T+Fd6u6qMMzGtYnhSdvWAe1MOC/a6zbQ8YgKx1O6BbgSU6eHc5/hY5hHQzC7xLbA9ZtkD8zvnsNia92C6PiYSGP00VVsiMDcWSPkFu3/9il4iYjrerWLQpMirVMeP5y0mn5YRIUqYdXBJ4o7zzz2/zv9EVK0NV04+DVR3x3PTpnIizTQtJteDN+SEuN+08EN2t7OT/6hKcZ4edM3vNy6fIcb0DYEfKBd26jtzHe6D0yNrq61Axfj959ZuElUeg7xhlsRVxqNRMpC9UAqcPlj8c/HtOIi20uCyUv1/hkHXRGHwVNxm94tB79odfEx46CjhhINU54oa9orhVmFv289lcYt6lboaKFNen3Fz2CsLwMEZiwIJPJ4wTq8f8DAk+eIPATToKXLud20LdD353Omi5F53T0X/3UzHGGGwAA"
+          content     = "<gzip 2>"
         }
       ])
       runcmd = [
@@ -917,5 +917,658 @@ locals {
   project_keep  = { for f in fileset(local.root, "**") : f => reverse(concat([true], [for r in local.project_ignore : r.keep if length(regexall(r.re, f)) > 0]))[0] }
   project_paths = [for f, keep in local.project_keep : f if keep]
 }
+### <gzip 1> decoded
+(
+set -eu
+isoloom_changed() {
+  echo "isoloom: changed $*"
+  if [ -n "${ISOLOOM_CHANGED:-}" ]; then
+    mkdir -p "${ISOLOOM_CHANGED%/*}" && : >"$ISOLOOM_CHANGED"
+  fi
+}
+isoloom_fail() {
+  echo "isoloom: $*" >&2
+  return 1
+}
+isoloom_pm() {
+  for _pm in apt-get dnf yum apk; do
+    if command -v "$_pm" >/dev/null 2>&1; then
+      echo "${_pm%-get}"
+      return 0
+    fi
+  done
+  isoloom_fail "no package manager Isoloom knows (apt-get, dnf, yum, apk)"
+}
+isoloom_installed() {
+  _name=${2%%=*}
+  _version=
+  case $2 in *=*) _version=${2#*=} ;; esac
+  case $1 in
+    apt)
+      # shellcheck disable=SC2016 # dpkg-query's own fields, not the shell's.
+      _have=$(dpkg-query -W -f='${Status} ${Version}' "$_name" 2>/dev/null) || return 1
+      case $_have in "install ok installed "*) ;; *) return 1 ;; esac
+      [ -z "$_version" ] || [ "${_have#install ok installed }" = "$_version" ]
+      ;;
+    dnf | yum)
+      if [ -z "$_version" ]; then
+        rpm -q --whatprovides "$_name" >/dev/null 2>&1
+      else
+        rpm -q "$_name-$_version" >/dev/null 2>&1
+      fi
+      ;;
+    apk)
+      if [ -z "$_version" ]; then
+        apk info -e "$_name" >/dev/null 2>&1
+      else
+        apk list --installed "$_name" 2>/dev/null | grep -q "^$_name-$_version "
+      fi
+      ;;
+    *) return 1 ;;
+  esac
+}
+isoloom_install() {
+  _pm=$1
+  shift
+  case $_pm in
+    apt)
+      apt-get update -qq &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "$@" >/dev/null &&
+        apt-get clean && rm -rf /var/lib/apt/lists/*
+      ;;
+    dnf | yum)
+      for _spec do
+        shift
+        case $_spec in
+          *=*) set -- "$@" "${_spec%%=*}-${_spec#*=}" ;;
+          *) set -- "$@" "$_spec" ;;
+        esac
+      done
+      "$_pm" install -y -q "$@" >/dev/null && "$_pm" clean all >/dev/null
+      ;;
+    apk) apk add --no-cache -q "$@" ;;
+    *) return 1 ;;
+  esac
+}
+isoloom_packages() {
+  _pm=$(isoloom_pm) || return 1
+  for _spec do
+    shift
+    isoloom_installed "$_pm" "$_spec" || set -- "$@" "$_spec"
+  done
+  [ "$#" -eq 0 ] && return 0
+  isoloom_install "$_pm" "$@" || isoloom_fail "installing $* failed" || return 1
+  isoloom_changed "packages $*"
+}
+isoloom_need() {
+  _cmd=$1
+  shift
+  command -v "$_cmd" >/dev/null 2>&1 && return 0
+  _pm=$(isoloom_pm) || return 1
+  isoloom_install "$_pm" "$@" || isoloom_fail "installing $* (for $_cmd) failed" || return 1
+  isoloom_changed "packages $*"
+}
+isoloom_sha256() {
+  sha256sum "$1" | cut -d ' ' -f 1
+}
+isoloom_fetch() {
+  if ! command -v curl >/dev/null 2>&1 && command -v wget >/dev/null 2>&1; then
+    wget -q -O "$2" "$1"
+    return
+  fi
+  isoloom_need curl curl ca-certificates || return 1
+  if [ ! -s /etc/ssl/certs/ca-certificates.crt ] && [ ! -s /etc/pki/tls/certs/ca-bundle.crt ]; then
+    _pm=$(isoloom_pm) || return 1
+    isoloom_install "$_pm" ca-certificates || isoloom_fail "installing ca-certificates failed" || return 1
+    isoloom_changed "packages ca-certificates"
+  fi
+  curl -fsSL --retry 3 -o "$2" "$1"
+}
+isoloom_put() {
+  if [ -f "$2" ] && [ ! -L "$2" ] && [ "$(isoloom_sha256 "$1")" = "$(isoloom_sha256 "$2")" ]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$2")" && rm -rf "$2" && cp "$1" "$2" || isoloom_fail "writing $2 failed" || return 1
+  isoloom_changed "$2"
+}
+isoloom_download() {
+  if [ -f "$2" ] && [ "$(isoloom_sha256 "$2")" = "$3" ]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$2")" || return 1
+  _tmp="$2.isoloom-download"
+  isoloom_fetch "$1" "$_tmp" || {
+    rm -f "$_tmp"
+    isoloom_fail "downloading $1 failed"
+    return 1
+  }
+  _got=$(isoloom_sha256 "$_tmp")
+  if [ "$_got" != "$3" ]; then
+    rm -f "$_tmp"
+    isoloom_fail "$1 has SHA-256 $_got, not $3: the file changed upstream, or the pin is wrong"
+    return 1
+  fi
+  mv -f "$_tmp" "$2" && isoloom_changed "$2"
+}
+isoloom_attrs() {
+  _owner=$2
+  _group=$3
+  if [ -n "$_owner" ] && [ -z "$_group" ]; then
+    _group=$(id -gn "$_owner") || return 1
+  fi
+  if [ -n "$_owner" ] && [ "$(stat -c %U "$1")" != "$_owner" ]; then
+    chown -h "$_owner" "$1" || return 1
+    isoloom_changed "owner of $1"
+  fi
+  if [ -n "$_group" ] && [ "$(stat -c %G "$1")" != "$_group" ]; then
+    chgrp -h "$_group" "$1" || return 1
+    isoloom_changed "group of $1"
+  fi
+  if [ -n "$4" ]; then
+    _want=${4#"${4%%[!0]*}"}
+    if [ "$(stat -c %a "$1")" != "${_want:-0}" ]; then
+      chmod "$4" "$1" || return 1
+      isoloom_changed "mode of $1"
+    fi
+  fi
+}
+isoloom_copy() {
+  case $1 in
+    */) ;;
+    *)
+      isoloom_put "$1" "$2" && isoloom_attrs "$2" "$3" "$4" "$5"
+      return
+      ;;
+  esac
+  [ -d "$1" ] || isoloom_fail "$1 is no folder" || return 1
+  if [ ! -d "$2" ]; then
+    mkdir -p "$2" || return 1
+    isoloom_changed "$2"
+  fi
+  (cd "$1" && find . -mindepth 1) | while IFS= read -r _entry; do
+    _from="$1/${_entry#./}"
+    _to="${2%/}/${_entry#./}"
+    if [ -d "$_from" ] && [ ! -L "$_from" ]; then
+      if [ ! -d "$_to" ]; then
+        mkdir -p "$_to" || exit 1
+        isoloom_changed "$_to"
+      fi
+    else
+      isoloom_put "$_from" "$_to" || exit 1
+    fi
+    isoloom_attrs "$_to" "$3" "$4" "$5" || exit 1
+  done
+}
+isoloom_template() {
+  _tmp=$(mktemp) || return 1
+  printf '%s' "$5" | base64 -d >"$_tmp" && isoloom_copy "$_tmp" "$1" "$2" "$3" "$4"
+  _status=$?
+  rm -f "$_tmp"
+  return "$_status"
+}
+isoloom_file() {
+  _path=$1 _file_owner=$2 _file_group=$3 _file_mode=$4 _state=$5
+  shift 5
+  case $_state in
+    directory)
+      if [ ! -d "$_path" ] || [ -L "$_path" ]; then
+        rm -rf "$_path" && mkdir -p "$_path" || return 1
+        isoloom_changed "$_path"
+      fi
+      ;;
+    absent)
+      if [ -e "$_path" ] || [ -L "$_path" ]; then
+        rm -rf "$_path" || return 1
+        isoloom_changed "$_path removed"
+      fi
+      return 0
+      ;;
+    link)
+      if [ ! -L "$_path" ] || [ "$(readlink "$_path")" != "$1" ]; then
+        mkdir -p "$(dirname "$_path")" && rm -rf "$_path" && ln -s "$1" "$_path" || return 1
+        isoloom_changed "$_path"
+      fi
+      ;;
+    download) isoloom_download "$1" "$_path" "$2" || return 1 ;;
+    *) isoloom_fail "no file state $_state" || return 1 ;;
+  esac
+  isoloom_attrs "$_path" "$_file_owner" "$_file_group" "$_file_mode"
+}
+isoloom_accounts() {
+  isoloom_need useradd shadow
+}
+isoloom_group() {
+  isoloom_accounts || return 1
+  _name=$1 _gid=$2 _system=$3
+  if _entry=$(getent group "$_name"); then
+    if [ -n "$_gid" ] && [ "$(echo "$_entry" | cut -d : -f 3)" != "$_gid" ]; then
+      groupmod -g "$_gid" "$_name" || return 1
+      isoloom_changed "gid of $_name"
+    fi
+    return 0
+  fi
+  set --
+  [ -z "$_gid" ] || set -- -g "$_gid"
+  [ "$_system" != yes ] || set -- "$@" -r
+  groupadd "$@" "$_name" || return 1
+  isoloom_changed "group $_name"
+}
+isoloom_passwd_field() {
+  getent passwd "$1" | cut -d : -f "$2"
+}
+isoloom_user() {
+  isoloom_accounts || return 1
+  _user=$1 _uid=$2 _group=$3 _groups=$4 _home=$5 _shell=$6 _system=$7 _hash=$8
+  if getent passwd "$_user" >/dev/null; then
+    isoloom_user_fields || return 1
+  else
+    set --
+    [ -z "$_uid" ] || set -- "$@" -u "$_uid"
+    [ -z "$_group" ] || set -- "$@" -g "$_group"
+    [ -z "$_groups" ] || set -- "$@" -G "$_groups"
+    [ -z "$_home" ] || set -- "$@" -d "$_home"
+    [ -z "$_shell" ] || set -- "$@" -s "$_shell"
+    if [ "$_system" = yes ]; then set -- "$@" -r; else set -- "$@" -m; fi
+    useradd "$@" "$_user" || return 1
+    isoloom_changed "user $_user"
+  fi
+  [ -n "$_hash" ] || return 0
+  [ "$(awk -F : -v u="$_user" '$1 == u { print $2 }' /etc/shadow)" = "$_hash" ] && return 0
+  printf '%s:%s\n' "$_user" "$_hash" | chpasswd -e || return 1
+  isoloom_changed "password of $_user"
+}
+isoloom_user_fields() {
+  if [ -n "$_uid" ] && [ "$(id -u "$_user")" != "$_uid" ]; then
+    usermod -u "$_uid" "$_user" || return 1
+    isoloom_changed "uid of $_user"
+  fi
+  if [ -n "$_group" ] && [ "$(id -gn "$_user")" != "$_group" ]; then
+    usermod -g "$_group" "$_user" || return 1
+    isoloom_changed "group of $_user"
+  fi
+  if [ -n "$_home" ] && [ "$(isoloom_passwd_field "$_user" 6)" != "$_home" ]; then
+    usermod -d "$_home" "$_user" || return 1
+    isoloom_changed "home of $_user"
+  fi
+  if [ -n "$_shell" ] && [ "$(isoloom_passwd_field "$_user" 7)" != "$_shell" ]; then
+    usermod -s "$_shell" "$_user" || return 1
+    isoloom_changed "shell of $_user"
+  fi
+  _rest=$_groups
+  while [ -n "$_rest" ]; do
+    _g=${_rest%%,*}
+    case $_rest in *,*) _rest=${_rest#*,} ;; *) _rest= ;; esac
+    id -nG "$_user" | tr ' ' '\n' | grep -qxF "$_g" && continue
+    usermod -a -G "$_g" "$_user" || return 1
+    isoloom_changed "$_user in $_g"
+  done
+}
+isoloom_restart_due() {
+  [ -n "${ISOLOOM_CHANGED:-}" ] && [ -e "$ISOLOOM_CHANGED" ]
+}
+isoloom_service() {
+  if [ -d /run/systemd/system ]; then
+    isoloom_systemd "$@"
+  elif command -v rc-service >/dev/null 2>&1 && [ -d /run/openrc ]; then
+    isoloom_openrc "$@"
+  else
+    echo "isoloom: no init system runs here: $1 is left to the container's supervisor"
+  fi
+}
+isoloom_systemd() {
+  if [ "$2" = no ]; then
+    if systemctl is-enabled --quiet "$1" 2>/dev/null; then
+      systemctl disable --quiet "$1" || return 1
+      isoloom_changed "$1 disabled"
+    fi
+    if systemctl is-active --quiet "$1"; then
+      systemctl stop "$1" || return 1
+      isoloom_changed "$1 stopped"
+    fi
+    return 0
+  fi
+  if ! systemctl is-enabled --quiet "$1" 2>/dev/null; then
+    systemctl enable --quiet "$1" || return 1
+    isoloom_changed "$1 enabled"
+  fi
+  if ! systemctl is-active --quiet "$1"; then
+    systemctl start "$1" && isoloom_changed "$1 started"
+  elif isoloom_restart_due; then
+    systemctl restart "$1" && echo "isoloom: restarted $1"
+  fi
+}
+isoloom_openrc() {
+  _enabled=$(rc-update show default | awk -v u="$1" '$1 == u { print "yes" }')
+  if [ "$2" = no ]; then
+    if [ -n "$_enabled" ]; then
+      rc-update -q del "$1" default || return 1
+      isoloom_changed "$1 disabled"
+    fi
+    if rc-service -q "$1" status >/dev/null 2>&1; then
+      rc-service -q "$1" stop || return 1
+      isoloom_changed "$1 stopped"
+    fi
+    return 0
+  fi
+  if [ -z "$_enabled" ]; then
+    rc-update -q add "$1" default || return 1
+    isoloom_changed "$1 enabled"
+  fi
+  if ! rc-service -q "$1" status >/dev/null 2>&1; then
+    rc-service -q "$1" start && isoloom_changed "$1 started"
+  elif isoloom_restart_due; then
+    rc-service -q "$1" restart && echo "isoloom: restarted $1"
+  fi
+}
+isoloom_firewall() {
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    for _port do
+      firewall-cmd -q --permanent --query-port="$_port" && continue
+      firewall-cmd -q --permanent --add-port="$_port" || return 1
+      firewall-cmd -q --add-port="$_port" || return 1
+      isoloom_changed "firewall $_port"
+    done
+  elif command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+    for _port do
+      ufw status | grep -Eq "^${_port}[[:space:]]+ALLOW" && continue
+      ufw allow "$_port" >/dev/null || return 1
+      isoloom_changed "firewall $_port"
+    done
+  fi
+}
+isoloom_first() {
+  _n=$1
+  shift
+  _i=0
+  for _arg do
+    shift
+    if [ "$_i" -lt "$_n" ]; then set -- "$@" "$_arg"; fi
+    _i=$((_i + 1))
+  done
+  "$@"
+}
+isoloom_command() {
+  _guard=$1 _n=$2
+  shift 2
+  case $_guard in
+    creates) [ -e "$1" ] && return 0 ;;
+    unless) (isoloom_first "$_n" "$@") >/dev/null 2>&1 && return 0 ;;
+    *) isoloom_fail "no guard $_guard" || return 1 ;;
+  esac
+  shift "$_n"
+  "$@" || isoloom_fail "the command $1 failed" || return 1
+  isoloom_changed "command $1"
+}
+ISOLOOM_CHANGED=/run/isoloom/configure.changed
+rm -f "$ISOLOOM_CHANGED"
+cd /opt/isoloom
+isoloom_packages 'nginx'
+isoloom_group 'site' '1600' 'no'
+# shellcheck disable=SC2016
+isoloom_user 'editor' '1600' 'site' '' '' '/bin/sh' 'no' '$6$akm4bzmJ7GlLE7UB$iaxzuoGRSRy0UV8V28D56kUKxpiLRxOC7GcBI.g0iz/23oN22qBZZlH1YNPS66l1mSQGgZjLHu0CtZiyATN2/.'
+isoloom_file '/srv/site' 'editor' '' '0755' 'directory'
+isoloom_copy 'site/' '/srv/site/' 'editor' '' ''
+isoloom_template '/etc/nginx/conf.d/site.conf' '' '' '0644' 'IyBUaGUgc2l0ZSwgZmlsbGVkIGluIGJ5IElzb2xvb20gZm9yIHdlYiAoMTAuNjYuMC4xMCkuCnNlcnZlciB7CiAgICBsaXN0ZW4gODAgZGVmYXVsdF9zZXJ2ZXI7CiAgICByb290IC9zcnYvc2l0ZTsKICAgIGluZGV4IGluZGV4Lmh0bWw7CiAgICBsb2NhdGlvbiAvYXBpLyB7CiAgICAgICAgcHJveHlfcGFzcyBodHRwOi8vMTAuNjYuMC4yMDo4MDgwLzsKICAgIH0KfQo='
+isoloom_file '/etc/nginx/sites-enabled/default' '' '' '' 'absent'
+isoloom_command 'creates' '1' '/srv/site/stamp.txt' 'sh' '-c' 'echo configured > /srv/site/stamp.txt'
+isoloom_firewall '80/tcp'
+isoloom_service 'nginx' 'yes'
+)
+### <gzip 2> decoded
+(
+set -eu
+isoloom_changed() {
+  echo "isoloom: changed $*"
+  if [ -n "${ISOLOOM_CHANGED:-}" ]; then
+    mkdir -p "${ISOLOOM_CHANGED%/*}" && : >"$ISOLOOM_CHANGED"
+  fi
+}
+isoloom_fail() {
+  echo "isoloom: $*" >&2
+  return 1
+}
+isoloom_pm() {
+  for _pm in apt-get dnf yum apk; do
+    if command -v "$_pm" >/dev/null 2>&1; then
+      echo "${_pm%-get}"
+      return 0
+    fi
+  done
+  isoloom_fail "no package manager Isoloom knows (apt-get, dnf, yum, apk)"
+}
+isoloom_installed() {
+  _name=${2%%=*}
+  _version=
+  case $2 in *=*) _version=${2#*=} ;; esac
+  case $1 in
+    apt)
+      # shellcheck disable=SC2016 # dpkg-query's own fields, not the shell's.
+      _have=$(dpkg-query -W -f='${Status} ${Version}' "$_name" 2>/dev/null) || return 1
+      case $_have in "install ok installed "*) ;; *) return 1 ;; esac
+      [ -z "$_version" ] || [ "${_have#install ok installed }" = "$_version" ]
+      ;;
+    dnf | yum)
+      if [ -z "$_version" ]; then
+        rpm -q --whatprovides "$_name" >/dev/null 2>&1
+      else
+        rpm -q "$_name-$_version" >/dev/null 2>&1
+      fi
+      ;;
+    apk)
+      if [ -z "$_version" ]; then
+        apk info -e "$_name" >/dev/null 2>&1
+      else
+        apk list --installed "$_name" 2>/dev/null | grep -q "^$_name-$_version "
+      fi
+      ;;
+    *) return 1 ;;
+  esac
+}
+isoloom_install() {
+  _pm=$1
+  shift
+  case $_pm in
+    apt)
+      apt-get update -qq &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "$@" >/dev/null &&
+        apt-get clean && rm -rf /var/lib/apt/lists/*
+      ;;
+    dnf | yum)
+      for _spec do
+        shift
+        case $_spec in
+          *=*) set -- "$@" "${_spec%%=*}-${_spec#*=}" ;;
+          *) set -- "$@" "$_spec" ;;
+        esac
+      done
+      "$_pm" install -y -q "$@" >/dev/null && "$_pm" clean all >/dev/null
+      ;;
+    apk) apk add --no-cache -q "$@" ;;
+    *) return 1 ;;
+  esac
+}
+isoloom_packages() {
+  _pm=$(isoloom_pm) || return 1
+  for _spec do
+    shift
+    isoloom_installed "$_pm" "$_spec" || set -- "$@" "$_spec"
+  done
+  [ "$#" -eq 0 ] && return 0
+  isoloom_install "$_pm" "$@" || isoloom_fail "installing $* failed" || return 1
+  isoloom_changed "packages $*"
+}
+isoloom_sha256() {
+  sha256sum "$1" | cut -d ' ' -f 1
+}
+isoloom_put() {
+  if [ -f "$2" ] && [ ! -L "$2" ] && [ "$(isoloom_sha256 "$1")" = "$(isoloom_sha256 "$2")" ]; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$2")" && rm -rf "$2" && cp "$1" "$2" || isoloom_fail "writing $2 failed" || return 1
+  isoloom_changed "$2"
+}
+isoloom_text() {
+  _tmp=$(mktemp) || return 1
+  printf '%s' "$2" >"$_tmp" && isoloom_put "$_tmp" "$1"
+  _status=$?
+  rm -f "$_tmp"
+  return "$_status"
+}
+isoloom_attrs() {
+  _owner=$2
+  _group=$3
+  if [ -n "$_owner" ] && [ -z "$_group" ]; then
+    _group=$(id -gn "$_owner") || return 1
+  fi
+  if [ -n "$_owner" ] && [ "$(stat -c %U "$1")" != "$_owner" ]; then
+    chown -h "$_owner" "$1" || return 1
+    isoloom_changed "owner of $1"
+  fi
+  if [ -n "$_group" ] && [ "$(stat -c %G "$1")" != "$_group" ]; then
+    chgrp -h "$_group" "$1" || return 1
+    isoloom_changed "group of $1"
+  fi
+  if [ -n "$4" ]; then
+    _want=${4#"${4%%[!0]*}"}
+    if [ "$(stat -c %a "$1")" != "${_want:-0}" ]; then
+      chmod "$4" "$1" || return 1
+      isoloom_changed "mode of $1"
+    fi
+  fi
+}
+isoloom_copy() {
+  case $1 in
+    */) ;;
+    *)
+      isoloom_put "$1" "$2" && isoloom_attrs "$2" "$3" "$4" "$5"
+      return
+      ;;
+  esac
+  [ -d "$1" ] || isoloom_fail "$1 is no folder" || return 1
+  if [ ! -d "$2" ]; then
+    mkdir -p "$2" || return 1
+    isoloom_changed "$2"
+  fi
+  (cd "$1" && find . -mindepth 1) | while IFS= read -r _entry; do
+    _from="$1/${_entry#./}"
+    _to="${2%/}/${_entry#./}"
+    if [ -d "$_from" ] && [ ! -L "$_from" ]; then
+      if [ ! -d "$_to" ]; then
+        mkdir -p "$_to" || exit 1
+        isoloom_changed "$_to"
+      fi
+    else
+      isoloom_put "$_from" "$_to" || exit 1
+    fi
+    isoloom_attrs "$_to" "$3" "$4" "$5" || exit 1
+  done
+}
+isoloom_restart_due() {
+  [ -n "${ISOLOOM_CHANGED:-}" ] && [ -e "$ISOLOOM_CHANGED" ]
+}
+isoloom_unit() {
+  case $2 in
+    '#!/sbin/openrc-run'*)
+      isoloom_text "/etc/init.d/$1" "$2" && isoloom_attrs "/etc/init.d/$1" root root 0755
+      ;;
+    *)
+      _unit=/etc/systemd/system/$1.service
+      _old=
+      [ ! -f "$_unit" ] || _old=$(isoloom_sha256 "$_unit")
+      isoloom_text "$_unit" "$2" || return 1
+      if [ "$_old" != "$(isoloom_sha256 "$_unit")" ] && [ -d /run/systemd/system ]; then
+        systemctl daemon-reload
+      fi
+      ;;
+  esac
+}
+isoloom_service() {
+  if [ -d /run/systemd/system ]; then
+    isoloom_systemd "$@"
+  elif command -v rc-service >/dev/null 2>&1 && [ -d /run/openrc ]; then
+    isoloom_openrc "$@"
+  else
+    echo "isoloom: no init system runs here: $1 is left to the container's supervisor"
+  fi
+}
+isoloom_systemd() {
+  if [ "$2" = no ]; then
+    if systemctl is-enabled --quiet "$1" 2>/dev/null; then
+      systemctl disable --quiet "$1" || return 1
+      isoloom_changed "$1 disabled"
+    fi
+    if systemctl is-active --quiet "$1"; then
+      systemctl stop "$1" || return 1
+      isoloom_changed "$1 stopped"
+    fi
+    return 0
+  fi
+  if ! systemctl is-enabled --quiet "$1" 2>/dev/null; then
+    systemctl enable --quiet "$1" || return 1
+    isoloom_changed "$1 enabled"
+  fi
+  if ! systemctl is-active --quiet "$1"; then
+    systemctl start "$1" && isoloom_changed "$1 started"
+  elif isoloom_restart_due; then
+    systemctl restart "$1" && echo "isoloom: restarted $1"
+  fi
+}
+isoloom_openrc() {
+  _enabled=$(rc-update show default | awk -v u="$1" '$1 == u { print "yes" }')
+  if [ "$2" = no ]; then
+    if [ -n "$_enabled" ]; then
+      rc-update -q del "$1" default || return 1
+      isoloom_changed "$1 disabled"
+    fi
+    if rc-service -q "$1" status >/dev/null 2>&1; then
+      rc-service -q "$1" stop || return 1
+      isoloom_changed "$1 stopped"
+    fi
+    return 0
+  fi
+  if [ -z "$_enabled" ]; then
+    rc-update -q add "$1" default || return 1
+    isoloom_changed "$1 enabled"
+  fi
+  if ! rc-service -q "$1" status >/dev/null 2>&1; then
+    rc-service -q "$1" start && isoloom_changed "$1 started"
+  elif isoloom_restart_due; then
+    rc-service -q "$1" restart && echo "isoloom: restarted $1"
+  fi
+}
+ISOLOOM_CHANGED=/run/isoloom/configure.changed
+rm -f "$ISOLOOM_CHANGED"
+cd /opt/isoloom
+isoloom_packages 'python3'
+isoloom_copy 'api/' '/srv/api/' '' '' ''
+isoloom_unit 'api-status' '[Unit]
+Description=api-status, defined by Isoloom
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart="python3" "-m" "http.server" "8080" "--directory" "/srv/api"
+User=nobody
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+'
+isoloom_service 'api-status' 'yes'
+isoloom_unit 'api-health' '[Unit]
+Description=api-health, defined by Isoloom
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart="python3" "-m" "http.server" "8081" "--directory" "/srv/api"
+WorkingDirectory=/srv/api
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+'
+isoloom_service 'api-health' 'yes'
+)
 
 ## .isoloom/resolved.json: identical in the `docker` snapshot

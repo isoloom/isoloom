@@ -663,6 +663,7 @@ name = "isoloom"
 version = "3.0.0"
 dependencies = [
  "clap",
+ "flate2",
  "insta",
  "isoloom-catalogue",
  "isoloom-import",

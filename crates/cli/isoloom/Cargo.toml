@@ -38,6 +38,8 @@ serde_yaml_ng.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+# The snapshots show a gzipped value as what it holds.
+flate2.workspace = true
 insta.workspace = true
 isoloom-test-support.workspace = true
 tempfile.workspace = true
