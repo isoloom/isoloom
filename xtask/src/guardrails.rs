@@ -10,7 +10,10 @@
 //! - a tool's JSON output is parsed only in the adapter that runs the tool.
 //!
 //! The product's sources are the crates' `src/` folders, tests left out (`tests/`, `tests.rs`, a
-//! file from its first `#[cfg(test)]` on, the tests' helpers).
+//! file from its first `#[cfg(test)]` on, the tests' helpers). The tests' own sources have theirs
+//! in [`flakes`]: no wait on the clock, no free port let go before it is used.
+
+mod flakes;
 
 use std::path::{Path, PathBuf};
 

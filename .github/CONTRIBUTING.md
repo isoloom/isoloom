@@ -166,10 +166,26 @@ module's name says the area (`cloud_docker`, `refusals`), not `tests2` or `misc`
   reads no host path, user or locale. `cargo xtask test` runs the tests in a temporary folder of
   their own and fails when they leave anything in it (`ISOLOOM_KEEP_TEMP=1` keeps that folder to
   look at).
-- A test waits on an event or polls to a deadline, never a bare `sleep`.
+- A test waits on a condition or an event (a channel, a child's exit, a file appearing), never a
+  wall-clock `sleep`; a poll has a generous deadline, there only to stop a hang, never to time
+  the thing it waits for. A `sleep` that is no wait (a stand-in answering late on purpose, the
+  poll inside a bounded wait) is counted in `xtask/src/guardrails/flakes.rs` with its reason, so a
+  new one fails `cargo test -p xtask`.
+- A free port is held from the moment it is picked until it is used: bind to port 0 and hand the
+  listener (or its port, while the listener is still held) to what uses it. A port read off a
+  listener and then let go is anyone's, and another test takes it first under load. The same
+  guardrail fails a listener on port 0 dropped or read and let go in the same statement.
 - A tool the test runs is a stand-in (`FakeBin`) unless the real tool is the point; then the test
   is ``#[ignore = "needs <tool>: <why>; `cargo xtask test` runs it"]``, so a machine without it
   lists it as ignored with its reason, and `cargo xtask test` runs it.
+- A stand-in program is written once per test run and linked (or pointed to) from each test that
+  runs it, not written fresh by every test: macOS checks every new program the first time it
+  runs, which takes seconds on a loaded machine and turns a test's own timeout into a flake.
+  The stand-ins `FakeBin` writes per test today are the ones to move first.
+- Each test owns its temporary folders and its environment: it never changes this process's
+  environment (`std::env::set_var` is `unsafe` and the workspace forbids `unsafe`), and gives a
+  process it starts the variables it needs (`Command::env`, `env_clear`), so tests running side by
+  side can't see each other's.
 
 ## Commits and pull requests
 
