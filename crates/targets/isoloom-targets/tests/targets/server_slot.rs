@@ -5,7 +5,9 @@
 use isoloom_spec::model::Target;
 use isoloom_targets::generate;
 
-use crate::testing::{Outcome, between, example};
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_nested, hcl_text};
+
+use crate::testing::{Outcome, example};
 
 #[test]
 fn every_server_module_checks_its_slot_against_the_range_it_describes() -> Outcome {
@@ -13,17 +15,20 @@ fn every_server_module_checks_its_slot_against_the_range_it_describes() -> Outco
     let mut modules = 0;
     for target in [Target::Proxmox, Target::Esxi] {
         for f in generate(&lab, target)?.iter().filter(|f| f.path.ends_with("main.tf")) {
-            let Ok(slot) = between(&f.contents, "variable \"slot\" {", "\n}\n") else {
+            let body = hcl_body(&f.contents);
+            let Some(slot) = hcl_blocks(&body, "variable", &["slot"]).first().map(|b| b.body().clone()) else {
                 continue;
             };
-            let described = between(slot, "description = \"1 to ", ",")?;
-            let max: u64 = described.trim_start_matches("description = \"1 to ").parse()?;
-            assert!(
-                slot.contains(&format!("condition     = var.slot >= 1 && var.slot <= {max}")),
-                "{}: {slot}",
-                f.path
-            );
-            assert!(slot.contains(&format!("error_message = \"slot is 1 to {max}.\"")), "{}: {slot}", f.path);
+            let description = hcl_text(&slot, "description");
+            let max: u64 = description
+                .strip_prefix("1 to ")
+                .and_then(|r| r.split(',').next())
+                .ok_or_else(|| format!("{}: {description}", f.path))?
+                .parse()?;
+            let validation = hcl_nested(&slot, "validation");
+            let validation = validation.first().ok_or("no validation")?.body();
+            assert_eq!(hcl_text(validation, "condition"), format!("var.slot >= 1 && var.slot <= {max}"), "{}", f.path);
+            assert_eq!(hcl_text(validation, "error_message"), format!("slot is 1 to {max}."), "{}", f.path);
             modules += 1;
         }
     }

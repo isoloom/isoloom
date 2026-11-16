@@ -5,7 +5,9 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Lab, refusal, refusal_on};
 
-use crate::testing::{Outcome, generated as file, valid_allowed};
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+
+use crate::testing::{Outcome, define, generated as file, vagrantfile, valid_allowed};
 
 /// Machine `web` with `fields` beside its network, `others` (more machines, as YAML lines) and
 /// the spec's `overrides` (YAML lines).
@@ -47,28 +49,43 @@ const IMAGES: &str = "overrides:
 #[test]
 fn every_target_boots_the_machines_own_image() -> Outcome {
     let s = build(DEBIAN, "", IMAGES)?;
-    let vagrant = file(&s, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(vagrant.contains("m.vm.box = \"lab/debian\""), "{vagrant}");
-    assert!(vagrant.contains("m.vm.box_url = \"https://boxes.example/d.box\""));
-    assert!(vagrant.contains("m.vm.box_server_url = \"https://boxes.example\""));
-    let proxmox = file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    assert!(proxmox.contains("resource \"proxmox_download_file\" \"web_image\""), "{proxmox}");
-    assert!(proxmox.contains("url                 = \"https://images.example/d.qcow2\""), "{proxmox}");
-    assert!(proxmox.contains("file_id      = proxmox_download_file.web_image.id"), "{proxmox}");
-    let cloud = |c: &str| file(&s, Target::CloudVm, &format!(".isoloom/cloud-vm/{c}/main.tf"));
-    for (c, line) in [
-        ("aws", "= \"ami-0abc\""),
-        ("azure", "source_image_id = \"/subscriptions/s/"),
-        ("gcp", "image = \"projects/p/global/images/d\""),
-        ("digitalocean", "= \"4242\""),
-        ("linode", "= \"private/42\""),
-        ("oci", "= \"ocid1.image.oc1..d\""),
+    let vf = vagrantfile(&s)?;
+    assert_eq!(
+        define(&vf, "web").statements("m.vm.box"),
+        [
+            "m.vm.box = \"lab/debian\"",
+            "m.vm.box_url = \"https://boxes.example/d.box\"",
+            "m.vm.box_server_url = \"https://boxes.example\""
+        ]
+    );
+    let proxmox = hcl_body(&file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?);
+    assert_eq!(
+        hcl_text(hcl_one(&proxmox, "proxmox_download_file", "web_image"), "url"),
+        "https://images.example/d.qcow2"
+    );
+    let disks = hcl_nested(hcl_one(&proxmox, "proxmox_virtual_environment_vm", "web"), "disk");
+    let file_ids: Vec<String> = disks.iter().map(|d| hcl_text(d.body(), "file_id")).collect();
+    assert_eq!(file_ids, ["proxmox_download_file.web_image.id"]);
+    let cloud = |c: &str| -> Outcome<isoloom_test_support::hcl::Body> { Ok(hcl_body(&file(&s, Target::CloudVm, &format!(".isoloom/cloud-vm/{c}/main.tf"))?)) };
+    for (c, kind, key, image) in [
+        ("aws", "aws_instance", "ami", "ami-0abc"),
+        (
+            "azure",
+            "azurerm_linux_virtual_machine",
+            "source_image_id",
+            "/subscriptions/s/resourceGroups/g/providers/Microsoft.Compute/images/d",
+        ),
+        ("gcp", "google_compute_instance", "image", "projects/p/global/images/d"),
+        ("digitalocean", "digitalocean_droplet", "image", "4242"),
+        ("linode", "linode_instance", "image", "private/42"),
+        ("oci", "oci_core_instance", "source_id", "ocid1.image.oc1..d"),
     ] {
-        let text = cloud(c)?;
-        assert!(text.contains(line), "{c}: {text}");
+        let module = cloud(c)?;
+        assert_eq!(hcl_values(hcl_one(&module, kind, "web"), key), [image], "{c}");
     }
-    assert!(
-        !cloud("aws")?.contains("data \"aws_ami\" \"debian_12\""),
+    assert_eq!(
+        hcl_blocks(&cloud("aws")?, "data", &["aws_ami"]).len(),
+        0,
         "no lookup for an OS no machine boots"
     );
     Ok(())
@@ -77,7 +94,8 @@ fn every_target_boots_the_machines_own_image() -> Outcome {
 #[test]
 fn a_proxmox_template_is_cloned_and_an_own_image_stands_in_for_the_os() -> Outcome {
     let kali = spec("os: kali, app: { steps: [{ run: s.sh }] }")?;
-    assert!(refusal(&kali, Target::Proxmox).unwrap().unwrap().contains("no Proxmox image for `kali`"));
+    let why = refusal(&kali, Target::Proxmox)?.ok_or("Kali has no Proxmox image")?;
+    assert!(why.contains("no Proxmox image for `kali`"), "{why}");
     // Kali is an AWS OS (its Marketplace image): only Proxmox needs the machine's own image.
     assert_eq!(refusal(&kali, Target::CloudVm).unwrap(), None);
     let s = build(
@@ -85,9 +103,12 @@ fn a_proxmox_template_is_cloned_and_an_own_image_stands_in_for_the_os() -> Outco
         "",
         "overrides:\n  proxmox: { machines: { web: { image: '9000' } } }\n  aws: { machines: { web: { image: ami-0abc } } }\n",
     )?;
-    let proxmox = file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    assert!(proxmox.contains("  clone {\n    vm_id = 9000\n    full  = true\n  }"), "{proxmox}");
-    assert!(!proxmox.contains("proxmox_download_file.kali"), "{proxmox}");
+    let proxmox = hcl_body(&file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?);
+    let clone = hcl_nested(hcl_one(&proxmox, "proxmox_virtual_environment_vm", "web"), "clone");
+    let cloned: Vec<(String, String)> = clone.iter().map(|c| (hcl_text(c.body(), "vm_id"), hcl_text(c.body(), "full"))).collect();
+    assert_eq!(cloned, [("9000".to_owned(), "true".to_owned())]);
+    let downloads = hcl_names(&proxmox, "resource", "proxmox_download_file");
+    assert!(!downloads.iter().any(|d| d.contains("kali")), "no Kali image to download: {downloads:?}");
     assert_eq!(refusal(&s, Target::CloudVm).unwrap(), None);
     Ok(())
 }
@@ -96,19 +117,31 @@ const BOOT: &str = "{ kernel: /srv/vmlinuz, initrd: /srv/initrd, cmdline: consol
 
 #[test]
 fn libvirt_boots_the_machines_own_way() -> Outcome {
-    let vagrant = file(&spec(&boot(BOOT))?, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    for line in [
+    let vf = vagrantfile(&spec(&boot(BOOT))?)?;
+    let web = define(&vf, "web");
+    let libvirt = web.block("m.vm.provider \"libvirt\"").every_statement();
+    for statement in [
         "v.kernel = \"/srv/vmlinuz\"",
         "v.initrd = \"/srv/initrd\"",
         "v.cmd_line = \"console=ttyS0\"",
         "v.loader = \"/usr/share/OVMF/OVMF_CODE.fd\"",
         "v.nvram = \"/srv/web_VARS.fd\"",
-        "v.boot \"network\"\n      v.boot \"hd\"",
-        "v.firmware_format = \"qcow2\"",
-        "libvirt__dhcp_enabled: true, libvirt__tftp_root: \"/srv/tftp\", libvirt__dhcp_bootp_file: \"pxelinux.0\", libvirt__dhcp_bootp_server: \"10.30.0.1\"",
     ] {
-        assert!(vagrant.contains(line), "{line}\n{vagrant}");
+        assert!(libvirt.contains(&statement), "{statement}: {libvirt:?}");
     }
+    // QEMU's provider takes the firmware's format.
+    let qemu = web.block("m.vm.provider \"qemu\"").every_statement();
+    assert!(qemu.contains(&"v.firmware_format = \"qcow2\""), "{qemu:?}");
+    let order: Vec<&&str> = libvirt.iter().filter(|s| s.starts_with("v.boot ")).collect();
+    assert_eq!(order, [&"v.boot \"network\"", &"v.boot \"hd\""]);
+    let tftp =
+        "libvirt__dhcp_enabled: true, libvirt__tftp_root: \"/srv/tftp\", libvirt__dhcp_bootp_file: \"pxelinux.0\", libvirt__dhcp_bootp_server: \"10.30.0.1\"";
+    assert!(
+        web.every_statement()
+            .iter()
+            .any(|s| s.starts_with("m.vm.network \"private_network\"") && s.contains(tftp)),
+        "{web:?}"
+    );
     Ok(())
 }
 
@@ -116,22 +149,22 @@ fn libvirt_boots_the_machines_own_way() -> Outcome {
 fn a_target_or_provider_that_boots_the_image_as_it_is_refuses_and_says_why() -> Outcome {
     let s = spec(&boot(BOOT))?;
     assert_eq!(refusal_on(&s, Target::Vagrant, Some("libvirt")).unwrap(), None);
-    let vbox = refusal_on(&s, Target::Vagrant, Some("virtualbox")).unwrap().unwrap();
+    let vbox = refusal_on(&s, Target::Vagrant, Some("virtualbox"))?.ok_or("virtualbox boots it")?;
     assert!(vbox.contains("Vagrant's virtualbox provider boots the box as it is"), "{vbox}");
-    let qemu = refusal_on(&pair(&boot(BOOT))?, Target::Vagrant, Some("qemu")).unwrap().unwrap();
+    let qemu = refusal_on(&pair(&boot(BOOT))?, Target::Vagrant, Some("qemu"))?.ok_or("qemu boots it")?;
     assert!(qemu.contains("`hardware.boot.kernel`, `hardware.boot.initrd`"), "{qemu}");
     assert_eq!(
         refusal_on(&pair(&boot("{ firmware_format: raw }"))?, Target::Vagrant, Some("qemu")).unwrap(),
         None
     );
-    let cloud = refusal(&s, Target::CloudVm).unwrap().unwrap();
+    let cloud = refusal(&s, Target::CloudVm)?.ok_or("the clouds boot it")?;
     assert!(cloud.contains("machine `web` boots its own way (`hardware.boot`)"), "{cloud}");
-    let proxmox = refusal(&s, Target::Proxmox).unwrap().unwrap();
+    let proxmox = refusal(&s, Target::Proxmox)?.ok_or("Proxmox boots it")?;
     assert!(
         proxmox.contains("machine `web` sets `hardware.boot.kernel`: Proxmox boots the VM's disk"),
         "{proxmox}"
     );
-    let cdrom = refusal(&spec(&boot("{ order: [cdrom] }"))?, Target::Proxmox).unwrap().unwrap();
+    let cdrom = refusal(&spec(&boot("{ order: [cdrom] }"))?, Target::Proxmox)?.ok_or("Proxmox boots a CD-ROM")?;
     assert!(cdrom.contains("no CD-ROM drive"), "{cdrom}");
     Ok(())
 }
@@ -139,16 +172,19 @@ fn a_target_or_provider_that_boots_the_image_as_it_is_refuses_and_says_why() -> 
 #[test]
 fn proxmox_boots_uefi_in_the_machines_order() -> Outcome {
     let s = spec(&boot("{ firmware: uefi, firmware_format: qcow2, order: [network, hd] }"))?;
-    let proxmox = file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    for line in [
-        "= \"ovmf\"",
-        "file_format       = \"qcow2\"",
-        "pre_enrolled_keys = false",
-        "boot_order = [\"net0\", \"virtio0\"]",
-    ] {
-        assert!(proxmox.contains(line), "{line}\n{proxmox}");
-    }
-    let bios = file(&spec(&boot("{ firmware: bios }"))?, Target::Proxmox, ".isoloom/proxmox/main.tf")?;
-    assert!(bios.contains("= \"seabios\"") && !bios.contains("efi_disk"), "{bios}");
+    let proxmox = hcl_body(&file(&s, Target::Proxmox, ".isoloom/proxmox/main.tf")?);
+    let vm = hcl_one(&proxmox, "proxmox_virtual_environment_vm", "web");
+    assert_eq!(hcl_text(vm, "bios"), "ovmf");
+    let efi = hcl_nested(vm, "efi_disk");
+    let efi: Vec<(String, String)> = efi
+        .iter()
+        .map(|e| (hcl_text(e.body(), "file_format"), hcl_text(e.body(), "pre_enrolled_keys")))
+        .collect();
+    assert_eq!(efi, [("qcow2".to_owned(), "false".to_owned())]);
+    assert_eq!(hcl_values(vm, "boot_order"), ["net0", "virtio0"]);
+    let bios = hcl_body(&file(&spec(&boot("{ firmware: bios }"))?, Target::Proxmox, ".isoloom/proxmox/main.tf")?);
+    let bios_vm = hcl_one(&bios, "proxmox_virtual_environment_vm", "web");
+    assert_eq!(hcl_text(bios_vm, "bios"), "seabios");
+    assert_eq!(hcl_nested(bios_vm, "efi_disk").len(), 0, "no EFI disk");
     Ok(())
 }

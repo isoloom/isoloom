@@ -46,7 +46,9 @@ fn a_server_guide_says_its_offline_networks_are_sealed_as_the_module_does() -> O
     for (target, page) in [(Target::Proxmox, "proxmox"), (Target::Esxi, "esxi")] {
         let files = isoloom_targets::generate(&lab, target)?;
         let module = crate::testing::file(&files, &format!(".isoloom/{page}/main.tf"))?;
-        assert!(module.contains("resource \"terraform_data\" \"isoloom_seal\""), "{page}: the module seals");
+        let body = isoloom_test_support::hcl_body(module);
+        let data = isoloom_test_support::hcl_names(&body, "resource", "terraform_data");
+        assert!(data.contains(&"isoloom_seal".to_owned()), "{page}: the module seals: {data:?}");
         let text = guide(page)?;
         let paragraphs = paragraphs(&text);
         let says_sealed = paragraphs

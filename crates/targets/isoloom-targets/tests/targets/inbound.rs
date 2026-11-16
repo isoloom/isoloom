@@ -5,46 +5,41 @@
 use isoloom_spec::model::Target;
 use isoloom_targets::{Lab, generate, refusal};
 
+use isoloom_test_support::{hcl, hcl_attribute, hcl_body, hcl_literals, hcl_text, hcl_values};
+
 use crate::testing::{Outcome, examples};
 
-/// The blocks that hold one inbound rule, by the line that opens them; those that hold a rule of
-/// either direction are inbound when their body says so.
-const INBOUND: [&str; 4] = ["ingress {", "inbound {", "inbound_rule {", "ingress_security_rules {"];
-const EITHER: [&str; 3] = [
-    "security_rule {",
-    "resource \"google_compute_firewall\"",
-    "resource \"oci_core_network_security_group_security_rule\"",
-];
+/// The blocks that hold one inbound rule; those that hold a rule of either direction (a
+/// resource's type, or a block's name) are inbound when their `direction` says so.
+const INBOUND: [&str; 4] = ["ingress", "inbound", "inbound_rule", "ingress_security_rules"];
+const EITHER: [&str; 3] = ["security_rule", "google_compute_firewall", "oci_core_network_security_group_security_rule"];
 
-/// The block that opens on the line at `start` of `text`, to its closing brace.
-fn block(text: &str, start: usize) -> &str {
-    let rest = text.get(start..).unwrap_or_default();
-    let mut depth = 0;
-    for (i, c) in rest.char_indices() {
-        match c {
-            '{' => depth += 1,
-            '}' if depth == 1 => return rest.get(..=i).unwrap_or(rest),
-            '}' => depth -= 1,
-            _ => {}
-        }
-    }
-    rest
+/// One inbound rule: every literal it holds, Azure's source prefix, and its description.
+struct Rule {
+    literals: Vec<String>,
+    azure_sources: Vec<String>,
+    description: Option<String>,
 }
 
-/// Every inbound rule of the Terraform module `text`, its whitespace folded.
-fn inbound_rules(text: &str) -> Vec<String> {
-    let mut at = 0;
+/// Every inbound rule of the parsed module `body`, its nested blocks searched.
+fn inbound_rules(body: &hcl::Body) -> Vec<Rule> {
     let mut out = Vec::new();
-    for line in text.split_inclusive('\n') {
-        let opens = line.trim();
-        if INBOUND.contains(&opens) || EITHER.iter().any(|e| opens.starts_with(e)) {
-            let body = block(text, at).split_whitespace().collect::<Vec<_>>().join(" ");
-            let inbound = INBOUND.contains(&opens) || body.contains("direction = \"Inbound\"") || body.contains("direction = \"INGRESS\"");
-            if inbound {
-                out.push(body);
-            }
+    for block in body.blocks() {
+        let kind = match block.identifier() {
+            "resource" => block.labels().first().map(|l| l.as_str().to_owned()).unwrap_or_default(),
+            other => other.to_owned(),
+        };
+        let direction = hcl_values(block.body(), "direction");
+        let inbound = INBOUND.contains(&kind.as_str()) || (EITHER.contains(&kind.as_str()) && direction.iter().any(|d| d == "Inbound" || d == "INGRESS"));
+        if inbound {
+            out.push(Rule {
+                literals: hcl_literals(block.body()),
+                azure_sources: hcl_values(block.body(), "source_address_prefix"),
+                description: hcl_attribute(block.body(), "description").map(|_| hcl_text(block.body(), "description")),
+            });
+        } else {
+            out.extend(inbound_rules(block.body()));
         }
-        at += line.len();
     }
     out
 }
@@ -66,18 +61,12 @@ fn no_cloud_rule_lets_the_whole_internet_in_but_path_mtu_discovery() -> Outcome 
                 .iter()
                 .filter(|f| std::path::Path::new(&f.path).extension().is_some_and(|e| e == "tf"))
             {
-                for rule in inbound_rules(&f.contents) {
+                for rule in inbound_rules(&hcl_body(&f.contents)) {
                     rules += 1;
-                    let anywhere = [
-                        "\"0.0.0.0/0\"",
-                        "\"::/0\"",
-                        "source_address_prefix = \"*\"",
-                        "source_address_prefix = \"Internet\"",
-                    ]
-                    .iter()
-                    .any(|a| rule.contains(a));
-                    let path_mtu = rule.contains("description = \"path MTU discovery\"") && f.path.contains("/oci/");
-                    assert!(!anywhere || path_mtu, "{}: {}: {rule}", dir.display(), f.path);
+                    let anywhere =
+                        rule.literals.iter().any(|l| l == "0.0.0.0/0" || l == "::/0") || rule.azure_sources.iter().any(|s| s == "*" || s == "Internet");
+                    let path_mtu = rule.description.as_deref() == Some("path MTU discovery") && f.path.contains("/oci/");
+                    assert!(!anywhere || path_mtu, "{}: {}: {:?}", dir.display(), f.path, rule.literals);
                 }
             }
         }

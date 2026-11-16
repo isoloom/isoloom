@@ -3,9 +3,10 @@
 
 use isoloom_spec::syntax::Tpm;
 use isoloom_spec::{Spec, Target, parse};
-use isoloom_targets::{Lab, generate, refusal};
+use isoloom_targets::{Lab, refusal};
+use isoloom_test_support::{manifest, named, yaml_at, yaml_documents, yaml_str};
 
-use crate::testing::{Outcome, generated, source};
+use crate::testing::{Outcome, cloud_config, define, generated, provisioners, set_up, source, strings, vagrantfile};
 
 /// The tuned-web example.
 fn tuned() -> Outcome<Spec> {
@@ -27,7 +28,7 @@ fn file(spec: &Spec, t: Target, suffix: &str) -> Outcome<String> {
 
 #[test]
 fn compose_sets_them_on_the_container() -> Outcome {
-    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&file(&tuned_container()?, Target::Docker, "compose.yml")?).unwrap();
+    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&file(&tuned_container()?, Target::Docker, "compose.yml")?)?;
     let web = &doc["services"]["web"];
     assert_eq!(web["environment"]["APP_MODE"].as_str(), Some("production"));
     assert_eq!(web["sysctls"]["net.core.somaxconn"].as_str(), Some("4096"));
@@ -39,9 +40,12 @@ fn compose_sets_them_on_the_container() -> Outcome {
 #[test]
 fn every_vm_target_runs_the_same_settings_before_the_steps() -> Outcome {
     let spec = tuned()?;
-    let vf = file(&spec, Target::Vagrant, "vagrant/Vagrantfile")?;
-    let settings = vf.find("name: \"settings\"").expect("the settings step");
-    assert!(settings < vf.find("name: \"provision/web.sh\"").unwrap());
+    let vf = vagrantfile(&Lab::new(spec.clone()))?;
+    let web = define(&vf, "web");
+    let steps = provisioners(web);
+    let at = |name: &str| steps.iter().position(|s| s == name).ok_or_else(|| format!("no `{name}` step in {steps:?}"));
+    assert!(at("settings")? < at("provision/web.sh")?, "{steps:?}");
+    let settings = web.statements("m.vm.provision \"shell\", name: \"settings\"").concat();
     for needle in [
         "APP_MODE=production",
         "net.core.somaxconn = 4096",
@@ -49,31 +53,31 @@ fn every_vm_target_runs_the_same_settings_before_the_steps() -> Outcome {
         "DefaultLimitNOFILE=8192:16384",
         "daemon-reexec",
     ] {
-        assert!(vf.contains(needle), "Vagrant: {needle}");
+        assert!(settings.contains(needle), "Vagrant: {needle}: {settings}");
     }
-    let pve = file(&spec, Target::Proxmox, "proxmox/main.tf")?;
-    assert!(pve.contains("net.core.somaxconn = 4096"), "Proxmox runcmd");
+    let pve = strings(&cloud_config(&file(&spec, Target::Proxmox, "proxmox/main.tf")?, "web")?, "runcmd");
+    assert!(pve.iter().any(|c| c.contains("net.core.somaxconn = 4096")), "Proxmox runcmd: {pve:?}");
     // Linode gives no TPM, which the machine asks for: its module is left out.
     for cloud in ["aws", "azure", "gcp", "oci"] {
-        let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
-        assert!(tf.contains("{ sh -c 'set -e") && tf.contains("APP_MODE=production"), "{cloud}");
+        let script = set_up(&file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?, "web")?;
+        assert!(
+            script.contains("{ sh -c 'set -e") && script.contains("APP_MODE=production"),
+            "{cloud}: {script}"
+        );
     }
     Ok(())
 }
 
 #[test]
 fn kubernetes_refuses_ulimits_and_sets_the_rest() -> Outcome {
-    assert!(
-        refusal(&Lab::new(tuned_container()?), Target::Kubernetes)
-            .unwrap()
-            .unwrap()
-            .contains("process limits")
-    );
+    let why = refusal(&Lab::new(tuned_container()?), Target::Kubernetes)?.ok_or("ulimits refused")?;
+    assert!(why.contains("process limits"), "{why}");
     let mut spec = tuned_container()?;
     spec.machines["web"].ulimits.clear();
-    let all: String = generate(&Lab::new(spec), Target::Kubernetes).unwrap().into_iter().map(|f| f.contents).collect();
-    assert!(all.contains("name: APP_MODE") && all.contains("value: production"));
-    assert!(all.contains("name: net.core.somaxconn"));
+    let docs = yaml_documents(&file(&spec, Target::Kubernetes, "kubernetes/environment.yaml")?);
+    let pod = yaml_at(manifest(&docs, "Deployment", "web"), "spec.template.spec").ok_or("no pod")?;
+    assert_eq!(yaml_str(named(named(pod, "containers", "web"), "env", "APP_MODE"), "value"), "production");
+    assert_eq!(yaml_str(named(pod, "securityContext.sysctls", "net.core.somaxconn"), "value"), "4096");
     Ok(())
 }
 

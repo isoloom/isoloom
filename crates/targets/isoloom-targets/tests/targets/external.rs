@@ -16,16 +16,15 @@ fn a_spec_with_addresses_on_every_machine_gets_the_external_target() -> Outcome 
     assert_eq!(spec.problems(), vec![]);
     let ids: Vec<&str> = spec.possible().into_iter().map(Target::id).collect();
     assert!(ids.contains(&"external") && ids.contains(&"vagrant"), "{ids:?}");
-    let files = generate(&spec, Target::External).unwrap();
-    let inv = &files.iter().find(|f| f.path == ".isoloom/external/inventory.ini").unwrap().contents;
-    assert!(
-        inv.contains("web ansible_host=192.168.1.20 ansible_user=admin ansible_ssh_private_key_file=~/.ssh/id_ed25519"),
-        "{inv}"
-    );
+    let files = generate(&spec, Target::External)?;
+    let inv = isoloom_test_support::ini_groups(crate::testing::file(&files, ".isoloom/external/inventory.ini")?);
+    let web = "web ansible_host=192.168.1.20 ansible_user=admin ansible_ssh_private_key_file=~/.ssh/id_ed25519";
+    assert!(inv.values().any(|hosts| hosts.iter().any(|h| h == web)), "{inv:?}");
     assert!(!files.iter().any(|f| f.path.ends_with("machines.json")), "no file for a runner that reads none");
     // Derived checks run from each machine; probes only.
-    let web = &files.iter().find(|f| f.path == ".isoloom/external/checks/web.sh").unwrap().contents;
-    assert!(web.contains("_tcp '192.168.1.21' 6379"), "{web}");
+    let runner = crate::testing::file(&files, ".isoloom/external/checks/web.sh")?;
+    let cache = crate::testing::check_line(runner, "cache:6379 from web")?;
+    assert!(cache.contains("_tcp '192.168.1.21' 6379"), "{cache}");
     assert!(files.iter().any(|f| f.path == ".isoloom/resolved.json"));
     Ok(())
 }
@@ -67,7 +66,7 @@ fn existing_hosts_behind_a_gateway_machine_are_still_generated() -> Outcome {
     assert_eq!(spec.problems(), vec![]);
     assert!(spec.possible().contains(&Target::External));
     assert_eq!(isoloom_targets::refusal(&spec, Target::External).unwrap(), None);
-    assert!(generate(&spec, Target::External).is_ok());
+    generate(&spec, Target::External)?;
     Ok(())
 }
 

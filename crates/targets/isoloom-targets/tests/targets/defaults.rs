@@ -38,7 +38,8 @@ fn later_layers_win_leaf_by_leaf() -> Outcome {
         source: "user".into(),
         value: yaml("vagrant: { provder: libvirt }\n")?,
     }]);
-    assert!(bad.unwrap_err().to_string().contains("user"));
+    let bad = bad.err().ok_or("a typo resolved")?.to_string();
+    assert!(bad.contains("user") && bad.contains("provder"), "{bad}");
     Ok(())
 }
 
@@ -72,8 +73,10 @@ fn environment_and_sets_reach_the_defaults() -> Outcome {
     };
     let set = with_sets(&["defaults.cloud.aws.region=x".into()])?;
     assert_eq!(set.defaults.cloud["aws"].region.as_deref(), Some("x"));
-    assert!(with_sets(&["nonsense".into()]).is_err(), "a set without `=`");
-    assert!(with_sets(&["a..b=1".into()]).is_err(), "a key with an empty part");
+    for (bad, case) in [("nonsense", "a set without `=`"), ("a..b=1", "a key with an empty part")] {
+        let err = with_sets(&[bad.into()]).err().ok_or(case)?.to_string();
+        assert!(err.contains(bad), "{case}: {err}");
+    }
     Ok(())
 }
 
@@ -92,14 +95,14 @@ fn sets_override_the_spec_before_it_is_parsed() -> Outcome {
 
 /// The default of `cloud-vm/<cloud>/main.tf`'s `region` variable.
 fn region(files: &[isoloom_targets::GeneratedFile], cloud: &str) -> Outcome<String> {
-    let module = crate::testing::file(files, &format!("cloud-vm/{cloud}/main.tf"))?;
-    let block = module
-        .split("variable \"region\"")
-        .nth(1)
-        .and_then(|b| b.split("\n}").next())
-        .unwrap_or_default();
-    let variable = block.split("default").nth(1).and_then(|d| d.split('"').nth(1)).unwrap_or_default();
-    Ok(variable.to_owned())
+    region_of(files, &format!("cloud-vm/{cloud}/main.tf"))
+}
+
+/// The default of the `region` variable of the module whose path ends with `path`.
+fn region_of(files: &[isoloom_targets::GeneratedFile], path: &str) -> Outcome<String> {
+    let body = isoloom_test_support::hcl_body(crate::testing::file(files, path)?);
+    let variable = isoloom_test_support::hcl_blocks(&body, "variable", &["region"]);
+    Ok(isoloom_test_support::hcl_text(variable.first().ok_or("no region variable")?.body(), "default"))
 }
 
 #[test]
@@ -118,6 +121,6 @@ fn a_defaults_region_reaches_the_module() -> Outcome {
     assert_eq!(region(&mine, "aws")?, "eu-west-1");
     assert_eq!(region(&files, "azure")?, "swedencentral", "other clouds keep theirs");
     let docker = generate(&lab, Target::CloudDocker)?;
-    assert!(crate::testing::file(&docker, "cloud-docker/aws/main.tf")?.contains("default = \"eu-west-3\""));
+    assert_eq!(region_of(&docker, "cloud-docker/aws/main.tf")?, "eu-west-3");
     Ok(())
 }

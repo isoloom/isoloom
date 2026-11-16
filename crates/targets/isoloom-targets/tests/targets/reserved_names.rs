@@ -49,13 +49,8 @@ fn a_check_runners_script_never_takes_a_machines_name() -> Outcome {
 #[test]
 fn a_machines_published_service_never_takes_another_machines_name() -> Outcome {
     let files = generate(&valid(NAMED_LIKE_ISOLOOMS)?, Target::Kubernetes)?;
-    let services: Vec<String> = files
-        .iter()
-        .filter(|f| f.path == ".isoloom/kubernetes/environment.yaml")
-        .flat_map(|f| f.contents.split("\n---").map(str::to_owned).collect::<Vec<_>>())
-        .filter(|doc| doc.contains("kind: Service\n"))
-        .filter_map(|doc| doc.split("\n  name: ").nth(1).and_then(|rest| rest.lines().next()).map(str::to_owned))
-        .collect();
+    let docs = isoloom_test_support::yaml_documents(crate::testing::file(&files, ".isoloom/kubernetes/environment.yaml")?);
+    let services = isoloom_test_support::manifest_names(&docs, "Service");
     let mut unique = services.clone();
     unique.sort();
     unique.dedup();
