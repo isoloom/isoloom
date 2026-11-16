@@ -189,7 +189,7 @@ fn the_authors_checks_come_first_from_the_access_machine_then_the_derived_ones()
     );
     assert_eq!(planned[0].probe, Probe::Script { path: "checks/a.sh".into() });
     assert_eq!(planned[1].probe, Probe::Playbook { path: "checks/b.yml".into() });
-    assert!(planned.iter().all(|c| c.position == Position::Machine("user".into())));
+    isoloom_test_support::assert_every!(&planned, |c: &&Resolved| c.position == Position::Machine("user".into()));
     assert_eq!(default_position(&s), Position::Machine("user".into()));
     assert!(matches!(&s.checks[0], Check::Script(_)));
 }

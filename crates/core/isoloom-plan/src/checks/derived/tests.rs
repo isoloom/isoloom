@@ -30,7 +30,7 @@ fn from<'a>(checks: &'a [Resolved], machine: &str) -> Vec<&'a str> {
 #[test]
 fn a_service_answers_where_a_shared_network_or_reach_lets_through_and_nowhere_else() {
     let checks = derived(&testing::spec(LAB));
-    assert!(checks.iter().all(|c| c.derived));
+    isoloom_test_support::assert_every!(&checks, |c: &&Resolved| c.derived);
     assert_eq!(
         from(&checks, "user"),
         ["web:80 on front from user", "cache:6379 from user", "cache:7000 blocked from user"]
@@ -132,6 +132,6 @@ fn with_no_machine_to_run_them_every_service_answers_from_the_networks() {
             "dc:443 at 10.9.0.12 from the networks"
         ]
     );
-    assert!(checks.iter().all(|c| c.position == Position::Networks && c.wait == 30));
+    isoloom_test_support::assert_every!(&checks, |c: &&Resolved| c.position == Position::Networks && c.wait == 30);
     assert!(matches!(&checks[2].probe, Probe::Http { url, .. } if url.scheme == Scheme::Https && url.port == Some(443)));
 }

@@ -128,6 +128,9 @@ machines:
         let vm = need(Target::Vagrant).unwrap();
         assert!(matches!(vm, Requirement::MoreAddresses { shape: MachineShape::Vm, .. }));
         let container = need(Target::Docker).unwrap();
-        assert!(container.to_string().contains("a container has one address per network"), "{container}");
+        assert_eq!(
+            container.to_string(),
+            "machine `web` has several addresses on `lan`: a container has one address per network (Docker and Kubernetes give an endpoint one IPv4 address); run it on a VM target (its `os`, and `app.steps` for an app)"
+        );
     }
 }

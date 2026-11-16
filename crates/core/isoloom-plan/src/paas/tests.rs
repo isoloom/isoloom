@@ -7,7 +7,7 @@ const SPEC: &str = "version: 1\nname: shop\nnetworks: { lab: { cidr: 10.30.0.0/2
 
 fn lab(yaml: &str) -> Lab {
     let lab = Lab::parse(yaml).unwrap();
-    assert!(lab.problems().is_empty(), "{:?}", lab.problems());
+    assert_eq!(lab.problems(), []);
     lab
 }
 
@@ -27,16 +27,23 @@ fn a_container_target_runs_each_service_as_a_machine_its_clients_wait_for() {
     assert!(spec.services.is_empty(), "{:?}", spec.services);
     assert_eq!(spec.machines.keys().map(String::as_str).collect::<Vec<_>>(), ["web", "db", "files", "bus"]);
     let web = &spec.machines["web"];
-    for s in ["db", "files", "bus"] {
-        assert!(web.depends_on.iter().any(|d| d == s), "{:?}", web.depends_on);
-    }
+    assert_eq!(web.depends_on, ["db", "files", "bus"]);
     assert_eq!(env(&spec, "DATABASE_HOST"), Some("db.shop.internal"));
     assert_eq!(env(&spec, "DATABASE_PASSWORD_FILE"), Some("/etc/isoloom/services/db/password"));
     assert_eq!(env(&spec, "STORAGE_BUCKET_FILE"), Some("/etc/isoloom/services/files/bucket"));
     assert_eq!(env(&spec, "STORAGE_AUTH"), Some("keys"));
     assert_eq!(env(&spec, "BUS_BOOTSTRAP_FILE"), Some("/etc/isoloom/services/bus/bootstrap"));
     let files: Vec<String> = web.secrets.iter().map(isoloom_spec::model::MachineSecret::path).collect();
-    assert!(files.iter().any(|f| f == "/etc/isoloom/services/files/secret-key"), "{files:?}");
+    assert_eq!(
+        files,
+        [
+            "/etc/isoloom/services/db/password",
+            "/etc/isoloom/services/files/access-key",
+            "/etc/isoloom/services/files/secret-key",
+            "/etc/isoloom/services/bus/user",
+            "/etc/isoloom/services/bus/password"
+        ]
+    );
 }
 
 #[test]
@@ -53,10 +60,8 @@ fn a_cloud_keeps_its_services_and_leaves_the_files_it_issues_to_its_delivery() {
 #[test]
 fn every_service_runs_as_a_vm_on_a_server() {
     let spec = lab(SPEC).for_target(Target::Proxmox);
-    for s in ["db", "files", "bus"] {
-        assert!(spec.machines.contains_key(s), "{s}");
-    }
-    assert!(lab(SPEC).refusal(Target::Proxmox).is_none());
+    assert_eq!(spec.machines.keys().map(String::as_str).collect::<Vec<_>>(), ["web", "db", "files", "bus"]);
+    assert_eq!(lab(SPEC).refusal(Target::Proxmox), None);
 }
 
 #[test]
@@ -68,7 +73,7 @@ fn an_identity_is_refused_off_the_clouds() {
     let l = lab(&identity);
     let refused = l.refusal(Target::Docker).unwrap();
     assert_eq!(refused.path.to_string(), "services.files");
-    assert!(l.refusal(Target::CloudVm).is_none());
+    assert_eq!(l.refusal(Target::CloudVm), None);
     assert_eq!(env(&l.for_target(Target::CloudVm), "STORAGE_AUTH"), Some("identity"));
 }
 
@@ -76,13 +81,28 @@ fn an_identity_is_refused_off_the_clouds() {
 fn a_spec_of_services_alone_runs_and_publishes_them() {
     let alone = "version: 1\nname: data\nnetworks: { lab: { cidr: 10.31.0.0/24 } }\ninputs:\n  PLAYER_IP: { sensitive: false }\nsecrets:\n  db-password: { env: DATA_DB_PASSWORD }\nservices:\n  db: { kind: postgres, version: \"16\", networks: { lab: 40 }, password: db-password, publish: { allow: PLAYER_IP } }\n";
     let l = lab(alone);
-    assert!(l.possible().contains(&Target::Docker), "{:?}", l.possible());
-    let spec = l.for_target(Target::Docker);
-    assert!(
-        spec.machines["db"].ports.iter().any(|p| p.port == 5432 && p.publish.is_some()),
-        "{:?}",
-        spec.machines["db"].ports
+    let possible: Vec<&str> = l.possible().into_iter().map(Target::id).collect();
+    assert_eq!(
+        possible,
+        [
+            "docker",
+            "hosted",
+            "cloud-docker",
+            "kubernetes",
+            "vagrant",
+            "proxmox",
+            "esxi",
+            "cloud-vm",
+            "external"
+        ]
     );
+    let spec = l.for_target(Target::Docker);
+    let ports: Vec<String> = spec.machines["db"]
+        .ports
+        .iter()
+        .map(|p| format!("{} published {:?}", p.port, p.publish))
+        .collect();
+    assert_eq!(ports, ["5432 published Some(5432)"]);
 }
 
 #[test]

@@ -153,6 +153,6 @@ overrides:
         assert_eq!(a.outside["corp"], OutsideAddress::Fixed("192.168.50.20".parse().unwrap()));
         assert_eq!(a.outside["home"], OutsideAddress::Dhcp);
         let features: Vec<Feature> = env.requirements.iter().map(Requirement::feature).collect();
-        assert!(features.contains(&Feature::ExternalNetworks) && features.contains(&Feature::BridgedNetworks));
+        assert_eq!(features, [Feature::ExternalNetworks, Feature::BridgedNetworks]);
     }
 }

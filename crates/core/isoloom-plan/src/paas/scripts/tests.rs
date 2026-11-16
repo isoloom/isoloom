@@ -57,9 +57,9 @@ fn property(text: &str, key: &str) -> String {
 /// The quoted value of option `name` in a JAAS line, as Java's `StreamTokenizer` reads a quoted
 /// string (`\` escapes the next character; `\t`, `\n` and the like are those characters).
 fn jaas_option(line: &str, name: &str) -> String {
-    let start = line.find(&format!("{name}=\"")).unwrap_or_else(|| panic!("no {name} in {line}")) + name.len() + 2;
+    let (_, quoted) = line.split_once(&format!("{name}=\"")).unwrap_or_else(|| panic!("no {name} in {line}"));
     let mut out = String::new();
-    let mut chars = line[start..].chars();
+    let mut chars = quoted.chars();
     while let Some(c) = chars.next() {
         match c {
             '"' => return out,
@@ -90,6 +90,7 @@ fn seaweedfs_takes_any_key_as_json_reads_it() {
 }
 
 #[test]
+#[ignore = "needs openssl 3: the Kafka script salts the password with `openssl kdf`; `cargo xtask test` runs it"]
 fn kafka_takes_any_password_in_both_properties_files_and_salts_it_for_add_scram() {
     for secret in NASTY {
         let dir = secrets(&[("user", "shop"), ("password", secret)]);
@@ -125,14 +126,9 @@ fn kafka_takes_any_password_in_both_properties_files_and_salts_it_for_add_scram(
 }
 
 #[test]
+#[ignore = "needs openssl 3 and python3: python's PBKDF2 checks the script's `openssl kdf`; `cargo xtask test` runs it"]
 fn the_salted_password_is_pbkdf2_hmac_sha512_of_the_password() {
-    // The same derivation by a second implementation, when the host has one.
-    let Ok(probe) = Command::new("python3").arg("-c").arg("import hashlib").output() else {
-        return;
-    };
-    if !probe.status.success() {
-        return;
-    }
+    // The same derivation by a second implementation.
     let secret = NASTY[2];
     let dir = secrets(&[("user", "shop"), ("password", secret)]);
     assert!(run(&kafka_config("in", "bus.shop.internal", "state"), dir.path()).0);
@@ -146,24 +142,42 @@ fn the_salted_password_is_pbkdf2_hmac_sha512_of_the_password() {
 }
 
 #[test]
-fn a_line_break_or_a_comma_in_the_user_is_refused_with_a_message() {
-    let dir = secrets(&[("user", "shop"), ("password", "two\nlines")]);
-    let (ok, err) = run(&kafka_config("in", "h", "state"), dir.path());
-    assert!(!ok && err.contains("line break"), "{err}");
-    let dir = secrets(&[("user", "a,b"), ("password", "x")]);
-    let (ok, err) = run(&kafka_config("in", "h", "state"), dir.path());
-    assert!(!ok && err.contains("--add-scram"), "{err}");
-    let dir = secrets(&[("access-key", "a\nb"), ("secret-key", "x")]);
-    let (ok, err) = run(&seaweedfs_config("in", "out/s3.json"), dir.path());
-    assert!(!ok && err.contains("line break"), "{err}");
+fn a_line_break_in_a_secret_or_a_comma_in_the_kafka_user_is_refused_with_a_message() {
+    let kafka = |user: &str, password: &str| {
+        let dir = secrets(&[("user", user), ("password", password)]);
+        run(&kafka_config("in", "h", "state"), dir.path())
+    };
+    let seaweedfs = |key: &str| {
+        let dir = secrets(&[("access-key", key), ("secret-key", "x")]);
+        run(&seaweedfs_config("in", "out/s3.json"), dir.path())
+    };
+    for (case, (ok, err), says) in [
+        (
+            "a password's line break",
+            kafka("shop", "two\nlines"),
+            "the Kafka login holds a line break, which its configuration cannot carry",
+        ),
+        (
+            "a user's comma",
+            kafka("a,b", "x"),
+            "the Kafka user holds `,` or `]`, or is quoted, which --add-scram cannot carry",
+        ),
+        (
+            "an access key's line break",
+            seaweedfs("a\nb"),
+            "an S3 key holds a line break, which its configuration cannot carry",
+        ),
+    ] {
+        assert_eq!((ok, err.trim_end()), (false, says), "{case}");
+    }
 }
 
 #[test]
 fn the_wait_helper_waits_for_a_file_then_times_out() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("wait-for"), wait_helper()).unwrap();
-    let (ok, _) = run("(sleep 1; echo v > fact) & sh ./wait-for fact 10", dir.path());
-    assert!(ok, "the file appeared within the timeout");
-    let (ok, err) = run("sh ./wait-for never 1", dir.path());
-    assert!(!ok && err.contains("didn't appear in 1 s"), "{err}");
+    let (appeared, _) = run("(sleep 1; echo v > fact) & sh ./wait-for fact 10", dir.path());
+    assert!(appeared, "the file appeared within the timeout");
+    let (never, err) = run("sh ./wait-for never 1", dir.path());
+    assert_eq!((never, err.trim_end()), (false, "wait-for: never didn't appear in 1 s"));
 }
