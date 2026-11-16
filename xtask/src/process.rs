@@ -3,6 +3,7 @@
 
 use std::path::Path;
 use std::process::{Command, ExitCode, Stdio};
+use std::sync::OnceLock;
 
 use crate::Res;
 
@@ -11,11 +12,25 @@ use crate::Res;
 pub(crate) use xtask_quality::process::{describe, output, quiet, without_run_env};
 
 /// `cargo`, the one running this xtask (`$CARGO`, so the same toolchain), in `dir`, without the
-/// variables `cargo run` set for the xtask.
+/// variables `cargo run` set for the xtask, compiling through sccache when it is installed
+/// ([`compiler_cache`]).
 pub(crate) fn cargo(dir: &Path) -> Command {
     let mut cmd = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
     without_run_env(&mut cmd);
+    compiler_cache(&mut cmd);
     cmd.current_dir(dir);
+    cmd
+}
+
+/// sccache as `cmd`'s compiler wrapper (`RUSTC_WRAPPER`) when it is installed and no wrapper is
+/// set (an empty `RUSTC_WRAPPER` says none): a crate another worktree or target folder already
+/// compiled comes from its cache. Never required: without it, `cmd` is left as it is.
+pub(crate) fn compiler_cache(cmd: &mut Command) -> &mut Command {
+    static INSTALLED: OnceLock<bool> = OnceLock::new();
+    let installed = *INSTALLED.get_or_init(|| first_line(Command::new("sccache").arg("--version")).is_some());
+    if installed && std::env::var_os("RUSTC_WRAPPER").is_none() {
+        cmd.env("RUSTC_WRAPPER", "sccache");
+    }
     cmd
 }
 

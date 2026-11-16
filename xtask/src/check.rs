@@ -253,10 +253,10 @@ fn cargo(root: &Path, args: &[&str]) -> Res<bool> {
     process::passed(process::cargo(root).args(args))
 }
 
-/// A tool on `PATH`, in the checkout.
+/// A tool on `PATH`, in the checkout (sccache its builds' compiler wrapper when installed).
 fn tool(root: &Path, program: &str, args: &[&str]) -> Res<bool> {
     let mut cmd = Command::new(program);
-    cmd.args(args).current_dir(root);
+    process::compiler_cache(&mut cmd).args(args).current_dir(root);
     process::passed(&mut cmd).map_err(|e| format!("{e} (is {program} installed?)").into())
 }
 
@@ -377,6 +377,7 @@ fn msrv(root: &Path) -> Res<bool> {
     let version = rust_version(&std::fs::read_to_string(root.join("Cargo.toml"))?)?;
     let mut cmd = Command::new("cargo");
     process::without_run_env(&mut cmd);
+    process::compiler_cache(&mut cmd);
     cmd.env_remove("RUSTUP_TOOLCHAIN").current_dir(root);
     cmd.arg(format!("+{version}"));
     cmd.args([
