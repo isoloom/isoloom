@@ -1,15 +1,19 @@
 //! IPv6 networks on the Terraform targets: Azure and Oracle Cloud write the spec's block, the
 //! other clouds refuse with their own reason, and Proxmox's router carries the IPv6 side.
 
-use crate::testing::{Outcome, plan, proxmox};
+use crate::testing::{Outcome, plan, proxmox, texts};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
 use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_nested, hcl_one, hcl_text, hcl_values};
 
-/// The module's literal texts that are scripts (a machine's set-up, its user data): the ones
-/// with a line break.
-fn scripts(body: &hcl::Body) -> Vec<String> {
-    hcl_literals(body).into_iter().filter(|l| l.contains('\n')).collect()
+/// The scripts (set-up, user data) of `kind` VM `name` in `tf`.
+fn scripts(tf: &str, kind: &str, name: &str) -> Vec<String> {
+    texts(tf, kind, name).into_iter().filter(|t| t.contains('\n')).collect()
+}
+
+/// Whether one of `scripts` has a line holding `what`.
+fn has_line(scripts: &[String], what: &str) -> bool {
+    scripts.iter().flat_map(|s| s.lines()).any(|l| l.contains(what))
 }
 
 const SPEC: &str = "version: 1
@@ -52,10 +56,11 @@ fn azure_writes_the_block_the_interfaces_and_the_rules() -> Outcome {
         .flat_map(|g| hcl_values(g.body(), "name"))
         .collect::<Vec<_>>();
     assert!(rules.iter().any(|r| r == "reach-0-front-ipv6-80-tcp"), "{rules:?}");
-    // The virtual network routes between subnets: no route through a router that isn't there.
-    let scripts = scripts(&body);
-    assert!(!scripts.iter().any(|s| s.contains("ip -6 route")), "{scripts:?}");
-    assert!(scripts.iter().any(|s| s.contains("ip -6 addr replace fd00:67:20::10/64")), "{scripts:?}");
+    // web's set-up puts its address on its interface; the virtual network routes between
+    // subnets: no route through a router that isn't there.
+    let web = scripts(tf, "azurerm_linux_virtual_machine", "web");
+    assert!(has_line(&web, "ip -6 addr replace fd00:67:20::10/64"), "{web:?}");
+    assert!(!has_line(&web, "ip -6 route"), "{web:?}");
     Ok(())
 }
 
@@ -72,10 +77,15 @@ fn the_other_clouds_refuse_with_their_reason() -> Outcome {
 
 #[test]
 fn the_proxmox_router_takes_its_ipv6_address_and_forwards() -> Outcome {
-    let tf = proxmox(SPEC)?;
-    assert!(tf.contains("Address=fd00:67:20::254/64"), "{tf}");
-    assert!(tf.contains("net.ipv6.conf.all.forwarding=1"), "{tf}");
-    assert!(tf.contains("ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64"), "{tf}");
+    let router = texts(&proxmox(SPEC)?, "proxmox_virtual_environment_file", "isoloom_router");
+    // Its interface on back (a networkd unit), forwarding, and the reach rule in nftables.
+    for line in [
+        "Address=fd00:67:20::254/64",
+        "net.ipv6.conf.all.forwarding=1",
+        "ip6 saddr fd00:67:10::/64 ip6 daddr fd00:67:20::/64",
+    ] {
+        assert!(has_line(&router, line), "{line}: {router:?}");
+    }
     Ok(())
 }
 
@@ -108,9 +118,9 @@ fn oracle_cloud_writes_the_block_the_vnics_and_the_rules() -> Outcome {
             ("fd00:67:10::/64".to_owned(), "fd00:67:10::10".to_owned())
         ]
     );
-    let scripts = scripts(&body);
-    assert!(scripts.iter().any(|s| s.contains("ip -6 addr replace fd00:67:20::10/64")), "{scripts:?}");
-    assert!(!scripts.iter().any(|s| s.contains("ip -6 route")), "{scripts:?}");
+    let web = scripts(tf, "oci_core_instance", "web");
+    assert!(has_line(&web, "ip -6 addr replace fd00:67:20::10/64"), "{web:?}");
+    assert!(!has_line(&web, "ip -6 route"), "{web:?}");
     // The rules mirror the IPv4 ones: the reach rule on its port, ICMPv6's "packet too big".
     let ingress: Vec<(String, String)> = hcl_blocks(&body, "resource", &["oci_core_security_list"])
         .iter()
@@ -134,11 +144,15 @@ fn oracle_cloud_reads_back_the_addresses_it_picks() -> Outcome {
     let tf = &oci.render(&e)?.contents;
     // No address named on `back`: Oracle Cloud picks it, and each machine's own set-up reads it
     // from its metadata service, by its VNIC's IPv4 address there.
-    assert!(!tf.contains("fd00:67:20::10"), "{tf}");
-    assert!(tf.contains("v.get(\\\"privateIp\\\") == \\\"10.67.20.10\\\""), "{tf}");
-    assert!(tf.contains("v.get(\\\"privateIp\\\") == \\\"10.67.20.20\\\""), "{tf}");
-    assert!(tf.contains("ipv6Addresses"), "{tf}");
-    assert!(tf.contains("inet 10.67.20.20/"), "{tf}");
+    let body = hcl_body(tf);
+    assert!(!hcl_literals(&body).iter().any(|l| l.contains("fd00:67:20::10")), "an address on back");
+    for (name, address) in [("web", "10.67.20.10"), ("user", "10.67.20.20")] {
+        let own = scripts(tf, "oci_core_instance", name);
+        assert!(has_line(&own, &format!("v.get(\"privateIp\") == \"{address}\"")), "{name}: {own:?}");
+        assert!(has_line(&own, "ipv6Addresses"), "{name}: {own:?}");
+    }
+    // user's second interface, on back, comes up by its IPv4 address.
+    assert!(has_line(&scripts(tf, "oci_core_instance", "user"), "inet 10.67.20.20/"));
     // Azure gives each interface its derived address, so it refuses.
     let azure = CloudVmModule::new(Cloud::Azure).refusal(&e).unwrap();
     assert!(azure.contains("`ipv6.addresses: auto`"), "{azure}");

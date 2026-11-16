@@ -5,7 +5,7 @@
 
 use crate::testing::{Outcome, cloud_vm, proxmox};
 use isoloom_terraform::Cloud;
-use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
+use isoloom_test_support::{assert_every, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_one, hcl_resource, hcl_text, hcl_values};
 
 /// The bodies of the resources of `body` whose attribute `key` (anywhere in them) is `value`.
 fn with_value<'b>(body: &'b hcl::Body, key: &str, value: &str) -> Vec<&'b hcl::Body> {
@@ -38,15 +38,12 @@ fn each_cloud_with_a_dns_writes_the_zone_and_a_record_per_name() -> Outcome {
         assert_eq!(hcl_blocks(&body, "resource", &[zone.0, zone.1]).len(), 1, "{cloud}: {zone:?}");
         let records = with_value(&body, key, alias);
         assert!(!records.is_empty(), "{cloud}: no record {key} = {alias}");
-        assert!(
-            records.iter().all(|r| hcl_literals(r).iter().any(|l| l == "10.84.0.10")),
-            "{cloud}: {alias} at web's address"
-        );
+        assert_every!(records, |r: &&hcl::Body| hcl_literals(r).iter().any(|l| l == "10.84.0.10"));
     }
     let gcp = hcl_body(&cloud_vm(Cloud::Gcp, SPEC)?);
     assert_eq!(hcl_text(hcl_one(&gcp, "google_dns_managed_zone", "private"), "visibility"), "private");
-    let aws = hcl_body(&cloud_vm(Cloud::Aws, SPEC)?);
-    assert_eq!(hcl_values(&aws, "enable_dns_hostnames"), ["true"]);
+    let vpc = hcl_resource(&cloud_vm(Cloud::Aws, SPEC)?, "aws_vpc", "env");
+    assert_eq!(hcl_text(&vpc, "enable_dns_hostnames"), "true");
     Ok(())
 }
 
@@ -77,19 +74,20 @@ fn azure_writes_aaaa_records_on_ipv6_and_reverse_names() -> Outcome {
 fn off_no_zone_is_written() -> Outcome {
     let off = SPEC.replace("dns: { private: true, domain: corp.internal }\n", "");
     for cloud in [Cloud::Aws, Cloud::Azure, Cloud::Gcp, Cloud::Oci] {
-        let tf = cloud_vm(cloud, &off)?;
-        assert!(
-            !tf.contains("corp.internal") && !tf.contains("dns_zone") && !tf.contains("route53"),
-            "{cloud}: {tf}"
-        );
+        let tf = hcl_body(&cloud_vm(cloud, &off)?);
+        let kinds: Vec<&str> = hcl_blocks(&tf, "resource", &[])
+            .iter()
+            .filter_map(|b| b.labels().first().map(hcl::BlockLabel::as_str))
+            .collect();
+        assert_every!(&kinds, |k: &&&str| !k.contains("dns") && !k.contains("route53"));
+        assert!(!hcl_literals(&tf).iter().any(|l| l.contains("corp.internal")), "{cloud}: the domain is written");
     }
     Ok(())
 }
 
 #[test]
 fn proxmox_takes_the_domain_as_its_search_domain() -> Outcome {
-    let tf = proxmox(SPEC)?;
-    let domains = hcl_values(&hcl_body(&tf), "domain");
-    assert!(!domains.is_empty() && domains.iter().all(|d| d == "corp.internal"), "{domains:?}");
+    let web = hcl_resource(&proxmox(SPEC)?, "proxmox_virtual_environment_vm", "web");
+    assert_eq!(hcl_values(&web, "domain"), ["corp.internal"]);
     Ok(())
 }

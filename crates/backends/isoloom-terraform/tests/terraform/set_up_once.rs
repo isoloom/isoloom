@@ -6,6 +6,7 @@
 use crate::testing::{Outcome, example, file, planned};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule, cloud_docker_modules};
+use isoloom_test_support::{hcl_attribute, hcl_blocks, hcl_body, hcl_map, hcl_nested, hcl_resource};
 
 /// A VM resource kind, the attribute its user data is in, and how `ignore_changes` names that
 /// attribute.
@@ -59,40 +60,43 @@ const KINDS: &[Kind] = &[
     },
 ];
 
-/// Each top-level `resource` of `module`: its kind, its name and its body.
-fn resources(module: &str) -> Vec<(&str, &str, &str)> {
-    module
-        .split("\nresource \"")
-        .skip(1)
-        .filter_map(|chunk| {
-            let (kind, rest) = chunk.split_once('"')?;
-            let name = rest.trim_start().strip_prefix('"')?.split('"').next()?;
-            Some((kind, name, chunk))
-        })
-        .collect()
+/// Attribute `key` of `body` as HCL writes it, without its whitespace (`[user_data]`).
+fn expression(body: &hcl::Body, key: &str) -> Option<String> {
+    Some(hcl::format::to_string(hcl_attribute(body, key)?).ok()?.split_whitespace().collect())
 }
 
-/// Whether `body` sets `attribute` (on a line of its own, as the modules write it).
-fn sets(body: &str, attribute: &str) -> bool {
-    body.lines()
-        .any(|l| l.trim_start().strip_prefix(attribute).is_some_and(|rest| rest.trim_start().starts_with('=')))
+/// Whether `body` sets `key`: an attribute of its own or of a nested block (Linode's
+/// `metadata { user_data }`), or a key of an object it sets (Oracle Cloud's
+/// `metadata = { user_data }`).
+fn sets(body: &hcl::Body, key: &str) -> bool {
+    body.iter().any(|s| match s {
+        hcl::Structure::Attribute(a) => a.key() == key || hcl_map(body, a.key()).iter().any(|(k, _)| k == key),
+        hcl::Structure::Block(b) => sets(b.body(), key),
+    })
 }
 
 /// The VMs of `module` with user data, each checked for its `lifecycle`; the names checked.
 fn checked(module: &str, what: &str) -> Vec<String> {
+    let body = hcl_body(module);
     let mut names = Vec::new();
-    for (kind, name, body) in resources(module) {
-        for k in KINDS.iter().filter(|k| k.resource == kind) {
-            if !sets(body, k.attribute) {
+    for k in KINDS {
+        for vm in hcl_blocks(&body, "resource", &[k.resource]) {
+            let name = vm.labels().get(1).map(|l| l.as_str().to_owned()).unwrap_or_default();
+            if !sets(vm.body(), k.attribute) {
                 continue;
             }
-            let ignore = format!("ignore_changes = [{}]", k.ignored);
-            assert!(
-                body.contains(&ignore),
-                "{what}: {kind}.{name} has its user data in `{}` but no `{ignore}`",
+            let ignored: Vec<String> = hcl_nested(vm.body(), "lifecycle")
+                .iter()
+                .filter_map(|l| expression(l.body(), "ignore_changes"))
+                .collect();
+            assert_eq!(
+                ignored,
+                [format!("[{}]", k.ignored)],
+                "{what}: {}.{name} has its user data in `{}`",
+                k.resource,
                 k.attribute
             );
-            names.push(format!("{kind}.{name}"));
+            names.push(format!("{}.{name}", k.resource));
         }
     }
     names
@@ -127,15 +131,26 @@ fn every_cloud_docker_host_keeps_its_expiry() -> Outcome {
     let files = cloud_docker_modules(&planned(&example("hello-stack")?, Target::CloudDocker)?, &crate::testing::docker_host(&[]))?;
     for cloud in Cloud::ALL {
         let module = file(&files, &format!("cloud-docker/{}/main.tf", cloud.id()))?;
-        assert!(module.contains("var.expires_at"), "{}: the host's user data schedules its expiry", cloud.id());
         let hosts = checked(module, &format!("cloud-docker {}", cloud.id()));
         if cloud == Cloud::Gcp {
             // Its startup script is an entry of `metadata`, which the provider updates in place:
             // no replacement, no restart, and the next boot takes the new expiry.
             assert!(hosts.is_empty(), "gcp: the startup script is in `metadata`, not `metadata_startup_script`");
-            assert!(sets(module, "startup-script"), "gcp: the startup script is a `metadata` entry");
+            let host = hcl_resource(module, "google_compute_instance", "env");
+            let script = hcl_map(&host, "metadata").into_iter().find(|(k, _)| k == "startup-script");
+            assert!(
+                script.is_some_and(|(_, s)| s.contains("${var.expires_at}")),
+                "gcp: the startup script schedules the expiry"
+            );
         } else {
             assert_eq!(hosts.len(), 1, "{}: the host was checked", cloud.id());
+            let (kind, _) = hosts[0].split_once('.').ok_or("a host")?;
+            let texts = crate::testing::texts(module, kind, "env");
+            assert!(
+                texts.iter().any(|t| t.contains("${var.expires_at}")),
+                "{}: the host's user data schedules its expiry",
+                cloud.id()
+            );
         }
     }
     Ok(())

@@ -4,12 +4,14 @@
 use std::error::Error;
 use std::path::Path;
 
+use hcl::template::{Element, Template};
 use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule, ProxmoxBackend};
+use isoloom_test_support::hcl_resource;
 
 /// A Windows Server the controller provisions: an environment with a controller and a Windows password.
 pub(crate) const WINDOWS_PROVISIONED: &str = "version: 1
@@ -128,5 +130,63 @@ pub(crate) fn docker_host(values: &[&str]) -> isoloom_terraform::CloudDockerHost
         outputs: vec![".isoloom/docker".to_owned()],
         start: vec!["cd /opt/isoloom && docker compose --project-name env --file .isoloom/docker/compose.yml up -d --build --wait".to_owned()],
         values: values.iter().map(|v| (*v).to_owned()).collect(),
+    }
+}
+
+/// The texts (scripts, user data, files) resource `kind` `name` of the module `tf` holds, as
+/// they read once Terraform has read them: each template's text with its interpolations as
+/// `${...}`, and each string written inside an interpolation (a file a script writes,
+/// `${base64encode("...")}`) a text of its own.
+///
+/// # Panics
+///
+/// When `tf` isn't HCL or doesn't have exactly one such resource.
+pub(crate) fn texts(tf: &str, kind: &str, name: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    texts_of_body(&hcl_resource(tf, kind, name), &mut out);
+    out
+}
+
+fn texts_of_body(body: &hcl::Body, out: &mut Vec<String>) {
+    for structure in body {
+        match structure {
+            hcl::Structure::Attribute(a) => texts_of(a.expr(), out),
+            hcl::Structure::Block(b) => texts_of_body(b.body(), out),
+        }
+    }
+}
+
+fn texts_of(expr: &hcl::Expression, out: &mut Vec<String>) {
+    use hcl::Expression as E;
+    match expr {
+        E::String(s) => out.push(s.clone()),
+        E::TemplateExpr(t) => {
+            let Ok(template) = Template::from_expr(t) else {
+                return out.push(t.to_string());
+            };
+            let mut text = String::new();
+            for element in template.elements() {
+                match element {
+                    Element::Literal(l) => text.push_str(l),
+                    Element::Interpolation(i) => {
+                        text.push_str("${");
+                        text.push_str(&hcl::format::to_string(&i.expr).unwrap_or_default());
+                        text.push('}');
+                        texts_of(&i.expr, out);
+                    }
+                    Element::Directive(_) => text.push_str("%{...}"),
+                }
+            }
+            out.push(text);
+        }
+        E::Array(items) => items.iter().for_each(|e| texts_of(e, out)),
+        E::Object(object) => object.values().for_each(|e| texts_of(e, out)),
+        E::Parenthesis(inner) => texts_of(inner, out),
+        E::FuncCall(call) => call.args.iter().for_each(|e| texts_of(e, out)),
+        E::Conditional(c) => {
+            texts_of(&c.true_expr, out);
+            texts_of(&c.false_expr, out);
+        }
+        _ => {}
     }
 }

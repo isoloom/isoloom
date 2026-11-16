@@ -6,7 +6,7 @@ use crate::testing::{Outcome, plan};
 use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmModule};
-use isoloom_test_support::{hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+use isoloom_test_support::{assert_every, hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 
 /// The plan of `yaml`, a valid spec, on `cloud-vm`.
 fn env(yaml: &str) -> Outcome<Environment> {
@@ -168,7 +168,7 @@ fn google_cloud_refuses_more_interfaces_than_a_vm_takes() -> Outcome {
         "version: 1\nname: wide\nnetworks:\n{nets}machines:\n  x:\n    networks: {{ {} }}\n    os: debian@12\n    app: {{ steps: [{{ run: x.sh }}] }}\n",
         on.join(", ")
     );
-    let why = refusal(Cloud::Gcp, &env(&spec)?).unwrap();
+    let why = refusal(Cloud::Gcp, &env(&spec)?).ok_or("Google Cloud takes nine interfaces")?;
     assert!(why.contains("takes 8 network interfaces"), "{why}");
     // Three networks: a machine type with four vCPUs.
     let three = env(&EDGE.replace("dmz: 1 }", "dmz: 1, far: 10 }").replace(
@@ -182,8 +182,17 @@ fn google_cloud_refuses_more_interfaces_than_a_vm_takes() -> Outcome {
 
 #[test]
 fn linode_refuses_a_gateway_with_its_reason() -> Outcome {
-    let why = refusal(Cloud::Linode, &env(EDGE)?).unwrap();
-    assert!(why.contains("one VPC interface") || why.contains("route tables"), "{why}");
+    // A gateway on two networks: refused for its second interface first.
+    assert_eq!(
+        refusal(Cloud::Linode, &env(EDGE)?).as_deref(),
+        Some("machine `fw` is on several networks: a Linode instance has one VPC interface")
+    );
+    // On one network, the gateway itself is what Linode can't do.
+    let one = env(&EDGE.replace("networks: { out: 5, dmz: 1 }", "networks: { dmz: 1 }"))?;
+    assert_eq!(
+        refusal(Cloud::Linode, &one).as_deref(),
+        Some("a Linode VPC has no route tables, so no traffic can be sent through a machine")
+    );
     Ok(())
 }
 
@@ -211,12 +220,18 @@ fn google_cloud_sets_the_mtu_and_the_others_refuse_it() -> Outcome {
             .collect())
     };
     assert_eq!(mtus(&e)?, ["1400", "1500"]);
-    assert!(refusal(Cloud::Aws, &e).unwrap().contains("no setting for a network's MTU"));
+    for cloud in [Cloud::Aws, Cloud::Azure, Cloud::Oci] {
+        assert_eq!(
+            refusal(cloud, &e),
+            Some(format!("network `a` sets its `mtu`: {cloud} has no setting for a network's MTU")),
+            "{cloud}"
+        );
+    }
     // A VPC network each: each network its own MTU, in Google's range.
     let two = env(&MTU.replace("10.81.0.0/24 }", "10.81.0.0/24, mtu: 8896 }"))?;
     assert_eq!(mtus(&two)?, ["1400", "8896"]);
     let big = env(&MTU.replace("10.81.0.0/24 }", "10.81.0.0/24, mtu: 9000 }"))?;
-    assert!(refusal(Cloud::Gcp, &big).unwrap().contains("1300 to 8896"));
+    assert!(refusal(Cloud::Gcp, &big).ok_or("Google Cloud takes 9000")?.contains("1300 to 8896"));
     // Without one, Ethernet's 1500, as on every other target.
     let none = env(&MTU.replace(", mtu: 1400", ""))?;
     assert_eq!(mtus(&none)?, ["1500", "1500"]);
@@ -243,7 +258,8 @@ fn azure_refuses_a_machine_with_more_allow_rules_than_fit_below_its_deny_rule() 
         .filter(|r| hcl_text(r.body(), "access") == "Allow" && hcl_text(r.body(), "direction") == "Inbound")
         .map(|r| hcl_text(r.body(), "priority").parse().unwrap_or(u64::MAX))
         .collect();
-    assert!(priorities.iter().all(|p| *p < 4000) && priorities.len() == 382, "{priorities:?}");
+    assert_eq!(priorities.len(), 382);
+    assert_every!(priorities, |p: &u64| *p < 4000);
     // 2 + 2 * 200 = 402: past the deny rule.
     let why = refusal(Cloud::Azure, &env(&spec(200))?).ok_or("Azure takes 402 rules")?;
     assert!(
