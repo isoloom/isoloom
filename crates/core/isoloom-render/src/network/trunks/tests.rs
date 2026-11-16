@@ -49,17 +49,11 @@ fn the_interface_is_named_after_the_lan_within_linux_s_limit() {
 #[test]
 fn a_vm_builds_its_trunk_once_per_boot() {
     let env = testing::env(VLAN_OFFICE, Target::Vagrant);
-    let cmds = vm_commands(&env, &admin());
-    assert_eq!(cmds.len(), 1);
-    let sh = &cmds[0];
-    assert!(
-        sh.starts_with("ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && "),
-        "{sh}"
+    assert_eq!(
+        vm_commands(&env, &admin()),
+        [
+            "ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && ip link set office up && ip link set office-s up && IF=$(ip -o -4 addr show | awk '$4 ~ /^10\\.70\\.10\\.50\\//{print $2}' | head -n 1) && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address 02:1f:0a:46:0a:32 && ip link add br10 type bridge && ip link set \"$IF\" master br10 && ip link set br10 up && ip link add link office-s name office-s.10 type vlan id 10 && ip link set office-s.10 master br10 && ip link set office-s.10 up && ip link add link office name office.10 address \"$MAC\" type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && IF=$(ip -o -4 addr show | awk '$4 ~ /^10\\.70\\.20\\.50\\//{print $2}' | head -n 1) && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address 02:1f:0a:46:14:32 && ip link add br20 type bridge && ip link set \"$IF\" master br20 && ip link set br20 up && ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20 && ip link set office-s.20 up && ip link add link office name office.20 address \"$MAC\" type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up; }"
+        ],
+        "one command, which does nothing once the trunk is there"
     );
-    assert!(sh.contains("ip link set \"$IF\" address 02:1f:0a:46:0a:32"), "{sh}");
-    assert!(
-        sh.contains("ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20"),
-        "{sh}"
-    );
-    assert!(sh.ends_with("ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up; }"), "{sh}");
 }

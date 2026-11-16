@@ -1,8 +1,6 @@
 use isoloom_plan::SecretFile;
 
-use super::{
-    BOOTSTRAP, DELIVERED, KEPT_DIR, PLACE_SCRIPT, command_line, from_environment, input, path, place, place_first, powershell_args, receive, step, wait,
-};
+use super::{BOOTSTRAP, KEPT_DIR, command_line, from_environment, input, path, place, place_first, powershell_args, receive, step, wait};
 
 fn file(name: &str, path: &str) -> SecretFile {
     SecretFile {
@@ -17,19 +15,7 @@ fn file(name: &str, path: &str) -> SecretFile {
 
 /// Standard base64 decoded (the tests read back what was encoded).
 fn decode(s: &str) -> Vec<u8> {
-    let value = |c: u8| match c {
-        b'A'..=b'Z' => c - b'A',
-        b'a'..=b'z' => c - b'a' + 26,
-        b'0'..=b'9' => c - b'0' + 52,
-        b'+' => 62,
-        _ => 63,
-    };
-    let mut out = Vec::new();
-    for chunk in s.trim_end_matches('=').as_bytes().chunks(4) {
-        let n = chunk.iter().enumerate().fold(0u32, |n, (i, c)| n | (u32::from(value(*c)) << (18 - 6 * i)));
-        out.extend(n.to_be_bytes()[1..chunk.len()].iter());
-    }
-    out
+    isoloom_test_support::b64_decode(s).expect("standard base64")
 }
 
 #[test]
@@ -42,48 +28,56 @@ fn a_path_from_root_is_on_drive_c() {
 fn delivery_locks_the_folder_then_keeps_each_value_then_marks_it() {
     let names = vec!["db-password".to_owned(), "it's".to_owned()];
     let ps = receive(&names, &[file("db-password", "/run/secrets/db-password")]);
-    let lock = ps.find("Protect-IsoloomPath $k").expect("the folder is locked");
-    let keep = ps.find("foreach ($n in @('db-password', 'it''s'))").expect("names in order, quoted");
-    let mark = ps.find(&format!("Set-Content -Path '{DELIVERED}'")).expect("the mark");
-    let placed = ps.find("Set-IsoloomSecret 'db-password' 'C:\\run\\secrets\\db-password'").expect("placed");
-    assert!(lock < keep && keep < mark && mark < placed, "{ps}");
-    assert!(ps.contains("[Console]::In.ReadLine()"), "values come on the standard input: {ps}");
-    assert!(
-        ps.contains("'S-1-5-18', 'S-1-5-32-544'") && ps.contains("SetAccessRuleProtection($true, $false)"),
-        "{ps}"
+    // The folder locked to SYSTEM and Administrators, each value read from the standard input
+    // into its file (names in order, quoted), the mark, then the files placed.
+    assert_eq!(
+        ps.lines().collect::<Vec<_>>(),
+        [
+            "$ErrorActionPreference = 'Stop'",
+            "function Protect-IsoloomPath($p) { $dir = Test-Path -PathType Container $p; $acl = if ($dir) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }; $acl.SetAccessRuleProtection($true, $false); $inherit = if ($dir) { 'ContainerInherit, ObjectInherit' } else { 'None' }; foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier $sid), 'FullControl', $inherit, 'None', 'Allow'))) }; Set-Acl -Path $p -AclObject $acl }",
+            "$k = 'C:\\ProgramData\\isoloom\\secrets'",
+            "New-Item -ItemType Directory -Force $k | Out-Null",
+            "Protect-IsoloomPath $k",
+            "foreach ($n in @('db-password', 'it''s')) { $v = [Console]::In.ReadLine(); if ($null -eq $v) { throw \"no value came for $n\" }; [IO.File]::WriteAllBytes(\"$k\\$n.new\", [Convert]::FromBase64String($v.Trim())); Move-Item -Force \"$k\\$n.new\" \"$k\\$n\" }",
+            "Remove-Variable v",
+            "Set-Content -Path 'C:\\ProgramData\\isoloom\\secrets\\.delivered' -Value ''",
+            "$ErrorActionPreference = 'Stop'",
+            "function Protect-IsoloomPath($p) { $dir = Test-Path -PathType Container $p; $acl = if ($dir) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }; $acl.SetAccessRuleProtection($true, $false); $inherit = if ($dir) { 'ContainerInherit, ObjectInherit' } else { 'None' }; foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier $sid), 'FullControl', $inherit, 'None', 'Allow'))) }; Set-Acl -Path $p -AclObject $acl }",
+            "$k = 'C:\\ProgramData\\isoloom\\secrets'",
+            "function Set-IsoloomSecret($name, $path) { New-Item -ItemType Directory -Force (Split-Path -Parent $path) | Out-Null; if (-not (Test-Path $path)) { New-Item -ItemType File $path | Out-Null }; Protect-IsoloomPath $path; [IO.File]::WriteAllBytes($path, [IO.File]::ReadAllBytes((Join-Path $k $name))) }",
+            "Set-IsoloomSecret 'db-password' 'C:\\run\\secrets\\db-password'"
+        ]
     );
 }
 
 #[test]
 fn a_file_is_locked_before_it_holds_the_value() {
-    let ps = place(&[file("db", "C:\\app\\db")]);
-    let lock = ps.find("Protect-IsoloomPath $path;").expect("locked");
-    let write = ps.find("[IO.File]::WriteAllBytes($path").expect("written");
-    assert!(lock < write, "{ps}");
-    assert!(ps.ends_with("Set-IsoloomSecret 'db' 'C:\\app\\db'\n"), "{ps}");
+    assert_eq!(
+        place(&[file("db", "C:\\app\\db")]),
+        "$ErrorActionPreference = 'Stop'\nfunction Protect-IsoloomPath($p) { $dir = Test-Path -PathType Container $p; $acl = if ($dir) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }; $acl.SetAccessRuleProtection($true, $false); $inherit = if ($dir) { 'ContainerInherit, ObjectInherit' } else { 'None' }; foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier $sid), 'FullControl', $inherit, 'None', 'Allow'))) }; Set-Acl -Path $p -AclObject $acl }\n$k = 'C:\\ProgramData\\isoloom\\secrets'\nfunction Set-IsoloomSecret($name, $path) { New-Item -ItemType Directory -Force (Split-Path -Parent $path) | Out-Null; if (-not (Test-Path $path)) { New-Item -ItemType File $path | Out-Null }; Protect-IsoloomPath $path; [IO.File]::WriteAllBytes($path, [IO.File]::ReadAllBytes((Join-Path $k $name))) }\nSet-IsoloomSecret 'db' 'C:\\app\\db'\n",
+        "locked, then written"
+    );
 }
 
 #[test]
 fn the_step_waits_then_places_now_and_at_every_boot() {
     let ps = step("win", &[file("db", "/run/secrets/db")]);
-    let waits = ps.find(&format!("Test-Path '{DELIVERED}'")).expect("waits");
-    let task = ps.find("Register-ScheduledTask -TaskName 'isoloom-apply-secrets'").expect("startup task");
-    assert!(
-        waits < task && ps.contains("New-ScheduledTaskTrigger -AtStartup") && ps.contains("-User 'SYSTEM'"),
-        "{ps}"
-    );
-    assert!(ps.contains(&format!("-File '{PLACE_SCRIPT}'; if ($LASTEXITCODE)")), "{ps}");
+    assert!(ps.starts_with(&wait("win")), "it waits first: {ps}");
+    assert!(ps.ends_with(&format!("{}\n", place_first())), "then places them now: {ps}");
     insta::assert_snapshot!(ps);
 }
 
 #[test]
 fn the_wait_names_the_machine_and_the_way_out() {
-    let ps = wait("win");
-    assert!(
-        ps.contains("win: waiting for its secrets, which the tool that runs it delivers") && ps.contains("AddSeconds(1800)"),
-        "{ps}"
+    assert_eq!(
+        wait("win"),
+        "$t = (Get-Date).AddSeconds(1800); $said = $false; while (-not (Test-Path 'C:\\ProgramData\\isoloom\\secrets\\.delivered')) { if (-not $said) { Write-Output 'win: waiting for its secrets, which the tool that runs it delivers'; $said = $true }; if ((Get-Date) -gt $t) { throw 'win: its secrets never came; start the environment with a tool that delivers them' }; Start-Sleep 5 }\n",
+        "half an hour of five-second tries, naming the machine and the way out"
     );
-    assert!(place_first().contains(PLACE_SCRIPT));
+    assert_eq!(
+        place_first(),
+        "& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\ProgramData\\isoloom\\apply-secrets.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
+    );
 }
 
 #[test]
@@ -119,25 +113,28 @@ fn values_from_the_environment_are_kept_then_placed_without_waiting() {
         &[("db".to_owned(), "PW_B64".to_owned()), ("it's".to_owned(), "X".to_owned())],
         &[file("db", "C:\\db.txt")],
     );
-    assert!(ps.contains("foreach ($e in @{ 'db' = 'PW_B64'; 'it''s' = 'X' }.GetEnumerator())"), "{ps}");
-    assert!(
-        ps.contains("if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) { continue }"),
-        "an empty value keeps the kept one: {ps}"
-    );
-    // An empty value writes an empty file: `$b` is initialised to an empty byte array directly, not
-    // through `else { [byte[]]@() }`, whose empty array PowerShell unwraps to $null -- which made
-    // WriteAllBytes throw "Value cannot be null" the first time an unset input was delivered.
-    assert!(
-        ps.contains("$b = [byte[]]::new(0); if ($v) { $b = [Convert]::FromBase64String($v) };") && !ps.contains("[byte[]]@()"),
-        "an empty value must not reach WriteAllBytes as $null: {ps}"
-    );
-    assert!(ps.contains(&format!("Set-Content -Path '{DELIVERED}' -Value ''\n")), "{ps}");
-    assert!(
-        ps.contains("Register-ScheduledTask -TaskName 'isoloom-apply-secrets'") && !ps.contains("Start-Sleep"),
-        "nothing waits: {ps}"
-    );
-    assert!(
-        ps.starts_with("$ErrorActionPreference = 'Stop'\n") && ps.contains(&format!("$k = '{KEPT_DIR}'")),
-        "{ps}"
+    // An empty value keeps the kept one; else an empty value writes an empty file: `$b` is
+    // initialised to an empty byte array directly, not through `else { [byte[]]@() }`, whose
+    // empty array PowerShell unwraps to $null -- which made WriteAllBytes throw "Value cannot be
+    // null" the first time an unset input was delivered. Nothing waits.
+    assert_eq!(
+        ps.lines().collect::<Vec<_>>(),
+        [
+            "$ErrorActionPreference = 'Stop'",
+            "function Protect-IsoloomPath($p) { $dir = Test-Path -PathType Container $p; $acl = if ($dir) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }; $acl.SetAccessRuleProtection($true, $false); $inherit = if ($dir) { 'ContainerInherit, ObjectInherit' } else { 'None' }; foreach ($sid in 'S-1-5-18', 'S-1-5-32-544') { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier $sid), 'FullControl', $inherit, 'None', 'Allow'))) }; Set-Acl -Path $p -AclObject $acl }",
+            "$k = 'C:\\ProgramData\\isoloom\\secrets'",
+            "New-Item -ItemType Directory -Force $k | Out-Null",
+            "Protect-IsoloomPath $k",
+            "foreach ($e in @{ 'db' = 'PW_B64'; 'it''s' = 'X' }.GetEnumerator()) { $v = [Environment]::GetEnvironmentVariable($e.Value); if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) { continue }; $b = [byte[]]::new(0); if ($v) { $b = [Convert]::FromBase64String($v) }; [IO.File]::WriteAllBytes(\"$k\\$($e.Key).new\", $b); Move-Item -Force \"$k\\$($e.Key).new\" \"$k\\$($e.Key)\" }",
+            "Set-Content -Path 'C:\\ProgramData\\isoloom\\secrets\\.delivered' -Value ''",
+            "Set-Content -Path 'C:\\ProgramData\\isoloom\\apply-secrets.ps1' -Value '$ErrorActionPreference = ''Stop''",
+            "function Protect-IsoloomPath($p) { $dir = Test-Path -PathType Container $p; $acl = if ($dir) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }; $acl.SetAccessRuleProtection($true, $false); $inherit = if ($dir) { ''ContainerInherit, ObjectInherit'' } else { ''None'' }; foreach ($sid in ''S-1-5-18'', ''S-1-5-32-544'') { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier $sid), ''FullControl'', $inherit, ''None'', ''Allow''))) }; Set-Acl -Path $p -AclObject $acl }",
+            "$k = ''C:\\ProgramData\\isoloom\\secrets''",
+            "function Set-IsoloomSecret($name, $path) { New-Item -ItemType Directory -Force (Split-Path -Parent $path) | Out-Null; if (-not (Test-Path $path)) { New-Item -ItemType File $path | Out-Null }; Protect-IsoloomPath $path; [IO.File]::WriteAllBytes($path, [IO.File]::ReadAllBytes((Join-Path $k $name))) }",
+            "Set-IsoloomSecret ''db'' ''C:\\db.txt''",
+            "'",
+            "$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File C:\\ProgramData\\isoloom\\apply-secrets.ps1'; Register-ScheduledTask -TaskName 'isoloom-apply-secrets' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null",
+            "& powershell -NoProfile -ExecutionPolicy Bypass -File 'C:\\ProgramData\\isoloom\\apply-secrets.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
+        ]
     );
 }
