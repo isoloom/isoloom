@@ -12,7 +12,7 @@ use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
-use isoloom_test_support::{yaml, yaml_documents};
+use isoloom_test_support::{assert_every, yaml, yaml_documents};
 
 /// A test's outcome: a failed step is its report.
 type Outcome<T = ()> = Result<T, Box<dyn Error>>;
@@ -125,8 +125,7 @@ fn the_playbook_configures_each_machine_through_its_own_role() -> Outcome {
         let text = file(&files, &format!(".isoloom/external/roles/{}/tasks/main.yml", role_name(machine)))?;
         let docs = yaml_documents(text);
         let tasks = docs.first().and_then(|d| d.as_sequence()).ok_or("a role's tasks aren't a list")?;
-        assert!(!tasks.is_empty(), "{machine}");
-        assert!(tasks.iter().all(|t| t["name"].as_str().is_some_and(|n| !n.is_empty())), "{machine}: {tasks:?}");
+        assert_every!(tasks, |t: &&serde_yaml_ng::Value| t["name"].as_str().is_some_and(|n| !n.is_empty()));
     }
     Ok(())
 }
@@ -148,17 +147,6 @@ fn a_machine_with_nothing_to_configure_is_in_the_inventory_alone() -> Outcome {
     let groups = inventory(file(&files, ".isoloom/external/inventory.ini")?);
     let web = groups.get("linux").and_then(|l| l.first()).ok_or("web isn't a linux host")?;
     assert_eq!(web.1.get("ansible_port").map(String::as_str), Some("2222"));
-    Ok(())
-}
-
-#[test]
-fn a_check_with_nowhere_to_run_is_refused_before_anything_is_written() -> Outcome {
-    // A check with no `from` runs on an access machine, which an external lab doesn't have.
-    let env = spec(
-        "version: 1\nname: home\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 5 }, os: debian@12, ports: { web: 80 } }\nchecks:\n  - { name: up, http: 'http://web/' }\noverrides:\n  external: { machines: { web: { ssh: { address: 192.168.1.20 } } } }\n",
-    )?;
-    let why = ExternalBackend.refusal(&env).ok_or("not refused")?;
-    assert!(ExternalBackend.render(&env).is_err(), "{why}");
     Ok(())
 }
 

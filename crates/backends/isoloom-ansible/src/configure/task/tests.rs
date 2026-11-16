@@ -9,10 +9,11 @@ fn a_task_capitalizes_its_name_and_indents_its_sequences() {
         .notify(&["nginx".to_owned()])
         .into_value();
     let text = yaml(vec![task]);
-    assert!(text.starts_with("- name: \"Packages nginx\"\n"), "{text}");
-    // The sequence under `name:` is indented four spaces (yamllint's indent-sequences).
-    assert!(text.contains("  ansible.builtin.apt:\n    name:\n      - nginx\n"), "{text}");
-    assert!(text.contains("  notify:\n    - \"Isoloom restart nginx\"\n"), "{text}");
+    // A sequence is indented under its key (yamllint's indent-sequences).
+    assert_eq!(
+        text,
+        "- name: \"Packages nginx\"\n  ansible.builtin.apt:\n    name:\n      - nginx\n    update_cache: true\n  notify:\n    - \"Isoloom restart nginx\"\n"
+    );
 }
 
 #[test]
@@ -24,9 +25,11 @@ fn a_mode_and_a_jinja_value_are_quoted_but_a_path_is_plain() {
         )
         .into_value();
     let text = yaml(vec![task]);
-    assert!(text.contains("dest: /etc/app.conf\n"), "a path is plain: {text}");
-    assert!(text.contains("mode: \"0640\"\n"), "a mode stays a string: {text}");
-    assert!(text.contains("src: \"{{ isoloom_project }}/a\"\n"), "a jinja value is quoted: {text}");
+    // A path is plain, a mode stays a string, a Jinja value is quoted.
+    assert_eq!(
+        text,
+        "- name: X\n  ansible.builtin.copy:\n    dest: /etc/app.conf\n    mode: \"0640\"\n    src: \"{{ isoloom_project }}/a\"\n"
+    );
 }
 
 #[test]
@@ -68,15 +71,11 @@ fn a_string_holding_jinja_is_unsafe_unless_isoloom_wrote_it() {
         .set("content", json!("a {{ b }}\nc\n"))
         .into_value();
     let text = yaml(vec![task]);
-    assert!(text.contains("- name: !unsafe \"Echo {{ x }}\"\n"), "{text}");
-    assert!(text.contains("cmd: !unsafe \"echo {{ lookup('pipe', 'id') }}\"\n"), "{text}");
-    assert!(text.contains("- !unsafe \"{% if 1 %}\"\n"), "{text}");
-    assert!(text.contains("- !unsafe \"{# c #}\"\n"), "{text}");
-    assert!(text.contains("- \"a}b{\"\n"), "a lone brace is no Jinja: {text}");
-    assert!(text.contains("content: !unsafe |2\n"), "a block scalar is tagged too: {text}");
-    assert!(
-        text.contains("own: \"{{ isoloom_project }}\"\n"),
-        "Isoloom's own Jinja stays a template: {text}"
+    // The spec's Jinja is `!unsafe` (a block scalar too; a lone brace is none); Isoloom's own
+    // stays a template.
+    assert_eq!(
+        text,
+        "- name: !unsafe \"Echo {{ x }}\"\n  ansible.builtin.shell:\n    cmd: !unsafe \"echo {{ lookup('pipe', 'id') }}\"\n    argv:\n      - !unsafe \"{% if 1 %}\"\n      - !unsafe \"{# c #}\"\n      - \"a}b{\"\n  vars:\n    own: \"{{ isoloom_project }}\"\n  content: !unsafe |2\n    a {{ b }}\n    c\n"
     );
 }
 
@@ -86,21 +85,12 @@ fn a_multiline_string_is_a_block_scalar() {
         .module("ansible.builtin.copy", json!({ "content": "a\nb\n", "dest": "/f" }))
         .into_value();
     let text = yaml(vec![task]);
-    assert!(text.contains("content: |2\n      a\n      b\n"), "{text}");
+    assert_eq!(text, "- name: X\n  ansible.builtin.copy:\n    content: |2\n      a\n      b\n    dest: /f\n");
 }
 
 /// `text` read back by a YAML parser, its `!unsafe` tags dropped, as JSON.
 fn read_back(text: &str) -> Value {
-    fn untag(v: serde_yaml_ng::Value) -> serde_yaml_ng::Value {
-        match v {
-            serde_yaml_ng::Value::Tagged(t) => untag(t.value),
-            serde_yaml_ng::Value::Sequence(items) => serde_yaml_ng::Value::Sequence(items.into_iter().map(untag).collect()),
-            serde_yaml_ng::Value::Mapping(m) => serde_yaml_ng::Value::Mapping(m.into_iter().map(|(k, item)| (k, untag(item))).collect()),
-            other => other,
-        }
-    }
-    let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(text).unwrap_or_else(|e| panic!("{e}: {text}"));
-    serde_json::to_value(untag(yaml)).unwrap()
+    serde_json::to_value(crate::testing::untagged(text)).unwrap()
 }
 
 /// A task whose `content` is `s`, as YAML.
@@ -131,7 +121,11 @@ fn a_block_scalar_reads_back_as_the_text_it_holds() {
         assert_eq!(read_back(&text), value, "{s:?} as {text}");
         assert!(!text.lines().any(|l| l.ends_with(' ')), "no trailing space in the file: {text}");
     }
-    assert!(content("  a\nb\n").1.contains("content: |2\n        a\n      b\n"), "{}", content("  a\nb\n").1);
+    // A first line that starts with spaces: the indentation indicator says where the text starts.
+    assert_eq!(
+        content("  a\nb\n").1,
+        "- name: X\n  ansible.builtin.copy:\n    content: |2\n        a\n      b\n    dest: /f\n"
+    );
 }
 
 proptest::proptest! {

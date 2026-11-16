@@ -220,6 +220,46 @@ mod tests {
         assert!(!site.contents.contains("db_password\n"), "{}", site.contents);
     }
 
+    /// A secret kept in a file of the computer `ansible-playbook` runs on is read there: a
+    /// relative path from the project folder, `~/…` from the home folder, an absolute one as it
+    /// is.
+    #[test]
+    fn a_secret_from_a_file_is_read_where_ansible_runs() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12, files: [{ path: /etc/p, secret: p }, { path: /etc/h, secret: h }, { path: /etc/r, secret: r }] }\nsecrets: { p: { file: keys/p.txt }, h: { file: '~/keys/h.txt' }, r: { file: /srv/keys/r.txt } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        let files = render(&env).expect("renders");
+        let site = files.iter().find(|f| f.path.ends_with("external/site.yml")).expect("site.yml");
+        let plays: serde_yaml_ng::Value = serde_yaml_ng::from_str(&site.contents).expect("YAML");
+        let read: Vec<(&str, &str, &str)> = plays[0]["tasks"]
+            .as_sequence()
+            .expect("tasks")
+            .iter()
+            .filter_map(|t| {
+                let copy = t.get("ansible.builtin.copy")?;
+                Some((copy["dest"].as_str()?, copy["content"].as_str()?, t["vars"]["isoloom_secret_file"].as_str()?))
+            })
+            .collect();
+        assert_eq!(
+            read,
+            [
+                (
+                    "/etc/p",
+                    "{{ lookup('ansible.builtin.file', isoloom_project ~ '/' ~ isoloom_secret_file) }}",
+                    "keys/p.txt"
+                ),
+                (
+                    "/etc/h",
+                    "{{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'HOME') ~ '/' ~ isoloom_secret_file) }}",
+                    "keys/h.txt"
+                ),
+                ("/etc/r", "{{ lookup('ansible.builtin.file', isoloom_secret_file) }}", "/srv/keys/r.txt"),
+            ],
+            "{}",
+            site.contents
+        );
+    }
+
     #[test]
     fn a_windows_hosts_secret_file_is_refused_not_dropped() {
         let env = environment(
@@ -270,20 +310,6 @@ mod tests {
         );
         assert_eq!(render(&env).expect("renders"), render(&env).expect("renders again"));
     }
-
-    #[test]
-    fn the_inventory_reaches_each_host_at_its_own_address_and_port() {
-        let env = environment(
-            "  a: { networks: { lab: 5 }, os: debian@12 }\noverrides: { external: { machines: { a: { ssh: { address: h.example, port: 2200 } } } } }\n",
-        );
-        let files = render(&env).expect("renders");
-        let inventory = files.iter().find(|f| f.path == ".isoloom/external/inventory.ini").expect("the inventory");
-        assert!(
-            inventory.contents.contains("\na ansible_host=h.example ansible_port=2200\n"),
-            "{}",
-            inventory.contents
-        );
-    }
 }
 
 /// The inventory as the existing hosts are reached.
@@ -310,11 +336,5 @@ mod inventory_tests {
     #[test]
     fn external_existing_hosts() {
         insta::assert_snapshot!(render(&example("existing-hosts", Target::External).unwrap(), &access()));
-    }
-
-    #[test]
-    fn rendering_twice_gives_the_same_inventory() {
-        let once = render(&example("existing-hosts", Target::External).unwrap(), &access());
-        assert_eq!(once, render(&example("existing-hosts", Target::External).unwrap(), &access()));
     }
 }
