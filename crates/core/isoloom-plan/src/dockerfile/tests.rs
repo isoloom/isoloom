@@ -327,3 +327,35 @@ fn a_file_copied_out_of_composers_image_is_the_catalogue_entry_for_it() {
     // The series' newest release, on the VM's own OS (the php image's).
     written_out(&t, "2.8.12");
 }
+
+#[test]
+fn a_dockerfile_a_vm_cant_be_is_refused_at_the_line_that_says_so() {
+    let refused = |text: &str| translate(&db(text), &Sources::default()).map(|_| ()).unwrap_err().to_string();
+    let found: Vec<String> = [
+        "",
+        "ARG V=1\nRUN make\n",
+        "FROM debian:12\nCOPY ../shared/a.conf /etc/a.conf\n",
+        "FROM debian:12\nCOPY sub\\\\a.conf /etc/a.conf\n",
+        "FROM debian:12 AS build\nRUN make\nFROM debian:12\nCOPY --from=build / /srv/\n",
+    ]
+    .into_iter()
+    .map(refused)
+    .collect();
+    assert_eq!(
+        found,
+        [
+            "build/db/Dockerfile line 1 (`FROM`): the Dockerfile has no `FROM`",
+            "build/db/Dockerfile line 1 (`FROM`): the Dockerfile has no `FROM`",
+            "build/db/Dockerfile line 2 (`COPY`): `../shared/a.conf` goes out of the build context",
+            "build/db/Dockerfile line 2 (`COPY`): `sub\\\\a.conf` goes out of the build context",
+            "build/db/Dockerfile line 4 (`COPY`): it copies a stage's whole filesystem: a VM can't be two systems"
+        ]
+    );
+}
+
+#[test]
+fn a_copy_with_chmod_sets_the_mode_of_what_it_placed() {
+    let t = translated_db("FROM debian:12\nCOPY --chmod=0755 run.sh /usr/local/bin/\n");
+    let modes: Vec<String> = script_lines(&t).into_iter().filter(|l| l.starts_with("chmod -R")).collect();
+    assert_eq!(modes, ["chmod -R 0755 \"$dest\""]);
+}

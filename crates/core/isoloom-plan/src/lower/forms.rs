@@ -256,4 +256,21 @@ mod tests {
         assert_eq!(container(&dc, None, &testing::daemons()).map_err(|no| no.field), Err("os".to_owned()));
         assert!(matches!(vm(&dc, None), Ok(Vm::Os(_))));
     }
+
+    #[test]
+    fn steps_whose_service_has_no_foreground_or_that_serve_nothing_have_no_container() {
+        let refused = |yaml: &str| {
+            container(&machine(yaml), None, &testing::daemons())
+                .map(|_| ())
+                .map_err(|no| format!("{}: {}", no.field, no.reason))
+        };
+        assert_eq!(
+            refused("{ os: debian@12, app: { steps: [{ run: a.sh }, { service: myd }] } }"),
+            Err("app.steps[1].service: `myd` isn't in the daemon table, so a container can't run it".to_owned())
+        );
+        assert_eq!(
+            refused("{ os: debian@12, ports: { web: 80 }, app: { steps: [{ run: web.sh }] } }"),
+            Err("command: its steps install services, but no `service` step or `command` runs one in a container".to_owned())
+        );
+    }
 }

@@ -262,3 +262,21 @@ fn a_service_whose_recipe_its_os_cant_carry_is_a_problem_not_a_machine_left_unse
         ]
     );
 }
+
+#[test]
+fn a_volume_or_a_file_where_the_entry_keeps_its_own_is_a_conflict_at_the_authors_field() {
+    let found: Vec<String> = lab(
+        "{ os: debian@12, service: postgres, with: { password: s3cret }, networks: { lab: 10 }, volumes: { mine: /var/lib/postgresql/data }, files: [{ path: /etc/motd, content: hi }, { path: /run/isoloom/with/password, content: x }] }",
+    )
+    .problems()
+    .iter()
+    .map(|p| format!("{:?} {}", p.code, p.line()))
+    .collect();
+    assert_eq!(
+        found,
+        [
+            "Conflict machines.web.volumes.mine: postgres keeps its `data` data at /var/lib/postgresql/data",
+            "Conflict machines.web.files[1]: postgres places a setting's value file at /run/isoloom/with/password"
+        ]
+    );
+}
