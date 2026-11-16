@@ -1,5 +1,5 @@
 ---
-source: crates/backends/isoloom-vagrant/tests/vagrant.rs
+source: crates/backends/isoloom-vagrant/tests/vagrant/examples.rs
 expression: "vagrantfile.get(start..end).ok_or(\"out of order\")?"
 ---
     # This computer's folders (`host_folders`), both ways: each provider's own shared folder.

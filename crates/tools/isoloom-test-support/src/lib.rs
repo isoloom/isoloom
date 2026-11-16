@@ -9,6 +9,7 @@
 //!   executes a file its own process wrote: that file is open for writing in every process
 //!   another test thread forks meanwhile, and executing it then fails with "Text file busy".
 //! - [`assert_every!`]: fails on an empty collection, where `iter().all(..)` passes.
+//! - [`needs`]: a test of a real tool fails naming the tool when it isn't there.
 //! - [`hcl_body`], [`yaml`], [`ruby_blocks`]: a rendered file parsed, so a test asserts on its values rather than on
 //!   substrings of its text.
 //! - [`sh_decode`], [`hcl_decode`] and the other decoders: a literal the builders write read back
@@ -228,6 +229,25 @@ impl Drop for ChildGuard {
         self.child.kill().ok();
         self.child.wait().ok();
     }
+}
+
+/// Fails naming the first of `tools` that isn't on the `PATH`: a test that needs a real tool is
+/// ignored by default (a player's machine lacks it) and `cargo xtask test` runs it, so a missing
+/// tool says so rather than fail on its first call.
+///
+/// # Errors
+/// The first tool not found.
+pub fn needs(tools: &[&str]) -> Outcome<()> {
+    for tool in tools {
+        // Looked up, not started: a tool that starts leaves its own files (PowerShell's pipe in
+        // the temporary folder) for the test run's leftover guard to find.
+        let found = std::env::var_os("PATH")
+            .is_some_and(|path| std::env::split_paths(&path).any(|d| d.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX)).is_file()));
+        if !found {
+            return Err(format!("needs `{tool}` on PATH").into());
+        }
+    }
+    Ok(())
 }
 
 /// Asserts that `$pred` holds for every item of `$items`, naming the first that doesn't, and that
