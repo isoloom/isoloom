@@ -1,8 +1,0 @@
----
-source: crates/cli/isoloom/tests/example_snapshots.rs
----
-# isoloom targets
-✗ cloud-vm (tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only)
-
-# isoloom generate --target cloud-vm (exit 1)
-· cloud-vm: tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only

@@ -165,9 +165,12 @@ mod tests {
     #[test]
     #[ignore = "needs ruby: records a Vagrantfile with the host's Ruby; `cargo xtask test` runs it"]
     fn what_a_vagrantfile_prints_never_reaches_the_recording() -> Outcome {
-        let (_dir, script, file) = folder("puts", "puts \"hello\"\nVagrant.configure(\"2\") { |c| c.vm.box = \"debian/bookworm64\" }\n")?;
-        let recorded = record_with(&["ruby"], &script, &file);
-        assert!(recorded.is_ok(), "{recorded:?}");
+        let configure = "Vagrant.configure(\"2\") { |c| c.vm.box = \"debian/bookworm64\" }\n";
+        let (_quiet, quiet_script, quiet_file) = folder("quiet", configure)?;
+        let quiet = record_with(&["ruby"], &quiet_script, &quiet_file)?;
+        let (_dir, script, file) = folder("puts", &format!("puts \"hello\"\n{configure}"))?;
+        assert_eq!(record_with(&["ruby"], &script, &file)?, quiet);
+        assert_ne!(quiet, Recording::default(), "the box is recorded");
         Ok(())
     }
 }

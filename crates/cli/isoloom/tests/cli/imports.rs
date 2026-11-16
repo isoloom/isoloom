@@ -1,6 +1,8 @@
 //! `isoloom import` through the binary: the draft it writes passes `isoloom validate`, and the
 //! notes say what the source had that the draft doesn't.
 
+use isoloom_test_support::{yaml, yaml_str};
+
 use crate::testing::{Outcome, isoloom, scratch};
 
 #[test]
@@ -34,10 +36,8 @@ fn a_terraform_import_prints_the_draft_and_its_notes_apart() -> Outcome {
     )?;
     let printed = isoloom(&dir, &[&"import", &"terraform", &dir, &"--stdout"])?;
     assert_eq!(printed.code, Some(0), "{printed:?}");
-    assert!(
-        printed.stdout.contains("machines:\n  web:\n    networks: { lab: 10 }\n"),
-        "the draft on stdout: {printed:?}"
-    );
+    let draft = yaml(&printed.stdout);
+    assert_eq!(yaml_str(&draft, "machines.web.networks.lab"), "10", "the draft on stdout: {printed:?}");
     assert!(printed.stderr.ends_with("\n✓ the draft is valid\n"), "the notes on stderr: {printed:?}");
     std::fs::write(dir.join("isoloom.yml"), &printed.stdout)?;
     let validated = isoloom(&dir, &[&"validate", &dir])?;

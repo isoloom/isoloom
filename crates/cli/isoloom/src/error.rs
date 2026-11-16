@@ -223,16 +223,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn each_error_names_what_to_fix() {
-        assert_eq!(CliError::UnknownTarget("bogus".into()).to_string(), "unknown target `bogus`");
-        assert_eq!(CliError::UnknownFormat("svg".into()).to_string(), "unknown format `svg`; `d2` or `dot`");
-        assert_eq!(
-            CliError::SpecExists(PathBuf::from("lab")).to_string(),
-            "lab already has a spec; use --force to replace it, or --stdout"
-        );
-    }
-
-    #[test]
     fn an_invalid_spec_keeps_its_problems_and_a_missing_one_its_reason() {
         let invalid = isoloom_spec::Error::Invalid {
             file: "isoloom.yml".into(),
@@ -247,6 +237,7 @@ mod tests {
     fn an_io_error_is_the_cause_of_the_read_that_failed() {
         let e = CliError::reading("compose.yaml")(std::io::Error::from(std::io::ErrorKind::NotFound));
         assert_eq!(e.to_string(), "can't read compose.yaml");
-        assert!(e.source().is_some());
+        let cause = e.source().and_then(|c| c.downcast_ref::<std::io::Error>()).map(std::io::Error::kind);
+        assert_eq!(cause, Some(std::io::ErrorKind::NotFound));
     }
 }

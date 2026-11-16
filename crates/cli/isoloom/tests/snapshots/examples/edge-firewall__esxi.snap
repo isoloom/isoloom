@@ -1,8 +1,0 @@
----
-source: crates/isoloom/tests/example_snapshots.rs
----
-# isoloom targets
-✗ esxi (Isoloom routes no network through a `gateway` machine on ESXi)
-
-# isoloom generate --target esxi (exit 1)
-· esxi: Isoloom routes no network through a `gateway` machine on ESXi

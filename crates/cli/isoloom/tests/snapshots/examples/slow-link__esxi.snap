@@ -1,8 +1,0 @@
----
-source: crates/cli/isoloom/tests/example_snapshots.rs
----
-# isoloom targets
-✗ esxi (tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only)
-
-# isoloom generate --target esxi (exit 1)
-· esxi: tool `shell` (`tools:`) is added beside the environment on the Docker and Vagrant targets only

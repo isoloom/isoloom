@@ -5,6 +5,8 @@
 
 use std::path::{Path, PathBuf};
 
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_text, ruby_blocks, yaml, yaml_documents, yaml_keys_at, yaml_str, yaml_values};
+
 use crate::testing::{Outcome, Scratch, isoloom_with, project};
 
 const ENV_VALUE: &str = "env-sentinel-7f3a9c";
@@ -163,15 +165,18 @@ fn find<'a>(generated: &'a [(PathBuf, String)], suffix: &str) -> Outcome<&'a str
 fn no_secret_value_reaches_a_generated_file() -> Outcome {
     let generated = generated(SPEC, "containers")?;
     // Docker and Kubernetes take the spec: their files are there, naming the secrets only.
-    let compose = find(&generated, "docker/compose.yml")?;
-    assert!(compose.contains("environment: ISOLOOM_SECRET_DB_PASSWORD"), "{compose}");
-    let pods = find(&generated, "kubernetes/environment.yaml")?;
-    assert!(pods.contains("secretName: isoloom-secrets"), "{pods}");
+    let compose = yaml(find(&generated, "docker/compose.yml")?);
+    assert_eq!(yaml_str(&compose, "secrets.db-password.environment"), "ISOLOOM_SECRET_DB_PASSWORD");
+    let pods = yaml_documents(find(&generated, "kubernetes/environment.yaml")?);
+    let secrets: Vec<String> = pods.iter().flat_map(|d| yaml_values(d, "secretName")).collect();
+    assert!(secrets.iter().any(|s| s == "isoloom-secrets"), "{secrets:?}");
     find(&generated, "resolved.json")?;
     // On cloud-docker, the module takes the containers' secrets as sensitive variables, the
     // value in no generated file.
-    let module = find(&generated, "cloud-docker/aws/main.tf")?;
-    assert!(module.contains("variable \"ISOLOOM_SECRET_DB_PASSWORD\""), "{module}");
+    let module = hcl_body(find(&generated, "cloud-docker/aws/main.tf")?);
+    let variables = hcl_blocks(&module, "variable", &["ISOLOOM_SECRET_DB_PASSWORD"]);
+    let sensitive: Vec<String> = variables.iter().map(|v| hcl_text(v.body(), "sensitive")).collect();
+    assert_eq!(sensitive, ["true"], "one sensitive variable");
     Ok(())
 }
 
@@ -217,18 +222,29 @@ fn every_issued_input_is_a_file_never_an_environment_value() -> Outcome {
     // On containers, each input is a secret file read from the environment, never one of
     // the container's variables; on a VM, a secret file the guest delivery writes, never a line of
     // the inputs file the machine's scripts read.
-    let compose = find(&generated, "docker/compose.yml")?;
-    let vagrantfile = find(&generated, "vagrant/Vagrantfile")?;
+    let compose_text = find(&generated, "docker/compose.yml")?;
+    let compose = yaml(compose_text);
+    let vagrantfile = ruby_blocks(find(&generated, "vagrant/Vagrantfile")?);
+    let delivery = vagrantfile
+        .block("config.vm.define \"web\"")
+        .statements("m.vm.provision \"shell\", name: \"secrets\"");
+    let [delivery] = delivery[..] else {
+        panic!("one secrets provisioner: {delivery:?}")
+    };
+    let read_from: Vec<String> = yaml_keys_at(&compose, "secrets")
+        .iter()
+        .map(|k| yaml_str(&compose, &format!("secrets.{k}.environment")))
+        .collect();
+    assert_eq!(read_from, SECRET_INPUTS, "each input a secret read from the environment");
     for input in SECRET_INPUTS {
-        assert!(compose.contains(&format!("environment: {input}\n")), "{input}: {compose}");
-        assert!(!compose.contains(&format!("${{{input}")), "{input} is interpolated: {compose}");
+        assert!(!compose_text.contains(&format!("${{{input}")), "{input} is interpolated: {compose_text}");
         assert!(
-            vagrantfile.contains(&format!("\"ISOLOOM_SECRET_INPUT_{input}\" => isoloom_b64(INPUTS[\"{input}\"])")),
-            "{input}: {vagrantfile}"
+            delivery.contains(&format!("\"ISOLOOM_SECRET_INPUT_{input}\" => isoloom_b64(INPUTS[\"{input}\"])")),
+            "{input}: {delivery}"
         );
         assert!(
-            !vagrantfile.contains(&format!("\"{input}\" => isoloom_b64")),
-            "{input} is a plain input: {vagrantfile}"
+            !vagrantfile.every_statement().iter().any(|s| s.contains(&format!("\"{input}\" => isoloom_b64"))),
+            "{input} is a plain input"
         );
     }
     Ok(())
