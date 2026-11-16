@@ -4,7 +4,7 @@
 use isoloom_spec::Target;
 use isoloom_targets::Lab;
 
-use isoloom_test_support::{assert_every, hcl, hcl_blocks, hcl_body, hcl_map, hcl_nested, hcl_one, hcl_values};
+use isoloom_test_support::{assert_every, hcl, hcl_blocks, hcl_body, hcl_map, hcl_nested, hcl_one, hcl_values, owned_pairs};
 
 use crate::testing::{Outcome, examples, generated as file, lab, problems, valid};
 
@@ -25,25 +25,20 @@ fn module_tags(body: &hcl::Body) -> Vec<(String, String)> {
     locals.chain(aws).collect()
 }
 
-/// `pairs` as owned (name, value) pairs.
-fn owned(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
-    pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
-}
-
 #[test]
 fn every_cloud_tags_its_resources_with_the_specs_tags() -> Outcome {
     let lab = tagged()?;
     for cloud in ["aws", "azure", "oci"] {
         let tags = module_tags(&hcl_body(&file(&lab, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?));
         // The spec's, and Isoloom's own beside them.
-        for tag in owned(&[("Cost.Center", "R&D 42"), ("team", "platform"), ("managed-by", "isoloom")]) {
+        for tag in owned_pairs(&[("Cost.Center", "R&D 42"), ("team", "platform"), ("managed-by", "isoloom")]) {
             assert!(tags.contains(&tag), "{cloud}: {tag:?} in {tags:?}");
         }
     }
     // Google Cloud's labels take lowercase letters, digits, `_` and `-`.
     let gcp = hcl_body(&file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?);
     let labels = hcl_map(hcl_one(&gcp, "google_project", "env"), "labels");
-    assert!(labels.contains(&owned(&[("cost_center", "r_d_42")])[0]), "{labels:?}");
+    assert!(labels.contains(&owned_pairs(&[("cost_center", "r_d_42")])[0]), "{labels:?}");
     assert!(!labels.iter().any(|(k, _)| k == "Cost.Center"), "{labels:?}");
     // DigitalOcean and Linode take tags as `name:value` words.
     for cloud in ["digitalocean", "linode"] {
@@ -97,7 +92,7 @@ fn google_cloud_labels_its_boot_disks_and_its_private_zone() -> Outcome {
     let lab = valid(&format!("{text}\ndns: {{ private: true }}\ntags:\n  team: platform\n"))?;
     let vm = hcl_body(&file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?);
     let docker = hcl_body(&file(&tagged()?, Target::CloudDocker, "cloud-docker/gcp/main.tf")?);
-    let team = owned(&[("team", "platform")]).remove(0);
+    let team = owned_pairs(&[("team", "platform")]).remove(0);
     for (module, body) in [("cloud-vm", &vm), ("cloud-docker", &docker)] {
         let disks: Vec<Vec<(String, String)>> = hcl_blocks(body, "resource", &["google_compute_instance"])
             .iter()

@@ -20,6 +20,10 @@ pub enum Service {
 }
 
 /// A Kafka cluster, its topics and its one SASL login.
+// Its `size`, `publish` and `clients` are Postgres's, attributes and all: the quality baseline
+// records that clone (dup/clone 1 in isoloom-spec). Sharing them takes a `#[serde(flatten)]`
+// struct, which serde doesn't support beside `deny_unknown_fields`, and the spec relies on that to
+// refuse a misspelt key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Kafka {

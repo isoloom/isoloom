@@ -14,6 +14,7 @@
 //!   substrings of its text.
 //! - [`sh_decode`], [`hcl_decode`] and the other decoders: a literal the builders write read back
 //!   as its language reads it, for the quoting properties and the fuzz target.
+//! - [`owned_pairs`]: (name, value) pairs written as string literals, owned.
 //!
 //! A test-only crate: it panics where a test should fail.
 
@@ -229,6 +230,12 @@ impl Drop for ChildGuard {
         self.child.kill().ok();
         self.child.wait().ok();
     }
+}
+
+/// `pairs` as owned (name, value) pairs: a map's entries, environment variables, tags.
+#[must_use]
+pub fn owned_pairs(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
 }
 
 /// Fails naming the first of `tools` that isn't on the `PATH`: a test that needs a real tool is
