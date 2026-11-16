@@ -6,7 +6,7 @@ use isoloom_targets::generate;
 
 use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_text, ruby_blocks};
 
-use crate::testing::{Outcome, between, define, example, from, generated, lab};
+use crate::testing::{Outcome, define, example, generated, lab, provisioners};
 
 #[test]
 fn windows_machines_use_winrm_and_powershell() -> Outcome {
@@ -25,21 +25,19 @@ fn windows_machines_use_winrm_and_powershell() -> Outcome {
         matches!(hosts.as_slice(), [one] if one.contains("drivers\\\\etc\\\\hosts")),
         "the Windows hosts file: {hosts:?}"
     );
-    let dc = between(vf, "config.vm.define \"dc01\"", "config.vm.define \"web\"")?;
     // The project in C:\isoloom first, then each step run from there.
-    let project = dc.find("m.vm.provision \"isoloom_project\", name: \"project\"").expect("the project step");
+    let steps = provisioners(dc01);
+    let at = |name: &str| steps.iter().position(|s| s == name).ok_or_else(|| format!("no `{name}` step in {steps:?}"));
+    assert!(at("project")? < at("provision/dc.ps1")?, "{steps:?}");
     // Run once, until the script changes (a mark of its hash).
-    let step = dc
-        .find("name: \"provision/dc.ps1\", inline: \"$isoloomSum = (Get-FileHash")
-        .expect("the step, run once");
-    let line = dc.get(step..).and_then(|s| s.lines().next()).unwrap_or_default();
+    let step = dc01.statements("m.vm.provision \"shell\", name: \"provision/dc.ps1\", inline: \"$isoloomSum = (Get-FileHash");
+    let line = step.first().and_then(|s| s.lines().next()).ok_or("the step, run once")?;
     assert!(
         line.contains(
             "Set-Location C:\\\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'provision/dc.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
         ),
         "the step, from the project: {line}"
     );
-    assert!(project < step);
     let web = define(&file, "web");
     assert_eq!(web.statements("m.vm.box = "), ["m.vm.box = \"example/win2019\""], "the spec's image wins");
     assert_eq!(web.statements("m.vm.box_version = "), ["m.vm.box_version = \"1.0\""]);
@@ -97,9 +95,8 @@ fn linux_machines_leave_windows_out_of_etc_hosts() -> Outcome {
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 192.168.56.0/24 }\nmachines:\n  dc01:\n    os: windows-server@2019\n    networks: { lab: 10 }\n    ports: { ldap: 389 }\n    app: { steps: [{ run: p.ps1 }] }\n  lx01:\n    os: ubuntu@24.04\n    networks: { lab: 12 }\n    ports: { ssh: 22 }\n    depends_on: [dc01]\n    app: { steps: [{ run: p.sh }] }\n",
     )?;
     let vf = &generate(&spec, Target::Vagrant).unwrap()[0].contents;
-    let lx01 = from(vf, "config.vm.define \"lx01\"")?;
-    let (head, rest) = lx01.split_at_checked(20).ok_or("a short define")?;
-    let lx = format!("{head}{}", rest.split("config.vm.define").next().unwrap_or_default());
+    let file = ruby_blocks(vf);
+    let lx = define(&file, "lx01").every_statement().join("\n");
     // The Windows DC isn't added to lx01's /etc/hosts by name.
     assert!(
         !lx.contains("192.168.56.10 dc01"),

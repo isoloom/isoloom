@@ -13,7 +13,7 @@ fn a_lab_every_generator_refuses_is_refused_with_reasons() -> Outcome {
         lab("version: 1\nname: w\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\ntargets: [cloud-vm]\nmachines:\n  ws: { os: windows@11, networks: { lab: 10 } }\n")?;
     let (files, skipped) = generate_all(&spec);
     assert_eq!(files.iter().map(|f| &f.path).collect::<Vec<_>>(), Vec::<&String>::new());
-    assert!(!skipped.is_empty() && skipped.iter().all(GenerateError::is_refusal));
+    isoloom_test_support::assert_every!(&skipped, |e: &&GenerateError| e.is_refusal());
     Ok(())
 }
 
@@ -50,31 +50,27 @@ const BAD_CIDR: &str = "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0
 const UNDECLARED_NETWORK: &str =
     "version: 1\nname: t\nnetworks:\n  app: { cidr: 10.20.0.0/24 }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx } }\n";
 
-/// That `refusal` on a spec nobody validated refuses every target with the spec's problem, and
-/// doesn't panic.
-fn refused_everywhere(yaml: &str, problem: &str) -> Outcome {
-    let spec = lab(yaml)?;
-    for t in Target::ALL {
-        let why = isoloom_targets::refusal(&spec, t)?.ok_or_else(|| format!("{t:?} not refused"))?;
-        assert!(why.contains(problem), "{t:?}: {why}");
+/// `refusal` on a spec nobody validated refuses every target with the spec's problem, and
+/// doesn't panic: a bad CIDR, a network nobody declared.
+#[test]
+fn refusal_of_an_invalid_spec_names_its_problem_on_every_target() -> Outcome {
+    for (case, yaml, problem) in [
+        ("an invalid CIDR", BAD_CIDR, "networks.app.cidr"),
+        ("an undeclared network", UNDECLARED_NETWORK, "no network named `lan`"),
+    ] {
+        let spec = lab(yaml)?;
+        for t in Target::ALL {
+            let why = isoloom_targets::refusal(&spec, t)?.ok_or_else(|| format!("{case}: {t:?} not refused"))?;
+            assert!(why.contains(problem), "{case} on {t:?}: {why}");
+        }
     }
     Ok(())
 }
 
 #[test]
-fn refusal_of_an_invalid_cidr_does_not_panic() -> Outcome {
-    refused_everywhere(BAD_CIDR, "networks.app.cidr")
-}
-
-#[test]
-fn refusal_of_an_undeclared_network_does_not_panic() -> Outcome {
-    refused_everywhere(UNDECLARED_NETWORK, "no network named `lan`")
-}
-
-#[test]
 fn checks_plan_of_an_undeclared_network_does_not_panic() -> Outcome {
     let planned = isoloom_plan::checks::plan(&lab(UNDECLARED_NETWORK)?.spec());
-    assert!(!planned.is_empty() && planned.iter().all(|c| !c.name.is_empty()), "{planned:?}");
+    isoloom_test_support::assert_every!(&planned, |c: &&isoloom_plan::checks::Resolved| !c.name.is_empty());
     Ok(())
 }
 
@@ -88,7 +84,8 @@ fn unsupported_features_are_refused_with_the_reason() -> Outcome {
             if what == "machines.dc01.os: Windows has no container form"
     ));
     // The domain's playbooks run from the controller: the VM targets generate it.
-    assert!(generate(&ad, Target::Vagrant).is_ok() && generate(&ad, Target::Proxmox).is_ok());
+    generate(&ad, Target::Vagrant)?;
+    generate(&ad, Target::Proxmox)?;
     assert!(
         matches!(generate(&ad, Target::CloudVm), Err(Error::Generate(GenerateError::Unsupported { ref what, .. })) if what.contains("no AWS image for `windows-11`"))
     );

@@ -54,7 +54,7 @@ fn kubernetes_declares_the_dormant_port_and_waits_for_80(spec: &Lab) -> Outcome 
         .ok_or("app has no initContainers")?;
     let waits = serde_yaml_ng::to_string(init)?;
     assert!(waits.contains("until nc -z web 80; do sleep 2; done"), "{waits}");
-    assert!(readiness_probes(&docs).iter().all(|p| !p.contains("4444")), "{env}");
+    isoloom_test_support::assert_every!(readiness_probes(&docs), |p: &String| !p.contains("4444"));
     Ok(())
 }
 
@@ -84,17 +84,18 @@ fn a_dormant_service_is_declared_but_never_waited_for() -> Outcome {
     // so whatever waits for it waits for it to start.
     let compose: serde_yaml_ng::Value = serde_yaml_ng::from_str(&generated(&spec, Target::Docker, ".isoloom/docker/compose.yml")?).unwrap();
     let svc = |n: &str| compose["services"][n].clone();
-    let probe = serde_yaml_ng::to_string(&svc("web")["healthcheck"]).unwrap();
-    assert!(probe.contains("127.0.0.1 80") && !probe.contains("4444"), "{probe}");
-    assert!(svc("shell").get("healthcheck").is_none());
-    assert!(
-        serde_yaml_ng::to_string(&svc("shell")).unwrap().contains(":4444"),
-        "still published: {:?}",
-        svc("shell")
+    let probe = isoloom_test_support::yaml_strs(&compose, "services.web.healthcheck.test");
+    assert_eq!(
+        probe.last().map(String::as_str),
+        Some("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 80"),
+        "{probe:?}"
     );
+    assert!(svc("shell").get("healthcheck").is_none());
+    let published = isoloom_test_support::yaml_strs(&compose, "services.shell.ports");
+    assert!(published.iter().any(|p| p.ends_with(":4444")), "still published: {published:?}");
     assert_eq!(svc("app")["depends_on"]["web"]["condition"].as_str(), Some("service_healthy"));
-    let check = serde_yaml_ng::to_string(&svc("isoloom-check-app")["depends_on"]).unwrap();
-    assert!(check.contains("web:") && !check.contains("shell:"), "{check}");
+    let waits = isoloom_test_support::yaml_keys_at(&compose, "services.isoloom-check-app.depends_on");
+    assert!(waits.contains(&"web".to_owned()) && !waits.contains(&"shell".to_owned()), "{waits:?}");
 
     kubernetes_declares_the_dormant_port_and_waits_for_80(&spec)?;
     vms_wait_for_80_only(&spec)?;
@@ -152,8 +153,12 @@ fn a_udp_service_is_published_as_udp_on_docker() -> Outcome {
     assert!(ports("dns").iter().any(|p| p.ends_with("+10053}:53/udp")), "{:?}", ports("dns"));
     assert_eq!(svc("dns")["labels"]["isoloom.port.dns"].as_str(), Some("udp:53"));
     assert_eq!(svc("dns")["labels"]["isoloom.port.zone"].as_str(), Some("tcp:53"));
-    let probe = serde_yaml_ng::to_string(&svc("dns")["healthcheck"]).unwrap();
-    assert!(probe.contains("127.0.0.1 53"), "{probe}");
+    let probe = isoloom_test_support::yaml_strs(&compose, "services.dns.healthcheck.test");
+    assert_eq!(
+        probe.last().map(String::as_str),
+        Some("/.isoloom-probe/busybox nc -z -w 2 127.0.0.1 53"),
+        "{probe:?}"
+    );
     assert!(svc("syslog").get("healthcheck").is_none());
     assert!(ports("syslog").iter().any(|p| p.ends_with(":514/udp")), "{:?}", ports("syslog"));
     Ok(())
@@ -178,7 +183,8 @@ fn a_udp_and_a_tcp_port_on_one_number_stay_apart_by_name() -> Outcome {
         "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  \
          dns: { networks: { lab: 5 }, ports: { dns: { port: 53, protocol: udp }, dns: 53 }, app: { image: x } }\n",
     );
-    assert!(twice.unwrap_err().to_string().contains("dns"));
+    let err = twice.err().ok_or("a port named twice parses")?.to_string();
+    assert!(err.contains("duplicate") && err.contains("dns"), "{err}");
     Ok(())
 }
 
@@ -212,7 +218,7 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
     for name in ["p53-udp", "p53", "p10053-udp"] {
         assert!(service_ports.iter().any(|p| p == name), "{name}: {service_ports:?}");
     }
-    assert!(readiness_probes(&docs).iter().all(|p| !p.contains("514")), "{env}");
+    isoloom_test_support::assert_every!(readiness_probes(&docs), |p: &String| !p.contains("514"));
 
     // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
     let vf = vagrantfile(&spec)?;
