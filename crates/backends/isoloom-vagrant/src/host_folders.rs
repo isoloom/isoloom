@@ -204,15 +204,26 @@ mod tests {
         }
     }
 
-    /// A share that is `drwxrwxr-x 1000:1000` must let another account of the VM in group 1000
-    /// (uid 1001) write, but vagrant-qemu's virtiofsd maps uid and gid 1000 alone, so its writes
-    /// would fail with EPERM. QEMU's block sets the ids it maps and squashes every other one to
-    /// this computer's user (`IsoloomQemu.virtiofs_squash`).
     /// Provider `name`'s block of the rendered Ruby (`m.vm.provider "<name>" do |…|`).
     fn provider<'r>(r: &'r isoloom_test_support::RubyBlock, name: &str) -> Option<&'r isoloom_test_support::RubyBlock> {
         r.find(&format!("m.vm.provider \"{name}\" do |")).into_iter().next()
     }
 
+    /// The trigger's statements that stop `vagrant up` on a provider that doesn't share: the table
+    /// of reasons, the unknown provider's, the abort.
+    fn refusals(r: &isoloom_test_support::RubyBlock) -> Vec<&str> {
+        r.block("m.trigger.before :up do |t|")
+            .block("t.ruby do |_, machine|")
+            .statements
+            .iter()
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// A share that is `drwxrwxr-x 1000:1000` must let another account of the VM in group 1000
+    /// (uid 1001) write, but vagrant-qemu's virtiofsd maps uid and gid 1000 alone, so its writes
+    /// would fail with EPERM. QEMU's block sets the ids it maps and squashes every other one to
+    /// this computer's user (`IsoloomQemu.virtiofs_squash`).
     #[test]
     fn qemus_share_lets_every_account_of_the_vm_write_as_the_others_do() {
         let out = ruby(&[share("shared", "/srv/shared", false)]);
@@ -271,33 +282,34 @@ mod tests {
             libvirt.statements
         );
         assert!(provider(&r, "hyperv").is_none(), "{out}");
+        let refused = refusals(&r);
+        let [why, _, abort] = refused.as_slice() else { panic!("{refused:?}") };
         assert!(
-            out.contains(":hyperv => \"host folders (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB"),
-            "{out}"
+            why.starts_with("why = { :hyperv => \"host folders (`host_folders`): the `hyperv` provider's only two-way shared folder is SMB")
+                && why.contains(", :vmware_esxi => \"host folders (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host")
+                && !why.contains(":qemu =>"),
+            "{why}"
         );
-        assert!(
-            out.contains(":vmware_esxi => \"host folders (`host_folders`): the `vmware_esxi` provider's VMs run on the ESXi host"),
-            "{out}"
-        );
-        assert!(!out.contains(":qemu =>"), "{out}");
-        assert!(out.contains("abort(\"#{machine.name}: \" + why) if why\n"), "{out}");
+        assert_eq!(*abort, "abort(\"#{machine.name}: \" + why) if why");
     }
 
     #[test]
     fn a_provider_isoloom_does_not_know_stops_vagrant_up_too() {
+        let unknown = |shared: &str| {
+            format!(
+                "why ||= \"host folders (`host_folders`): Isoloom knows no two-way shared folder of the `#{{machine.provider_name}}` provider\" unless [{shared}].include?(machine.provider_name)"
+            )
+        };
         let out = ruby(&[share("shared", "/srv/shared", false)]);
-        assert!(
-            out.contains(
-                "why ||= \"host folders (`host_folders`): Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless [:virtualbox, :vmware_desktop, :parallels, :libvirt, :qemu, :utm].include?(machine.provider_name)\n"
-            ),
-            "{out}"
+        let read_write = isoloom_test_support::ruby_blocks(&out);
+        assert_eq!(
+            refusals(&read_write)[1],
+            unknown(":virtualbox, :vmware_desktop, :parallels, :libvirt, :qemu, :utm")
         );
         // A read-only folder: QEMU shares none, so it is refused like an unknown provider.
         let read_only = ruby(&[share("/srv/a", "/a", true)]);
-        assert!(
-            read_only.contains("unless [:virtualbox, :vmware_desktop, :parallels, :libvirt, :utm].include?"),
-            "{read_only}"
-        );
+        let read_only = isoloom_test_support::ruby_blocks(&read_only);
+        assert_eq!(refusals(&read_only)[1], unknown(":virtualbox, :vmware_desktop, :parallels, :libvirt, :utm"));
     }
 
     #[test]
@@ -314,7 +326,11 @@ mod tests {
             ["o.vm.synced_folder File.expand_path(\"/srv/a\", ROOT), \"/a\", type: \"virtiofs\", create: true, mount_opts: \"ro\""]
         );
         assert!(provider(&r, "qemu").is_none(), "{out}");
-        assert!(out.contains(":qemu => \"host folders (`host_folders`): one is read-only"), "{out}");
+        let refused = refusals(&r);
+        assert!(
+            refused[0].contains(", :qemu => \"host folders (`host_folders`): one is read-only (`read_only`)"),
+            "{refused:?}"
+        );
     }
 
     #[test]

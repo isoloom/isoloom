@@ -146,7 +146,17 @@ mod tests {
         image.box_server_url = Some("https://boxes.example".into());
         source(&mut r, Some(&image));
         let text = r.finish();
-        assert!(text.contains("m.vm.box_url = File.join(ROOT, \"boxes/my.box\")"), "{text}");
-        assert!(text.contains("m.vm.box_server_url = \"https://boxes.example\""), "{text}");
+        let urls: Vec<&str> = text
+            .lines()
+            .filter(|l| l.starts_with("m.vm.box_url") || l.starts_with("m.vm.box_server_url"))
+            .collect();
+        assert_eq!(
+            urls,
+            [
+                "m.vm.box_url = File.join(ROOT, \"boxes/my.box\")",
+                "m.vm.box_server_url = \"https://boxes.example\""
+            ],
+            "{text}"
+        );
     }
 }

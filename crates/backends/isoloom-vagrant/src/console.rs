@@ -75,31 +75,47 @@ pub(crate) fn virtualbox(r: &mut Ruby) {
 mod tests {
     use super::*;
 
-    #[test]
-    fn the_consoles_listen_on_the_loopback_only() {
+    fn ruby(write: impl FnOnce(&mut Ruby)) -> String {
         let mut r = Ruby::new();
-        libvirt(&mut r);
-        qemu(&mut r, Some(Arch::Arm64));
-        vmware(&mut r, "web");
-        virtualbox(&mut r);
-        let text = r.finish();
-        assert!(text.contains("v.graphics_type = \"vnc\"\nv.graphics_ip = \"127.0.0.1\"\n"), "{text}");
-        assert!(text.contains("v.extra_qemu_args = IsoloomConsole.qemu(\"aarch64\")"), "{text}");
-        assert!(!text.contains("-vga none"), "the VM keeps a display: {text}");
-        assert!(text.contains("if (console = IsoloomConsole.of(\"web\"))\n  v.vmx[\"RemoteDisplay.vnc.enabled\"] = \"TRUE\"\n  v.vmx[\"RemoteDisplay.vnc.ip\"] = \"127.0.0.1\"\n"), "{text}");
-        assert!(
-            text.contains("v.customize [\"modifyvm\", :id, \"--vrde\", IsoloomConsole.virtualbox_vrde? ? \"on\" : \"off\", \"--vrdeaddress\", \"127.0.0.1\", \"--vrdeport\", \"3390-3489\"]"),
-            "{text}"
-        );
-        let ruby = CONSOLE_RB;
-        assert!(ruby.contains("\"127.0.0.1:0,to=99\""), "QEMU's VNC on the loopback");
-        assert!(ruby.contains(isoloom_spec::contract::CONSOLES), "the runner's variable");
+        write(&mut r);
+        r.finish()
     }
 
+    /// Each provider's console listens on this computer's loopback, and nowhere else: libvirt's
+    /// VNC, VMware's VNC at the runner's port, VirtualBox's remote display, QEMU's VNC (set by
+    /// `IsoloomConsole.qemu`, the VM keeping a display).
     #[test]
-    fn a_qemu_vm_of_the_hosts_cpu_reads_it_at_run_time() {
-        let mut r = Ruby::new();
-        qemu(&mut r, None);
-        assert!(r.finish().contains("v.extra_qemu_args = IsoloomConsole.qemu(HOST_ARCH)"));
+    fn the_consoles_listen_on_the_loopback_only() {
+        assert_eq!(
+            ruby(libvirt),
+            "v.graphics_type = \"vnc\"\nv.graphics_ip = \"127.0.0.1\"\nv.graphics_autoport = \"yes\"\n"
+        );
+        assert_eq!(
+            ruby(|r| vmware(r, "web")),
+            "if (console = IsoloomConsole.of(\"web\"))\n  v.vmx[\"RemoteDisplay.vnc.enabled\"] = \"TRUE\"\n  v.vmx[\"RemoteDisplay.vnc.ip\"] = \"127.0.0.1\"\n  v.vmx[\"RemoteDisplay.vnc.port\"] = console.fetch(\"port\").to_s\n  v.vmx[\"RemoteDisplay.vnc.password\"] = console.fetch(\"password\")\nend\n"
+        );
+        assert_eq!(
+            ruby(virtualbox),
+            "v.customize [\"modifyvm\", :id, \"--vrde\", IsoloomConsole.virtualbox_vrde? ? \"on\" : \"off\", \"--vrdeaddress\", \"127.0.0.1\", \"--vrdeport\", \"3390-3489\"]\n"
+        );
+        // QEMU's VNC is an argument the Ruby gives: every `-vnc` it gives listens on the loopback.
+        let vnc: Vec<&str> = CONSOLE_RB.lines().filter(|l| l.contains("\"-vnc\"")).collect();
+        isoloom_test_support::assert_every!(vnc, |l: &&str| l.contains("[\"-vnc\", \"127.0.0.1:0,to=99\"]"));
+        assert!(CONSOLE_RB.contains(isoloom_spec::contract::CONSOLES), "the runner's variable");
+    }
+
+    /// A QEMU VM keeps a display (not the plugin's `-vga none`), its console for its own CPU, or
+    /// the host's read when Vagrant reads the file.
+    #[test]
+    fn a_qemu_vm_shows_its_console_for_its_own_cpu_or_the_hosts() {
+        let other_default = "v.other_default = %w[-parallel none -monitor none -display none]\n";
+        assert_eq!(
+            ruby(|r| qemu(r, Some(Arch::Arm64))),
+            format!("{other_default}v.extra_qemu_args = IsoloomConsole.qemu(\"aarch64\")\n")
+        );
+        assert_eq!(
+            ruby(|r| qemu(r, None)),
+            format!("{other_default}v.extra_qemu_args = IsoloomConsole.qemu(HOST_ARCH)\n")
+        );
     }
 }

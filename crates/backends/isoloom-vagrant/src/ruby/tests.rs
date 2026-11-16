@@ -6,6 +6,9 @@ use super::{Call, Provision, Ruby, Start, Value, closing_tag, quote};
 fn quotes_backslashes_and_interpolations_are_escaped() {
     assert_eq!(quote(r#"a"b\c"#), r#""a\"b\\c""#);
     assert_eq!(quote("#{x} #$y #@z # {"), r#""\#{x} \#$y \#@z # {""#);
+    // A string value is quoted so; a raw one is Ruby as written.
+    assert_eq!(Value::str("a \"b\" #{c}").to_string(), r#""a \"b\" \#{c}""#);
+    assert_eq!(Value::raw("ENV[\"X\"]").to_string(), "ENV[\"X\"]");
 }
 
 #[test]
@@ -46,15 +49,11 @@ proptest! {
         let tag = first.split("<<~'").nth(1).and_then(|t| t.strip_suffix('\'')).expect("a heredoc");
         let (last, body) = rest.split_last().expect("the closing line");
         prop_assert_eq!(*last, tag);
-        prop_assert!(body.iter().all(|l| l.trim() != tag), "{written}");
+        for line in body {
+            prop_assert_ne!(line.trim(), tag, "{}", written);
+        }
         prop_assert_eq!(body.len(), lines.len());
     }
-}
-
-#[test]
-fn strings_are_quoted_and_cannot_interpolate() {
-    assert_eq!(Value::str("a \"b\" #{c}").to_string(), r#""a \"b\" \#{c}""#);
-    assert_eq!(Value::raw("ENV[\"X\"]").to_string(), "ENV[\"X\"]");
 }
 
 #[test]
@@ -145,5 +144,11 @@ fn an_on_demand_define_is_not_started_by_up() {
             r.provision(Provision::new("m", "shell").script("inline", "b"));
         });
     });
-    assert!(r.finish().contains("config.vm.define \"web\", autostart: false do |m|\n"));
+    let file = r.finish();
+    let defines = isoloom_test_support::ruby_blocks(&file)
+        .find("config.vm.define ")
+        .into_iter()
+        .map(|d| d.head.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(defines, ["config.vm.define \"web\", autostart: false do |m|"], "{file}");
 }
