@@ -31,6 +31,8 @@ wasm-bindgen.workspace = true
 zip.workspace = true
 
 [dev-dependencies]
+# The generated Compose file and the spec, read back by path.
+serde_yaml_ng.workspace = true
 wasm-bindgen-test.workspace = true
 
 [lints]
