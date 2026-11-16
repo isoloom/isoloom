@@ -163,20 +163,19 @@ fn the_start_sources_the_library_only_for_its_calls_and_marks_a_quoted_dollar_fo
 
 #[test]
 fn a_start_copy_s_source_is_built_into_the_image_s_project_folder() {
-    let (env, process) = started_with("[{ copy: { from: site/, to: /srv/site/ } }]");
-    let d = super::super::dockerfile::render(&Configured::of(&env, "m").expect("a recipe"), "nginx@sha256:0", &process);
-    let instructions: Vec<&str> = d.lines().filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
-    assert_eq!(
-        instructions,
-        [
-            "FROM nginx@sha256:0",
-            "WORKDIR /opt/isoloom",
-            "COPY [\".isoloom/configure/lib/configure.sh\", \"/usr/local/lib/isoloom/configure.sh\"]",
-            "COPY [\"site/\", \"site/\"]",
-            "COPY --chmod=0755 [\".isoloom/configure/m/run\", \"/usr/local/bin/isoloom-run\"]",
-            "ENTRYPOINT [\"/usr/local/bin/isoloom-run\"]",
-            "CMD [\"nginx\",\"-g\",\"daemon off;\"]"
-        ],
-        "the copy runs at each start, from what the build put in the project folder"
-    );
+    let instructions = |steps: &str| {
+        let (env, process) = started_with(steps);
+        let d = super::super::dockerfile::render(&Configured::of(&env, "m").expect("a recipe"), "nginx@sha256:0", &process);
+        d.lines()
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    let mut copied = instructions("[{ copy: { from: site/, to: /srv/site/ } }]");
+    let mut script = instructions("[{ command: [touch, /run/started], creates: /run/started }, { run: prepare.sh }]");
+    // The copy runs at each start, from what the build put in the project folder: where a
+    // script's start has its script.
+    assert_eq!(copied.remove(3), "COPY [\"site/\", \"site/\"]");
+    assert_eq!(script.remove(3), "COPY [\"prepare.sh\", \"prepare.sh\"]");
+    assert_eq!(copied, script);
 }
