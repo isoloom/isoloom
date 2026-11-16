@@ -236,11 +236,32 @@ mod tests {
 
     use super::*;
 
+    /// What `value` parsed as a `K` gives: its text, or the refusal's what and rule.
+    fn parsed<K: Kind>(value: &str) -> Result<String, (&'static str, &'static str)> {
+        match value.parse::<Name<K>>() {
+            Ok(name) => Ok(name.to_string()),
+            Err(Error::Name { what, rule, .. }) => Err((what, rule)),
+            Err(other) => panic!("{value}: not a name's refusal: {other}"),
+        }
+    }
+
     #[test]
     fn each_kind_holds_only_names_following_its_rule() {
-        assert!("php-fpm".parse::<EntryName>().is_ok() && "PHP".parse::<EntryName>().is_err() && "a--b".parse::<EntryName>().is_err());
-        assert!("php_fpm".parse::<SettingName>().is_ok() && "php-fpm".parse::<SettingName>().is_err());
-        assert!("branch".parse::<VarName>().is_ok() && "_x".parse::<VarName>().is_err());
+        let kebab_entry = ("entry name", EntryKind::RULE);
+        let snake_setting = ("setting name", SettingKind::RULE);
+        for (value, got, expected) in [
+            ("php-fpm", parsed::<EntryKind>("php-fpm"), Ok("php-fpm".to_owned())),
+            ("PHP", parsed::<EntryKind>("PHP"), Err(kebab_entry)),
+            ("a--b", parsed::<EntryKind>("a--b"), Err(kebab_entry)),
+            ("php_fpm", parsed::<SettingKind>("php_fpm"), Ok("php_fpm".to_owned())),
+            ("php-fpm", parsed::<SettingKind>("php-fpm"), Err(snake_setting)),
+            ("branch", parsed::<VarKind>("branch"), Ok("branch".to_owned())),
+            ("_x", parsed::<VarKind>("_x"), Err(("variable name", VarKind::RULE))),
+            ("site-logs", parsed::<DataKind>("site-logs"), Ok("site-logs".to_owned())),
+            ("logs_", parsed::<DataKind>("logs_"), Err(("data name", DataKind::RULE))),
+        ] {
+            assert_eq!(got, expected, "{value}");
+        }
         let wrong = "Own Config".parse::<CaseName>().unwrap_err().to_string();
         assert_eq!(
             wrong,
@@ -249,18 +270,14 @@ mod tests {
     }
 
     #[test]
-    fn a_name_is_its_text() {
-        let name: EntryName = "php-fpm".parse().unwrap();
-        assert_eq!((name.as_ref(), name.as_str(), name.to_string().as_str()), ("php-fpm", "php-fpm", "php-fpm"));
-    }
-
-    #[test]
-    fn a_name_debugs_as_its_text_and_orders_by_it() {
-        let a: EntryName = "alpha".parse().unwrap();
-        let b: EntryName = "beta".parse().unwrap();
-        assert_eq!(format!("{a:?}"), "\"alpha\"");
-        assert!(a < b, "a name orders by its text");
-        assert_eq!(a.partial_cmp(&b), Some(std::cmp::Ordering::Less));
+    fn a_name_orders_and_is_looked_up_as_its_text() {
+        let names: std::collections::BTreeMap<EntryName, u8> = [("beta", 2), ("alpha", 1)].into_iter().map(|(n, v)| (n.parse().unwrap(), v)).collect();
+        assert_eq!(names.keys().map(EntryName::as_str).collect::<Vec<_>>(), ["alpha", "beta"]);
+        assert_eq!(names.get("beta"), Some(&2), "a map of names finds one by its text");
+        let hashed: std::collections::HashSet<EntryName> = names.into_keys().collect();
+        assert!(hashed.contains("alpha"), "it hashes as its text");
+        let alpha: EntryName = "alpha".parse().unwrap();
+        assert_eq!(format!("{alpha:?}"), "\"alpha\"", "it debugs as its text");
     }
 
     #[test]

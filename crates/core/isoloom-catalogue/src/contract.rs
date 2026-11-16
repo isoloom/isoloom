@@ -223,9 +223,12 @@ mod tests {
             fill("http://{{ machine }}:{{ version }}/{{ with.root }}", &values).unwrap(),
             "http://web:1.2.3/site/"
         );
-        // A bare placeholder that is neither `machine` nor `version` is refused.
-        assert!(fill("{{ nope }}", &values).is_err());
-        // A `with.<setting>` the case leaves without a value is refused.
-        assert!(fill("{{ with.missing }}", &values).is_err());
+        for (text, refusal) in [
+            ("{{ nope }}", "`{{ nope }}`: a contract names `machine`, `version` and `with.<setting>`"),
+            ("{{ with.missing }}", "`{{ with.missing }}`: the case gives `missing` no value"),
+            ("http://{{ machine", "`http://{{ machine`: a `{{` without its `}}`"),
+        ] {
+            assert_eq!(fill(text, &values), Err(refusal.to_owned()), "{text}");
+        }
     }
 }

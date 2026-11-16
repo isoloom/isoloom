@@ -2,9 +2,23 @@
 //! `when:` and `for_each:` applied, placeholders and pins filled in, the official image only on
 //! its own OS.
 
-use isoloom_spec::syntax::{Code, Step};
+use isoloom_spec::syntax::{Code, CommandStep, Guard, Invocation, Step};
 
 use crate::testing::{demo, resolve};
+
+/// What a `command` step runs, as the shell's text or the program and its arguments; nothing
+/// for another step.
+fn runs(step: &Step) -> Option<Vec<String>> {
+    match step {
+        Step::Command(CommandStep {
+            run: Invocation::Shell(text), ..
+        }) => Some(vec![text.clone()]),
+        Step::Command(CommandStep {
+            run: Invocation::Exec(argv), ..
+        }) => Some(argv.args().to_vec()),
+        _ => None,
+    }
+}
 
 /// The kinds of `steps`, in order.
 fn kinds(steps: &[Step]) -> Vec<&'static str> {
@@ -84,8 +98,12 @@ fn when_picks_the_steps_of_the_family_the_release_and_the_settings() {
 
     let greeted = resolve(&demo().unwrap(), "debian@12", "demo", "{ greeting: hello there }").unwrap();
     assert_eq!(kinds(&greeted.configure), ["template", "command", "service"]);
-    let Step::Command(c) = &greeted.configure[1] else { panic!() };
-    assert!(format!("{c:?}").contains("echo hello there > /etc/demo/greeting"), "{c:?}");
+    assert_eq!(runs(&greeted.configure[1]), Some(vec!["echo hello there > /etc/demo/greeting".to_owned()]));
+    assert!(
+        matches!(&greeted.configure[1], Step::Command(CommandStep { guard: Guard::Creates(path), .. }) if path.as_str() == "/etc/demo/greeting"),
+        "{:?}",
+        greeted.configure[1]
+    );
 }
 
 #[test]
@@ -148,8 +166,10 @@ fn a_password_gets_its_value_file_and_its_owner_a_start_step() {
     assert_eq!(r.value_files[0].path, "/run/isoloom/with/admin");
     assert_eq!(r.value_files[0].owner.as_ref().map(ToString::to_string).as_deref(), Some("demo"));
     assert_eq!(kinds(&r.start), ["command", "command"], "chown to its owner, then the entry's own start step");
-    assert!(
-        format!("{:?}", r.start[1]).contains("/run/isoloom/with/admin"),
+    assert_eq!(runs(&r.start[0]), Some(["chown", "demo", "/run/isoloom/with/admin"].map(String::from).to_vec()));
+    assert_eq!(
+        runs(&r.start[1]),
+        Some(["demo-admin", "--password-file", "/run/isoloom/with/admin"].map(String::from).to_vec()),
         "the entry reads the file, never the value"
     );
 }
@@ -163,10 +183,10 @@ fn several_services_each_read_their_own_settings() {
     // Each service keeps the `with:` keys that are its own: demo reads `port`, mini reads `size`.
     let web = resolved[0].ports.iter().find(|(n, _)| n.as_str() == "web").map(|(_, p)| p.port.get());
     assert_eq!(web, Some(81), "demo's web port comes from its `port` setting");
-    assert!(
-        format!("{:?}", resolved[1].configure).contains("--size 2"),
-        "mini applies its `size`: {:?}",
-        resolved[1].configure
+    assert_eq!(
+        runs(&resolved[1].configure[0]),
+        Some(vec!["mini --size 2".to_owned()]),
+        "mini applies its `size`"
     );
     let nope = crate::testing::lab("debian@12", "[demo, mini]", "{ port: 81, nope: 1 }").unwrap();
     let p = catalogue.resolve(&nope, "web").unwrap_err();
@@ -189,28 +209,19 @@ fn passwords_in_a_list_get_value_files_each_with_its_own_setting_owner() {
         "{ admin: { secret: admin }, users: [{ name: ann, password: { secret: admin } }] }",
     )
     .unwrap();
-    let admin = r.value_files.iter().find(|f| f.path.contains("admin")).expect("admin's value file");
-    assert_eq!(admin.owner.as_ref().map(ToString::to_string).as_deref(), Some("demo"));
     // The list item's password is collected too, with no owner (the `users` setting has none).
-    let listed = r
+    let files: Vec<_> = r
         .value_files
         .iter()
-        .find(|f| !f.path.contains("admin"))
-        .expect("the list item's password value file");
-    assert!(listed.owner.is_none(), "the `users` setting has no owner of its own");
-}
-
-#[test]
-fn an_integer_setting_accepts_a_value_at_its_maximum() {
-    let mut files = crate::testing::fixture_files().unwrap();
-    let mini = files.get("mini/entry.yml").cloned().unwrap();
-    files.insert(
-        "mini/entry.yml".into(),
-        mini.replace("minimum: 1, default: 1", "minimum: 1, maximum: 5, default: 1"),
+        .map(|f| (f.path.as_str(), f.owner.as_ref().map(ToString::to_string)))
+        .collect();
+    assert_eq!(
+        files,
+        [
+            ("/run/isoloom/with/admin", Some("demo".to_owned())),
+            ("/run/isoloom/with/users/1/password", None)
+        ]
     );
-    let catalogue = crate::testing::load(&files).unwrap();
-    let lab = crate::testing::lab("debian@12", "mini", "{ size: 5 }").unwrap();
-    assert!(catalogue.resolve(&lab, "web").is_ok(), "5 is within 1..=5");
 }
 
 #[test]

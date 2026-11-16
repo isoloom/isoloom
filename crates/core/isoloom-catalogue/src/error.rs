@@ -89,8 +89,9 @@ mod tests {
             Finding::new("nginx/entry.yml: recipe.install[0]", "bad"),
             Finding::new("mini/lock.yml", "stale"),
         ]);
-        let text = e.to_string();
-        assert!(text.contains("- catalogue/nginx/entry.yml: recipe.install[0]: bad"), "{text}");
-        assert!(text.contains("- catalogue/mini/lock.yml: stale"), "{text}");
+        assert_eq!(
+            e.to_string(),
+            "the catalogue breaks its rules:\n- catalogue/nginx/entry.yml: recipe.install[0]: bad\n- catalogue/mini/lock.yml: stale"
+        );
     }
 }

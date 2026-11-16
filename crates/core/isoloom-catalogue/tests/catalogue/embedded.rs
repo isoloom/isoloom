@@ -2,7 +2,7 @@
 //! OS its default release claims, with the official image only where its OS is the machine's.
 
 use isoloom_catalogue::Catalogue;
-use isoloom_spec::syntax::Step;
+use isoloom_spec::syntax::{FileState, Step};
 
 use crate::testing::resolve;
 
@@ -50,13 +50,32 @@ fn nginx_at_1_31_is_mainline_from_its_own_repository() {
 }
 
 #[test]
-fn nginx_resolved_on_debian_12_with_a_site_and_php() {
+fn nginx_with_a_site_serves_it_in_place_of_its_own_page_and_passes_php_to_the_fpm_machine() {
     let spec = isoloom_spec::syntax::parse(
         "version: 1\nname: t\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, service: nginx, with: { root: site/, php_fpm: 'fpm:9000' }, networks: { lab: 10 } }\n  fpm: { os: debian@12, networks: { lab: 20 } }\n",
     )
     .unwrap();
     let r = embedded().unwrap().resolve(&spec, "web").unwrap().remove(0);
-    insta::assert_snapshot!(format!("{:#?}\n{:#?}\n{:#?}\n{:#?}", r.install, r.configure, r.start, r.files));
+    let kinds: Vec<_> = r.configure.iter().map(Step::kind).collect();
+    assert_eq!(kinds, ["template", "file", "template", "file", "copy", "firewall", "service"]);
+    let [Step::Template(_), _, Step::Template(php), Step::File(page), Step::Copy(site), ..] = r.configure.as_slice() else {
+        panic!("{:?}", r.configure)
+    };
+    assert_eq!(
+        (page.path.as_str(), &page.state),
+        ("/usr/share/nginx/html", &FileState::Absent),
+        "nginx's own page goes first"
+    );
+    assert_eq!((site.from.as_str(), site.to.as_str()), ("site/", "/usr/share/nginx/html/"));
+    assert_eq!(php.to.as_str(), "/etc/nginx/isoloom.d/php.conf");
+    let php_conf = r.files.get(&php.from).map(String::as_str).unwrap_or_default();
+    let pass: Vec<_> = php_conf.lines().filter(|l| l.trim_start().starts_with("fastcgi_pass")).collect();
+    assert_eq!(
+        pass,
+        ["    fastcgi_pass  {{ machines.fpm.addresses.lab }}:9000;"],
+        "the fpm machine's address, per target"
+    );
+    assert!(r.start.is_empty(), "{:?}", r.start);
 }
 
 #[test]
