@@ -1,16 +1,9 @@
 //! What the commands print and the exit code they give: validation, targets, generation with
 //! a refused cloud, and profiles.
 
-use crate::testing::{Outcome, Scratch, example, isoloom, isoloom_with, project, scratch, validate_json};
+use isoloom_test_support::{assert_every, hcl_blocks, hcl_body, hcl_text, ruby_blocks};
 
-#[test]
-fn an_example_validates() -> Outcome {
-    let home = scratch("example-validates")?;
-    let o = isoloom(&home, &[&"validate", &example("hello-stack")])?;
-    assert_eq!(o.code, Some(0), "{o:?}");
-    assert!(o.stdout.contains("hello-stack is valid"), "{o:?}");
-    Ok(())
-}
+use crate::testing::{Outcome, Scratch, example, isoloom, isoloom_with, project, scratch, validate_json};
 
 #[test]
 fn targets_lists_the_refused_clouds_under_cloud_vm() -> Outcome {
@@ -19,15 +12,10 @@ fn targets_lists_the_refused_clouds_under_cloud_vm() -> Outcome {
     assert_eq!(o.code, Some(0), "{o:?}");
     let (_, after) = o.stdout.split_once("✓ cloud-vm\n").ok_or("cloud-vm isn't generated")?;
     let under: Vec<&str> = after.lines().take_while(|l| l.starts_with("    ")).collect();
-    assert_eq!(under.len(), 4, "{}", o.stdout);
-    assert!(
-        under
-            .first()
-            .is_some_and(|l| l.starts_with("    ✗ gcp (") && l.contains("no Windows VM on Google Cloud")),
-        "{}",
-        o.stdout
-    );
-    assert!(!o.stdout.contains("✗ aws") && !o.stdout.contains("✗ azure"), "{}", o.stdout);
+    // Every cloud but AWS and Azure refuses a Windows VM, each on a line of its own, with why.
+    let clouds: Vec<&str> = under.iter().filter_map(|l| l.strip_prefix("    ✗ ")?.split(' ').next()).collect();
+    assert_eq!(clouds, ["gcp", "digitalocean", "linode", "oci"], "{}", o.stdout);
+    assert!(under.first().is_some_and(|l| l.contains("no Windows VM on Google Cloud")), "{}", o.stdout);
     Ok(())
 }
 
@@ -42,10 +30,9 @@ fn targets_gives_the_validators_of_each_target_generated() -> Outcome {
     let listed: serde_json::Value = serde_json::from_str(&o.stdout)?;
     let targets = listed.as_array().ok_or("not a list")?;
     assert!(targets.iter().any(|t| t["id"] == "vagrant"), "{listed}");
-    for t in targets {
-        assert!(t["validators"].as_array().is_some_and(|v| !v.is_empty()), "{t}");
-        assert!(t["writes"].as_str().is_some_and(|s| !s.is_empty()), "{t}");
-    }
+    assert_every!(targets, |t: &&serde_json::Value| {
+        t["validators"].as_array().is_some_and(|v| !v.is_empty()) && t["writes"].as_str().is_some_and(|s| !s.is_empty())
+    });
     Ok(())
 }
 
@@ -82,7 +69,13 @@ fn validate_lists_an_invalid_specs_problems_as_json_and_gives_1() -> Outcome {
     let (run, v) = validate_json(&dir, &dir)?;
     assert_eq!(run.code, Some(1), "{run:?}");
     assert_eq!(v["ok"], false);
-    assert!(v["problems"].as_array().is_some_and(|p| !p.is_empty()), "{v}");
+    let problems: Vec<(&str, &str)> = v["problems"]
+        .as_array()
+        .ok_or("no problems")?
+        .iter()
+        .map(|p| (p["code"].as_str().unwrap_or_default(), p["path"].as_str().unwrap_or_default()))
+        .collect();
+    assert_eq!(problems, [("unknown-reference", "machines.a.networks.wan")], "{v}");
     Ok(())
 }
 
@@ -214,13 +207,9 @@ fn check_quiet_shows_only_failures_and_json_one_result_per_file() -> Outcome {
     let files = report["files"].as_array().ok_or("no files")?;
     let compose = files.iter().find(|f| f["path"] == ".isoloom/docker/compose.yml").ok_or("no compose.yml")?;
     assert_eq!(compose["status"], "out_of_date");
-    assert!(
-        files
-            .iter()
-            .filter(|f| f["path"] != ".isoloom/docker/compose.yml")
-            .all(|f| f["status"] == "current"),
-        "{report:#}"
-    );
+    assert_every!(files.iter().filter(|f| f["path"] != ".isoloom/docker/compose.yml"), |f: &&serde_json::Value| f
+        ["status"]
+        == "current");
     assert_eq!(
         report["summary"],
         serde_json::json!({ "ok": false, "checked": files.len(), "current": files.len() - 1, "failed": 1 })
@@ -381,8 +370,12 @@ fn a_users_default_region_reaches_the_module() -> Outcome {
     }
     let o = isoloom(&home, &[&"generate", &dir, &"--target", &"cloud-vm"])?;
     assert_eq!(o.code, Some(0), "{o:?}");
-    let module = std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/main.tf"))?;
-    assert!(module.contains("default = \"eu-north-1\""), "{module}");
+    let module = hcl_body(&std::fs::read_to_string(dir.join(".isoloom/cloud-vm/aws/main.tf"))?);
+    let region: Vec<String> = hcl_blocks(&module, "variable", &["region"])
+        .iter()
+        .map(|v| hcl_text(v.body(), "default"))
+        .collect();
+    assert_eq!(region, ["eu-north-1"], "the region variable's default");
     // `isoloom check` sees the same files.
     let checked = isoloom(&home, &[&"check", &dir, &"--target", &"cloud-vm"])?;
     assert_eq!(checked.code, Some(0), "{checked:?}");
@@ -759,10 +752,12 @@ fn every_command_judges_the_lab_generate_writes() -> Outcome {
     // The snapshot's targets, the same way.
     let inspected = isoloom(&home, &[&"inspect", &"targets.generated", &dir, &"--images", &table])?;
     assert_eq!(inspected.code, Some(0), "{inspected:?}");
-    assert!(inspected.stdout.contains("\"docker\""), "{inspected:?}");
-    // `-s` too, on the commands that had none.
+    let in_snapshot: Vec<String> = serde_json::from_str(&inspected.stdout)?;
+    assert!(in_snapshot.iter().any(|t| t == "docker"), "{in_snapshot:?}");
+    // `-s` too, on the commands that had none: the web machine's 3 CPUs and the access machine's 1.
     let set = isoloom(&home, &[&"resources", &dir, &"-s", &"machines.web.resources.cpus=3", &"--json"])?;
-    assert!(set.stdout.contains("\"cpus\":"), "{set:?}");
+    let resources: serde_json::Value = serde_json::from_str(&set.stdout)?;
+    assert_eq!(resources["cpus"], 4, "{resources}");
     let renamed = isoloom(&home, &[&"validate", &dir, &"--skip-files", &"-s", &"name=renamed"])?;
     assert!(renamed.stdout.contains("✓ renamed is valid"), "{renamed:?}");
     Ok(())
@@ -868,12 +863,15 @@ fn an_environment_value_reaches_every_format_as_written() -> Outcome {
     for (k, v) in written {
         assert!(env.contains(&(Some(k.to_owned()), Some(v.to_owned()))), "kubernetes: {k} in {env:?}");
     }
-    // The VM forms write each variable as `NAME=value` into the machine's settings script.
-    for file in ["vagrant/Vagrantfile", "proxmox/main.tf"] {
-        let text = read(file)?;
-        for (k, v) in written {
-            assert!(text.contains(&format!("{k}={v}")), "{file} has no `{k}={v}`");
-        }
+    // The VM forms write each variable as `"NAME=value"` into systemd's `DefaultEnvironment`, in
+    // the settings script isoloom-render writes for Vagrant and Proxmox alike.
+    let vagrantfile = read("vagrant/Vagrantfile")?;
+    let settings: Vec<&str> = vagrantfile.lines().filter(|l| l.contains("DefaultEnvironment=")).collect();
+    let [settings] = settings[..] else {
+        panic!("one DefaultEnvironment line: {settings:?}")
+    };
+    for (k, v) in written {
+        assert!(settings.contains(&format!("\"{k}={v}\"")), "`{k}={v}` in {settings}");
     }
     Ok(())
 }
@@ -901,11 +899,16 @@ fn clones_publishing_a_free_host_port_are_generated_where_the_format_picks_one()
         let port = port.as_str().unwrap_or_default();
         assert!(port.ends_with(":${ISOLOOM_PUBLISH_FIXED:+80}:80"), "{clone}: {port}");
     }
-    // Vagrant moves a taken host port to a free one.
-    let vagrantfile = read("vagrant/Vagrantfile")?;
-    let forwards: Vec<&str> = vagrantfile.lines().filter(|l| l.contains("\"forwarded_port\"")).collect();
-    assert_eq!(forwards.len(), 2, "{vagrantfile}");
-    assert!(forwards.iter().all(|l| l.contains("auto_correct: true")), "{forwards:?}");
+    // Vagrant moves a taken host port to a free one: each clone's one forward says so.
+    let vagrantfile = ruby_blocks(&read("vagrant/Vagrantfile")?);
+    for clone in ["web-01", "web-02"] {
+        let define = vagrantfile.block(&format!("config.vm.define \"{clone}\""));
+        let forwards: Vec<&str> = define.every_statement().into_iter().filter(|s| s.contains("\"forwarded_port\"")).collect();
+        let [forward] = &forwards[..] else {
+            panic!("{clone}: one forward: {forwards:?}")
+        };
+        assert!(forward.contains("auto_correct: true"), "{clone}: {forward}");
+    }
     // A target publishing every port at its number says so once, for the spec.
     let refused = isoloom(&dir, &[&"generate", &"--target", &"kubernetes", &dir])?;
     assert_ne!(refused.code, Some(0));

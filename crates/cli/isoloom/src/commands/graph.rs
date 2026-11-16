@@ -125,7 +125,9 @@ mod tests {
     #[test]
     fn a_format_is_d2_or_dot_and_another_is_named() {
         assert_eq!(Format::named("dot").ok(), Some(Format::Dot));
-        assert!(matches!(Format::named("svg"), Err(CliError::UnknownFormat(f)) if f == "svg"));
+        let unknown = Format::named("svg");
+        assert!(matches!(&unknown, Err(CliError::UnknownFormat(f)) if f == "svg"), "{unknown:?}");
+        assert_eq!(unknown.err().map(|e| e.to_string()).as_deref(), Some("unknown format `svg`; `d2` or `dot`"));
     }
 
     #[test]

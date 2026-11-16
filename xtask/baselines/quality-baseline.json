@@ -1,7 +1,7 @@
 {
   "rules": {
     "exception/expect": {
-      "isoloom": 5,
+      "isoloom": 4,
       "isoloom-render": 2,
       "isoloom-spec": 2,
       "isoloom-targets": 1,

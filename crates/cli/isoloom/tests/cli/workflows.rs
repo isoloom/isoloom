@@ -203,20 +203,17 @@ fn the_workflows_validate_the_generated_files_and_never_run_them() -> Outcome {
 /// `llvm-objdump -p` standing in, listing `dlls`) are those: its exit code and what it printed.
 #[cfg(unix)]
 fn imports(dlls: &[&str]) -> Outcome<(Option<i32>, String)> {
-    use std::os::unix::fs::PermissionsExt as _;
-    let dir = scratch("no-vc-runtime")?;
-    let objdump = dir.join("llvm-objdump");
-    let mut script = String::from("#!/bin/sh\necho 'isoloom.exe: file format coff-x86-64'\n");
+    let bin = isoloom_test_support::FakeBin::named("no-vc-runtime")?;
+    let mut script = String::from("echo 'isoloom.exe: file format coff-x86-64'\n");
     for dll in dlls {
         script.push_str("echo '    DLL Name: ");
         script.push_str(dll);
         script.push_str("'\n");
     }
-    std::fs::write(&objdump, script)?;
-    std::fs::set_permissions(&objdump, std::fs::Permissions::from_mode(0o755))?;
+    bin.stand_in("llvm-objdump", &script)?;
     let out = Command::new("bash")
         .arg(root().join(".github/scripts/no-vc-runtime.sh"))
-        .arg(&objdump)
+        .arg(bin.path().join("llvm-objdump"))
         .arg("isoloom.exe")
         .output()?;
     Ok((out.status.code(), String::from_utf8_lossy(&out.stdout).into_owned()))

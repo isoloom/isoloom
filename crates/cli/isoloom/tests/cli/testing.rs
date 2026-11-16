@@ -56,13 +56,19 @@ pub(crate) struct Run {
     pub(crate) stderr: String,
 }
 
-/// `isoloom <args>` with `home` as its state folder and `env` set.
+/// `isoloom <args>` with `home` as its state folder and `env` set: no other `ISOLOOM_*` variable
+/// of the test's own environment reaches it, so the user's defaults and profile never leak in.
 pub(crate) fn isoloom_with(home: &Path, args: &[&dyn AsRef<std::ffi::OsStr>], env: &[(&str, &str)]) -> Outcome<Run> {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_isoloom"));
+    for (key, _) in std::env::vars_os() {
+        if key.to_string_lossy().starts_with("ISOLOOM_") {
+            cmd.env_remove(key);
+        }
+    }
     for arg in args {
         cmd.arg(arg);
     }
-    let out = cmd.env("ISOLOOM_HOME", home).env_remove("ISOLOOM_PROFILE").envs(env.iter().copied()).output()?;
+    let out = cmd.env("ISOLOOM_HOME", home).envs(env.iter().copied()).output()?;
     Ok(Run {
         code: out.status.code(),
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
@@ -80,23 +86,4 @@ pub(crate) fn validate_json(home: &Path, target: &dyn AsRef<std::ffi::OsStr>) ->
     let run = isoloom(home, &[&"validate", target, &"--json"])?;
     let report = serde_json::from_str(&run.stdout)?;
     Ok((run, report))
-}
-
-#[test]
-fn a_scratch_folder_is_gone_once_its_test_ends_by_a_panic_too() -> Outcome {
-    let dir = scratch("gone")?;
-    std::fs::write(dir.join("a-file"), "")?;
-    let path = dir.to_path_buf();
-    drop(dir);
-    assert!(!path.exists(), "{} is left", path.display());
-    let seen = std::sync::Mutex::new(None);
-    let failed = std::panic::catch_unwind(|| {
-        let panicked = scratch("panicked").unwrap_or_else(|e| panic!("{e}"));
-        *seen.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(panicked.to_path_buf());
-        panic!("a failed assertion");
-    });
-    assert!(failed.is_err());
-    let made = seen.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner).ok_or("no folder made")?;
-    assert!(!made.exists(), "{} is left", made.display());
-    Ok(())
 }

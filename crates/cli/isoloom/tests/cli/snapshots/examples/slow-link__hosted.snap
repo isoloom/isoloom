@@ -1,0 +1,23 @@
+---
+source: crates/cli/isoloom/tests/cli/examples.rs
+---
+# isoloom targets
+✓ hosted
+
+# isoloom generate --target hosted (exit 0)
+✓ .isoloom/docker/compose.yml
+✓ .isoloom/docker/checks/user.sh
+✓ .isoloom/resolved.json
+✓ .isoloom/.gitignore
+
+## .isoloom/.generated: identical in the `docker` snapshot
+
+## .isoloom/.generated.lock: identical in the `docker` snapshot
+
+## .isoloom/.gitignore: identical in the `docker` snapshot
+
+## .isoloom/docker/checks/user.sh: identical in the `docker` snapshot
+
+## .isoloom/docker/compose.yml: identical in the `docker` snapshot
+
+## .isoloom/resolved.json: identical in the `docker` snapshot

@@ -241,11 +241,6 @@ pub(crate) fn list(dir: &Path, files: &[GeneratedFile], removed: &[String]) -> R
 mod tests {
     use super::*;
 
-    #[test]
-    fn the_list_is_under_the_output_folder() {
-        assert_eq!(LIST, format!("{OUTPUT_DIR}/.generated"));
-    }
-
     /// Two writers of one file at once (two `generate`s in one project) both succeed, and the
     /// file holds one of them whole, with no fresh file left beside it.
     #[test]

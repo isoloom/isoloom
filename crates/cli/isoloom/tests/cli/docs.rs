@@ -3,6 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
+use isoloom_test_support::{manifest_names, yaml_documents};
+
 use crate::testing::{Outcome, isoloom, project, scratch};
 
 /// The repository's root.
@@ -97,18 +99,15 @@ fn the_changelog_and_the_migration_guide_name_the_published_service_kubernetes_w
     )?;
     let o = isoloom(&home, &[&"generate", &dir, &"--target", &"kubernetes"])?;
     assert_eq!(o.code, Some(0), "{o:?}");
-    let services = std::fs::read_to_string(dir.join(".isoloom/kubernetes/services.yaml")).or_else(|_| {
-        // The Services are wherever the manifests put them.
-        let mut all = String::new();
-        for entry in std::fs::read_dir(dir.join(".isoloom/kubernetes"))? {
-            let path = entry?.path();
-            if path.extension().is_some_and(|e| e == "yaml") {
-                all.push_str(&std::fs::read_to_string(path)?);
-            }
+    // The Services are wherever the manifests put them.
+    let mut manifests = Vec::new();
+    for entry in std::fs::read_dir(dir.join(".isoloom/kubernetes"))? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|e| e == "yaml") {
+            manifests.extend(yaml_documents(&std::fs::read_to_string(path)?));
         }
-        Ok::<String, std::io::Error>(all)
-    })?;
-    assert!(services.contains("name: isoloom-web\n"), "{services}");
+    }
+    assert!(manifest_names(&manifests, "Service").iter().any(|n| n == "isoloom-web"), "{manifests:?}");
     let pattern = "`isoloom-<machine>`";
     let changelog = std::fs::read_to_string(root().join("CHANGELOG.md"))?;
     let entry = changelog
