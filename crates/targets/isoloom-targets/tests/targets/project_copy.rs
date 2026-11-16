@@ -12,22 +12,9 @@ use std::process::Command;
 use isoloom_render::project::ignore::{self, Rules};
 use isoloom_spec::Target;
 
-use crate::testing::{Outcome, example, generated as file};
+use isoloom_test_support::needs;
 
-/// Fails naming the first of `tools` that doesn't run here: the test is ignored by default (a
-/// player's machine lacks it) and `cargo xtask test` runs it, so a missing tool says so.
-fn needs(tools: &[&str]) -> Outcome {
-    for tool in tools {
-        // Looked up, not started: a tool that starts leaves its own files (PowerShell's pipe in
-        // the temporary folder) for the test run's leftover guard to find.
-        let found = std::env::var_os("PATH")
-            .is_some_and(|path| std::env::split_paths(&path).any(|d| d.join(format!("{tool}{}", std::env::consts::EXE_SUFFIX)).is_file()));
-        if !found {
-            return Err(format!("needs `{tool}` on PATH").into());
-        }
-    }
-    Ok(())
-}
+use crate::testing::{Outcome, example, generated as file};
 
 #[test]
 fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
