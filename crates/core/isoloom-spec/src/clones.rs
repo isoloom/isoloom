@@ -364,13 +364,6 @@ mod tests {
     }
 
     #[test]
-    fn every_wrong_count_is_reported() {
-        let (_, refused) = expanded("machines:\n  ws: { count: 1 }\n  db: { count: two }\n  me: { count: 2, access: true }\n");
-        let paths: Vec<String> = refused.unwrap_err().iter().map(|p| p.path.to_string()).collect();
-        assert_eq!(paths, ["machines.ws.count", "machines.db.count", "machines.me.count"]);
-    }
-
-    #[test]
     fn a_count_is_2_to_99_on_a_machine_that_isnt_the_access_one() {
         let refused = |yaml: &str| expanded(yaml).1.unwrap_err().remove(0).reason;
         assert_eq!(refused("machines:\n  ws: { count: 1 }\n"), "2 to 99 (one machine needs no count)");
@@ -382,5 +375,9 @@ mod tests {
         );
         assert_eq!(expanded("machines:\n  ws: { count: 99 }\n").1.unwrap()["ws"].len(), 99);
         assert_eq!(expanded("machines:\n  ws: { count: ~ }\n").1.unwrap().len(), 0);
+        // Every wrong count of a spec is reported, each at its own machine.
+        let (_, all) = expanded("machines:\n  ws: { count: 1 }\n  db: { count: two }\n  me: { count: 2, access: true }\n");
+        let paths: Vec<String> = all.unwrap_err().iter().map(|p| p.path.to_string()).collect();
+        assert_eq!(paths, ["machines.ws.count", "machines.db.count", "machines.me.count"]);
     }
 }

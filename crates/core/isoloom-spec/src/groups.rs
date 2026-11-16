@@ -398,4 +398,13 @@ mod tests {
         assert!(matches("*01", "ws01") && matches("w*1", "ws01") && !matches("w*2", "ws01"));
         assert!(matches("dc01", "dc01") && !matches("dc0", "dc01"));
     }
+
+    #[test]
+    fn a_group_names_its_machines() {
+        let empty = crate::testing::model("version: 1\nname: t\ngroups:\n  g: { members: [] }\nmachines:\n  m: {}\n").unwrap();
+        assert_eq!(
+            problems(&empty),
+            [validate::Problem::new(Code::InvalidValue, "groups.g.members", "name the machines in the group")]
+        );
+    }
 }

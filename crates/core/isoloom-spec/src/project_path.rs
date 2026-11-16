@@ -161,11 +161,13 @@ mod tests {
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink("real", dir.join("alias"))?;
-            std::os::unix::fs::symlink("/etc", dir.join("ctx"))?;
+            let outside = crate::testing::folder("project-path-outside")?;
+            std::fs::write(outside.path().join("hostname"), "")?;
+            std::os::unix::fs::symlink(outside.path(), dir.join("ctx"))?;
             std::os::unix::fs::symlink("/nowhere/at/all", dir.join("dangling"))?;
             assert_eq!(inside(dir, "alias/file")?, dir.canonicalize()?.join("real/file"));
             assert!(matches!(inside(dir, "ctx"), Err(Escape::Outside(_))));
-            assert!(matches!(inside(dir, "ctx/hostname"), Err(Escape::Outside(_) | Escape::Missing)));
+            assert!(matches!(inside(dir, "ctx/hostname"), Err(Escape::Outside(_))));
             assert_eq!(inside(dir, "dangling"), Err(Escape::Missing));
         }
         Ok(())
