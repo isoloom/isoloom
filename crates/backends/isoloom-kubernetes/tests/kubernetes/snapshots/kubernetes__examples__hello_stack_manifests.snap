@@ -1,5 +1,5 @@
 ---
-source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/kubernetes/examples.rs
 expression: "manifests(\"hello-stack\")?"
 ---
 === .isoloom/kubernetes/kustomization.yaml
