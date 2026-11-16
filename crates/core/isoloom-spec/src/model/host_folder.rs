@@ -82,7 +82,10 @@ mod tests {
         }
         let rw: HostFolder = serde_yaml_ng::from_str("{ from: x, path: /x, read_only: false }")?;
         assert!(!rw.read_only);
-        assert!(serde_yaml_ng::from_str::<HostFolder>("{ from: x, path: /x, ro: true }").is_err());
+        let ro = serde_yaml_ng::from_str::<HostFolder>("{ from: x, path: /x, ro: true }")
+            .unwrap_err()
+            .to_string();
+        assert!(ro.contains("unknown field `ro`"), "{ro}");
         Ok(())
     }
 }
