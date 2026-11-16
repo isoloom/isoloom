@@ -283,8 +283,8 @@ fn the_retry_file_is_removed_once_the_play_succeeds() {
 
 #[test]
 fn the_transient_list_fits_in_its_single_quotes() {
-    assert!(TRANSIENT.iter().all(|t| !t.contains('\'') && *t == t.to_lowercase()));
-    assert!(helpers().contains(&format!("_isoloom_attempts={ATTEMPTS}\n")));
+    isoloom_test_support::assert_every!(TRANSIENT.iter(), |t: &&&str| !t.contains('\'') && **t == t.to_lowercase());
+    assert!(helpers().lines().any(|l| l == format!("_isoloom_attempts={ATTEMPTS}")), "{}", helpers());
 }
 
 #[test]
@@ -317,16 +317,17 @@ fn the_script_runs_each_playbook_through_run_play_with_retry_files_on() {
     .unwrap();
     let spec = isoloom_plan::Lab::new(source).spec();
     let s = provision_script(&spec, &["web".into()]);
+    // Retry files on, then the helpers, then each playbook from its folder through `run_play`.
+    let (head, plays) = s.split_once(&helpers()).expect("the helpers");
     assert!(
-        s.contains(&format!(
-            "mkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n"
+        head.ends_with(&format!(
+            "\nmkdir -p {RETRY_DIR}\nexport ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH={RETRY_DIR}\n"
         )),
-        "{s}"
+        "{head}"
     );
-    assert!(s.contains(&helpers()), "{s}");
-    assert!(
-        s.contains("cd '/opt/isoloom/ansible'\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -e '{\"greeting\":\"hi there\"}' --limit 'web' 'site.yml'\n"),
-        "{s}"
+    assert_eq!(
+        plays,
+        "cd '/opt/isoloom/ansible'\n[ ! -f requirements.yml ] || retry_download ansible-galaxy install -r requirements.yml\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -e '{\"greeting\":\"hi there\"}' --limit 'web' 'site.yml'\n"
     );
 }
 
@@ -342,5 +343,10 @@ fn every_machine_its_roles_and_its_inventories_unless_limited() {
         s.ends_with("cd '/opt/isoloom/.'\nretry_download ansible-galaxy install -r '/opt/isoloom/roles/requirements.yml'\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i '/opt/isoloom/extra.ini' -i '/opt/isoloom/more.ini' 'site.yml'\n"),
         "{s}"
     );
-    assert!(provision_script(&spec, &["a".into(), "b".into()]).contains(" --limit 'a,b' 'site.yml'\n"));
+    assert!(
+        provision_script(&spec, &["a".into(), "b".into()]).ends_with(
+            "\nrun_play ansible-playbook -i /etc/isoloom/inventory.ini -i '/opt/isoloom/extra.ini' -i '/opt/isoloom/more.ini' --limit 'a,b' 'site.yml'\n"
+        ),
+        "limited to the machines given"
+    );
 }

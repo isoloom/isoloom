@@ -63,22 +63,46 @@ fn https_goes_through_the_http_proxy_unless_it_has_its_own() {
 #[test]
 fn a_vm_gets_the_proxy_for_its_shell_services_and_package_managers() {
     let sh = linux_prelude(constraints("constraints: { proxy: { http: \"http://p:3128\" } }\n").as_ref()).expect("a proxy");
-    assert!(sh.starts_with("set -e\n# The proxy, for every login shell"), "{sh}");
-    assert!(sh.contains("Defaults env_keep += "), "{sh}");
-    assert!(
-        sh.contains("printf %s 'Acquire::http::Proxy \"http://p:3128\";\nAcquire::https::Proxy \"http://p:3128\";\n' > /etc/apt/apt.conf.d/95isoloom-proxy"),
-        "{sh}"
+    let Some(run) = testing::on_etc(
+        &sh,
+        &["apt/apt.conf.d", "sudoers.d", "profile.d"],
+        &[("environment", "PATH=/usr/bin\nhttp_proxy=http://old:3128\n")],
+        &["docker"],
+    ) else {
+        return;
+    };
+    assert_eq!(
+        run.etc("environment"),
+        "PATH=/usr/bin\nHTTP_PROXY=http://p:3128\nhttp_proxy=http://p:3128\nHTTPS_PROXY=http://p:3128\nhttps_proxy=http://p:3128\nNO_PROXY=localhost,127.0.0.1,::1,web,www,10.9.0.0/24\nno_proxy=localhost,127.0.0.1,::1,web,www,10.9.0.0/24\n",
+        "the old proxy replaced, the rest kept"
     );
-    assert!(sh.contains("printf 'proxy=%s\\n' 'http://p:3128' >> \"$f\""), "{sh}");
-    assert!(
-        sh.contains("Environment=\"HTTP_PROXY=http://p:3128\"\n") && !sh.contains("Environment=\"http_proxy"),
-        "{sh}"
+    assert_eq!(
+        run.etc("profile.d/isoloom-proxy.sh"),
+        "export HTTP_PROXY='http://p:3128'\nexport http_proxy='http://p:3128'\nexport HTTPS_PROXY='http://p:3128'\nexport https_proxy='http://p:3128'\nexport NO_PROXY='localhost,127.0.0.1,::1,web,www,10.9.0.0/24'\nexport no_proxy='localhost,127.0.0.1,::1,web,www,10.9.0.0/24'\n"
     );
-    assert!(
-        sh.contains("DefaultEnvironment=%s\\n' '\"HTTP_PROXY=http://p:3128\" \"HTTPS_PROXY=http://p:3128\" \"NO_PROXY="),
-        "{sh}"
+    assert_eq!(
+        run.etc("systemd/system.conf.d/isoloom-proxy.conf"),
+        "[Manager]\nDefaultEnvironment=\"HTTP_PROXY=http://p:3128\" \"HTTPS_PROXY=http://p:3128\" \"NO_PROXY=localhost,127.0.0.1,::1,web,www,10.9.0.0/24\"\n",
+        "systemd's services, capitals alone"
     );
-    assert!(!sh.contains("chrony") && !sh.contains("mirror"), "{sh}");
+    assert_eq!(
+        run.etc("sudoers.d/isoloom-proxy"),
+        "Defaults env_keep += \"http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY\"\n"
+    );
+    assert_eq!(
+        run.etc("apt/apt.conf.d/95isoloom-proxy"),
+        "Acquire::http::Proxy \"http://p:3128\";\nAcquire::https::Proxy \"http://p:3128\";\n"
+    );
+    assert_eq!(
+        run.etc("systemd/system/docker.service.d/isoloom-proxy.conf"),
+        "[Service]\nEnvironment=\"HTTP_PROXY=http://p:3128\"\nEnvironment=\"HTTPS_PROXY=http://p:3128\"\nEnvironment=\"NO_PROXY=localhost,127.0.0.1,::1,web,www,10.9.0.0/24\"\n"
+    );
+    assert_eq!(
+        run.calls(),
+        ["systemctl daemon-reload", "systemctl is-active --quiet docker", "systemctl restart docker"],
+        "a running Docker daemon restarted with it"
+    );
+    assert_eq!(run.etc("chrony/sources.d/isoloom.sources"), "", "no time server");
 }
 
 #[test]
@@ -87,20 +111,27 @@ fn a_vm_takes_its_packages_from_the_mirrors_and_its_time_from_the_site() {
         "constraints: { mirrors: { debian: \"http://m/debian/\", ubuntu: \"http://m/ubuntu\", pypi: \"https://pypi.corp\", npm: \"https://npm.corp\" }, ntp: [a.corp, b.corp] }\n",
     ).as_ref())
     .expect("mirrors and time servers");
-    assert!(!sh.contains("proxy"), "{sh}");
-    assert!(
-        sh.contains("debian\\.org/debian/?([[:space:]]|$)#http://m/debian/\\2#g"),
-        "a trailing slash is dropped: {sh}"
-    );
-    assert!(sh.contains("ubuntu\\.com/ubuntu/?([[:space:]]|$)#http://m/ubuntu/\\3#g"), "{sh}");
-    assert!(
-        sh.contains("printf '[global]\\nindex-url = %s\\n' 'https://pypi.corp' > /etc/pip.conf\n"),
-        "{sh}"
-    );
-    assert!(sh.contains("printf 'registry=%s\\n' 'https://npm.corp' > /etc/npmrc\n"), "{sh}");
-    assert!(
-        sh.contains("printf '%s\\n' 'server a.corp iburst' 'server b.corp iburst' > /etc/chrony/sources.d/isoloom.sources"),
-        "{sh}"
-    );
-    assert!(sh.ends_with("printf '[Time]\\nNTP=%s\\n' 'a.corp b.corp' > /etc/systemd/timesyncd.conf.d/isoloom.conf && (systemctl restart systemd-timesyncd 2>/dev/null || true); fi\n"), "{sh}");
+    // Each distribution's sources rewritten to its mirror, a trailing slash dropped.
+    for line in [
+        r#". /etc/os-release; if [ "$ID" = debian ]; then for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do if [ -f "$f" ]; then sed -i -E 's#https?://(deb|httpredir|ftp)\.debian\.org/debian/?([[:space:]]|$)#http://m/debian/\2#g' "$f"; fi; done; fi"#,
+        r#". /etc/os-release; if [ "$ID" = ubuntu ]; then for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do if [ -f "$f" ]; then sed -i -E 's#https?://([a-z0-9-]+\.)?(archive|security)\.ubuntu\.com/ubuntu/?([[:space:]]|$)#http://m/ubuntu/\3#g' "$f"; fi; done; fi"#,
+    ] {
+        assert!(sh.lines().any(|l| l == line), "no `{line}` in {sh}");
+    }
+    // Neither Debian nor Ubuntu here: the sources are left alone; pip's and npm's files written,
+    // and chrony's time servers where chrony is.
+    let Some(run) = testing::on_etc(&sh, &["chrony"], &[("os-release", "ID=alpine\n")], &[]) else {
+        return;
+    };
+    assert_eq!(run.etc("pip.conf"), "[global]\nindex-url = https://pypi.corp\n");
+    assert_eq!(run.etc("npmrc"), "registry=https://npm.corp\n");
+    assert_eq!(run.etc("chrony/sources.d/isoloom.sources"), "server a.corp iburst\nserver b.corp iburst\n");
+    assert_eq!(run.calls(), ["systemctl restart chrony"]);
+    assert_eq!(run.etc("environment"), "", "no proxy");
+    // Without chrony: systemd-timesyncd's.
+    let Some(timesyncd) = testing::on_etc(&sh, &[], &[("os-release", "ID=alpine\n")], &[]) else {
+        return;
+    };
+    assert_eq!(timesyncd.etc("systemd/timesyncd.conf.d/isoloom.conf"), "[Time]\nNTP=a.corp b.corp\n");
+    assert_eq!(timesyncd.calls(), ["systemctl restart systemd-timesyncd"]);
 }

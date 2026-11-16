@@ -68,13 +68,7 @@ fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
 #[cfg(unix)]
 fn b64(s: &str) -> String {
-    let out = std::process::Command::new("sh")
-        .arg("-c")
-        .arg("printf '%s' \"$V\" | base64 | tr -d '\\n'")
-        .env("V", s)
-        .output()
-        .unwrap();
-    String::from_utf8(out.stdout).unwrap()
+    isoloom_spec::shell::base64(s.as_bytes())
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
@@ -112,7 +106,11 @@ fn a_missing_value_fails_the_delivery_without_the_mark() {
 fn no_value_is_in_a_script() {
     let files = [file("db", "/etc/app/db", Some(1000), Some(0o400))];
     let sh = receive(&["db".to_owned()], &files);
-    assert!(sh.contains("install -D -o 1000 -g 0 -m 0400 /var/lib/isoloom/secrets/db '/etc/app/db'"), "{sh}");
+    assert_eq!(
+        sh,
+        "set -e\numask 077\nmkdir -p /var/lib/isoloom/secrets\nchmod 700 /var/lib/isoloom/secrets\nIFS= read -r v || [ -n \"$v\" ]; printf '%s\\n' \"$v\" | base64 -d > /var/lib/isoloom/secrets/db.new; mv -f /var/lib/isoloom/secrets/db.new /var/lib/isoloom/secrets/db\nunset v\ntouch /var/lib/isoloom/secrets/.delivered\ninstall -D -o 1000 -g 0 -m 0400 /var/lib/isoloom/secrets/db '/etc/app/db'\n",
+        "the values come on the standard input, never in the script"
+    );
     assert_eq!(
         place(&[file("x", "/run/secrets/x", None, None)]),
         "install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/x '/run/secrets/x'\n"
@@ -121,10 +119,13 @@ fn no_value_is_in_a_script() {
 
 #[test]
 fn the_step_waits_then_places_at_every_boot() {
-    let sh = step("web", &[file("db", "/run/secrets/db", None, None)]);
-    assert!(sh.starts_with("set -e\ni=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
-    assert!(sh.contains("systemctl enable isoloom-apply-secrets.service"), "{sh}");
-    assert!(sh.contains("install -D -o 0 -g 0 -m 0400"), "{sh}");
+    let files = [file("db", "/run/secrets/db", None, None)];
+    let sh = step("web", &files);
+    assert_eq!(
+        sh,
+        "set -e\ni=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$i\" -gt 0 ] || echo 'web: waiting for its secrets, which the tool that runs it delivers'; i=$((i+5)); if [ \"$i\" -gt 1800 ]; then echo 'web: its secrets never came; start the environment with a tool that delivers them' >&2; exit 1; fi; sleep 5; done\nmkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'APPLY-SECRETS'\n#!/bin/sh\n# The machine's secrets, put in place\ninstall -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/db '/run/secrets/db'\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'UNIT'\n[Unit]\nDescription=The machine's secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi\n",
+        "the wait, then the placing kept as a boot service"
+    );
     if let Some(mut posix) = crate::test_support::posix_sh() {
         assert!(posix.arg("-n").arg("-c").arg(&sh).status().unwrap().success(), "{sh}");
     }
@@ -158,9 +159,10 @@ fn a_docker_host_reads_each_kept_value_into_its_variable() {
 #[test]
 fn the_wait_gives_up_after_half_an_hour_of_five_second_tries() {
     let sh = wait("web");
-    assert!(sh.contains("if [ \"$i\" -gt 1800 ]; then echo"), "{sh}");
-    assert!(sh.ends_with("sleep 5; done\n"), "{sh}");
-    assert!(sh.contains("'web: waiting for its secrets, which the tool that runs it delivers'"), "{sh}");
+    assert_eq!(
+        sh,
+        "i=0; until [ -f /var/lib/isoloom/secrets/.delivered ]; do [ \"$i\" -gt 0 ] || echo 'web: waiting for its secrets, which the tool that runs it delivers'; i=$((i+5)); if [ \"$i\" -gt 1800 ]; then echo 'web: its secrets never came; start the environment with a tool that delivers them' >&2; exit 1; fi; sleep 5; done\n"
+    );
     assert!(!sh.contains('`'), "no backquote, which shellcheck reads as an expansion left unexpanded: {sh}");
 }
 
@@ -183,7 +185,11 @@ fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() 
     let script = from_environment(&[("db".to_owned(), "PW_B64".to_owned()), ("api".to_owned(), "API_B64".to_owned())], &[]);
     // Only what keeps the values: the placing service needs a real machine's `/etc`.
     let (keeping, placing) = script.split_once(&format!("touch {DELIVERED}\n")).expect("the mark");
-    assert!(placing.contains("systemctl enable isoloom-apply-secrets.service"), "{placing}");
+    assert_eq!(
+        placing,
+        "mkdir -p /etc/isoloom\ncat > /etc/isoloom/apply-secrets.sh <<'APPLY-SECRETS'\n#!/bin/sh\n# The machine's secrets, put in place\nexit 0\nAPPLY-SECRETS\nchmod +x /etc/isoloom/apply-secrets.sh\nif command -v systemctl >/dev/null; then\ncat > /etc/systemd/system/isoloom-apply-secrets.service <<'UNIT'\n[Unit]\nDescription=The machine's secrets, put in place\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=oneshot\nRemainAfterExit=yes\nExecStart=-/etc/isoloom/apply-secrets.sh\n\n[Install]\nWantedBy=multi-user.target\nUNIT\nsystemctl daemon-reload\nsystemctl enable isoloom-apply-secrets.service\nsystemctl restart isoloom-apply-secrets.service\nelse\nmkdir -p /etc/local.d && ln -sf /etc/isoloom/apply-secrets.sh /etc/local.d/isoloom-apply-secrets.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/apply-secrets.sh || true\nfi\n",
+        "placed now and at every boot, without waiting"
+    );
     let first = format!("export PW_B64={}; {keeping}touch {DELIVERED}\n", b64("p@ss 'word'\n"));
     let (fresh, fresh_dir, _fresh) = run(&first, "", "env-first");
     assert!(fresh.status.success(), "{}", String::from_utf8_lossy(&fresh.stderr));

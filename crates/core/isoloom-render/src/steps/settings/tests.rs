@@ -155,50 +155,19 @@ machines:
     assert!(root.join("srv/t").is_dir() && root.join("srv/cache").is_dir());
 }
 
-/// A settings script run by [`run_settings`]: its stand-in `/etc`, and the commands it ran.
-struct Ran {
-    dir: tempfile::TempDir,
-}
-
-impl Ran {
-    /// The file at `path` under the stand-in `/etc`, empty when there's none.
-    fn etc(&self, path: &str) -> String {
-        std::fs::read_to_string(self.dir.path().join("etc").join(path)).unwrap_or_default()
-    }
-
-    /// The `systemctl` and `sysctl` calls, in order, the stand-in `/etc` written `$ETC`.
-    fn calls(&self) -> Vec<String> {
-        let etc = self.dir.path().join("etc").display().to_string();
-        self.etc("../calls").lines().map(|l| l.replace(&etc, "$ETC")).collect()
-    }
-}
-
-/// A settings script run with `/etc`, `systemctl` and `sysctl` stood in for: `resolved` says
-/// whether systemd-resolved is active; `/etc/environment` holds `PATH` and an old `MODE`.
-fn run_settings(sh: &str, resolved: bool, resolv_conf: &str) -> Option<Ran> {
-    let mut posix = crate::test_support::posix_sh()?;
-    let dir = tempfile::tempdir().expect("a folder");
-    let etc = dir.path().join("etc");
-    for sub in ["dhcp", "udhcpc", "systemd/system.conf.d", "sysctl.d", "profile.d"] {
-        std::fs::create_dir_all(etc.join(sub)).expect("a folder");
-    }
-    std::fs::write(etc.join("resolv.conf"), resolv_conf).expect("resolv.conf");
-    std::fs::write(etc.join("environment"), "PATH=/usr/bin\nMODE=old\n").expect("environment");
-    std::fs::write(
-        etc.join("dhcp/dhclient.conf"),
-        "request subnet-mask;\nsupersede domain-name-servers 1.1.1.1; # isoloom\n",
+/// A settings script run on a stand-in `/etc` ([`testing::on_etc`]): `resolved` says whether
+/// systemd-resolved is active; `/etc/environment` holds `PATH` and an old `MODE`.
+fn run_settings(sh: &str, resolved: bool, resolv_conf: &str) -> Option<testing::Ran> {
+    testing::on_etc(
+        sh,
+        &["dhcp", "udhcpc", "systemd/system.conf.d", "sysctl.d", "profile.d"],
+        &[
+            ("resolv.conf", resolv_conf),
+            ("environment", "PATH=/usr/bin\nMODE=old\n"),
+            ("dhcp/dhclient.conf", "request subnet-mask;\nsupersede domain-name-servers 1.1.1.1; # isoloom\n"),
+        ],
+        if resolved { &["systemd-resolved"] } else { &[] },
     )
-    .expect("dhclient.conf");
-    let calls = dir.path().join("calls");
-    let shim = format!(
-        "systemctl() {{ printf 'systemctl %s\\n' \"$*\" >> {calls}; case \"$*\" in 'is-active -q systemd-resolved') {resolved} ;; is-active*) false ;; esac; }}\nsysctl() {{ printf 'sysctl %s\\n' \"$*\" >> {calls}; }}\n",
-        calls = calls.display(),
-        resolved = if resolved { "true" } else { "false" }
-    );
-    let script = sh.replace("/etc/", &format!("{}/", etc.display()));
-    let out = posix.arg("-c").arg(format!("{shim}{script}")).output().expect("sh runs");
-    assert!(out.status.success(), "{}\n{script}", String::from_utf8_lossy(&out.stderr));
-    Some(Ran { dir })
 }
 
 const DNS: &str = r#"

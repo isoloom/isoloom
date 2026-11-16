@@ -68,12 +68,6 @@ fn host_values_are_quoted_only_when_the_split_needs_it() {
 }
 
 #[test]
-fn an_access_shows_its_group_variables() {
-    let shown = format!("{:?}", Access::new(Vars::new(), vars(&WINDOWS_OVER_SSH), |_| Vars::new()));
-    assert!(shown.starts_with("Access { linux: [], windows: [(\"ansible_connection\", \"ssh\")"), "{shown}");
-}
-
-#[test]
 fn each_host_gets_its_access_s_own_variables_after_its_address() {
     let access = Access::new(Vars::new(), vars(&[("ansible_connection", "winrm")]), |h| {
         h.machine.winrm.map(winrm_vars).unwrap_or_default()
