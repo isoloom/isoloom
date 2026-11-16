@@ -247,13 +247,13 @@ checks: [check.sh, { script: v1..2/probe.sh, from: web }]
         let dir = scratch.path();
         fs::create_dir_all(dir.join("real"))?;
         fs::write(dir.join("real/a.ini"), "")?;
-        std::os::unix::fs::symlink("/etc", dir.join("ctx"))?;
-        // A file outside the project that every OS has: the test's own.
+        // A folder and a file outside the project: the test's own.
         let outside = crate::testing::folder("files-linked-outside")?;
+        std::os::unix::fs::symlink(outside.path(), dir.join("ctx"))?;
         fs::write(outside.path().join("conf.ini"), "")?;
         std::os::unix::fs::symlink(outside.path().join("conf.ini"), dir.join("conf.ini"))?;
         std::os::unix::fs::symlink("real/a.ini", dir.join("own.ini"))?;
-        std::os::unix::fs::symlink("/etc", dir.join("data"))?;
+        std::os::unix::fs::symlink(outside.path(), dir.join("data"))?;
         let spec = model(&lab(machine))?;
         let found: Vec<String> = validate_files(&spec, dir).iter().map(ToString::to_string).collect();
         assert_eq!(

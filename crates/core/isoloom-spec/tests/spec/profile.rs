@@ -1,11 +1,11 @@
 //! Profiles: one file per customer or site, merged into the spec and the defaults, checked
 //! against the spec, and pinning a target.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use isoloom_spec::host::Host;
 use isoloom_spec::profile::{self, Profile};
-use isoloom_spec::{Target, defaults, load_profiled};
+use isoloom_spec::{Error, Target, defaults, load_profiled};
 
 use crate::testing::Outcome;
 
@@ -127,13 +127,18 @@ fn a_profile_gives_inputs_the_spec_declares_as_a_map() -> Outcome {
 
 #[test]
 fn a_profile_file_is_strict() -> Outcome {
-    let refused = |text: &str| profile::parse("p", PathBuf::from("p.yml"), text).unwrap_err().to_string();
-    let typo = refused("targt: docker\n");
-    assert!(typo.contains("unknown field `targt`"), "{typo}");
-    let target = refused("target: moon\n");
-    assert!(target.contains("moon"), "{target}");
+    let refused = |text: &str| profile::parse("p", PathBuf::from("p.yml"), text).unwrap_err();
+    for (text, word) in [("targt: docker\n", "unknown field `targt`"), ("target: moon\n", "moon")] {
+        let e = refused(text);
+        assert!(matches!(e, Error::ProfileYaml { .. }) && e.to_string().contains(word), "{text}: {e}");
+    }
     let list = refused("inputs: { REGISTRY: [a, b] }\n");
-    assert!(list.contains("single value"), "{list}");
+    assert!(matches!(&list, Error::ProfileInput { input, .. } if input == "REGISTRY"), "{list}");
+    assert!(list.to_string().contains("single value"), "{list}");
+    for (text, section) in [("spec: 5\n", "spec"), ("defaults: [a]\n", "defaults")] {
+        let e = refused(text);
+        assert!(matches!(e, Error::ProfileMapping { key, .. } if key == section), "{text}: {e}");
+    }
     let p = parse("inputs: { PORT: 8080, DEBUG: true }\n")?;
     assert_eq!(p.inputs["PORT"], "8080");
     assert_eq!(p.inputs["DEBUG"], "true");
@@ -172,7 +177,7 @@ fn profiles_are_listed_and_found_by_name() -> Outcome {
     assert!(profile::load(dir, &"a".repeat(63)).unwrap_err().to_string().contains("no profile"));
     std::fs::write(dir.join(profile::DIR).join("a-site.yaml"), "{}\n")?;
     assert!(profile::load(dir, "a-site").unwrap_err().to_string().contains("keep one"));
-    assert_eq!(profile::list(Path::new("/nonexistent"))?, profile::Listed::default());
+    assert_eq!(profile::list(&dir.join("nowhere"))?, profile::Listed::default(), "a project without profiles");
     Ok(())
 }
 

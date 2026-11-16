@@ -177,23 +177,15 @@ mod tests {
     }
 
     #[test]
-    fn plain_word_is_wrapped() {
-        assert_eq!(quote("abc"), "'abc'");
-    }
-
-    #[test]
-    fn empty_string_is_an_empty_word() {
-        assert_eq!(quote(""), "''");
-    }
-
-    #[test]
-    fn single_quotes_are_closed_escaped_and_reopened() {
-        assert_eq!(quote("it's"), "'it'\\''s'");
-        assert_eq!(quote("'"), "''\\'''");
-    }
-
-    #[test]
-    fn shell_metacharacters_stay_literal() {
-        assert_eq!(quote("$(rm -rf /) `x` \"y\" \\n"), "'$(rm -rf /) `x` \"y\" \\n'");
+    fn a_word_is_single_quoted_its_own_quotes_closed_escaped_and_reopened() {
+        for (word, quoted) in [
+            ("abc", "'abc'"),
+            ("", "''"),
+            ("it's", "'it'\\''s'"),
+            ("'", "''\\'''"),
+            ("$(rm -rf /) `x` \"y\" \\n", "'$(rm -rf /) `x` \"y\" \\n'"),
+        ] {
+            assert_eq!(quote(word), quoted, "{word:?}");
+        }
     }
 }

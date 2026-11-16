@@ -398,4 +398,15 @@ mod tests {
         );
         assert_eq!(relocate("README.md", "plain", 2), ("README.md".to_owned(), "plain".to_owned()));
     }
+
+    #[test]
+    fn an_instance_never_takes_an_ipv6_block_of_the_environment() -> Result<(), String> {
+        let spec = model(
+            "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.20.0.0/24, ipv6: { cidr: \"fd00:20::/64\" } }\n  dmz: { cidr: 10.30.0.0/24, ipv6: { cidr: \"fd00:20:1::/64\" } }\nmachines: {}\n",
+        )?;
+        let p = conflict(&spec, 1).ok_or("instance 1 is refused")?;
+        assert_eq!((p.code, p.path.as_str()), (Code::Conflict, "networks.lan.ipv6.cidr"));
+        assert!(p.reason.contains("fd00:20:1::/64") && p.reason.contains("`dmz`"), "{}", p.reason);
+        Ok(())
+    }
 }
