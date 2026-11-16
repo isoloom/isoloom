@@ -127,7 +127,8 @@ mod tests {
     #[test]
     fn a_missing_folder_is_an_error_not_a_clean_run() {
         let dir = tempfile::Builder::new().prefix("isoloom-xtask-leftovers-").tempdir().unwrap();
-        assert!(leftovers(&dir.path().join("gone")).is_err());
+        let gone = leftovers(&dir.path().join("gone")).map_err(|e| e.kind());
+        assert_eq!(gone, Err(std::io::ErrorKind::NotFound));
     }
 
     #[test]

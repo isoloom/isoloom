@@ -177,6 +177,19 @@ mod tests {
         violations(&serde_json::json!({ "workspace_root": "/ws", "packages": packages }))
     }
 
+    /// What each violation names: `<crate> -> <dependency>` for an edge, the crate for one the
+    /// rule can't place.
+    fn named(found: &[String]) -> Vec<String> {
+        let word = |s: &str| s.split([' ', ':']).next().unwrap_or_default().to_owned();
+        found
+            .iter()
+            .map(|f| match f.split_once(" depends on ") {
+                Some((from, to)) => format!("{} -> {}", word(from), word(to)),
+                None => word(f),
+            })
+            .collect()
+    }
+
     #[test]
     fn the_layers_may_depend_downwards_only() {
         let ok = check(&[
@@ -214,7 +227,7 @@ mod tests {
             helpers(),
             package("isoloom-vagrant", "crates/backends/isoloom-vagrant", &[(TEST_SUPPORT, None)]),
         ]);
-        assert_eq!(built.len(), 1, "{built:?}");
+        assert_eq!(named(&built), ["isoloom-vagrant -> isoloom-test-support"], "{built:?}");
     }
 
     #[test]
@@ -234,7 +247,7 @@ mod tests {
             package("isoloom-wasm", "crates/frontends/isoloom-wasm", &[]),
             package("isoloom", "crates/cli/isoloom", &[("isoloom-topology", None)]),
         ]);
-        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(named(&found), ["isoloom-topology -> isoloom-wasm", "isoloom -> isoloom-topology"], "{found:?}");
     }
 
     #[test]
@@ -244,7 +257,11 @@ mod tests {
             package("isoloom-vagrant", "crates/backends/isoloom-vagrant", &[("isoloom-compose", None)]),
             package("isoloom-import", "crates/tools/isoloom-import", &[("isoloom-compose", None)]),
         ]);
-        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(
+            named(&found),
+            ["isoloom-vagrant -> isoloom-compose", "isoloom-import -> isoloom-compose"],
+            "{found:?}"
+        );
     }
 
     #[test]
@@ -255,13 +272,13 @@ mod tests {
             // The xtask may use any crate (the catalogue's refresh reads its types).
             package("xtask", "xtask", &[("isoloom-spec", None)]),
         ]);
-        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(named(&found), ["isoloom -> xtask"], "{found:?}");
     }
 
     #[test]
     fn a_crate_outside_the_layout_or_the_core_order_is_named() {
         let found = check(&[package("isoloom-new", "crates/core/isoloom-new", &[]), package("stray", "stray", &[])]);
-        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(named(&found), ["isoloom-new", "stray"], "{found:?}");
         assert!(found[0].contains("add it to the core order"), "{found:?}");
     }
 
@@ -317,8 +334,13 @@ mod tests {
             ("isothrum", &[]),
         ]);
         let found = runner_crates(&pulled);
-        assert_eq!(found.len(), 2, "{found:?}");
-        assert!(found[0].starts_with("isothrum-core is in") && found[0].contains("some-lib"), "{found:?}");
+        assert_eq!(
+            found,
+            [
+                "isothrum-core is in Isoloom's dependency graph (pulled in by some-lib): Isoloom never depends on the runner",
+                "isothrum is in Isoloom's dependency graph (pulled in by nothing named): Isoloom never depends on the runner",
+            ]
+        );
         // A name that only starts like it is not the runner.
         assert_eq!(runner_crates(&resolved(&[("isothrumbus", &[])])), Vec::<String>::new());
     }

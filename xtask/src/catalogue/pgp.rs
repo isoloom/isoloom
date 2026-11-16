@@ -130,15 +130,6 @@ mod tests {
         out
     }
 
-    #[test]
-    fn base64_pads_as_the_standard_says() {
-        assert_eq!(base64(b""), "");
-        assert_eq!(base64(b"M"), "TQ==");
-        assert_eq!(base64(b"Ma"), "TWE=");
-        assert_eq!(base64(b"Man"), "TWFu");
-        assert_eq!(base64(b"Many"), "TWFueQ==");
-    }
-
     /// An armour block around `packets`.
     fn armored(packets: &[u8]) -> String {
         format!(
@@ -148,10 +139,13 @@ mod tests {
     }
 
     #[test]
-    fn base64_reads_back_what_it_wrote() {
-        for bytes in [&b""[..], b"a", b"ab", b"abc", b"\x00\xff\x10\x99"] {
-            assert_eq!(decode(&base64(bytes)).unwrap(), bytes);
+    fn the_armours_base64_reads_as_the_standard_writes_it() {
+        // RFC 4648's padding, and the test's own encoder (the armour's fixtures) read back.
+        for (text, bytes) in [("", &b""[..]), ("TQ==", b"M"), ("TWE=", b"Ma"), ("TWFu", b"Man"), ("TWFueQ==", b"Many")] {
+            assert_eq!(decode(text).unwrap(), bytes, "{text}");
+            assert_eq!(base64(bytes), text);
         }
+        assert_eq!(decode(&base64(b"\x00\xff\x10\x99")).unwrap(), b"\x00\xff\x10\x99");
     }
 
     #[test]
@@ -167,6 +161,6 @@ mod tests {
         assert_eq!(fingerprints(&armored(&all)).unwrap(), std::slice::from_ref(&expected));
         let two = format!("{}{}", armored(&key), armored(&key));
         assert_eq!(fingerprints(&two).unwrap(), [expected.clone(), expected]);
-        assert!(fingerprints("no key here").is_err());
+        assert_eq!(fingerprints("no key here").unwrap_err(), "no public key block in the file");
     }
 }

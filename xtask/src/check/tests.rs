@@ -49,14 +49,16 @@ fn a_step_that_does_not_exist_is_an_error_naming_the_steps() {
 fn the_rust_version_is_the_workspace_one() {
     let manifest = "[workspace]\nmembers = []\n[workspace.package]\nrust-version = \"1.89\"\n";
     assert_eq!(rust_version(manifest).ok().as_deref(), Some("1.89"));
-    assert!(rust_version("[package]\nname = \"x\"\n").is_err());
+    let none = rust_version("[package]\nname = \"x\"\n").err().map(|e| e.to_string());
+    assert_eq!(none.as_deref(), Some("Cargo.toml sets no workspace.package.rust-version"));
 }
 
 #[test]
 fn a_1x_release_checks_the_changes_as_a_major_and_a_later_one_as_the_version_says() {
     let answer = r#"{"crate":{"name":"isoloom-spec","max_stable_version":"1.4.2"}}"#;
     assert_eq!(latest_release(answer).ok().as_deref(), Some("1.4.2"));
-    assert!(latest_release(r#"{"errors":[]}"#).is_err());
+    let none = latest_release(r#"{"errors":[]}"#).err().map(|e| e.to_string());
+    assert_eq!(none.as_deref(), Some("crates.io's answer names no max_stable_version"));
     assert_eq!(release_type("1.4.2"), ["--release-type", "major"]);
     assert_eq!(release_type("2.0.0"), Vec::<&str>::new());
     assert!(release_type("10.0.0").is_empty(), "a 10.x isn't a 1.x");

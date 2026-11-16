@@ -174,7 +174,7 @@ mod tests {
     fn the_spec_parsers_dictionary_holds_every_step_kind_in_libfuzzers_format() {
         let text = std::fs::read_to_string(dictionary(&repo::root(), "spec_syntax")).expect("the spec parser's dictionary");
         let entries: Vec<&str> = text.lines().filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
-        assert!(entries.iter().all(|e| e.starts_with('"') && e.ends_with('"')), "one quoted entry per line");
+        isoloom_test_support::assert_every!(&entries, |e: &&&str| e.starts_with('"') && e.ends_with('"'));
         for kind in [
             "run:",
             "copy:",

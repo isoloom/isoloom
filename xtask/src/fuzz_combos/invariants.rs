@@ -134,7 +134,10 @@ mod tests {
     fn a_leaked_secret_value_is_caught_and_a_hashed_one_is_not() {
         let value = "ISOLOOM-FUZZ-SENTINEL-deadbeef".to_owned();
         let leaked = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: ISOLOOM-FUZZ-SENTINEL-deadbeef")];
-        assert!(secret_leak(&leaked, std::slice::from_ref(&value)).is_some());
+        assert_eq!(
+            secret_leak(&leaked, std::slice::from_ref(&value)).as_deref(),
+            Some("a secret value leaked into `.isoloom/docker/compose.yaml`")
+        );
         let safe = [GeneratedFile::new(".isoloom/docker/compose.yaml", "password: $6$rounds$abc")];
         assert!(secret_leak(&safe, std::slice::from_ref(&value)).is_none());
     }
@@ -144,9 +147,12 @@ mod tests {
         let one = [GeneratedFile::new("a", "x"), GeneratedFile::new("b", "y")];
         assert!(determinism(&one, &one).is_none());
         let changed = [GeneratedFile::new("a", "x"), GeneratedFile::new("b", "z")];
-        assert!(determinism(&one, &changed).is_some());
+        assert_eq!(
+            determinism(&one, &changed).as_deref(),
+            Some("generation is not deterministic: `b` changed between two runs")
+        );
         let shorter = [GeneratedFile::new("a", "x")];
-        assert!(determinism(&one, &shorter).is_some());
+        assert_eq!(determinism(&one, &shorter).as_deref(), Some("generation is not deterministic: 2 files, then 1"));
     }
 
     #[test]
@@ -155,7 +161,8 @@ mod tests {
             target: Target::Docker,
             what: "   ".to_owned(),
         }];
-        assert!(reasonless(&silent).is_some());
+        let found = reasonless(&silent).unwrap_or_default();
+        assert!(found.starts_with("a target was left out with no reason: `"), "{found}");
         let with_reason = [GenerateError::NotPossible(Target::Vagrant)];
         assert!(reasonless(&with_reason).is_none());
     }
