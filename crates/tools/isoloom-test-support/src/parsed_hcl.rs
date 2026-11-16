@@ -168,3 +168,86 @@ fn literals_of(expr: &hcl::Expression, out: &mut Vec<String>) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TF: &str = r#"
+resource "aws_instance" "web" {
+  instance_type = "t3.micro"
+  subnet_id     = aws_subnet.lan.id
+  root_block_device { volume_size = 20 }
+  network_interface { device_index = 0 }
+  network_interface { device_index = 1 }
+  tags = { Name = "web" }
+}
+resource "aws_instance" "db" { instance_type = "t3.small" }
+resource "aws_vpc" "lab" {}
+data "aws_ami" "debian" {}
+variable "region" { default = "eu-west-3" }
+"#;
+
+    #[test]
+    fn a_module_is_read_by_block_labels_and_attribute() {
+        let body = hcl_body(TF);
+        assert_eq!(hcl_names(&body, "resource", "aws_instance"), ["web", "db"]);
+        assert_eq!(hcl_names(&body, "data", "aws_ami"), ["debian"]);
+        assert_eq!(hcl_blocks(&body, "resource", &["aws_instance"]).len(), 2, "a label prefix");
+        assert_eq!(hcl_blocks(&body, "variable", &["region"]).len(), 1);
+        let web = hcl_one(&body, "aws_instance", "web");
+        assert_eq!(hcl_text(web, "instance_type"), "t3.micro", "a string's value");
+        assert_eq!(hcl_text(web, "subnet_id"), "aws_subnet.lan.id", "anything else as HCL writes it");
+        assert_eq!(hcl_attribute(web, "volume_size"), None, "directly in the body only");
+        assert_eq!(hcl_values(web, "volume_size"), ["20"], "nested blocks too, by name");
+        let interfaces: Vec<Vec<String>> = hcl_nested(web, "network_interface")
+            .iter()
+            .map(|b| hcl_values(b.body(), "device_index"))
+            .collect();
+        assert_eq!(interfaces, [["0"], ["1"]]);
+        assert_eq!(hcl_resource(TF, "aws_instance", "db"), hcl_one(&body, "aws_instance", "db").clone());
+    }
+
+    #[test]
+    #[should_panic(expected = "no attribute `ami`")]
+    fn an_attribute_that_isnt_set_fails_the_test_rather_than_read_empty() {
+        let body = hcl_body(TF);
+        let _text = hcl_text(hcl_one(&body, "aws_instance", "web"), "ami");
+    }
+
+    #[test]
+    #[should_panic(expected = "0 resource \"aws_instance\" \"cache\"")]
+    fn a_resource_that_isnt_there_fails_the_test() {
+        let _body = hcl_one(&hcl_body(TF), "aws_instance", "cache");
+    }
+
+    #[test]
+    #[should_panic(expected = "2 `resource \"aws_vpc\" \"lab\"`")]
+    fn a_resource_written_twice_fails_the_test() {
+        let _body = hcl_resource("resource \"aws_vpc\" \"lab\" {}\nresource \"aws_vpc\" \"lab\" {}\n", "aws_vpc", "lab");
+    }
+
+    #[test]
+    #[should_panic(expected = "not HCL")]
+    fn text_that_isnt_hcl_fails_the_test() {
+        let _body = hcl_body("resource \"a\" {");
+    }
+
+    #[test]
+    fn every_literal_is_read_from_lists_objects_calls_and_conditionals_never_a_reference() {
+        let body = hcl_body(
+            "resource \"x\" \"y\" {\n  ports = [22, 80]\n  open  = true\n  cidr  = cidrsubnet(\"10.0.0.0/16\", 8, 1)\n  name  = var.x ? \"a\" : \"b\"\n  ref   = aws_vpc.lab.id\n  rule { note = \"in a block\" }\n}\n",
+        );
+        assert_eq!(hcl_literals(&body), ["22", "80", "true", "10.0.0.0/16", "8", "1", "a", "b", "in a block"]);
+    }
+
+    #[test]
+    fn an_hcl_map_is_read_by_entry_from_every_object_written_in_it() {
+        let body = hcl_body("locals {\n  tags = merge({ \"Cost.Center\" = \"R&D\", team = local.team }, var.x == \"\" ? {} : { at = var.x })\n}\n");
+        let locals = hcl_blocks(&body, "locals", &[]);
+        let tags = locals.first().map(|l| hcl_map(l.body(), "tags")).unwrap_or_default();
+        let entries = [("Cost.Center", "R&D"), ("team", "local.team"), ("at", "var.x")].map(|(k, v)| (k.to_owned(), v.to_owned()));
+        assert_eq!(tags, entries);
+        assert_eq!(hcl_map(&body, "nothing"), Vec::new());
+    }
+}

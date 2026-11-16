@@ -18,3 +18,26 @@ pub fn ini_groups(text: &str) -> BTreeMap<String, Vec<String>> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_inventory_is_read_as_its_groups_lines_in_order() {
+        let groups = ini_groups(
+            "# written by isoloom\nlocal ansible_connection=local\n\n[web]\nweb1 ansible_host=10.0.0.2\n  web2\n[web:vars]\nhttp_port=80\n[empty]\n",
+        );
+        let expected = [
+            ("", vec!["local ansible_connection=local"]),
+            ("empty", vec![]),
+            ("web", vec!["web1 ansible_host=10.0.0.2", "web2"]),
+            ("web:vars", vec!["http_port=80"]),
+        ];
+        let expected: BTreeMap<String, Vec<String>> = expected
+            .into_iter()
+            .map(|(g, lines)| (g.to_owned(), lines.into_iter().map(str::to_owned).collect()))
+            .collect();
+        assert_eq!(groups, expected);
+    }
+}

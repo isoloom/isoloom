@@ -171,3 +171,68 @@ pub fn named<'v>(value: &'v serde_yaml_ng::Value, path: &str, name: &str) -> &'v
         _ => panic!("{} items named `{name}` at `{path}`", found.len()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const COMPOSE: &str = "services:\n  web:\n    image: nginx\n    ports: ['8080:80', 8443]\n    labels: { isoloom.managed: 'true' }\n    networks: { lan: { ipv4_address: 10.0.0.2 } }\n";
+
+    #[test]
+    fn a_value_is_read_by_its_path_a_list_item_by_index_a_dotted_key_in_backquotes() {
+        let v = yaml(COMPOSE);
+        assert_eq!(yaml_str(&v, "services.web.networks.lan.ipv4_address"), "10.0.0.2");
+        assert_eq!(yaml_str(&v, "services.web.labels.`isoloom.managed`"), "true");
+        assert_eq!(yaml_str(&v, "services.web.ports.1"), "8443", "a number as written");
+        assert_eq!(yaml_strs(&v, "services.web.ports"), ["8080:80", "8443"]);
+        assert_eq!(yaml_keys_at(&v, "services.web"), ["image", "ports", "labels", "networks"]);
+        assert_eq!(yaml_keys_at(&v, ""), ["services"], "the top's keys");
+        for missing in ["services.db", "services.web.ports.2", "services.web.image.x", "services.web.ports.first"] {
+            assert_eq!(yaml_at(&v, missing), None, "{missing}");
+        }
+        assert_eq!(yaml_strs(&v, "services.web.image"), Vec::<String>::new(), "not a list");
+    }
+
+    #[test]
+    #[should_panic(expected = "no scalar at `services.db.image`")]
+    fn a_scalar_that_isnt_there_fails_the_test_rather_than_read_empty() {
+        let _text = yaml_str(&yaml(COMPOSE), "services.db.image");
+    }
+
+    #[test]
+    #[should_panic(expected = "not YAML")]
+    fn text_that_isnt_yaml_fails_the_test() {
+        let _value = yaml("a: [unclosed");
+    }
+
+    #[test]
+    fn a_key_is_read_anywhere_by_name_in_document_order() {
+        let pod = yaml("spec:\n  initContainers: [{ name: a, image: busybox }]\n  containers: [{ name: b, image: nginx, env: [{ name: image, value: x }] }]\n");
+        assert_eq!(yaml_values(&pod, "image"), ["busybox", "nginx"]);
+        assert_eq!(yaml_values(&pod, "name"), ["a", "b", "image"]);
+    }
+
+    const MANIFESTS: &str = "kind: Service\nmetadata: { name: web }\n---\n---\nkind: Deployment\nmetadata: { name: web }\nspec: { containers: [{ name: app, image: nginx }, { name: side, image: envoy }] }\n---\nkind: Deployment\nmetadata: { name: db }\n";
+
+    #[test]
+    fn manifests_are_found_by_kind_and_name_and_an_item_of_a_list_by_its_name() {
+        let docs = yaml_documents(MANIFESTS);
+        assert_eq!(docs.len(), 3, "the empty document left out");
+        assert_eq!(manifest_names(&docs, "Deployment"), ["web", "db"]);
+        let web = manifest(&docs, "Deployment", "web");
+        assert_eq!(yaml_str(named(web, "spec.containers", "side"), "image"), "envoy");
+    }
+
+    #[test]
+    #[should_panic(expected = "0 Deployment `cache` among the manifests")]
+    fn a_manifest_that_isnt_there_fails_the_test() {
+        let _found = manifest(&yaml_documents(MANIFESTS), "Deployment", "cache");
+    }
+
+    #[test]
+    #[should_panic(expected = "0 items named `app` at `spec.volumes`")]
+    fn an_item_that_isnt_in_the_list_fails_the_test() {
+        let docs = yaml_documents(MANIFESTS);
+        let _found = named(manifest(&docs, "Deployment", "web"), "spec.volumes", "app");
+    }
+}
