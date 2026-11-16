@@ -124,10 +124,6 @@ esac"#,
         bin
     }
 
-    fn calls(bin: &FakeBin) -> Vec<String> {
-        bin.calls().unwrap().iter().map(|c| c.join(" ")).collect()
-    }
-
     #[test]
     fn a_fresh_run_copies_the_project_and_scripts_in_starts_attached_and_removes_the_container() {
         let bin = docker();
@@ -138,7 +134,7 @@ esac"#,
         let name = "isoloom-conformance-debian-12-apply";
         let image = image(family).unwrap();
         assert_eq!(
-            calls(&bin),
+            crate::testing::said(&bin),
             [
                 format!("docker rm -f {name}"),
                 format!("docker create --name {name} --cpus 2 --entrypoint sh {image} /isoloom-test/run.sh apt apply"),
@@ -165,7 +161,7 @@ esac"#,
                 dir.display()
             )
         );
-        assert_eq!(calls(&bin).last(), Some(&format!("docker rm -f {name}")));
+        assert_eq!(crate::testing::said(&bin).last(), Some(&format!("docker rm -f {name}")));
     }
 
     #[test]
@@ -174,7 +170,7 @@ esac"#,
         let family = FAMILIES[0];
         let dir = bin.dir().join("run");
         crate::process::testing::with_stand_ins(&bin.path(), || built(family, &dir, 2)).unwrap();
-        let calls = calls(&bin);
+        let calls = crate::testing::said(&bin);
         let project = dir.join("project");
         assert_eq!(
             calls.first(),

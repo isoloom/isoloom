@@ -320,22 +320,11 @@ mod tests {
         tempfile::Builder::new().prefix(&format!("isoloom-xtask-verify-{name}-")).tempdir().unwrap()
     }
 
-    /// An archive holding `summary.txt` (`text`).
-    fn results(text: &[u8]) -> Vec<u8> {
-        let mut tar = tar::Builder::new(Vec::new());
-        let mut header = tar::Header::new_gnu();
-        header.set_size(u64::try_from(text.len()).unwrap());
-        header.set_mode(0o644);
-        header.set_cksum();
-        tar.append_data(&mut header, "summary.txt", text).unwrap();
-        tar.into_inner().unwrap()
-    }
-
     #[test]
     fn the_results_unpack_and_an_empty_archive_is_no_results() {
         let dir = scratch("whole");
         let dir = dir.path();
-        std::fs::write(dir.join("out.tar"), results(b"all clean\n")).unwrap();
+        std::fs::write(dir.join("out.tar"), crate::testing::tar_of("summary.txt", b"all clean\n")).unwrap();
         unpack(&dir.join("out.tar"), &dir.join("out"), 0).unwrap();
         assert_eq!(std::fs::read_to_string(dir.join("out/summary.txt")).unwrap(), "all clean\n");
         std::fs::write(dir.join("empty.tar"), b"").unwrap();
@@ -347,7 +336,7 @@ mod tests {
     fn results_cut_off_halfway_are_an_error_with_the_runners_status() {
         let dir = scratch("cut");
         let dir = dir.path();
-        let whole = results(&[b'x'; 2048]);
+        let whole = crate::testing::tar_of("summary.txt", &[b'x'; 2048]);
         std::fs::write(dir.join("out.tar"), &whole[..1024]).unwrap();
         let e = unpack(&dir.join("out.tar"), &dir.join("out"), 3).unwrap_err().to_string();
         let said = format!("the results didn't unpack into {} (runner exit status 3): ", dir.join("out").display());
@@ -408,7 +397,7 @@ esac"#,
         let tag = format!("isoloom-verify:{}", cksum(b"FROM scratch\nyamllint\n"));
         let (first, second) = crate::process::testing::with_stand_ins(&bin.path(), || (image(&root).unwrap(), image(&root).unwrap()));
         assert_eq!((first.as_str(), second.as_str()), (tag.as_str(), tag.as_str()));
-        let calls: Vec<String> = bin.calls().unwrap().iter().map(|c| c.join(" ")).collect();
+        let calls = crate::testing::said(&bin);
         assert_eq!(
             calls,
             [

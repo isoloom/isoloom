@@ -188,7 +188,7 @@ esac"#,
         assert_eq!(run.checks, [("the port answers".to_owned(), true, String::new())]);
         let (d, home) = (dir.display(), bin.dir().join("work/runner-home"));
         let lab = format!("{d} --target vagrant --name nginx-vm-vagrant --home {}", home.display());
-        let calls: Vec<String> = bin.calls().unwrap().iter().map(|c| c.join(" ")).collect();
+        let calls = crate::testing::said(&bin);
         assert_eq!(
             calls,
             [

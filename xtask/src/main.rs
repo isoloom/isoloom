@@ -53,6 +53,8 @@ mod process;
 mod quality;
 mod repo;
 mod test;
+#[cfg(test)]
+mod testing;
 mod text;
 mod tf_test;
 mod verify;
