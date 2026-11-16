@@ -62,18 +62,10 @@ mod tests {
     #[test]
     fn a_source_error_is_the_cause_not_part_of_the_message() -> std::result::Result<(), String> {
         let yaml = serde_yaml_ng::from_str::<serde_yaml_ng::Value>("a: [").err().ok_or("`a: [` parses")?;
+        let cause = yaml.to_string();
         let e = Error::ComposeYaml(yaml);
         assert_eq!(e.to_string(), "not a Compose file");
-        assert!(e.source().is_some_and(|s| !s.to_string().is_empty()));
+        assert_eq!(e.source().map(ToString::to_string), Some(cause));
         Ok(())
-    }
-
-    #[test]
-    fn a_network_out_of_blocks_names_the_field_and_the_range() {
-        let e = Error::NoBlockLeft {
-            at: "networks.back".to_owned(),
-            base: "10.88",
-        };
-        assert_eq!(e.to_string(), "networks.back: no 10.88.<n>.0/24 block left to address it");
     }
 }

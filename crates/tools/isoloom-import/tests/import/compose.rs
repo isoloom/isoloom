@@ -4,7 +4,7 @@
 use isoloom_import::{NoteKind, compose::draft};
 use isoloom_spec::syntax::{EnvValue, Octets};
 
-use crate::testing::{Outcome, fixture, has, image, ports, spec, validate, validate_in, value_at, values_at};
+use crate::testing::{Outcome, fixture, has, image, notes, ports, said, spec, validate, validate_in, value_at, values_at};
 
 /// The shop fixture's draft.
 fn shop() -> Outcome<isoloom_import::Draft> {
@@ -17,9 +17,16 @@ fn the_draft_passes_validate() -> Outcome {
     let d = shop()?;
     assert_eq!(validate_in(&d, &fixture("compose-shop"))?, Vec::<String>::new(), "{}", d.yaml);
     assert_eq!(spec(&d)?.name, "shop-demo");
-    assert!(d.yaml.starts_with(isoloom_spec::schema::MODELINE));
-    assert!(d.yaml.contains("# Drafted by `isoloom import compose` from docker-compose.yml."));
-    assert!(d.yaml.contains("Review it with the notes the\n# import printed:"), "{}", d.yaml);
+    let header: Vec<&str> = d.yaml.lines().take_while(|l| l.starts_with('#')).collect();
+    assert_eq!(
+        header,
+        [
+            isoloom_spec::schema::MODELINE,
+            "# Drafted by `isoloom import compose` from docker-compose.yml. Review it with the notes the",
+            "# import printed: what Compose said that this file doesn't, and why.",
+            "# Next: add `os` and `app.steps` to each machine for the VM targets, and `checks` that prove the behavior.",
+        ]
+    );
     Ok(())
 }
 
@@ -55,19 +62,49 @@ fn jobs_and_profile_services_are_left_out_with_a_note() -> Outcome {
     let spec = spec(&d)?;
     assert!(!spec.machines.contains_key("seed"), "a one-shot job would restart forever as a machine");
     assert!(!spec.machines.contains_key("tester"), "Compose doesn't start profile-only services");
-    assert!(has(&d, NoteKind::Changed, "services.seed", "runs once and exits"));
-    assert!(has(&d, NoteKind::Changed, "services.tester", "only started with profile test"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.seed",
+        "left out: it runs once and exits (others wait for it to complete); one-shot work is a `setup` script of the machine it prepares"
+    ));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.tester",
+        "left out: only started with profile test; if it's a test, make it a check script (`checks:`)"
+    ));
     Ok(())
 }
 
 #[test]
 fn everything_else_is_a_note_with_its_reason() -> Outcome {
     let d = shop()?;
-    assert!(has(&d, NoteKind::Changed, "networks.front.ipam", "re-addressed to 10.88.1.0/24"));
-    assert!(has(&d, NoteKind::InImage, "services.web.environment", "MODE=production"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "networks.front.ipam",
+        "172.30.0.0/16 isn't a private /24 to /29; re-addressed to 10.88.1.0/24"
+    ));
+    assert!(has(
+        &d,
+        NoteKind::InImage,
+        "services.web.environment",
+        "fixed values belong in the image (ENV): MODE=production"
+    ));
     assert!(!d.notes.iter().any(|n| n.at.contains("volumes")), "named volumes carry over: {:?}", d.notes);
-    assert!(has(&d, NoteKind::Changed, "services.web.ports", "loopback"));
-    assert!(has(&d, NoteKind::Equivalent, "services.cache.healthcheck", "probes every service port"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.web.ports",
+        "published on the host's loopback (127.0.0.1) only; Compose publishes on every interface unless told otherwise"
+    ));
+    assert!(has(
+        &d,
+        NoteKind::Equivalent,
+        "services.cache.healthcheck",
+        "Isoloom probes every service port; a custom check belongs in `checks`"
+    ));
     Ok(())
 }
 
@@ -76,7 +113,12 @@ fn renames_point_at_the_settings_that_still_use_the_old_name() -> Outcome {
     let compose = "services:\n  db.main:\n    image: postgres:16\n    expose: [5432]\n  app:\n    image: app\n    environment: { DB_HOST: db.main }\n";
     let d = draft(compose, "x", "compose.yaml")?;
     assert!(spec(&d)?.machines.contains_key("db-main"), "{}", d.yaml);
-    assert!(has(&d, NoteKind::Changed, "services.db.main", "the environment of app still says `db.main`"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.db.main",
+        "renamed `db-main` (machine names are DNS names); the environment of app still says `db.main`: update it"
+    ));
     Ok(())
 }
 
@@ -114,7 +156,12 @@ fn a_volume_shared_between_services_is_shared_between_machines() -> Outcome {
     let at = |m: &str| spec.machines[m].volumes.get("shared").map(isoloom_spec::model::Mount::path);
     assert_eq!((at("a"), at("b")), (Some("/data"), Some("/in")));
     assert!(!d.notes.iter().any(|n| n.kind == NoteKind::NotInSpec), "{:?}", d.notes);
-    assert!(has(&d, NoteKind::InImage, "services.a.volumes", "./conf:/etc/x:ro"));
+    assert!(has(
+        &d,
+        NoteKind::InImage,
+        "services.a.volumes",
+        "project files mounted in: copy them into the image, or run scripts as `setup` scripts: ./conf:/etc/x:ro"
+    ));
     Ok(())
 }
 
@@ -129,10 +176,19 @@ fn a_services_network_aliases_are_its_machines_aliases() -> Outcome {
     assert_eq!(spec.machines["api"].aliases, ["api.example.com"], "{}", d.yaml);
     let at = "services.api.networks.front.aliases";
     assert!(has(&d, NoteKind::Changed, at, "`web` left out: it names a machine"), "{:?}", d.notes);
-    assert!(has(&d, NoteKind::Changed, at, "`bad_name` left out"), "{:?}", d.notes);
+    assert!(
+        has(&d, NoteKind::Changed, at, "`bad_name` left out: not a name a machine can answer to"),
+        "{:?}",
+        d.notes
+    );
     // On one of its two networks in Compose, on both in the spec: said.
     assert!(
-        has(&d, NoteKind::Changed, at, "on every network it is on, not only on `front`"),
+        has(
+            &d,
+            NoteKind::Changed,
+            at,
+            "the machine's `aliases` answer on every network it is on, not only on `front`"
+        ),
         "{:?}",
         d.notes
     );
@@ -147,7 +203,10 @@ fn a_mount_path_the_spec_cant_hold_is_kept_for_validate_to_name() -> Outcome {
     let d = draft("services:\n  a:\n    image: x\n    volumes: [\"logs:/var/my logs\"]\n", "x", "compose.yaml")?;
     assert_eq!(value_at(&d, "machines.a.volumes.logs"), "/var/my logs");
     let problems = validate(&d)?;
-    assert!(problems.iter().any(|p| p.starts_with("machines.a.volumes.logs:")), "{problems:?}");
+    assert_eq!(
+        problems,
+        ["machines.a.volumes.logs: `/var/my logs` isn't a safe absolute path inside the machine (no spaces or ':'), like /var/lib/postgresql/data"]
+    );
     Ok(())
 }
 
@@ -162,7 +221,12 @@ fn published_ports_read_every_compose_form() -> Outcome {
         (published(443), published(80), published(9000), published(5432)),
         (Some(8443), Some(8080), None, Some(15432))
     );
-    assert!(has(&d, NoteKind::Changed, "services.a.ports", "no fixed host port for 9000"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.a.ports",
+        "no fixed host port for 9000: add `publish:` to the service by hand"
+    ));
     Ok(())
 }
 
@@ -185,7 +249,12 @@ fn udp_ports_are_imported_as_udp_ports() -> Outcome {
 fn a_protocol_other_than_tcp_and_udp_is_drafted_as_tcp_and_said_so() -> Outcome {
     let d = draft("services:\n  sig:\n    image: x\n    ports: [\"3868:3868/sctp\"]\n", "x", "compose.yaml")?;
     assert!(
-        has(&d, NoteKind::Changed, "services.sig.ports", "3868:3868/sctp drafted as TCP"),
+        has(
+            &d,
+            NoteKind::Changed,
+            "services.sig.ports",
+            "3868:3868/sctp drafted as TCP: a port is TCP or UDP"
+        ),
         "{:?}",
         d.notes
     );
@@ -200,14 +269,24 @@ fn a_key_set_twice_keeps_the_last_value_as_compose_does() -> Outcome {
     let spec = spec(&d)?;
     assert_eq!(validate(&d)?, Vec::<String>::new());
     assert_eq!(ports(&spec, "api").iter().map(|s| s.1).collect::<Vec<_>>(), [8080]);
-    assert!(has(&d, NoteKind::InImage, "services.api.environment", "MONGO_PORT=27019, MONGO_HOST=db"));
+    assert!(has(
+        &d,
+        NoteKind::InImage,
+        "services.api.environment",
+        "fixed values belong in the image (ENV): MONGO_PORT=27019, MONGO_HOST=db"
+    ));
     assert!(has(
         &d,
         NoteKind::Changed,
         "services.api.environment",
-        "`MONGO_PORT` is set more than once; the last value (`27019`)"
+        "`MONGO_PORT` is set more than once; the last value (`27019`) is kept, as Compose does"
     ));
-    assert!(has(&d, NoteKind::Changed, "services.api", "`expose` is set more than once"));
+    assert!(has(
+        &d,
+        NoteKind::Changed,
+        "services.api",
+        "`expose` is set more than once; the last value (`8080`) is kept, as Compose does"
+    ));
     assert_eq!(
         d.notes.iter().filter(|n| n.text.contains("more than once")).count(),
         2,
@@ -257,25 +336,36 @@ fn a_gpu_reservation_becomes_gpus_and_every_other_resource_key_is_noted() -> Out
         ("2".to_owned(), "nvidia".to_owned())
     );
     let at = "services.train.deploy";
-    assert!(has(&d, NoteKind::NotInSpec, &format!("{at}.resources.limits"), "pids"), "{:?}", d.notes);
-    assert!(
-        has(&d, NoteKind::NotInSpec, &format!("{at}.resources.reservations"), "cpus, memory"),
-        "{:?}",
-        d.notes
+    let unaddressed = ("networks.default.ipam", NoteKind::Changed, "no subnet given; addressed as 10.88.1.0/24");
+    assert_eq!(
+        notes(&d),
+        said(&[
+            unaddressed,
+            (
+                &format!("{at}.resources.limits"),
+                NoteKind::NotInSpec,
+                "a machine's limits are its CPUs and memory (`resources`); not: pids"
+            ),
+            (
+                &format!("{at}.resources.reservations"),
+                NoteKind::NotInSpec,
+                "a machine has a size (`resources`), not a reservation; not kept: cpus, memory"
+            ),
+            (
+                &format!("{at}.resources.reservations.devices[1]"),
+                NoteKind::Changed,
+                "not read by the import: left out; carry it over by hand if the environment needs it"
+            ),
+            (at, NoteKind::NotInSpec, "only resource limits are kept; not: replicas"),
+        ])
     );
-    assert!(
-        has(&d, NoteKind::Changed, &format!("{at}.resources.reservations.devices[1]"), ""),
-        "{:?}",
-        d.notes
-    );
-    assert!(has(&d, NoteKind::NotInSpec, at, "replicas"), "{:?}", d.notes);
     let all = draft(
         "services:\n  t:\n    image: x\n    deploy: { resources: { reservations: { devices: [{ capabilities: [gpu] }] } } }\n",
         "ml",
         "compose.yml",
     )?;
     assert_eq!(value_at(&all, "machines.t.hardware.gpus"), "all");
-    assert!(all.notes.iter().all(|n| !n.at.contains("deploy")), "{:?}", all.notes);
+    assert_eq!(notes(&all), said(&[unaddressed]), "a GPU reservation alone is all kept");
     Ok(())
 }
 
@@ -296,10 +386,23 @@ fn a_second_gpu_device_and_a_count_that_isnt_one_are_noted_not_dropped() -> Outc
     assert_eq!(values_at(&two, "machines.train.hardware.gpus.ids"), ["0"], "the first one kept");
     let devices = "services.train.deploy.resources.reservations.devices";
     let second = format!("{devices}[1]");
-    assert!(has(&two, NoteKind::Changed, &second, "one GPU request"), "{:?}", two.notes);
+    assert!(
+        has(
+            &two,
+            NoteKind::Changed,
+            &second,
+            "a machine has one GPU request (`hardware.gpus`), the first GPU device's: this one is left out"
+        ),
+        "{:?}",
+        two.notes
+    );
     assert_eq!(value_at(&two, "machines.infer.hardware.gpus"), "all");
     let count = "services.infer.deploy.resources.reservations.devices[0].count";
-    assert!(has(&two, NoteKind::Changed, count, "`some` is neither a number nor `all`"), "{:?}", two.notes);
+    assert!(
+        has(&two, NoteKind::Changed, count, "`some` is neither a number nor `all`: read as `all`, every GPU"),
+        "{:?}",
+        two.notes
+    );
     assert_eq!(validate(&two)?, Vec::<String>::new(), "{}", two.yaml);
     Ok(())
 }
@@ -310,7 +413,12 @@ fn a_host_folder_read_from_the_shell_is_noted_as_a_bind_not_drafted_as_a_volume(
     let d = draft(compose, "x", "compose.yaml")?;
     assert!(spec(&d)?.machines["db"].volumes.is_empty(), "{}", d.yaml);
     assert!(
-        has(&d, NoteKind::InImage, "services.db.volumes", "${DATA_DIR:-./data}:/var/lib/postgresql/data"),
+        has(
+            &d,
+            NoteKind::InImage,
+            "services.db.volumes",
+            "project files mounted in: copy them into the image, or run scripts as `setup` scripts: ${DATA_DIR:-./data}:/var/lib/postgresql/data"
+        ),
         "{:?}",
         d.notes
     );
@@ -329,7 +437,12 @@ fn a_variable_set_from_another_one_is_noted_not_renamed_silently() -> Outcome {
         d.yaml
     );
     assert!(
-        has(&d, NoteKind::Changed, "services.db.environment", "POSTGRES_PASSWORD=${DB_PASSWORD:-secret}"),
+        has(
+            &d,
+            NoteKind::Changed,
+            "services.db.environment",
+            "the machine gets each shell variable these read as an input of that name (an input keeps its name), without a default: set the variable from it in the image or a `setup` script: POSTGRES_PASSWORD=${DB_PASSWORD:-secret}"
+        ),
         "{:?}",
         d.notes
     );
@@ -338,5 +451,101 @@ fn a_variable_set_from_another_one_is_noted_not_renamed_silently() -> Outcome {
         "a variable read under its own name is the input: {:?}",
         d.notes
     );
+    Ok(())
+}
+
+#[test]
+fn each_service_key_without_a_place_in_the_spec_is_a_note_of_its_kind() -> Outcome {
+    let compose = std::fs::read_to_string(fixture("compose-keys").join("compose.yaml"))?;
+    let d = draft(&compose, "x", "compose.yaml")?;
+    let left_out = "not read by the import: left out; carry it over by hand if the environment needs it";
+    let expected = said(&[
+        ("secrets", NoteKind::Changed, left_out),
+        (
+            "services.web.network_mode",
+            NoteKind::ByDesign,
+            "a machine has its own addresses; attached to the default network instead",
+        ),
+        ("networks.default.ipam", NoteKind::Changed, "no subnet given; addressed as 10.88.1.0/24"),
+        (
+            "services.web.image",
+            NoteKind::Changed,
+            "`nginx:${TAG}` reads shell variables; kept as written, fix it to one image",
+        ),
+        (
+            "services.web.command",
+            NoteKind::InImage,
+            "set it in the image (CMD / ENTRYPOINT): nginx -g daemon off;",
+        ),
+        ("services.web.hostname", NoteKind::Equivalent, "the hostname is the machine's name, `web`"),
+        (
+            "services.web.env_file",
+            NoteKind::Equivalent,
+            "values given at launch are `inputs`: list the ones the machine needs",
+        ),
+        ("services.web.x-team", NoteKind::Tooling, "extension field, ignored"),
+        ("services.web.stdin_open", NoteKind::Changed, left_out),
+        (
+            "services.web.expose",
+            NoteKind::Changed,
+            "couldn't read port `1-100`; add it to the machine's `ports` by hand",
+        ),
+        ("services.app.build", NoteKind::Changed, "context `../app` is outside the project; copy it in"),
+        (
+            "services.app.build",
+            NoteKind::InImage,
+            "only the context is kept, not: network (build settings belong in the Dockerfile)",
+        ),
+        (
+            "services.app.build.args",
+            NoteKind::InImage,
+            "read from the shell, left out: B (give fixed values)",
+        ),
+        ("services.app.image", NoteKind::Equivalent, "names the built image; Isoloom names it"),
+    ]);
+    assert_eq!(notes(&d), expected);
+    Ok(())
+}
+
+#[test]
+fn a_services_size_dependency_and_fixed_build_settings_carry_over() -> Outcome {
+    let compose = std::fs::read_to_string(fixture("compose-keys").join("compose.yaml"))?;
+    let d = draft(&compose, "x", "compose.yaml")?;
+    assert_eq!(
+        (value_at(&d, "machines.web.resources.cpus"), value_at(&d, "machines.web.resources.memory_mb")),
+        ("2".to_owned(), "512".to_owned())
+    );
+    assert_eq!(values_at(&d, "machines.web.depends_on"), ["db"]);
+    let build = "machines.app.app.build";
+    assert_eq!(
+        [
+            value_at(&d, &format!("{build}.context")),
+            value_at(&d, &format!("{build}.dockerfile")),
+            value_at(&d, &format!("{build}.target")),
+            value_at(&d, &format!("{build}.args.A"))
+        ],
+        ["../app", "../app/app.Dockerfile", "prod", "1"]
+    );
+    Ok(())
+}
+
+#[test]
+fn an_address_the_network_cant_give_is_moved_and_a_dependency_with_nothing_to_wait_for_is_dropped() -> Outcome {
+    let compose = "services:\n  a:\n    image: x\n    depends_on: [dns]\n    networks: { n: { ipv4_address: 10.5.0.1 } }\n  dns:\n    image: y\n    expose: [\"53/udp\"]\n    networks: [n]\nnetworks:\n  n: { ipam: { config: [{ subnet: 10.5.0.0/24 }] } }\n";
+    let d = draft(compose, "x", "compose.yaml")?;
+    assert_eq!(
+        notes(&d),
+        said(&[
+            ("services.a.networks.n.ipv4_address", NoteKind::Changed, "10.5.0.1 isn't usable here; given .10"),
+            (
+                "machines.a.depends_on",
+                NoteKind::Changed,
+                "`dns` has no known TCP port (UDP has no handshake), so there's nothing to wait for; add its `ports` and the dependency back"
+            ),
+        ])
+    );
+    let spec = spec(&d)?;
+    assert_eq!(spec.machines["a"].networks["n"], Octets::One(10));
+    assert_eq!(spec.machines["a"].depends_on, Vec::<String>::new());
     Ok(())
 }

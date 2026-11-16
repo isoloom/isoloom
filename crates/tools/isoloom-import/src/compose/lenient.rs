@@ -145,8 +145,18 @@ mod tests {
         Ok(())
     }
 
+    /// Without a key set twice, the file reads as `serde_yaml_ng` reads it: every kind of value,
+    /// a tagged one included; and what it refuses, refused with its error.
     #[test]
-    fn text_that_isnt_yaml_is_refused() {
-        assert!(lenient_yaml("a: [").is_err());
+    fn a_file_without_a_key_set_twice_reads_as_serde_yaml_reads_it() -> Result<(), serde_yaml_ng::Error> {
+        let text = "a: [true, -3, 7, 1.5, ~, null, '', text]\nb: { c: !Ref x, d: !Tag [1] }\n? [k]\n: v\n";
+        let (value, dups) = lenient_yaml(text)?;
+        assert_eq!(value, serde_yaml_ng::from_str::<Value>(text)?);
+        assert_eq!(dups, []);
+        for refused in ["a: [", "a: ! x"] {
+            let (lenient, strict) = (lenient_yaml(refused).err(), serde_yaml_ng::from_str::<Value>(refused).err());
+            assert_eq!(lenient.map(|e| e.to_string()), strict.map(|e| e.to_string()), "{refused}");
+        }
+        Ok(())
     }
 }

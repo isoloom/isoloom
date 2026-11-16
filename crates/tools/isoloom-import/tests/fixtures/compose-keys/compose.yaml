@@ -1,0 +1,23 @@
+# Every service key the spec has no place for, each said with its kind.
+secrets: { token: { file: ./token } }
+x-defaults: { restart: always }
+services:
+  web:
+    image: "nginx:${TAG}"
+    command: ["nginx", "-g", "daemon off;"]
+    hostname: www
+    env_file: .env
+    x-team: a
+    stdin_open: true
+    cpus: 1.5
+    mem_limit: 512m
+    depends_on: { db: { condition: service_started } }
+    expose: ["1-100"]
+    network_mode: host
+  db:
+    image: postgres:16
+    expose: [5432]
+  app:
+    image: myapp
+    build: { context: ../app, network: host, dockerfile: app.Dockerfile, target: prod, args: { A: "1", B: "${B}" } }
+    expose: [8080]

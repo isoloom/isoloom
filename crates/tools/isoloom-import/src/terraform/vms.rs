@@ -220,17 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn the_os_is_read_from_the_image_it_names() {
-        let read = crate::os_name::read;
-        assert_eq!(read("ami-0windows2022 windows"), "windows-server@2022");
-        assert_eq!(read("2019-Datacenter"), "windows-server@2019");
-        assert_eq!(read("ubuntu-2404-lts"), "ubuntu@24.04");
-        assert_eq!(read("ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"), "ubuntu@22.04");
-        assert_eq!(read("debian-11"), "debian@11");
-        assert_eq!(read("anything"), "debian@12");
-    }
-
-    #[test]
     fn an_address_is_read_with_or_without_its_block() {
         assert_eq!(address("10.0.1.10/24"), Some(Ipv4Addr::new(10, 0, 1, 10)));
         assert_eq!(address(" 10.0.1.11"), Some(Ipv4Addr::new(10, 0, 1, 11)));

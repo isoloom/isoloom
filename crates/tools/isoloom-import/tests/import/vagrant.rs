@@ -5,7 +5,7 @@ use isoloom_import::NoteKind;
 use isoloom_import::vagrant::{Recording, draft};
 use isoloom_spec::syntax::Octets;
 
-use crate::testing::{Outcome, fixture, has, ports, spec, steps, validate, validate_in};
+use crate::testing::{Outcome, fixture, has, notes, ports, said, spec, steps, validate, validate_in};
 
 /// The recording `name` of the classic fixture's folder, as JSON (some tests change it).
 fn recorded_json(name: &str) -> Outcome<serde_json::Value> {
@@ -31,7 +31,12 @@ fn a_vagrantfile_with_a_loop_becomes_a_draft_that_passes_validate() -> Outcome {
     let boxes = &spec.overrides.vagrant.as_ref().ok_or("no vagrant overrides")?.machines;
     assert_eq!(boxes["web"].box_name.as_deref(), Some("ubuntu/jammy64"), "an unknown box is kept");
     assert_eq!(steps(&spec, "web"), ["site.yml", "provision/web.sh"], "global provisioners run first");
-    assert!(has(&d, NoteKind::InImage, "define web.vm.provision", "inline script"));
+    assert!(has(
+        &d,
+        NoteKind::InImage,
+        "define web.vm.provision",
+        "an inline script: put it in a file and list it in `app.steps`"
+    ));
     Ok(())
 }
 
@@ -139,7 +144,12 @@ fn a_public_network_is_a_bridged_network() -> Outcome {
     assert!(lease.dhcp && lease.default_route && lease.interface.is_none(), "{}", by_dhcp.yaml);
     assert_eq!(leased.machines["web"].networks["lan"], Octets::One(0));
     assert!(
-        has(&by_dhcp, NoteKind::Changed, "define web.vm.network", "set it to the LAN's"),
+        has(
+            &by_dhcp,
+            NoteKind::Changed,
+            "define web.vm.network",
+            "by DHCP from the LAN, whose block the Vagrantfile doesn't say: `cidr` is 192.168.1.0/24, set it to the LAN's"
+        ),
         "{:?}",
         by_dhcp.notes
     );
@@ -179,13 +189,22 @@ fn a_synced_folder_is_a_host_folder() -> Outcome {
         at,
         "`notes`: each target shares a host folder its own way; not kept: type: rsync"
     ));
-    assert!(has(&d, NoteKind::Equivalent, at, "the project: Isoloom copies it"), "{:?}", d.notes);
+    assert!(
+        has(
+            &d,
+            NoteKind::Equivalent,
+            at,
+            "the project: Isoloom copies it into each Linux VM (/opt/isoloom); to share it both ways instead, give the machine `host_folders: [{ from: ., path: /vagrant }]`"
+        ),
+        "{:?}",
+        d.notes
+    );
     // A Windows machine has none: left out, and said.
     let windows = one_machine("gusztavvargadr/windows-server", r#"{"name":"synced_folder","args":["data","C:/data"]}"#)?;
     let on_windows = draft(&windows, "lab", "Vagrantfile")?;
     assert!(spec(&on_windows)?.machines["web"].host_folders.is_empty(), "{}", on_windows.yaml);
     assert!(
-        has(&on_windows, NoteKind::Changed, at, "a Windows machine has no host folders"),
+        has(&on_windows, NoteKind::Changed, at, "`data` left out: a Windows machine has no host folders"),
         "{:?}",
         on_windows.notes
     );
@@ -206,11 +225,11 @@ fn a_shell_provisioners_arguments_and_variables_are_noted_not_dropped() -> Outco
         .iter()
         .find(|n| n.at == "define web.vm.provision" && n.text.starts_with("left out:"))
         .ok_or("no note")?;
-    assert!(
-        note.text.contains("`args: [\"a b\",\"c\"]`") && note.text.contains("`env: {\"MODE\":\"lab\"}`"),
-        "{note:?}"
+    // `privileged` isn't said: running as root is what a step does.
+    assert_eq!(
+        note.text,
+        "left out: `args: [\"a b\",\"c\"]` (a step runs its script with no arguments: write them into the script), `env: {\"MODE\":\"lab\"}` (a step's script has no variables of its own: set them in the script, or use the machine's `environment`)"
     );
-    assert!(!note.text.contains("privileged"), "running as root is what a step does: {note:?}");
     Ok(())
 }
 
@@ -221,6 +240,68 @@ fn a_box_is_read_with_its_version() -> Outcome {
         spec(&d)?.machines["web"].os.map(|o| o.to_string()).as_deref(),
         Some("ubuntu@22.04"),
         "ubuntu/jammy64 is 22.04"
+    );
+    Ok(())
+}
+
+#[test]
+fn each_vagrant_setting_without_a_place_in_the_spec_is_a_note_of_its_kind() -> Outcome {
+    let d = draft(&recorded("notes-recorded.json")?, "lab", "Vagrantfile")?;
+    let network = "define web.vm.network";
+    let provision = "define web.vm.provision";
+    assert_eq!(
+        notes(&d),
+        said(&[
+            (network, NoteKind::Changed, "a DHCP private network: give the machine a fixed address"),
+            (network, NoteKind::Changed, "several interfaces to bridge to: the first, `en0`, is kept"),
+            (
+                network,
+                NoteKind::Changed,
+                "by DHCP from the LAN, whose block the Vagrantfile doesn't say: `cidr` is 192.168.1.0/24, set it to the LAN's"
+            ),
+            (network, NoteKind::Changed, "a forwarded port without both ports: add it by hand"),
+            (
+                "define web.vm.provider virtualbox",
+                NoteKind::ByDesign,
+                "`customize`: raw commands for one hypervisor, which no other target understands"
+            ),
+            (provision, NoteKind::Changed, "ansible_local without a playbook"),
+            (provision, NoteKind::Equivalent, "Isoloom copies the project into each Linux VM (/opt/isoloom)"),
+            ("define web.vm.provision puppet", NoteKind::Equivalent, "a `.sh` step can run any tool"),
+            (provision, NoteKind::Changed, "`setup.py`: steps are .sh (Linux) or .ps1 (Windows) files"),
+            (
+                "define web.vm.hostname",
+                NoteKind::Equivalent,
+                "`www`: the hostname is the machine's name, `web`"
+            ),
+            (
+                "define dc.vm.box",
+                NoteKind::Changed,
+                "`gusztavvargadr/windows-server-2022` kept as the machine's image; its OS read as windows-server@2022: check it"
+            ),
+            (
+                "define dc.vm.provision",
+                NoteKind::Changed,
+                "`reboot: true` on Windows: restart it from the environment's playbooks (`ansible.windows.win_reboot`)"
+            ),
+            (
+                "provision ansible",
+                NoteKind::Changed,
+                "host-side Ansible became environment-level `provision:`, run from a controller VM; check its inventory groups"
+            ),
+        ])
+    );
+    // What does carry over: the provider's size, the bridge's first interface, the host-side
+    // playbook as the environment's, the Windows script (its reboot said, not drafted).
+    let drafted = spec(&d)?;
+    let web = &drafted.machines["web"];
+    assert_eq!(web.resources.map(|r| (r.cpus, r.memory_mb)), Some((Some(2), Some(2048))));
+    assert_eq!(drafted.networks["lan"].bridged.as_ref().and_then(|b| b.interface.as_deref()), Some("en0"));
+    assert!(web.app().is_none(), "no step it can run: {}", d.yaml);
+    assert_eq!(steps(&drafted, "dc"), ["dc.ps1"]);
+    assert_eq!(
+        isoloom_test_support::yaml_str(&isoloom_test_support::yaml(&d.yaml), "provision.0.ansible"),
+        "site.yml"
     );
     Ok(())
 }

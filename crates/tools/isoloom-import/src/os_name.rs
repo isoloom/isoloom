@@ -101,6 +101,12 @@ mod tests {
             ("generic/fedora42", "fedora"),
             ("kalilinux/rolling", "kali"),
             ("someone/thing", "debian@12"),
+            // Cloud images, as Terraform names them.
+            ("ami-0windows2022 windows", "windows-server@2022"),
+            ("2019-Datacenter", "windows-server@2019"),
+            ("ubuntu-2404-lts", "ubuntu@24.04"),
+            ("ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*", "ubuntu@22.04"),
+            ("debian-11", "debian@11"),
         ] {
             assert_eq!(read(name), os, "{name}");
         }

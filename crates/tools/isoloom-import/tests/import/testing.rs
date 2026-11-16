@@ -51,9 +51,19 @@ pub(crate) fn validate(d: &Draft) -> Outcome<Vec<String>> {
     Ok(lab(d)?.problems().iter().map(Problem::line).collect())
 }
 
-/// Whether the draft has a note of `kind` at `at` whose text says `text`.
+/// Whether the draft has a note of `kind` at `at` whose whole text is `text`.
 pub(crate) fn has(d: &Draft, kind: NoteKind, at: &str, text: &str) -> bool {
-    d.notes.iter().any(|n| n.kind == kind && n.at == at && n.text.contains(text))
+    d.notes.iter().any(|n| n.kind == kind && n.at == at && n.text == text)
+}
+
+/// The draft's notes, (where, kind, what), in the order the import said them.
+pub(crate) fn notes(d: &Draft) -> Vec<(String, NoteKind, String)> {
+    d.notes.iter().map(|n| (n.at.clone(), n.kind, n.text.clone())).collect()
+}
+
+/// Notes written as a table, to compare with [`notes`].
+pub(crate) fn said(rows: &[(&str, NoteKind, &str)]) -> Vec<(String, NoteKind, String)> {
+    rows.iter().map(|(at, kind, text)| ((*at).to_owned(), *kind, (*text).to_owned())).collect()
 }
 
 /// A machine's ports: (name, port, published host port, UDP).
