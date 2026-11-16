@@ -920,6 +920,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "serde_yaml_ng",
  "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",

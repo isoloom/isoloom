@@ -1,5 +1,6 @@
-//! The functions the editor calls, as JavaScript sees them: run in WebAssembly with
-//! `wasm-pack test --node crates/frontends/isoloom-wasm` (CI does).
+//! isoloom-wasm's one test binary: the functions the editor calls, as JavaScript sees them. It
+//! runs in WebAssembly only, with `wasm-pack test --node crates/frontends/isoloom-wasm`
+//! (`cargo xtask check --only wasm-test`); natively it holds no test.
 #![cfg(target_arch = "wasm32")]
 
 use isoloom_wasm::{bundle, bundle_target, choices_json, own_files_json, plan_json};
@@ -7,7 +8,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 /// Two machines on a cable: a VM with a step, and a web server.
-const TOPOLOGY: &str = include_str!("fixtures/pair.json");
+const TOPOLOGY: &str = include_str!("../fixtures/pair.json");
 
 const MALFORMED: &str = "{ not json";
 
@@ -34,36 +35,41 @@ mod js_error {
 fn plan_json_is_a_plan() {
     let plan: serde_json::Value = serde_json::from_str(&plan_json(TOPOLOGY).map_err(message).unwrap()).unwrap();
     assert_eq!(plan["ok"], true);
-    assert!(plan["isoloom_yml"].as_str().unwrap().contains("name: pair"));
+    let spec: serde_yaml_ng::Value = serde_yaml_ng::from_str(plan["isoloom_yml"].as_str().unwrap()).unwrap();
+    assert_eq!(spec["name"].as_str(), Some("pair"));
     let bad: serde_json::Value = serde_json::from_str(&plan_json(MALFORMED).map_err(message).unwrap()).unwrap();
     assert_eq!(bad["ok"], false);
-    assert!(bad["error"].as_str().unwrap().contains("malformed"));
+    assert!(bad["error"].as_str().unwrap().starts_with("the topology is malformed: "), "{bad}");
 }
 
 #[wasm_bindgen_test]
 fn own_files_json_lists_the_starters() {
     let files: serde_json::Value = serde_json::from_str(&own_files_json(TOPOLOGY).map_err(message).unwrap()).unwrap();
     assert_eq!(files[0]["path"], "provision/client.sh");
-    assert!(message(own_files_json(MALFORMED).unwrap_err()).contains("malformed"));
+    let refused = message(own_files_json(MALFORMED).unwrap_err());
+    assert!(refused.starts_with("the topology is malformed: "), "{refused}");
 }
 
 #[wasm_bindgen_test]
 fn bundle_is_a_zip() {
     let zip = bundle(TOPOLOGY).unwrap();
     assert_eq!(&zip[..4], b"PK\x03\x04");
-    assert!(message(bundle(MALFORMED).unwrap_err()).contains("malformed"));
+    let refused = message(bundle(MALFORMED).unwrap_err());
+    assert!(refused.starts_with("the topology is malformed: "), "{refused}");
 }
 
 #[wasm_bindgen_test]
 fn bundle_target_refuses_a_target_the_project_has_not() {
     assert_eq!(&bundle_target(TOPOLOGY, "docker").unwrap()[..2], b"PK");
-    let e = message(bundle_target(TOPOLOGY, "nowhere").unwrap_err());
-    assert!(e.contains("no files for `nowhere`"), "{e}");
+    assert_eq!(
+        message(bundle_target(TOPOLOGY, "nowhere").unwrap_err()),
+        "this project has no files for `nowhere`"
+    );
 }
 
 #[wasm_bindgen_test]
 fn choices_json_lists_isoloom_s_values() {
     let c: serde_json::Value = serde_json::from_str(&choices_json().map_err(message).unwrap()).unwrap();
     assert!(c["os"].as_array().unwrap().iter().any(|os| os == "debian@12"));
-    assert_eq!(c["protocols"][0], "tcp");
+    assert_eq!(c["protocols"], serde_json::json!(["tcp", "udp", "http", "https", "tls"]));
 }
