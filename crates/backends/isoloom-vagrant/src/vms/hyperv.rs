@@ -287,13 +287,18 @@ pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
 /// hostname step does on a Debian or Ubuntu box right after the address was set, leaving the VM
 /// off its networks. Harmless where networkd doesn't run.
 fn networkd_addresses(nics: &[Nic], macs: &[String]) -> String {
-    let mut files = String::new();
-    for (i, (n, m)) in nics.iter().zip(macs).enumerate() {
-        files.push_str(&format!(
-            "  printf '[Match]\\nMACAddress={m}\\n\\n[Network]\\nAddress={}/{}\\nDHCP=no\\nLinkLocalAddressing=no\\nIPv6AcceptRA=no\\n' > /etc/systemd/network/05-isoloom-env-net-{i}.network\n",
-            n.ip, n.len
-        ));
-    }
+    let files: Vec<String> = nics
+        .iter()
+        .zip(macs)
+        .enumerate()
+        .map(|(i, (n, m))| {
+            format!(
+                "  printf '[Match]\\nMACAddress={m}\\n\\n[Network]\\nAddress={}/{}\\nDHCP=no\\nLinkLocalAddressing=no\\nIPv6AcceptRA=no\\n' > /etc/systemd/network/05-isoloom-env-net-{i}.network\n",
+                n.ip, n.len
+            )
+        })
+        .collect();
+    let files = files.concat();
     format!(
         "# systemd-networkd would drop the addresses on its next restart.\nif [ -d /etc/systemd/network ]; then\n{files}  networkctl reload 2>/dev/null || true\nfi\n"
     )
