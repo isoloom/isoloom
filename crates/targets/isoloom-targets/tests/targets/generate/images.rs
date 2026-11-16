@@ -75,7 +75,7 @@ fn a_target_the_image_table_gives_no_form_for_the_access_machine_refuses_it() ->
     // A table with the container only: the container targets generate it, the VM targets don't.
     let container = isoloom_spec::images::Table::parse("access: { docker: registry.example.com/workstation:1 }\n").unwrap();
     let half = Lab::new(supplied).with_images(container);
-    assert!(generate(&half, Target::Docker).is_ok());
+    generate(&half, Target::Docker)?;
     assert!(refused(&half, Target::Vagrant).contains("`access.vm`"), "{}", refused(&half, Target::Vagrant));
     Ok(())
 }
@@ -83,20 +83,27 @@ fn a_target_the_image_table_gives_no_form_for_the_access_machine_refuses_it() ->
 #[test]
 fn the_image_table_sits_between_built_in_images_and_the_spec() -> Outcome {
     let table = isoloom_spec::images::Table::parse("os:\n  debian@12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
-    let vagrant = generated(&example("hello-stack")?.with_images(table), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(
-        vagrant.contains("m.vm.box = \"my-org/debian-12\"\n    m.vm.box_version = \"1.2.0\""),
-        "{vagrant}"
-    );
+    let vagrant = crate::testing::vagrantfile(&example("hello-stack")?.with_images(table))?;
+    for vm in ["web", "cache"] {
+        assert_eq!(
+            crate::testing::define(&vagrant, vm).statements("m.vm.box"),
+            ["m.vm.box = \"my-org/debian-12\"", "m.vm.box_version = \"1.2.0\""],
+            "{vm}"
+        );
+    }
     // A spec's own box (`overrides.vagrant`) still wins.
     let other = isoloom_spec::images::Table::parse("os:\n  windows-server@2019: { vagrant: other/box }\n").unwrap();
     let mut pinned = source("windows-hello")?;
     for m in pinned.overrides.vagrant.as_mut().unwrap().machines.values_mut() {
         m.box_name = Some("spec/box".into());
     }
-    let own = generated(&Lab::new(pinned).with_images(other), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(own.contains("\"spec/box\"") && !own.contains("other/box"));
-    assert!(isoloom_spec::images::Table::parse("bogus: 1\n").is_err());
+    let own = crate::testing::vagrantfile(&Lab::new(pinned).with_images(other))?;
+    assert_eq!(crate::testing::define(&own, "web01").statements("m.vm.box = "), ["m.vm.box = \"spec/box\""]);
+    let bogus = isoloom_spec::images::Table::parse("bogus: 1\n")
+        .err()
+        .ok_or("an unknown key parses")?
+        .to_string();
+    assert!(bogus.contains("bogus"), "{bogus}");
     // The OS is written as a spec writes it.
     let os = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: x }\n")
         .unwrap_err()

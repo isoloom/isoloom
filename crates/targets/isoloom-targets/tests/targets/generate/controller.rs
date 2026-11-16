@@ -6,7 +6,7 @@ use isoloom_targets::Lab;
 
 use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_one, hcl_text, hcl_values};
 
-use crate::testing::{Outcome, define, example, from, generated, lab, problems, provisioners, set_up, source, vagrantfile};
+use crate::testing::{Outcome, define, example, generated, lab, problems, provisioners, set_up, source, vagrantfile};
 
 /// The statements of `block` and the blocks inside it equal to `statement`.
 fn count(block: &isoloom_test_support::RubyBlock, statement: &str) -> usize {
@@ -86,10 +86,11 @@ fn playbook_vars_keep_their_types() -> Outcome {
     let vars = &spec.source().provision[0].vars;
     assert_eq!(vars["tools"], serde_json::json!(["curl", "jq"]));
     assert_eq!(vars["cache_port"], serde_json::json!(6379));
-    let vagrantfile = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
+    let vf = vagrantfile(&spec)?;
+    let ansible = define(&vf, "isoloom-controller").statements("m.vm.provision \"shell\", name: \"ansible\"");
     assert!(
-        vagrantfile.contains(r#"-e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}'"#),
-        "{vagrantfile}"
+        matches!(ansible.as_slice(), [one] if one.contains(r#"-e '{"greeting":"hello from ansible","tools":["curl","jq"],"cache_port":6379}'"#)),
+        "{ansible:?}"
     );
     Ok(())
 }
@@ -151,12 +152,12 @@ fn the_controller_is_small_by_default_and_sized_by_the_spec() -> Outcome {
 #[test]
 fn the_controller_halts_after_provisioning_unless_kept_running() -> Outcome {
     let mut src = source("ansible-pair")?;
-    let text = generated(&Lab::new(src.clone()), Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    let ctl = from(&text, "config.vm.define \"isoloom-controller\"")?;
-    // After the playbooks, before the on-demand checks; marked so a check run waits it out.
-    let (ansible, halt) = (ctl.find("name: \"ansible\"").unwrap(), ctl.find("name: \"halt\"").unwrap());
-    assert!(ansible < halt, "{ctl}");
     let file = vagrantfile(&Lab::new(src.clone()))?;
+    // After the playbooks, the last step; marked so a check run waits it out.
+    let steps = provisioners(define(&file, "isoloom-controller"));
+    let at = |name: &str| steps.iter().position(|s| s == name).ok_or_else(|| format!("no `{name}` step in {steps:?}"));
+    assert!(at("ansible")? < at("halt")?, "{steps:?}");
+    assert_eq!(steps.last().map(String::as_str), Some("halt"), "{steps:?}");
     let halt_steps = define(&file, "isoloom-controller").statements("m.vm.provision \"shell\", name: \"halt\"");
     assert!(
         matches!(halt_steps.as_slice(), [one] if one.contains("touch /run/isoloom-halting; (sleep 5; poweroff)")),
@@ -184,12 +185,9 @@ fn the_provision_script_can_be_limited_to_machines() -> Outcome {
     let all = isoloom_render::controller::provision_script(&spec.spec(), &[]);
     // (The retry of unreachable hosts limits itself, from the retry file: only the runs count.)
     let runs = |s: &str| s.lines().filter(|l| l.starts_with("run_play ")).map(String::from).collect::<Vec<_>>();
-    assert!(!runs(&all).is_empty() && runs(&all).iter().all(|l| !l.contains("--limit")), "{all}");
+    isoloom_test_support::assert_every!(runs(&all), |l: &String| !l.contains("--limit"));
     let some = isoloom_render::controller::provision_script(&spec.spec(), &["web".into(), "cache".into()]);
-    assert!(
-        !runs(&some).is_empty() && runs(&some).iter().all(|l| l.contains(" --limit 'web,cache' ")),
-        "{some}"
-    );
+    isoloom_test_support::assert_every!(runs(&some), |l: &String| l.contains(" --limit 'web,cache' "));
     Ok(())
 }
 
@@ -198,12 +196,15 @@ fn the_provision_script_can_be_limited_to_machines() -> Outcome {
 #[test]
 fn the_controller_retries_unreachable_hosts_from_the_retry_file() -> Outcome {
     let spec = example("ansible-pair")?;
-    for (target, path) in [
-        (Target::Vagrant, ".isoloom/vagrant/Vagrantfile"),
-        (Target::Proxmox, ".isoloom/proxmox/main.tf"),
-        (Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf"),
-    ] {
-        let text = generated(&spec, target, path)?;
+    let vf = vagrantfile(&spec)?;
+    let vagrant = define(&vf, "isoloom-controller")
+        .statements("m.vm.provision \"shell\", name: \"ansible\"")
+        .concat();
+    // Proxmox's controller sets up from the snippets of its cloud-init file.
+    let proxmox_tf = hcl_body(&generated(&spec, Target::Proxmox, ".isoloom/proxmox/main.tf")?);
+    let proxmox = hcl_literals(hcl_one(&proxmox_tf, "proxmox_virtual_environment_file", "isoloom_controller")).join("\n");
+    let aws = set_up(&generated(&spec, Target::CloudVm, ".isoloom/cloud-vm/aws/main.tf")?, "isoloom_controller")?;
+    for (path, text) in [("vagrant", vagrant), ("proxmox", proxmox), ("cloud-vm", aws)] {
         assert!(
             text.contains("export ANSIBLE_RETRY_FILES_ENABLED=True ANSIBLE_RETRY_FILES_SAVE_PATH=/tmp/isoloom-retry"),
             "{path}"
@@ -235,10 +236,13 @@ fn host_vars_go_on_each_machines_inventory_line_with_their_types() -> Outcome {
     let typed = lab(
         "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: p.sh }] }\nprovision:\n  - ansible: site.yml\n    host_vars:\n      a: { code: \"10\", quote: \"it's\", n: 3, on: true, none: null, l: [x, 1], m: { k: v } }\n",
     )?;
-    let vagrantfile = generated(&typed, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
+    let typed_vf = vagrantfile(&typed)?;
+    let typed_inventory = define(&typed_vf, "isoloom-controller").every_statement().join("\n");
     assert!(
-        vagrantfile.contains(r#"a ansible_host=10.9.0.10 code='"10"' quote='"it'"'"'s"' n='3' on='True' none='None' l='["x", 1]' m='{"k": "v"}'"#),
-        "{vagrantfile}"
+        typed_inventory
+            .lines()
+            .any(|l| l.trim() == r#"a ansible_host=10.9.0.10 code='"10"' quote='"it'"'"'s"' n='3' on='True' none='None' l='["x", 1]' m='{"k": "v"}'"#),
+        "{typed_inventory}"
     );
     Ok(())
 }

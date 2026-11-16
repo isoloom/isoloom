@@ -7,7 +7,7 @@ use isoloom_test_support::{yaml, yaml_at, yaml_keys_at, yaml_str, yaml_strs};
 use serde::Deserialize as _;
 use serde_yaml_ng::Value;
 
-use crate::testing::{Outcome, example, file, generated, lab};
+use crate::testing::{Outcome, check_line, define, example, file, generated, header, lab, vagrantfile};
 
 /// The Compose file `lab` generates, parsed, with its text (for the header comments).
 fn compose(lab: &Lab) -> Outcome<(Value, String)> {
@@ -70,8 +70,10 @@ fn compose_has_addresses_healthchecks_init_and_checks() -> Outcome {
     assert_eq!(yaml_str(&c, "services.isoloom-check-web.network_mode"), "service:web");
     let files = generate(&spec, Target::Docker)?;
     let runner = file(&files, ".isoloom/docker/checks/isoloom-networks.sh")?;
-    assert!(runner.contains("cd /isoloom/project && sh '\\''checks/cache-seeded.sh'\\''"), "{runner}");
-    assert!(runner.contains("_http_is 'http://web/' 200"), "{runner}");
+    let script = check_line(runner, "checks/cache-seeded.sh")?;
+    assert!(script.contains("cd /isoloom/project && sh '\\''checks/cache-seeded.sh'\\''"), "{script}");
+    let page = check_line(runner, "the page greets")?;
+    assert!(page.starts_with("if _retry 30 _http_is 'http://web/' 200; "), "{page}");
     Ok(())
 }
 
@@ -106,9 +108,14 @@ fn a_ctf_labs_shape_keeps_its_port_inputs_setup_and_checks() -> Outcome {
     );
     assert!(yaml_strs(&c, "services.isoloom-init-database-1.volumes").contains(&"database-evidence:/var/lib/ctf".to_owned()));
     let files = generate(&spec, Target::Docker)?;
-    let runners: String = files.iter().filter(|f| f.path.contains("/checks/")).map(|f| f.contents.as_str()).collect();
-    assert!(runners.contains("_http_is 'http://web/api/invoices/INV-1042' 401"), "{runners}");
-    assert!(runners.contains("build/check/check.sh"), "{runners}");
+    let runner = file(&files, ".isoloom/docker/checks/isoloom-networks.sh")?;
+    let refused = check_line(runner, "the API refuses a request without its key")?;
+    assert!(
+        refused.starts_with("if _retry 30 _http_is 'http://web/api/invoices/INV-1042' 401; "),
+        "{refused}"
+    );
+    let script = check_line(runner, "build/check/check.sh")?;
+    assert!(script.contains("sh '\\''build/check/check.sh'\\''"), "{script}");
     Ok(())
 }
 
@@ -130,11 +137,8 @@ fn reach_rules_add_a_router_with_matching_rules() -> Outcome {
     // Offline machines lose their default route; no Docker-internal network with a router.
     let offline = yaml_keys_at(&c, "services").into_iter().map(|s| script(&c, &s)).collect::<Vec<_>>().join("\n");
     assert!(offline.contains("ip route del default"));
-    assert!(
-        yaml_keys_at(&c, "networks")
-            .iter()
-            .all(|n| yaml_at(&c, &format!("networks.{n}.internal")).is_none())
-    );
+    isoloom_test_support::assert_every!(yaml_keys_at(&c, "networks"), |n: &String| yaml_at(&c, &format!("networks.{n}.internal"))
+        .is_none());
     // Names across networks, and checks from the access machine's position. The access box is on
     // demand (the `access` profile), so a check in the `check` profile can't share its namespace:
     // it runs from the stand-in at the box's addresses (`isoloom-access`), not the box itself.
@@ -163,11 +167,8 @@ fn a_gateway_routes_its_networks_instead_of_the_router() -> Outcome {
     assert!(all.contains("ip route replace 10.70.10.0/24 via 10.70.0.5"), "{all}");
     assert!(waits_for(&c, "isoloom-routes-web").contains(&("fw".to_owned(), "service_healthy".to_owned())));
     // Its own rules decide: no Docker-internal network, no route deletion.
-    assert!(
-        yaml_keys_at(&c, "networks")
-            .iter()
-            .all(|n| yaml_at(&c, &format!("networks.{n}.internal")).is_none())
-    );
+    isoloom_test_support::assert_every!(yaml_keys_at(&c, "networks"), |n: &String| yaml_at(&c, &format!("networks.{n}.internal"))
+        .is_none());
     assert!(!all.contains("ip route del default"));
     Ok(())
 }
@@ -184,10 +185,16 @@ fn networks_outside_10_move_into_10_on_docker_keeping_last_octets() -> Outcome {
     assert_eq!(yaml_str(&c, "services.a.networks.dmz.ipv4_address"), "10.18.5.7");
     assert_eq!(yaml_str(&c, "networks.corp.ipam.config.0.subnet"), "10.240.0.0/24");
     assert_eq!(yaml_str(&c, "services.a.networks.corp.ipv4_address"), "10.240.0.10");
-    assert!(text.contains("# On Docker, network `corp` uses 10.240.0.0/24 instead of 192.168.20.0/24"));
+    assert!(
+        header(&text)
+            .iter()
+            .any(|l| l.starts_with("On Docker, network `corp` uses 10.240.0.0/24 instead of 192.168.20.0/24")),
+        "{text}"
+    );
     // VMs keep the spec's addresses.
-    let vf = generated(&spec, Target::Vagrant, "vagrant/Vagrantfile")?;
-    assert!(vf.contains("ip: \"192.168.20.10\""));
+    let vf = vagrantfile(&spec)?;
+    let nics = define(&vf, "a").statements("m.vm.network \"private_network\"");
+    assert!(nics.iter().any(|n| n.contains("ip: \"192.168.20.10\"")), "{nics:?}");
     Ok(())
 }
 
@@ -259,7 +266,8 @@ machines:
     // `--wait` waits for: a job that fails fails the `up`.
     let (c, text) = compose(&spec)?;
     let dc = "docker compose -f .isoloom/docker/compose.yml";
-    assert!(text.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{text}");
+    let start = format!("Start:  {dc} up -d --build --wait");
+    assert!(header(&text).contains(&start.as_str()), "{text}");
     assert!(!text.contains("--exit-code-from"), "{text}");
     let done = waits_for(&c, "isoloom-jobs-done");
     let jobs: Vec<&str> = done
@@ -268,14 +276,11 @@ machines:
         .filter(|job| job.starts_with("isoloom-init-"))
         .collect();
     assert_eq!(jobs, ["isoloom-init-web-1", "isoloom-init-web-2"], "web waits for db's: {done:?}");
-    assert!(
-        done.iter()
-            .filter(|(job, _)| job.starts_with("isoloom-init-"))
-            .all(|(_, condition)| condition == "service_completed_successfully")
-    );
+    let conditions: Vec<&String> = done.iter().filter(|(job, _)| job.starts_with("isoloom-init-")).map(|(_, cond)| cond).collect();
+    isoloom_test_support::assert_every!(conditions, |cond: &&String| *cond == "service_completed_successfully");
     // Nothing left over: the one command it always was.
     let (_, plain) = compose(&example("hello-stack")?)?;
-    assert!(plain.contains(&format!("# Start:  {dc} up -d --build --wait\n")), "{plain}");
+    assert!(header(&plain).contains(&start.as_str()), "{plain}");
     Ok(())
 }
 

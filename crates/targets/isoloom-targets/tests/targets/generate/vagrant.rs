@@ -232,21 +232,27 @@ fn hyperv_router_and_macs(v: &str, networks: usize) {
 fn vagrant_on_hyperv_takes_windows_and_privileged_machines() -> Outcome {
     // Windows: the box's Hyper-V build from `overrides.vagrant` (`boxes.hyperv`), a static
     // address through WMI.
-    let win = example("windows-hello")?;
-    let v = generated(&win, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(
-        v.contains(
-            "      o.vm.box = \"StefanScherer/windows_2019\"\n      o.vm.box_version = \">= 0\"\n      v.vmname = \"windows-hello-#{ISOLOOM_KEY}-web01\""
-        ),
-        "{v}"
+    let win = vagrantfile(&example("windows-hello")?)?;
+    let web01 = define(&win, "web01");
+    let hyperv = provider(web01, "hyperv");
+    assert_eq!(
+        hyperv.statements[..3],
+        [
+            "o.vm.box = \"StefanScherer/windows_2019\"",
+            "o.vm.box_version = \">= 0\"",
+            "v.vmname = \"windows-hello-#{ISOLOOM_KEY}-web01\""
+        ],
+        "{hyperv:?}"
     );
+    let v = web01.every_statement().join("\n");
     assert!(
         v.contains("IsoloomHyperV.address(machine, <<~'PS1')") && v.contains("EnableStatic(@($n.ip), @($n.mask))"),
         "{v}"
     );
     // Hyper-V forwards no port: the published one is relayed from the host port its forward takes.
     let host = "ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB01_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web01/web\", 8082)).to_i";
-    assert!(v.contains(&format!("forwarded_port\", guest: 80, host: {host},")), "{v}");
+    let forwards = web01.statements("m.vm.network \"forwarded_port\", guest: 80,");
+    assert!(matches!(forwards.as_slice(), [one] if one.contains(&format!("host: {host},"))), "{forwards:?}");
     assert!(v.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")), "{v}");
     assert!(v.contains("mac = '02:15:") && v.contains("ip = '192.168.57.10'; mask = '255.255.255.0'"), "{v}");
 
@@ -278,9 +284,10 @@ fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() ->
     let spec = lab(yaml)?;
     // Still generated for every other provider; the Hyper-V block says what is missing.
     let v = generated(&spec, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
+    let hyperv = crate::testing::between(&v, "m.vm.provider \"hyperv\"", "\n    end")?;
     assert!(
-        v.contains("# No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`."),
-        "{v}"
+        hyperv.contains("# No Hyper-V build of this box is known: give one with `overrides.vagrant.machines.<machine>.boxes.hyperv`."),
+        "{hyperv}"
     );
     assert_eq!(isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("virtualbox")).unwrap(), None);
     let why = isoloom_targets::refusal_on(&spec, Target::Vagrant, Some("hyperv"))
@@ -292,7 +299,12 @@ fn an_os_without_a_hyperv_box_is_refused_on_hyperv_until_the_spec_gives_one() ->
         "{yaml}overrides: {{ vagrant: {{ machines: {{ box: {{ boxes: {{ hyperv: my/debian13 }} }} }} }} }}\n"
     ))?;
     assert_eq!(isoloom_targets::refusal_on(&own, Target::Vagrant, Some("hyperv")).unwrap(), None);
-    let given = generated(&own, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    assert!(given.contains("o.vm.box = \"my/debian13\"\n      o.vm.box_version = \">= 0\""), "{given}");
+    let given = vagrantfile(&own)?;
+    let given_hyperv = provider(define(&given, "box"), "hyperv");
+    assert_eq!(
+        given_hyperv.statements[..2],
+        ["o.vm.box = \"my/debian13\"", "o.vm.box_version = \">= 0\""],
+        "{given_hyperv:?}"
+    );
     Ok(())
 }

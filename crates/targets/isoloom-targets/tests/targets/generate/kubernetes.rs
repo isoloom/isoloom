@@ -6,7 +6,7 @@ use isoloom_targets::generate;
 use isoloom_test_support::{manifest, manifest_names, named, yaml_at, yaml_documents, yaml_str, yaml_strs};
 use serde_yaml_ng::Value;
 
-use crate::testing::{Outcome, allowed, example, file, generated, lab};
+use crate::testing::{Outcome, allowed, example, file, generated, header, lab};
 
 /// The manifests of `environment.yaml` that `lab` generates, parsed, with its text (for the
 /// header comments).
@@ -106,13 +106,10 @@ fn kubernetes_publishes_and_keeps_offline_machines_inside() -> Outcome {
     // A published port is a cluster-internal Service, reached through `kubectl port-forward`:
     // nothing opens a public load balancer.
     let services = manifest_names(&docs, "Service");
-    assert!(
-        services.iter().all(|s| yaml_at(manifest(&docs, "Service", s), "spec.type").is_none()),
-        "{services:?}"
-    );
+    isoloom_test_support::assert_every!(&services, |s: &&String| yaml_at(manifest(&docs, "Service", s), "spec.type").is_none());
     assert_eq!(yaml_str(manifest(&docs, "Service", "isoloom-web"), "spec.ports.0.port"), "8080");
     assert!(
-        text.contains("#   kubectl -n isoloom-hello-stack port-forward svc/isoloom-web 8080:8080\n"),
+        header(&text).contains(&"  kubectl -n isoloom-hello-stack port-forward svc/isoloom-web 8080:8080"),
         "{text}"
     );
     let notes = generated(&spec, Target::Kubernetes, ".isoloom/kubernetes/chart/templates/NOTES.txt")?;
