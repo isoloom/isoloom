@@ -27,7 +27,7 @@ mod suite;
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::process::{ExitCode, Stdio};
 use std::time::Instant;
 
 use crate::{Res, generate_all, process, repo, verify};
@@ -68,7 +68,7 @@ fn tf_test(a: &Args) -> Res<ExitCode> {
     let examples: BTreeSet<&str> = suites.iter().map(|s| s.example.as_str()).collect();
     let specs: Vec<PathBuf> = examples.iter().map(|e| root.join("examples").join(e)).collect();
     generate_all::generate(&generate_all::binary(&root)?, &specs, &tree)?;
-    if process::quiet(Command::new("docker").arg("info")).is_err() {
+    if process::quiet(process::tool("docker").arg("info")).is_err() {
         return Err("Docker isn't running".into());
     }
     let image = verify::image(&root)?;
@@ -131,7 +131,7 @@ fn pack(root: &Path, tree: &Path, suites: &[suite::Suite], out: &Path) -> Res<Pa
 fn container(image: &str, input: &Path, cpus: u16) -> Res<String> {
     let cache = std::env::var("VERIFY_CACHE").unwrap_or_else(|_| "isoloom-verify-cache".into());
     let script = "mkdir -p /work && tar -xf - -C /work --no-same-owner --warning=no-unknown-keyword || exit 2; exec bash /work/run.sh";
-    let mut docker = Command::new("docker");
+    let mut docker = process::tool("docker");
     docker.args(["run", "--rm", "-i", "--platform", "linux/amd64", "--cpus", &cpus.to_string()]);
     docker.args(["-v", &format!("{cache}:/cache"), "-e", &format!("TF_TEST_JOBS={cpus}")]);
     docker.args([image, "bash", "-c", script]);
@@ -143,11 +143,12 @@ fn container(image: &str, input: &Path, cpus: u16) -> Res<String> {
     Ok(String::from_utf8_lossy(&done.stdout).into_owned())
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     /// `run.sh` with its folders (`/work`, `/out`, `/cache`, `/tmp`) under `at`.
+    #[cfg(unix)]
     fn script_under(at: &std::path::Path) -> String {
         let marked = SCRIPT
             .replace("/tmp/", "\u{1}tmp/")
@@ -161,6 +162,7 @@ mod tests {
     /// module whose init fails offline and online, one whose provider starts too slowly once, one
     /// that isn't there. Every module is reported in the list's order, whatever order the jobs
     /// ended in, with its status and what Terraform said.
+    #[cfg(unix)]
     #[test]
     fn the_script_reports_every_module_in_the_list_s_order() {
         let bin = isoloom_test_support::FakeBin::named("tf-test").unwrap();
@@ -218,5 +220,82 @@ esac"#,
         isoloom_test_support::assert_every!(calls.iter().filter(|c| c.get(1).map(String::as_str) == Some("test")), |c: &&Vec<String>| c
             .iter()
             .any(|w| w == "-json"));
+    }
+
+    /// The container's input for one suite: the tree, the suite's file at its module's
+    /// `tests/`, the shared mocks beside it, the modules' list and the script.
+    #[test]
+    fn the_input_holds_the_tree_each_suites_file_and_mocks_at_its_module_the_list_and_the_script() {
+        let dir = tempfile::Builder::new().prefix("isoloom-xtask-tf-test-").tempdir().unwrap();
+        let (root, tree, out) = (dir.path().join("root"), dir.path().join("tree"), dir.path().join("out"));
+        let tests = root.join(suite::DIR).join("proxmox");
+        std::fs::create_dir_all(&tests).unwrap();
+        std::fs::create_dir_all(root.join(suite::DIR).join(suite::MOCKS)).unwrap();
+        std::fs::write(root.join(suite::DIR).join(suite::MOCKS).join("proxmox.tfmock.hcl"), "").unwrap();
+        std::fs::write(tests.join("web.tftest.hcl"), "run \"x\" {}\n").unwrap();
+        std::fs::create_dir_all(tree.join("web/.isoloom/proxmox")).unwrap();
+        std::fs::write(tree.join("web/.isoloom/proxmox/main.tf"), "").unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        let s = suite::Suite {
+            file: tests.join("web.tftest.hcl"),
+            example: "web".into(),
+            target: "proxmox".into(),
+            module: "web/.isoloom/proxmox".into(),
+        };
+        let input = pack(&root, &tree, &[s], &out).unwrap();
+        let mut archive = tar::Archive::new(File::open(&input).unwrap());
+        let mut files: Vec<(String, String)> = Vec::new();
+        for entry in archive.entries().unwrap() {
+            let mut entry = entry.unwrap();
+            if entry.header().entry_type().is_file() {
+                let mut text = String::new();
+                std::io::Read::read_to_string(&mut entry, &mut text).unwrap();
+                files.push((entry.path().unwrap().display().to_string(), text));
+            }
+        }
+        let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "tree/web/.isoloom/proxmox/main.tf",
+                "tree/web/.isoloom/proxmox/tests/web.tftest.hcl",
+                "tree/web/.isoloom/proxmox/tests/mocks/proxmox.tfmock.hcl",
+                "modules",
+                "run.sh",
+            ]
+        );
+        assert_eq!(files[3].1, "web/.isoloom/proxmox\n");
+        assert_eq!(files[4].1, SCRIPT);
+    }
+
+    /// A stand-in `docker run` printing `said` and exiting `status`, each call logged.
+    #[cfg(unix)]
+    fn docker(said: &str, status: u8) -> isoloom_test_support::FakeBin {
+        let bin = isoloom_test_support::FakeBin::named("xtask-tf-test").unwrap();
+        let body = format!(
+            "echo \"docker $*\" >> '{}'\ncat > /dev/null\nprintf '%s\\n' '{said}'\nexit {status}",
+            bin.log().display()
+        );
+        bin.stand_in("docker", &body).unwrap();
+        bin
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_container_runs_the_script_capped_at_its_cpus_and_what_it_printed_is_read() {
+        let bin = docker("@@module web", 0);
+        let input = bin.dir().join("in.tar");
+        std::fs::write(&input, "").unwrap();
+        let said = crate::process::testing::with_stand_ins(&bin.path(), || container("isoloom-verify:1", &input, 3)).unwrap();
+        assert_eq!(said, "@@module web\n");
+        let call = bin.calls().unwrap().remove(0);
+        assert_eq!(
+            call.get(..8),
+            Some(&["docker", "run", "--rm", "-i", "--platform", "linux/amd64", "--cpus", "3"].map(String::from)[..])
+        );
+        assert!(call.windows(2).any(|w| w == ["-e", "TF_TEST_JOBS=3"]), "{call:?}");
+        let failed = docker("", 2);
+        let e = crate::process::testing::with_stand_ins(&failed.path(), || container("isoloom-verify:1", &input, 3)).unwrap_err();
+        assert_eq!(e.to_string(), "the container failed (exit status: 2)");
     }
 }

@@ -278,4 +278,35 @@ mod tests {
         assert_eq!(civil_date(1_791_936_000), "2026-10-14");
         assert_eq!(civil_date(1_791_936_000 + 86_399), "2026-10-14");
     }
+
+    /// Galaxy serving ansible.posix: its highest version 2.2.2, the release's archive `sha`.
+    #[cfg(unix)]
+    fn galaxy(sha: &str) -> super::super::fetch::testing::Web {
+        let index = "https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/index/ansible/posix";
+        let web = super::super::fetch::testing::Web::new();
+        let release = format!(r#"{{"download_url":"https://galaxy.example/ansible-posix-2.2.2.tar.gz","artifact":{{"sha256":"{sha}"}}}}"#);
+        web.serves(&format!("{index}/"), &[], br#"{"highest_version":{"version":"2.2.2"}}"#).serves(
+            &format!("{index}/versions/2.2.2/"),
+            &[],
+            release.as_bytes(),
+        );
+        web
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_new_collection_is_pinned_at_galaxys_highest_and_a_rebuilt_archive_is_a_move() {
+        let (old, new) = ("ab".repeat(32), "cd".repeat(32));
+        let web = galaxy(&old);
+        let (pinned, change) = web.browse(|| collection(None, "ansible.posix", "GPL-3.0-or-later", false)).unwrap();
+        assert_eq!((pinned.version.as_str(), pinned.sha256.to_string()), ("2.2.2", old.clone()));
+        assert_eq!(change, Some((false, "ansible.posix 2.2.2 pinned".to_owned())));
+        let (_, same) = web.browse(|| collection(Some(&pinned), "ansible.posix", "GPL-3.0-or-later", false)).unwrap();
+        assert_eq!(same, None, "kept and unchanged");
+        let rebuilt = galaxy(&new);
+        let (_, moved) = rebuilt
+            .browse(|| collection(Some(&pinned), "ansible.posix", "GPL-3.0-or-later", false))
+            .unwrap();
+        assert_eq!(moved, Some((true, format!("ansible.posix 2.2.2: its archive changed ({old} → {new})"))));
+    }
 }

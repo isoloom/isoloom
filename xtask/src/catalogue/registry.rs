@@ -127,6 +127,8 @@ fn token(repository: &str) -> Res<String> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    use super::super::fetch::testing::Web;
     use super::*;
 
     #[test]
@@ -149,5 +151,77 @@ mod tests {
         )
         .unwrap();
         assert_eq!(platforms(&list), ["amd64", "arm64"]);
+    }
+
+    #[cfg(unix)]
+    const HUB: &str = "https://registry-1.docker.io/v2/library/nginx";
+
+    /// Docker Hub with an anonymous token for `library/nginx`, and the amd64 image's
+    /// configuration (`architecture` `arch`) under `sha256:cfg`.
+    #[cfg(unix)]
+    fn hub(arch: &str) -> Web {
+        let web = Web::new();
+        let config = format!(r#"{{"architecture":"{arch}","config":{{"Entrypoint":["/docker-entrypoint.sh"],"Cmd":["nginx","-g","daemon off;"]}}}}"#);
+        web.serves(
+            "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/nginx:pull",
+            &[],
+            br#"{"token":"tok"}"#,
+        )
+        .serves(&format!("{HUB}/blobs/sha256:cfg"), &[], config.as_bytes())
+        .serves(
+            &format!("{HUB}/manifests/sha256:amd"),
+            &["Docker-Content-Digest: sha256:amd"],
+            br#"{"config":{"digest":"sha256:cfg"}}"#,
+        );
+        web
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_multi_platform_tag_pins_its_index_digest_and_the_amd64_images_process() {
+        let web = hub("amd64");
+        let index = r#"{"manifests":[{"digest":"sha256:arm","platform":{"os":"linux","architecture":"arm64"}},{"digest":"sha256:amd","platform":{"os":"linux","architecture":"amd64"}}]}"#;
+        web.serves(&format!("{HUB}/manifests/1.30"), &["Docker-Content-Digest: sha256:index"], index.as_bytes());
+        let pinned = web.browse(|| pin("docker.io/library/nginx:1.30")).unwrap();
+        assert_eq!(
+            pinned,
+            Pinned {
+                digest: "sha256:index".into(),
+                platforms: vec!["arm64".into(), "amd64".into()],
+                entrypoint: vec!["/docker-entrypoint.sh".into()],
+                command: vec!["nginx".into(), "-g".into(), "daemon off;".into()],
+            }
+        );
+        // Every registry call carries the token.
+        let registry: Vec<Vec<String>> = web.calls().into_iter().filter(|c| c.iter().any(|w| w.starts_with(HUB))).collect();
+        assert_eq!(registry.len(), 3, "{registry:?}");
+        isoloom_test_support::assert_every!(&registry, |c: &Vec<String>| c.windows(2).any(|w| w[0] == "Bearer" && w[1] == "tok"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_single_image_tag_takes_its_platform_from_its_configuration() {
+        let web = hub("arm64");
+        web.serves(
+            &format!("{HUB}/manifests/1.30"),
+            &["Docker-Content-Digest: sha256:one"],
+            br#"{"config":{"digest":"sha256:cfg"}}"#,
+        );
+        let pinned = web.browse(|| pin("nginx:1.30")).unwrap();
+        assert_eq!((pinned.digest.as_str(), pinned.platforms), ("sha256:one", vec!["arm64".to_owned()]));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_tag_without_an_amd64_image_or_a_digest_is_refused() {
+        let web = hub("amd64");
+        let arm_only = r#"{"manifests":[{"digest":"sha256:arm","platform":{"os":"linux","architecture":"arm64"}}]}"#;
+        web.serves(&format!("{HUB}/manifests/arm"), &["Docker-Content-Digest: sha256:x"], arm_only.as_bytes())
+            .serves(&format!("{HUB}/manifests/nodigest"), &[], br#"{"config":{"digest":"sha256:cfg"}}"#)
+            .serves(&format!("{HUB}/manifests/noconfig"), &["Docker-Content-Digest: sha256:y"], b"{}");
+        let refused = |r: &str| web.browse(|| pin(r)).unwrap_err().to_string();
+        assert_eq!(refused("nginx:arm"), "nginx:arm publishes no amd64 image");
+        assert_eq!(refused("nginx:nodigest"), format!("{HUB}/manifests/nodigest: no digest in the answer"));
+        assert_eq!(refused("nginx:noconfig"), "nginx:noconfig: no configuration in its manifest");
     }
 }

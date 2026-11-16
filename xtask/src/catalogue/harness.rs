@@ -151,4 +151,66 @@ mod tests {
             ]
         );
     }
+
+    /// The two CLIs as stand-ins, each call logged: `isoloom generate` succeeds, the runner's
+    /// `check --json` prints a check event; its `up` fails when `fail-up` is there.
+    #[cfg(unix)]
+    fn harness(keep: bool) -> (isoloom_test_support::FakeBin, Harness) {
+        let bin = isoloom_test_support::FakeBin::named("xtask-harness").unwrap();
+        let log = bin.log();
+        bin.stand_in("isoloom", &format!("echo \"isoloom $*\" >> '{}'", log.display())).unwrap();
+        let runner = format!(
+            r#"echo "runner $*" >> '{log}'
+case "$1" in
+  up) [ ! -f '{dir}/fail-up' ] ;;
+  check) echo '{{"event":"check","name":"the port answers","ok":true,"detail":""}}' ;;
+esac"#,
+            log = log.display(),
+            dir = bin.dir().display()
+        );
+        bin.stand_in("runner", &runner).unwrap();
+        let h = Harness {
+            isoloom: bin.path().join("isoloom"),
+            runner: bin.path().join("runner"),
+            work: bin.dir().join("work"),
+            provider: "libvirt".into(),
+            keep,
+        };
+        (bin, h)
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_vm_lab_is_generated_for_vagrant_brought_up_checked_and_taken_down_in_its_own_home() {
+        let (bin, h) = harness(false);
+        let dir = bin.dir().join("nginx-vm");
+        let run = h.run(&dir, Form::Vm).unwrap();
+        assert_eq!(run.checks, [("the port answers".to_owned(), true, String::new())]);
+        let (d, home) = (dir.display(), bin.dir().join("work/runner-home"));
+        let lab = format!("{d} --target vagrant --name nginx-vm-vagrant --home {}", home.display());
+        let calls: Vec<String> = bin.calls().unwrap().iter().map(|c| c.join(" ")).collect();
+        assert_eq!(
+            calls,
+            [
+                format!("isoloom generate --target vagrant {d}"),
+                format!("runner up {lab} --provider libvirt --replace"),
+                format!("runner check {lab} --json"),
+                format!("runner down {lab} --provider libvirt"),
+            ]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_lab_that_failed_to_come_up_is_an_error_and_taken_down_unless_kept() {
+        for keep in [false, true] {
+            let (bin, h) = harness(keep);
+            std::fs::write(bin.dir().join("fail-up"), "").unwrap();
+            let dir = bin.dir().join("nginx-container");
+            let e = h.run(&dir, Form::Container).unwrap_err().to_string();
+            assert_eq!(e, format!("the runner's `up` failed (exit status: 1) for {} on docker", dir.display()));
+            let ops: Vec<String> = bin.calls().unwrap().iter().filter(|c| c[0] == "runner").map(|c| c[1].clone()).collect();
+            assert_eq!(ops, if keep { vec!["up"] } else { vec!["up", "down"] }, "keep: {keep}");
+        }
+    }
 }

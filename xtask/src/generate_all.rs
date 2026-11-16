@@ -149,9 +149,111 @@ fn copy_link(from: &Path, to: &Path) -> Res<()> {
 mod tests {
     use super::*;
 
+    /// Every file and link under `dir`, by its path from `dir`, sorted; a link as `path -> target`.
+    #[cfg(unix)]
+    fn listing(dir: &Path) -> Vec<String> {
+        fn walk(dir: &Path, at: &Path, out: &mut Vec<String>) {
+            for entry in std::fs::read_dir(at).unwrap().flatten() {
+                let path = entry.path();
+                let shown = path.strip_prefix(dir).unwrap().display().to_string();
+                let kind = entry.file_type().unwrap();
+                if kind.is_symlink() {
+                    out.push(format!("{shown} -> {}", std::fs::read_link(&path).unwrap().display()));
+                } else if kind.is_dir() {
+                    walk(dir, &path, out);
+                } else {
+                    out.push(shown);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(dir, dir, &mut out);
+        out.sort();
+        out
+    }
+
+    /// A stand-in `isoloom generate <folder>`: `bad` fails, `none` writes nothing, any other
+    /// writes `.isoloom/docker/compose.yaml`; each says what it did.
+    #[cfg(unix)]
+    fn isoloom() -> isoloom_test_support::FakeBin {
+        let bin = isoloom_test_support::FakeBin::named("xtask-generate-all").unwrap();
+        bin.stand_in(
+            "isoloom",
+            r#"case "$2" in
+  */bad) echo "bad: the spec doesn't parse"; exit 1 ;;
+  */none) echo "no target can run it" ;;
+  *) mkdir -p "$2/.isoloom/docker"; : > "$2/.isoloom/docker/compose.yaml"; echo "generated $(basename "$2")" ;;
+esac"#,
+        )
+        .unwrap();
+        bin
+    }
+
+    #[cfg(unix)]
     #[test]
-    fn only_isoloom_outputs_are_left_out() {
-        assert!(is_output(".isoloom") && is_output(".isoloom-2"));
-        assert!(!is_output("isoloom.yml") && !is_output(".isoloomignore"));
+    fn each_spec_is_copied_without_its_outputs_then_generated_into_a_fresh_tree() {
+        let bin = isoloom();
+        let specs = bin.dir().join("specs");
+        let web = specs.join("web");
+        for dir in ["build/app", ".isoloom/docker", ".isoloom-2"] {
+            std::fs::create_dir_all(web.join(dir)).unwrap();
+        }
+        for file in [
+            "isoloom.yml",
+            "build/app/Dockerfile",
+            ".isoloom/docker/stale.yaml",
+            ".isoloom-2/old",
+            ".isoloom-notes",
+        ] {
+            std::fs::write(web.join(file), "x").unwrap();
+        }
+        std::os::unix::fs::symlink("build/app", web.join("app")).unwrap();
+        std::fs::create_dir_all(specs.join("none")).unwrap();
+        let out = bin.dir().join("out");
+        std::fs::create_dir_all(out.join("left-from-before")).unwrap();
+        generate(&bin.path().join("isoloom"), &[web, specs.join("none")], &out).unwrap();
+        assert_eq!(
+            listing(&out),
+            [
+                "generate.log",
+                "web/.isoloom-notes",
+                "web/.isoloom/docker/compose.yaml",
+                "web/app -> build/app",
+                "web/build/app/Dockerfile",
+                "web/isoloom.yml",
+            ],
+            "the outputs at the spec's top left out (a file named like one kept), a link kept a link, the tree made afresh"
+        );
+        let log = std::fs::read_to_string(out.join("generate.log")).unwrap();
+        assert_eq!(log, "== web\ngenerated web\n== none\nno target can run it\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_spec_that_fails_to_generate_stops_the_run_naming_it_and_the_log() {
+        let bin = isoloom();
+        let specs = bin.dir().join("specs");
+        for name in ["bad", "after"] {
+            std::fs::create_dir_all(specs.join(name)).unwrap();
+        }
+        let out = bin.dir().join("out");
+        let e = generate(&bin.path().join("isoloom"), &[specs.join("bad"), specs.join("after")], &out).unwrap_err();
+        assert_eq!(e.to_string(), format!("bad failed to generate (see {})", out.join("generate.log").display()));
+        assert_eq!(
+            std::fs::read_to_string(out.join("generate.log")).unwrap(),
+            "== bad\nbad: the spec doesn't parse\n"
+        );
+        assert!(!out.join("after").exists(), "the run stopped");
+    }
+
+    #[test]
+    fn the_examples_are_the_folders_of_examples_sorted() {
+        let root = tempfile::Builder::new().prefix("isoloom-xtask-examples-").tempdir().unwrap();
+        for dir in ["examples/web", "examples/db"] {
+            std::fs::create_dir_all(root.path().join(dir)).unwrap();
+        }
+        std::fs::write(root.path().join("examples/README.md"), "").unwrap();
+        let found = examples(root.path()).unwrap();
+        assert_eq!(found, [root.path().join("examples/db"), root.path().join("examples/web")]);
     }
 }

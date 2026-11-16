@@ -116,7 +116,7 @@ fn conformance(a: &Args) -> Res<ExitCode> {
     if families.is_empty() || renderers.is_empty() {
         return Err("no family or renderer matches".into());
     }
-    if process::quiet(std::process::Command::new("docker").arg("info")).is_err() {
+    if process::quiet(process::tool("docker").arg("info")).is_err() {
         return Err("Docker isn't running".into());
     }
     let cpus = verify::cpus(std::env::var("ISOLOOM_VERIFY_CPUS").ok().as_deref())?;
