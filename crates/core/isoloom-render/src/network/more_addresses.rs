@@ -59,17 +59,16 @@ mod tests {
 
     #[test]
     fn each_address_lands_on_the_interface_of_the_primary_one() {
-        let sh = linux(&web());
-        assert!(sh.starts_with("dev=$(ip -o -4 addr show | grep -F ' inet 10.0.0.10/'"), "{sh}");
-        assert!(
-            sh.contains("ip addr replace 10.0.0.11/24 dev \"$dev\"\nip addr replace 10.0.0.12/24 dev \"$dev\"\n"),
-            "{sh}"
+        assert_eq!(
+            linux(&web()),
+            "dev=$(ip -o -4 addr show | grep -F ' inet 10.0.0.10/' | awk '{print $2; exit}')\nip addr replace 10.0.0.11/24 dev \"$dev\"\nip addr replace 10.0.0.12/24 dev \"$dev\"\n"
         );
-        let ps = windows(&web());
-        assert_eq!(ps.lines().count(), 2, "{ps}");
-        assert!(
-            ps.contains("(Get-NetIPAddress -IPAddress '10.0.0.10').InterfaceIndex -IPAddress '10.0.0.11' -PrefixLength 24 -SkipAsSource $true"),
-            "{ps}"
+        assert_eq!(
+            windows(&web()).lines().collect::<Vec<_>>(),
+            [
+                "if (-not (Get-NetIPAddress -IPAddress '10.0.0.11' -ErrorAction SilentlyContinue)) { New-NetIPAddress -InterfaceIndex (Get-NetIPAddress -IPAddress '10.0.0.10').InterfaceIndex -IPAddress '10.0.0.11' -PrefixLength 24 -SkipAsSource $true | Out-Null }",
+                "if (-not (Get-NetIPAddress -IPAddress '10.0.0.12' -ErrorAction SilentlyContinue)) { New-NetIPAddress -InterfaceIndex (Get-NetIPAddress -IPAddress '10.0.0.10').InterfaceIndex -IPAddress '10.0.0.12' -PrefixLength 24 -SkipAsSource $true | Out-Null }"
+            ]
         );
     }
 }

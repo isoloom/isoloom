@@ -14,5 +14,6 @@ mod tests {
     fn it_is_fnv_1a() {
         assert_eq!(super::of(""), 0x811c_9dc5);
         assert_eq!(super::of("a"), 0xe40c_292c);
+        assert_eq!(super::of("foobar"), 0xbf9c_f968);
     }
 }

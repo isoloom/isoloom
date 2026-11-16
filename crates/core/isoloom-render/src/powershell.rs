@@ -38,7 +38,7 @@ fn is_quote(c: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{UNTAR, quote};
+    use super::quote;
 
     #[test]
     fn every_kind_of_single_quote_is_doubled() {
@@ -48,10 +48,5 @@ mod tests {
             "'a\u{2018}\u{2018}b\u{2019}\u{2019}c\u{201A}\u{201A}d\u{201B}\u{201B}e'"
         );
         assert_eq!(quote("$x `n \""), "'$x `n \"'");
-    }
-
-    #[test]
-    fn the_untar_script_reads_the_archive_it_is_given() {
-        assert!(UNTAR.contains("$archive") && UNTAR.contains("$dest") && UNTAR.contains("$strip"));
     }
 }

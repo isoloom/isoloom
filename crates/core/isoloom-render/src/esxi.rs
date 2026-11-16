@@ -26,9 +26,8 @@ mod tests {
 
     #[test]
     fn every_windows_os_has_an_esxi_guest_os_and_any_other_keeps_its_own() {
-        for os in isoloom_spec::os::all().filter(|o| o.kind.is_windows()).map(|o| o.name) {
-            assert!(guest_os(os).is_some(), "{os}");
-        }
+        let windows: Vec<&str> = isoloom_spec::os::all().filter(|o| o.kind.is_windows()).map(|o| o.name).collect();
+        isoloom_test_support::assert_every!(windows, |os: &&str| guest_os(os).is_some());
         assert_eq!(guest_os("windows-server-2019"), Some("windows2019srv-64"));
         assert_eq!(guest_os("windows-server-2022"), Some("windows2019srvnext-64"));
         assert_eq!(guest_os("debian-12"), None);

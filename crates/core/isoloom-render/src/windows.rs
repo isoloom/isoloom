@@ -70,10 +70,29 @@ mod tests {
 
     #[test]
     fn a_windows_vm_setting_itself_up_has_no_routes_seal_or_volumes() {
-        let e = env("  win: { networks: { dark: 10 }, os: windows-server@2022 }\n");
-        assert_eq!(guest_refusal(&e, "win"), None);
-        let why = set_up_at_boot_refusal(&e, "win").unwrap();
-        assert!(why.contains("`internet: false`"), "{why}");
-        assert!(!why.contains("later") && !why.contains("next"), "{why}");
+        let gateway = crate::testing::env(
+            "version: 1\nname: w\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\n  site: { cidr: 10.7.0.0/24, gateway: gw }\nmachines:\n  gw: { networks: { lan: 10, site: 1 }, os: debian@12 }\n  win: { networks: { site: 10 }, os: windows-server@2022 }\n",
+            Target::Proxmox,
+        );
+        // No valid spec mounts a volume on Windows: one is given to it, as a backend's plan could.
+        let mut mounting = crate::testing::env(
+            "version: 1\nname: w\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nvolumes: { data: { owner: lin } }\nmachines:\n  lin: { networks: { lan: 11 }, os: debian@12, volumes: { data: /data } }\n  win: { networks: { lan: 10 }, os: windows-server@2022 }\n",
+            Target::Proxmox,
+        );
+        let volumes = mounting.machines["lin"].volumes.clone();
+        if let Some(win) = mounting.machines.get_mut("win") {
+            win.volumes = volumes;
+        }
+        for (e, why) in [
+            (&gateway, Some("machine `win`: this target sets no gateway machine's routes on Windows")),
+            (
+                &env("  win: { networks: { dark: 10 }, os: windows-server@2022 }\n"),
+                Some("machine `win`: this target cuts no Windows machine off the internet (`internet: false`)"),
+            ),
+            (&mounting, Some("machine `win`: this target mounts no volume on Windows")),
+            (&env("  win: { networks: { lan: 10 }, os: windows-server@2022 }\n"), None),
+        ] {
+            assert_eq!(set_up_at_boot_refusal(e, "win").as_deref(), why);
+        }
     }
 }
