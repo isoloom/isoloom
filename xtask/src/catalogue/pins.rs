@@ -253,18 +253,6 @@ mod tests {
         out.finish().unwrap()
     }
 
-    /// A tar of one file, `name` holding `text`.
-    #[cfg(unix)]
-    fn tar_of(name: &str, text: &str) -> Vec<u8> {
-        let mut tar = tar::Builder::new(Vec::new());
-        let mut header = tar::Header::new_gnu();
-        header.set_size(u64::try_from(text.len()).unwrap());
-        header.set_mode(0o644);
-        header.set_cksum();
-        tar.append_data(&mut header, name, text.as_bytes()).unwrap();
-        tar.into_inner().unwrap()
-    }
-
     #[cfg(unix)]
     const PACKAGES: &str =
         "Package: nginx\nVersion: 1.30.6-1~bookworm\n\nPackage: nginx\nVersion: 1.30.6-2~bookworm\n\nPackage: nginx\nVersion: 1.31.0-1~bookworm\n";
@@ -329,11 +317,15 @@ mod tests {
     fn an_alpine_index_is_the_second_archive_of_two() {
         let web = Web::new();
         let url = "https://nginx.example/packages/alpine/v3.24/main/x86_64/APKINDEX.tar.gz";
-        let signed = [gz(&tar_of(".SIGN.RSA.nginx.rsa.pub", "sig")), gz(&tar_of("APKINDEX", "P:nginx\nV:1.30.6-r1\n"))].concat();
+        let signed = [
+            gz(&crate::testing::tar_of(".SIGN.RSA.nginx.rsa.pub", b"sig")),
+            gz(&crate::testing::tar_of("APKINDEX", b"P:nginx\nV:1.30.6-r1\n")),
+        ]
+        .concat();
         web.serves(url, &[], &signed);
         let r = repository(Family::Alpine, "https://nginx.example/packages/alpine/v3.24/main", &"0".repeat(64));
         assert_eq!(web.browse(|| Indexes::default().versions(&r, "nginx")).unwrap(), ["1.30.6-r1"]);
-        web.serves(url, &[], &gz(&tar_of("other", "x")));
+        web.serves(url, &[], &gz(&crate::testing::tar_of("other", b"x")));
         let e = web.browse(|| Indexes::default().versions(&r, "nginx")).unwrap_err().to_string();
         assert_eq!(e, format!("{url}: no APKINDEX in the archive"));
     }
