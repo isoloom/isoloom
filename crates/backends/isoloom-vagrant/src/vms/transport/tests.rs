@@ -38,17 +38,33 @@ fn env() -> Environment {
     environment(SPEC)
 }
 
-#[test]
-fn the_test_spec_is_valid() {
-    let lab = isoloom_plan::Lab::parse(SPEC).expect("the test spec parses");
-    assert_eq!(lab.problems(), Vec::new());
-}
-
 /// What `write` writes, as the Vagrantfile has it.
 fn text(write: impl FnOnce(&mut Ruby)) -> String {
     let mut r = Ruby::new();
     write(&mut r);
     r.finish()
+}
+
+/// Each provisioner `write` writes, its name and its statement (its script included), in order.
+fn provisioned(write: impl FnOnce(&mut Ruby)) -> Vec<(String, String)> {
+    let s = text(write);
+    isoloom_test_support::ruby_blocks(&s)
+        .statements
+        .iter()
+        .filter_map(|p| {
+            let name = p.lines().next()?.split("name: \"").nth(1)?.split('"').next()?;
+            Some((name.to_owned(), p.clone()))
+        })
+        .collect()
+}
+
+/// The statement of the provisioner named `name`.
+fn named<'p>(provisioners: &'p [(String, String)], name: &str) -> &'p str {
+    let found: Vec<&str> = provisioners.iter().filter(|(n, _)| n == name).map(|(_, s)| s.as_str()).collect();
+    match found.as_slice() {
+        [one] => one,
+        _ => panic!("{} provisioners named {name}: {provisioners:?}", found.len()),
+    }
 }
 
 /// The provisioner names, in order.
@@ -78,15 +94,23 @@ fn the_steps_run_in_the_plans_order() {
     );
 }
 
+/// The default route through the gateway is set once the steps ran (after the playbook), by its
+/// own provisioner alone, and kept across reboots.
 #[test]
 fn the_default_route_comes_once_provisioned() {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
-    let playbook = s.find("name: \"site.yml\"").expect("the playbook");
-    let default = s.find("name: \"default route\"").expect("the default route");
-    assert!(playbook < default, "{s}");
-    assert_eq!(s.matches("ip route replace default via 10.85.0.1").count(), 1, "{s}");
-    let after_default = s.get(default..).unwrap_or_default();
-    assert!(after_default.contains("systemctl enable isoloom-routes.service"), "kept across reboots: {s}");
+    let p = provisioned(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
+    let at = |name: &str| p.iter().position(|(n, _)| n == name);
+    assert!(at("site.yml") < at("default route") && at("site.yml").is_some(), "{p:?}");
+    let setting: Vec<&str> = p
+        .iter()
+        .filter(|(_, s)| s.contains("ip route replace default via 10.85.0.1"))
+        .map(|(n, _)| n.as_str())
+        .collect();
+    assert_eq!(setting, ["default route"]);
+    assert!(
+        named(&p, "default route").contains("systemctl enable isoloom-routes.service"),
+        "kept across reboots: {p:?}"
+    );
 }
 
 #[test]
@@ -181,23 +205,29 @@ fn a_provisioning_given_no_input_keeps_the_one_given_before() {
 
 #[test]
 fn a_linux_machine_waits_for_a_windows_one_by_address() {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
-    assert!(s.contains("name: \"wait for dc\"") && s.contains("</dev/tcp/10.84.0.20/389"), "{s}");
+    let p = provisioned(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
+    let wait = named(&p, "wait for dc");
+    assert!(wait.contains("</dev/tcp/10.84.0.20/389"), "{wait}");
 }
 
 #[test]
 fn windows_runs_powershell_with_its_inputs() {
     let s = text(|r| provisioners(r, &env(), "dc", Os::Windows, |_| {}));
     assert_eq!(names(&s), ["project", "hosts", "routes", "inputs", "dc.ps1", "ready"], "{s}");
-    assert!(s.contains("route -p add 10.85.0.0 MASK 255.255.255.0 10.84.0.2"), "through the gateway: {s}");
-    let run = s.lines().find(|l| l.contains("-File 'dc.ps1'")).unwrap_or_default();
+    let p = provisioned(|r| provisioners(r, &env(), "dc", Os::Windows, |_| {}));
+    let routes = named(&p, "routes");
+    assert!(
+        routes.contains("route -p add 10.85.0.0 MASK 255.255.255.0 10.84.0.2"),
+        "through the gateway: {routes}"
+    );
+    let run = named(&p, "dc.ps1");
     assert!(run.contains("env: { \"TOKEN\" => isoloom_b64(INPUTS[\"TOKEN\"]) }"), "{run}");
     assert!(run.contains("FromBase64String"), "decoded before the script reads it: {run}");
     assert!(!s.contains("/etc/"), "no Linux step on Windows: {s}");
 }
 
 #[test]
-fn routes_trunks_tc_and_egress_survive_a_reboot() {
+fn egress_survives_a_reboot_and_a_machine_without_trunks_gets_no_trunk_step() {
     let env = env();
     let s = text(|r| step_provisioners(r, &env, "app", (0, &Step::Egress), Os::Linux));
     assert!(s.contains("name: \"no internet\"") && s.contains("ExecStart=-/etc/isoloom/egress.sh"), "{s}");

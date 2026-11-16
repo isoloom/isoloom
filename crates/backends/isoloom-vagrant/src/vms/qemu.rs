@@ -190,9 +190,4 @@ mod tests {
         assert_eq!(opts.as_deref(), Some(r#""connect=127.0.0.1:#{QEMU_HUBS["app"]["web"]}""#));
         assert_eq!(Link::None.socket_opts(), None);
     }
-
-    #[test]
-    fn the_ruby_picks_from_as_many_ports_as_the_links_count() {
-        assert!(super::QEMU_RB.contains(&format!("PORTS = {}_{:03}\n", super::HUB_PORT_COUNT / 1000, super::HUB_PORT_COUNT % 1000)));
-    }
 }

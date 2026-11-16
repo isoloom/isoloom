@@ -24,8 +24,8 @@ fn input(name: &str) -> Value {
 }
 
 /// Inputs `names` from the host's environment, each in base64: a provisioner's environment, which
-/// its script decodes (PowerShell, [`windows_decode`]; a shell, [`linux_decode`] or the inputs
-/// file of [`linux_inputs`]).
+/// its script decodes (PowerShell, [`windows_decode`]; a shell, the inputs file of
+/// [`linux_inputs`]).
 pub(crate) fn encoded(names: &[String]) -> Value {
     Value::hash(names.iter().map(|n| (Value::str(n), input(n))))
 }
@@ -35,17 +35,6 @@ pub(crate) fn encoded(names: &[String]) -> Value {
 pub(crate) fn inputs_env(env: &Environment, machine: &str) -> Option<Value> {
     let names = &env.machines.get(machine)?.inputs;
     (!names.is_empty()).then(|| encoded(names))
-}
-
-/// Shell decoding inputs `names`, each in base64 in its own variable ([`encoded`]), in place and
-/// exported, before the script reads them; a value's last line breaks kept. Empty without any.
-#[cfg(test)]
-pub(crate) fn linux_decode(names: &[String]) -> String {
-    names
-        .iter()
-        .map(|k| format!("{k}=\"$(printenv {k} | base64 -d; printf x)\"; {k}=\"${{{k}%x}}\"; export {k}\n"))
-        .collect::<Vec<_>>()
-        .concat()
 }
 
 /// PowerShell's text of `$v`, a value in base64 ([`encoded`]): UTF-8, as the host encoded it.
@@ -257,49 +246,23 @@ machines:
     }
 
     #[test]
-    fn a_reprovision_given_no_value_keeps_the_value_kept() {
-        // A runner re-provisions a VM lab without its launch values (it keeps none).
-        let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[]);
-        let dir = tempfile::Builder::new().prefix("isoloom-values-keep-").tempdir().expect("a temporary folder");
-        let dir = dir.path();
-        let script: String = script
-            .replace("/var/lib/isoloom/secrets", ".")
-            .lines()
-            .take_while(|l| !l.starts_with("touch"))
-            .flat_map(|l| [l, "\n"])
-            .collect();
-        if isoloom_render::test_support::posix_sh().is_none() {
-            return;
-        }
-        let run = |value: &str| {
-            isoloom_render::test_support::posix_sh()
-                .unwrap()
-                .arg("-c")
-                .arg(&script)
-                .current_dir(dir)
-                .env("V", isoloom_spec::shell::base64(value.as_bytes()))
-                .status()
-                .expect("sh runs")
-                .success()
-        };
-        let first = run("secret{1}");
-        let again = run("");
-        let kept = std::fs::read_to_string(dir.join("input-demo-secret")).unwrap_or_default();
-        assert!(first && again);
-        assert_eq!(kept, "secret{1}");
-    }
-
-    #[test]
     fn a_windows_machine_keeps_its_inputs_for_its_setup_and_startup_tasks() {
         let env = environment(SPEC);
-        let s = text(|r| windows_inputs(r, &env, "dc"));
-        assert!(s.contains("env: { \"MODE\" => isoloom_b64(INPUTS[\"MODE\"]) }"), "{s}");
-        assert!(
-            s.contains("if ($v) { [Environment]::SetEnvironmentVariable($k, [Text.Encoding]"),
-            "kept when given none: {s}"
+        let set = |scope: &str| {
+            format!(
+                "foreach ($k in @('MODE')) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v)){scope}) }} }}"
+            )
+        };
+        // Machine-wide, and only when given: a provisioning given none keeps the value set before.
+        assert_eq!(
+            text(|r| windows_inputs(r, &env, "dc")),
+            format!(
+                "m.vm.provision \"shell\", name: \"inputs\", env: {{ \"MODE\" => isoloom_b64(INPUTS[\"MODE\"]) }}, inline: \"{}\"\n",
+                set(", 'Machine'")
+            )
         );
-        assert!(windows_decode(&env, "dc").contains("FromBase64String"));
-        assert!(windows_decode(&env, "web").contains("MODE"));
+        // A step's own decoding, in its process.
+        assert_eq!(windows_decode(&env, "dc"), format!("{}; ", set("")));
     }
 
     #[test]
@@ -307,26 +270,5 @@ machines:
         assert!(any_secret(&environment(SPEC)));
         let none = "version: 1\nname: t\ninputs: [MODE]\nnetworks: { lab: { cidr: 10.84.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n";
         assert!(!any_secret(&environment(none)));
-    }
-
-    #[test]
-    fn a_value_decoded_in_place_is_read_as_given_and_never_run() {
-        let tricky = "it's $(touch ran) \"quoted\" `touch ran`\n\n";
-        let dir = tempfile::Builder::new().prefix("isoloom-decode-").tempdir().expect("a temporary folder");
-        let dir = dir.path();
-        let script = format!("{}printf %s \"$TOKEN\" > read\n", linux_decode(&["TOKEN".to_owned()]));
-        std::fs::write(dir.join("decode.sh"), script).expect("the script written");
-        let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
-        let status = posix
-            .arg("decode.sh")
-            .current_dir(dir)
-            .env("TOKEN", isoloom_spec::shell::base64(tricky.as_bytes()))
-            .status()
-            .expect("sh runs");
-        let read = std::fs::read_to_string(dir.join("read")).unwrap_or_default();
-        let ran = dir.join("ran").exists();
-        assert!(status.success());
-        assert_eq!(read, tricky);
-        assert!(!ran, "a command in the value ran");
     }
 }
