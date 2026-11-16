@@ -37,7 +37,7 @@
     },
     "inputs": {
       "$ref": "#/$defs/Inputs",
-      "description": "Values given at each start (an access token, a password): a list of names, or a map of name to\n`{ sensitive, description }`. An input is sensitive unless it says otherwise: it reaches a\nmachine as a file (`files: [{ path, input }]`), never as an environment variable.",
+      "description": "Values given at each start (an access token, a password): a list of names, or a map of name to\n`{ sensitive, description, default }`. An input is sensitive unless it says otherwise: it\nreaches a machine as a file (`files: [{ path, input }]`), never as an environment variable.\nGiven no value (unset or empty), an input is its `default` when it declares one, else\nempty; but on Compose an input's file with no default can't be left unset (Compose won't\nstart). So an environment that must start without a launch (a local run, CI) gives its inputs a\ndefault (`\"\"`: empty). A default is text without a NUL or a `}`, written as it is in the\ngenerated files: a sensitive input's default is a public development value\n(`dev-launch-token`), and a warning says so when it reads like a real secret.",
       "default": {}
     },
     "secrets": {
@@ -389,7 +389,7 @@
               "$ref": "#/$defs/Input"
             }
           },
-          "description": "Inputs by name, each with whether it is sensitive and what it is."
+          "description": "Inputs by name, each with whether it is sensitive, what it is and its default."
         }
       ],
       "description": "`inputs:` as written, for the schema."
@@ -406,6 +406,10 @@
         "description": {
           "type": "string",
           "description": "What the value is, shown when a runner asks for it."
+        },
+        "default": {
+          "type": "string",
+          "description": "The value used when the runner gives none (unset or empty): a local run, CI, an import\nwithout a launch. Text without a NUL or a `}`; `\"\"` starts it empty. It is written in the generated\nfiles as it is, so anyone reading them reads it: a sensitive input's default is a public\ndevelopment value (`dev-launch-token`), never a real secret."
         }
       },
       "description": "One input."
