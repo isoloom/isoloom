@@ -332,6 +332,18 @@ variable "ssh_private_key_file" {
   description = "The private key of ssh_public_key (a path, ~ allowed): Terraform signs in to the machines with it to bring the project in and wait for their set-up"
 }
 
+variable "ssh_proxy_host" {
+  type        = string
+  default     = ""
+  description = "A SOCKS5 proxy (its host) Terraform's SSH connections go through first, for a server whose lab bridge only its node reaches; empty for none"
+}
+
+variable "ssh_proxy_port" {
+  type        = number
+  default     = 0
+  description = "The port of ssh_proxy_host"
+}
+
 provider "proxmox" {
   endpoint  = var.proxmox_endpoint
   api_token = var.proxmox_api_token != "" ? var.proxmox_api_token : null
@@ -782,6 +794,9 @@ resource "terraform_data" "isoloom_ready_web" {
     bastion_host        = local.router_address
     bastion_user        = "isoloom"
     bastion_private_key = file(pathexpand(var.ssh_private_key_file))
+    proxy_scheme        = var.ssh_proxy_host != "" ? "socks5" : null
+    proxy_host          = var.ssh_proxy_host != "" ? var.ssh_proxy_host : null
+    proxy_port          = var.ssh_proxy_host != "" ? var.ssh_proxy_port : null
     timeout             = "10m"
   }
   provisioner "remote-exec" {
@@ -801,6 +816,9 @@ resource "terraform_data" "isoloom_ready_block" {
     bastion_host        = local.router_address
     bastion_user        = "isoloom"
     bastion_private_key = file(pathexpand(var.ssh_private_key_file))
+    proxy_scheme        = var.ssh_proxy_host != "" ? "socks5" : null
+    proxy_host          = var.ssh_proxy_host != "" ? var.ssh_proxy_host : null
+    proxy_port          = var.ssh_proxy_host != "" ? var.ssh_proxy_port : null
     timeout             = "10m"
   }
   provisioner "remote-exec" {
@@ -820,6 +838,9 @@ resource "terraform_data" "isoloom_ready_client" {
     bastion_host        = local.router_address
     bastion_user        = "isoloom"
     bastion_private_key = file(pathexpand(var.ssh_private_key_file))
+    proxy_scheme        = var.ssh_proxy_host != "" ? "socks5" : null
+    proxy_host          = var.ssh_proxy_host != "" ? var.ssh_proxy_host : null
+    proxy_port          = var.ssh_proxy_host != "" ? var.ssh_proxy_port : null
     timeout             = "10m"
   }
   provisioner "remote-exec" {

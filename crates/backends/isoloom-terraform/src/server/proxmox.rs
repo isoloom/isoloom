@@ -216,12 +216,14 @@ fn guests(env: &Environment, module: &mut Module) {
         env,
         reference("proxmox_virtual_environment_vm.isoloom_router.id"),
         crate::ready::all(waited.iter().map(String::as_str)),
+        true,
     ));
 }
 
 /// Each Linux VM's readiness wait, then the controller's (`crate::ready`): Terraform signs in
 /// through the router as `isoloom` and waits for the set-up cloud-init runs. The machines it
-/// waits for.
+/// waits for. Through the SOCKS5 proxy first when one is set: the router's uplink may be on a
+/// bridge only the node reaches.
 fn waits(env: &Environment, module: &mut Module) -> Vec<String> {
     let mut waited = Vec::new();
     let mut wait = |name: &str, id: &str, at: std::net::Ipv4Addr, within_s: u32, reboots: usize| {
@@ -229,6 +231,7 @@ fn waits(env: &Environment, module: &mut Module) -> Vec<String> {
             host: string(at.to_string()),
             user: crate::machine::USER.to_owned(),
             bastion: reference("local.router_address"),
+            socks: true,
         };
         module.block(
             crate::ready::Wait {

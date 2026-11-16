@@ -72,6 +72,17 @@ machine is set up, `terraform_data.isoloom_seal` seals the `internet: false` net
 router. So the apply ends with the environment ready. The environment's inputs are variables of
 their own names (`-var TOKEN=...`, or `TF_VAR_TOKEN`).
 
+When `uplink_bridge` is one only the node reaches (a NAT bridge with private addresses), the
+router's uplink address is out of reach of the machine running Terraform. Give the module a SOCKS5
+proxy through the node: `ssh_proxy_host` and `ssh_proxy_port` (unset by default). Terraform's SSH
+connections (the waits and the seal) then go to the proxy first, then to the router, then to the
+machine. A tunnel to the node is one:
+
+```sh
+ssh -N -D 127.0.0.1:1080 root@pve.example.internal &
+terraform -chdir=.isoloom/proxmox apply ... -var ssh_proxy_host=127.0.0.1 -var ssh_proxy_port=1080
+```
+
 Or with a runner, which also gives the module the environment's inputs (the
 machines take the project from their cloud-init; a Linux VM's secrets come from the module's
 `ISOLOOM_SECRET_<NAME>` variables in its cloud-init snippet, and Terraform stores sensitive values

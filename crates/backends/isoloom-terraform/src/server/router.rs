@@ -112,13 +112,16 @@ enum Ruleset {
 /// signs in to the router at its uplink address as `isoloom` and applies the sealed ruleset
 /// ([`sealed_reload`]) once every resource of `after` is done (the machines' set-up, or the
 /// waits for it), so the one `terraform apply` closes those networks once their machines are set
-/// up. Made again with the router (`router`, its id), whose first boot is unsealed.
-pub(crate) fn seal(env: &Environment, router: Expression, after: Vec<Expression>) -> Option<Block> {
+/// up. Made again with the router (`router`, its id), whose first boot is unsealed. `socks`: the
+/// connection goes through the module's SOCKS5 proxy first when one is set
+/// ([`crate::machine::provisioner::SOCKS_VARIABLES`]).
+pub(crate) fn seal(env: &Environment, router: Expression, after: Vec<Expression>, socks: bool) -> Option<Block> {
     use crate::machine::provisioner::{Connection, connection};
     seal::any(env).then(|| {
         let at = Connection::Ssh {
             host: reference("local.router_address"),
             user: crate::machine::USER.to_owned(),
+            socks,
         };
         let mut b = Block::builder("resource")
             .add_label("terraform_data")

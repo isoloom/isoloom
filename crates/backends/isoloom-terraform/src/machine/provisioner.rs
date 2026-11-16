@@ -2,7 +2,7 @@
 //! files to upload, then commands in one or more `remote-exec` provisioners, the machine
 //! restarting between two of them.
 
-use crate::hcl_builder::{Block, BlockBuilder, Expression, Template, boolean, call, list, reference, string};
+use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, boolean, call, conditional, list, null, reference, string};
 use isoloom_render::project::{self, TarExclusion};
 
 /// How Terraform reaches the machine.
@@ -14,6 +14,8 @@ pub(crate) enum Connection {
         host: Expression,
         /// The user it logs in as.
         user: String,
+        /// Through the module's SOCKS5 proxy first, when one is set (see [`SOCKS_VARIABLES`]).
+        socks: bool,
     },
     /// SSH through a jump host (the router, the only VM on the host's own network), the same
     /// user and key on both.
@@ -24,6 +26,8 @@ pub(crate) enum Connection {
         user: String,
         /// The jump host's address.
         bastion: Expression,
+        /// Through the module's SOCKS5 proxy first, when one is set (see [`SOCKS_VARIABLES`]).
+        socks: bool,
     },
     /// WinRM over HTTP, as `isoloom` with a password.
     WinRm {
@@ -76,8 +80,8 @@ impl Provisioner {
     /// The same set-up, reached through `bastion` when it goes over SSH.
     #[must_use]
     pub(crate) fn via(mut self, bastion: Expression) -> Provisioner {
-        if let Connection::Ssh { host, user } = self.connection {
-            self.connection = Connection::SshVia { host, user, bastion };
+        if let Connection::Ssh { host, user, socks } = self.connection {
+            self.connection = Connection::SshVia { host, user, bastion, socks };
         }
         self
     }
@@ -106,8 +110,9 @@ impl Provisioner {
 }
 
 /// An SSH connection as `user` to `host`, through `bastion` when there is one (as the same
-/// user, with the same key).
-fn ssh(host: &Expression, user: &str, bastion: Option<&Expression>) -> BlockBuilder {
+/// user, with the same key), and through the module's SOCKS5 proxy first when `socks` (see
+/// [`SOCKS_VARIABLES`]).
+fn ssh(host: &Expression, user: &str, bastion: Option<&Expression>, socks: bool) -> BlockBuilder {
     let key = || call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])]);
     let mut b = Block::builder("connection")
         .add_attribute(("type", string("ssh")))
@@ -120,14 +125,33 @@ fn ssh(host: &Expression, user: &str, bastion: Option<&Expression>) -> BlockBuil
             .add_attribute(("bastion_user", string(user)))
             .add_attribute(("bastion_private_key", key()));
     }
+    if socks {
+        b = proxied(b);
+    }
     b.add_attribute(("timeout", string("10m")))
+}
+
+/// A module whose SSH connections may start at a SOCKS5 proxy declares `ssh_proxy_host` and
+/// `ssh_proxy_port` (Proxmox's: its lab bridge may be one only the node reaches, a NAT bridge,
+/// so the machine running Terraform reaches the router through a tunnel to the node). Terraform
+/// then connects to the proxy, then to the bastion, then to the host. Unset (`""`), the
+/// attributes are null and the connection is a direct one.
+pub(crate) const SOCKS_VARIABLES: [&str; 2] = ["ssh_proxy_host", "ssh_proxy_port"];
+
+/// `b` with the proxy attributes of [`SOCKS_VARIABLES`], null while no proxy is set.
+fn proxied(b: BlockBuilder) -> BlockBuilder {
+    let [host, port] = SOCKS_VARIABLES.map(|v| reference(&format!("var.{v}")));
+    let set = || binary(host.clone(), BinaryOperator::NotEq, string(""));
+    b.add_attribute(("proxy_scheme", conditional(set(), string("socks5"), null())))
+        .add_attribute(("proxy_host", conditional(set(), host.clone(), null())))
+        .add_attribute(("proxy_port", conditional(set(), port, null())))
 }
 
 pub(crate) fn connection(c: &Connection) -> Block {
     let b = Block::builder("connection");
     match c {
-        Connection::Ssh { host, user } => ssh(host, user, None),
-        Connection::SshVia { host, user, bastion } => ssh(host, user, Some(bastion)),
+        Connection::Ssh { host, user, socks } => ssh(host, user, None, *socks),
+        Connection::SshVia { host, user, bastion, socks } => ssh(host, user, Some(bastion), *socks),
         Connection::WinRm { host, password, ntlm } => {
             let b = b
                 .add_attribute(("type", string("winrm")))
