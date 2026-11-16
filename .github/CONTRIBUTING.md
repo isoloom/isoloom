@@ -28,6 +28,7 @@ The steps ([`xtask/src/check.rs`](../xtask/src/check.rs)):
 | `hooks` | shellcheck over the Git hooks, then their test |
 | `clippy` | `cargo clippy --workspace --all-targets -- -D warnings`: any warning fails |
 | `test` | `cargo xtask test`: the tests under cargo-nextest, then the doctests; fails if they leave anything in the temporary folder |
+| `coverage` | the tests' line coverage under cargo-llvm-cov, at least `COVERAGE_FLOOR` in `xtask/src/check.rs` (about a point under dev's, raised as it rises) |
 | `doc` | the API docs build without a warning |
 | `quality` | `cargo xtask quality`, the ratchet: no per-crate count may go up |
 | `regenerate` | the generated files (docs/spec.md, docs/matrix.md, docs/reference/cli.md, schemas/) are current; a stale one names `.githooks/regenerate`, which rewrites them all |
