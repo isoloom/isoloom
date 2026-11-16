@@ -99,4 +99,15 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn the_controller_is_a_linux_vm_reached_over_ssh() {
+        assert_eq!(
+            with("controller: { image: { vagrant: x/y, winrm: ssl, winssh: true } }"),
+            [
+                "controller.image.winssh: the controller is a Linux VM: no OpenSSH for Windows",
+                "controller.image.winrm: the controller is a Linux VM: no WinRM",
+            ]
+        );
+    }
 }

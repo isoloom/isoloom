@@ -327,4 +327,21 @@ mod tests {
         let p: Vec<String> = validate(&spec).into_iter().map(|p| p.to_string()).collect();
         assert!(p.iter().any(|p| p.starts_with("controller.image.aws:")), "{p:?}");
     }
+
+    #[test]
+    fn a_network_boot_needs_a_network_and_something_to_serve() {
+        assert_eq!(
+            crate::testing::problems(&crate::testing::lab(
+                "machines:\n  a: { vm: { os: debian@12, boot: { order: [network], network: { file: x.0 } } } }\n"
+            )),
+            [
+                "machines.a.networks: attach the machine to at least one network",
+                "machines.a.vm.boot.network: a network boot is served on the machine's first network: give it one in `networks`",
+            ]
+        );
+        assert_eq!(
+            alone("{ os: debian@12, boot: { order: [network], network: {} } }"),
+            ["machines.a.vm.boot.network: give the TFTP folder (`tftp_root`) or the boot file (`file`) it serves"]
+        );
+    }
 }

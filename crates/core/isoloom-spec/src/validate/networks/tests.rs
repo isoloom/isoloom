@@ -172,3 +172,43 @@ fn an_impairment_below_zero_is_refused_before_it_runs() {
         ]
     );
 }
+
+#[test]
+fn a_networks_block_is_a_network_address_overlapping_no_other() {
+    assert_eq!(
+        problems("version: 1\nname: t\nnetworks:\n  lan: { cidr: nonsense }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n"),
+        [
+            "networks.lan.cidr: `nonsense` isn't a network address like 10.20.0.0/24",
+            "machines.web.networks.lan: no network named `lan`",
+        ]
+    );
+    assert_eq!(
+        problems(&lab(
+            "  dmz: { cidr: 10.0.0.0/25 }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n"
+        )),
+        ["networks.dmz.cidr: overlaps network `lan`"]
+    );
+}
+
+#[test]
+fn an_impairment_says_what_it_impairs_on_isoloom_s_router() {
+    // Machine `r` is the gateway's address, which it takes when the network names it.
+    let tc = |network: &str| {
+        let octet = if network.contains("gateway") { 1 } else { 10 };
+        problems(&format!(
+            "version: 1\nname: t\nnetworks:\n  lan: {network}\nmachines:\n  r: {{ networks: {{ lan: {octet} }}, docker: {{ image: x }} }}\n"
+        ))
+    };
+    assert_eq!(
+        tc("{ cidr: 10.0.0.0/24, tc: {} }"),
+        ["networks.lan.tc: say what to impair: `delay`, `jitter`, `loss` or `rate`"]
+    );
+    assert_eq!(
+        tc("{ cidr: 10.0.0.0/24, tc: { jitter: 5ms } }"),
+        ["networks.lan.tc.jitter: jitter varies a `delay`; set one"]
+    );
+    assert_eq!(
+        tc("{ cidr: 10.0.0.0/24, gateway: r, tc: { delay: 5ms } }"),
+        ["networks.lan.tc: `lan` is routed by its gateway machine, which owns its link; `tc` applies on Isoloom's router"]
+    );
+}

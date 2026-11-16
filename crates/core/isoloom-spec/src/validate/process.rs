@@ -86,37 +86,47 @@ mod tests {
         let ok = problems(
             "docker: { image: postgres }, command: [docker-entrypoint.sh, postgres], working_dir: /srv, healthcheck: { test: pg_isready, interval: 2s, retries: 30, start_period: 1m }",
         );
-        assert!(ok.is_empty(), "{ok:?}");
+        assert_eq!(ok, Vec::<String>::new());
         let vm = problems("vm: { os: debian@12 }, command: 'python3 -m http.server 80', healthcheck: { http: { port: 80 } }");
-        assert!(vm.is_empty(), "{vm:?}");
+        assert_eq!(vm, Vec::<String>::new());
     }
 
     #[test]
     fn the_working_dir_is_absolute() {
-        let p = problems("docker: { image: postgres }, working_dir: srv");
-        assert!(p.iter().any(|m| m.contains("working_dir: `srv` must be an absolute path")), "{p:?}");
+        assert_eq!(
+            problems("docker: { image: postgres }, working_dir: srv"),
+            ["machines.a.working_dir: `srv` must be an absolute path, like /srv/app"]
+        );
     }
 
     #[test]
     fn a_healthcheck_says_what_to_check_and_how_often() {
-        let p = problems("docker: { image: nginx }, healthcheck: { interval: '5' }");
-        assert!(p.iter().any(|m| m.contains("say what to check")), "{p:?}");
-        assert!(p.iter().any(|m| m.contains("interval: `5` isn't a duration")), "{p:?}");
+        assert_eq!(
+            problems("docker: { image: nginx }, healthcheck: { interval: '5' }"),
+            [
+                "machines.a.healthcheck: say what to check: `test` (a command) or `http` (a page, with its `port`)",
+                "machines.a.healthcheck.interval: `5` isn't a duration of at least 1s, like 5s, 1m or 1m30s",
+            ]
+        );
     }
 
     #[test]
     fn a_healthcheck_is_a_test_or_a_page_from_its_root() {
-        let p = problems("docker: { image: nginx }, healthcheck: { test: x, http: { port: 80, path: health } }");
-        assert!(
-            p.iter().any(|m| m.contains("not both")) && p.iter().any(|m| m.contains("must start with /")),
-            "{p:?}"
+        assert_eq!(
+            problems("docker: { image: nginx }, healthcheck: { test: x, http: { port: 80, path: health } }"),
+            [
+                "machines.a.healthcheck: use `test` or `http`, not both",
+                "machines.a.healthcheck.http.path: `health` must start with /, like /healthz",
+            ]
         );
     }
 
     #[test]
     fn an_idle_machine_runs_no_command() {
-        let p = problems("docker: { image: alpine, idle: true }, command: [sleep, '1']");
-        assert!(p.iter().any(|m| m.contains("an `idle` machine")), "{p:?}");
+        assert_eq!(
+            problems("docker: { image: alpine, idle: true }, command: [sleep, '1']"),
+            ["machines.a: an `idle` machine runs nothing of its own: leave `idle` out to give it a `command` or `working_dir`"]
+        );
     }
 
     #[test]
@@ -142,6 +152,18 @@ mod tests {
         assert_eq!(
             problems("docker: { image: nginx }, healthcheck: { test: x, interval: 0s }"),
             ["machines.a.healthcheck.interval: `0s` isn't a duration of at least 1s, like 5s, 1m or 1m30s"]
+        );
+    }
+
+    #[test]
+    fn a_command_a_healthchecks_port_and_its_retries_are_given() {
+        assert_eq!(
+            problems("docker: { image: x }, command: '', healthcheck: { http: { port: 0 }, retries: 0 }"),
+            [
+                "machines.a.command: give the program to run (a text, or a list starting with the program)",
+                "machines.a.healthcheck.http.port: 1 to 65535",
+                "machines.a.healthcheck.retries: at least 1 try",
+            ]
         );
     }
 }

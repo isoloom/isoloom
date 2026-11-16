@@ -164,4 +164,17 @@ mod tests {
             nothing("are all dormant (they answer later) or UDP (no handshake to wait for)")
         );
     }
+
+    #[test]
+    fn a_published_port_is_a_port_one_machine_publishes() {
+        assert_eq!(
+            problems(&lab(
+                "machines:\n  a: { networks: { lan: 10 }, docker: { image: x }, ports: [{ port: 80, publish: 0 }, { port: 81, publish: 8080 }] }\n  b: { networks: { lan: 11 }, docker: { image: x }, ports: [{ port: 80, publish: 8080 }] }\n"
+            )),
+            [
+                "machines.a.ports[0].publish: port 0 isn't a port",
+                "machines.b.ports[0].publish: port 8080 is already published by `a`",
+            ]
+        );
+    }
 }

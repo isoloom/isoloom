@@ -186,4 +186,20 @@ mod tests {
         assert_eq!(tag(0), ["networks.home.bridged.vlan: a VLAN tag is 1 to 4094"]);
         assert_eq!(tag(4095), ["networks.home.bridged.vlan: a VLAN tag is 1 to 4094"]);
     }
+
+    #[test]
+    fn an_outside_network_keeps_its_own_routing_docker_block_and_ipv6() {
+        let spec = format!(
+            "{BASE}  home: {{ cidr: 10.5.0.0/24, bridged: {{ interface: ' ' }} }}\n  corp: {{ cidr: 10.6.0.0/24, external: corp-net, gateway: web, docker: {{ cidr: 10.7.0.0/24 }}, ipv6: {{ cidr: 'fd00:20::/64' }} }}\nmachines:\n  web: {{ networks: {{ lan: 10, home: 10, corp: 1 }}, docker: {{ image: nginx }} }}\n"
+        );
+        let got = problems(&spec);
+        for want in [
+            "networks.home.bridged.interface: name the host interface, or leave `interface` out",
+            "networks.corp.gateway: `corp` is outside the environment: its own routing decides, so leave `gateway` out",
+            "networks.corp.docker: `corp` keeps its own block on Docker: leave its `cidr` out of `overrides.docker`",
+            "networks.corp.ipv6: `corp` is outside the environment: its IPv6 is its own, so leave `ipv6` out",
+        ] {
+            assert!(got.iter().any(|g| g == want), "missing {want:?} in {got:#?}");
+        }
+    }
 }
