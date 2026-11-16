@@ -31,15 +31,30 @@ fn needs(tools: &[&str]) -> Outcome {
 
 #[test]
 fn every_vagrantfile_copies_the_project_with_its_own_step() -> Outcome {
-    let vagrant = file(&example("hello-stack")?, Target::Vagrant, "vagrant/Vagrantfile")?;
-    assert!(!vagrant.contains("Dir.children(ROOT)"), "the project is listed when the Vagrantfile loads");
-    assert!(!vagrant.contains("provision \"file\""), "a file provisioner copies the project");
-    assert!(vagrant.contains("provisioner(:isoloom_project)"), "no project provisioner");
-    // One step per VM with provisioning (web, cache) and the controller isn't there: hello-stack
-    // has no environment-level playbooks. Isoloom's outputs stay out.
-    assert!(vagrant.contains("    m.vm.provision \"isoloom_project\", name: \"project\"\n"), "{vagrant}");
+    let vf = crate::testing::vagrantfile(&example("hello-stack")?)?;
+    let statements = vf.every_statement();
+    assert!(
+        !statements.iter().any(|s| s.contains("Dir.children(ROOT)")),
+        "the project is listed when the Vagrantfile loads"
+    );
+    assert!(
+        !statements.iter().any(|s| s.contains("provision \"file\"")),
+        "a file provisioner copies the project"
+    );
+    assert!(statements.iter().any(|s| s.contains("provisioner(:isoloom_project)")), "no project provisioner");
+    // One step per VM, Isoloom's controller (it runs the checks) included.
+    let vms = crate::testing::defined(&vf);
+    assert_eq!(vms, ["cache", "web", "isoloom-controller"]);
+    for vm in &vms {
+        let steps = crate::testing::define(&vf, vm).statements("m.vm.provision \"isoloom_project\"");
+        assert_eq!(steps, ["m.vm.provision \"isoloom_project\", name: \"project\""], "{vm}");
+    }
     // Every other step: the rules of a machine reading none of the outputs.
-    assert!(vagrant.contains("IsoloomProject::COPY_RULES = \"/.isoloom*\n.git/\n"), "{vagrant}");
+    let rules: Vec<&&str> = statements.iter().filter(|s| s.starts_with("IsoloomProject::COPY_RULES = ")).collect();
+    assert!(
+        matches!(rules.as_slice(), [one] if one.starts_with("IsoloomProject::COPY_RULES = \"/.isoloom*\n.git/\n")),
+        "{rules:?}"
+    );
     Ok(())
 }
 
@@ -218,13 +233,32 @@ fn isoloomignore_leaves_paths_out() -> Outcome {
     Ok(())
 }
 
+/// The attributes of a module's `locals` blocks, each as HCL writes it.
+fn locals(tf: &str) -> Vec<(String, String)> {
+    let body = isoloom_test_support::hcl_body(tf);
+    isoloom_test_support::hcl_blocks(&body, "locals", &[])
+        .iter()
+        .flat_map(|b| {
+            b.body()
+                .attributes()
+                .map(|a| (a.key().to_owned(), isoloom_test_support::hcl_text(b.body(), a.key())))
+        })
+        .collect()
+}
+
+/// Whether one of `locals` reads the project's `.isoloomignore`.
+fn reads_isoloomignore(locals: &[(String, String)]) -> bool {
+    locals.iter().any(|(_, v)| v.contains("file(\"${local.root}/.isoloomignore\")"))
+}
+
 #[test]
 fn terraform_outputs_read_isoloomignore() -> Outcome {
     let spec = example("hello-stack")?;
     // Proxmox writes the files that go through cloud-init.
-    let proxmox = file(&spec, Target::Proxmox, "proxmox/main.tf")?;
-    assert!(proxmox.contains("project_files = [for f in local.project_paths : {"), "{proxmox}");
-    assert!(proxmox.contains("file(\"${local.root}/.isoloomignore\")"), "{proxmox}");
+    let proxmox = locals(&file(&spec, Target::Proxmox, "proxmox/main.tf")?);
+    let files = proxmox.iter().find(|(k, _)| k == "project_files").map(|(_, v)| v.as_str()).unwrap_or_default();
+    assert!(files.starts_with("[for f in local.project_paths : {"), "{proxmox:?}");
+    assert!(reads_isoloomignore(&proxmox), "{proxmox:?}");
     // The cloud modules archive the project by the same rules (`tar`'s exclusion list) and bring
     // it in over SSH before they wait for the set-up.
     for (target, path) in [
@@ -234,10 +268,9 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
         (Target::CloudDocker, "cloud-docker/azure/main.tf"),
     ] {
         let tf = file(&spec, target, path)?;
-        assert!(
-            tf.contains("file(\"${local.root}/.isoloomignore\")") && tf.contains("local_file\" \"isoloom_project\""),
-            "{path}"
-        );
+        assert!(reads_isoloomignore(&locals(&tf)), "{path}");
+        let archives = isoloom_test_support::hcl_names(&isoloom_test_support::hcl_body(&tf), "resource", "local_file");
+        assert!(archives.contains(&"isoloom_project".to_owned()), "{path}: {archives:?}");
     }
     Ok(())
 }
@@ -246,15 +279,21 @@ fn terraform_outputs_read_isoloomignore() -> Outcome {
 fn windows_machines_get_the_project_before_their_steps() -> Outcome {
     let spec = example("windows-hello")?;
     for path in ["cloud-vm/aws/main.tf", "cloud-vm/azure/main.tf"] {
-        let tf = file(&spec, Target::CloudVm, path)?;
+        let body = isoloom_test_support::hcl_body(&file(&spec, Target::CloudVm, path)?);
         // The host's archive (as a Linux machine's), uploaded once, unpacked by the set-up
         // script (no longer in C:\isoloom, which the project replaces) before the steps.
-        assert!(tf.contains("destination = \"C:\\\\Windows\\\\Temp\\\\isoloom-project.tgz\""), "{path}");
-        assert!(!tf.contains("destination = \"C:/isoloom/"), "{path}: a step uploaded on its own");
-        assert!(tf.contains("-File C:\\\\ProgramData\\\\isoloom\\\\setup.ps1"), "{path}");
-        let unpack = tf.find("$dest = 'C:\\\\isoloom'; $strip = 1").expect("the project unpacked");
-        // The plan's `Run` step, from C:\\isoloom.
-        let step = tf.find("-File 'provision/iis.ps1'").expect("the step");
+        let uploads = isoloom_test_support::hcl_values(&body, "destination");
+        assert!(uploads.contains(&"C:\\Windows\\Temp\\isoloom-project.tgz".to_owned()), "{path}: {uploads:?}");
+        assert!(!uploads.iter().any(|d| d.starts_with("C:/isoloom/")), "{path}: a step uploaded on its own");
+        let literals = isoloom_test_support::hcl_literals(&body);
+        assert!(literals.iter().any(|l| l.contains("-File C:\\ProgramData\\isoloom\\setup.ps1")), "{path}");
+        // The set-up script unpacks the project, then runs the plan's `Run` step from C:\isoloom.
+        let setup = literals
+            .iter()
+            .find(|l| l.contains("$dest = 'C:\\isoloom'; $strip = 1"))
+            .ok_or("the project unpacked")?;
+        let unpack = setup.find("$dest = 'C:\\isoloom'; $strip = 1").ok_or("the unpacking")?;
+        let step = setup.find("-File 'provision/iis.ps1'").ok_or("the step")?;
         assert!(unpack < step, "{path}");
     }
     Ok(())

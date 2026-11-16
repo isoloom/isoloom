@@ -107,7 +107,8 @@ fn the_text_the_markdown_and_the_json_hold_every_row_and_column() {
     }
     let rows = json["rows"].as_array().unwrap();
     assert_eq!(rows.len(), m.rows.len());
-    assert!(rows.iter().all(|r| r["cells"].as_object().unwrap().len() == m.columns.len()));
+    isoloom_test_support::assert_every!(rows, |r: &&serde_json::Value| r["cells"].as_object().map(serde_json::Map::len)
+        == Some(m.columns.len()));
     assert_eq!(json["columns"].as_array().unwrap().len(), m.columns.len());
     assert_eq!(json["validators"].as_array().unwrap().len(), m.validators.len());
     let grid = md
