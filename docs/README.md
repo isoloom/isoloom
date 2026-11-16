@@ -55,6 +55,8 @@ How-tos:
 ## Explanation: understand the design
 
 - [Architecture](explanation/architecture.md)
+- [What Isoloom is, and what it is not](explanation/boundaries.md): its boundary with Isothrum
+  and the Cyber CTF launcher
 - [Security considerations](explanation/security.md)
 - [Determinism](explanation/determinism.md)
 
