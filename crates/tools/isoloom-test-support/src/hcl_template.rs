@@ -57,7 +57,11 @@ fn escape(chars: &mut std::str::Chars<'_>) -> Option<char> {
         '\\' => '\\',
         '"' => '"',
         'u' => {
+            // Exactly four hex digits: HCL refuses a shorter escape, or a sign.
             let hex: String = chars.by_ref().take(4).collect();
+            if hex.len() != 4 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+                return None;
+            }
             char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?
         }
         _ => return None,
@@ -74,4 +78,37 @@ pub fn hcl_decode(lit: &str) -> Option<String> {
             HclPiece::Expr(_) => None,
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_template_reads_as_its_text_and_interpolations_its_markers_and_escapes_literal() {
+        let text = |t: &str| HclPiece::Text(t.to_owned());
+        let expr = |e: &str| HclPiece::Expr(e.to_owned());
+        assert_eq!(hcl_pieces(r#""a ${var.x} b""#), Some(vec![text("a "), expr("var.x"), text(" b")]));
+        assert_eq!(hcl_pieces(r#""$${x} %%{y} \"q\" \\ \té""#), Some(vec![text("${x} %{y} \"q\" \\ \té")]));
+        assert_eq!(hcl_pieces(r#""""#), Some(vec![]));
+        for wrong in [
+            r#""%{ if x }""#,
+            r#""a"b""#,
+            "\"a\nb\"",
+            r#""${open""#,
+            r#""\q""#,
+            r#""\u00""#,
+            r#""\u+0e9""#,
+            "unquoted",
+        ] {
+            assert_eq!(hcl_pieces(wrong), None, "{wrong:?}");
+        }
+    }
+
+    #[test]
+    fn a_string_is_text_only_when_it_interpolates_nothing() {
+        assert_eq!(hcl_decode(r#""plain $${x}""#).as_deref(), Some("plain ${x}"));
+        assert_eq!(hcl_decode(r#""a ${var.x}""#), None);
+        assert_eq!(hcl_decode(r#""\q""#), None);
+    }
 }

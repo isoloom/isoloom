@@ -166,3 +166,65 @@ fn opens_block(line: &str) -> bool {
     let do_block = code.ends_with(" do") || (code.contains(" do |") && code.ends_with('|'));
     (keyword || do_block) && !code.ends_with(" end") && !code.contains("; end")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const VAGRANTFILE: &str = "Vagrant.configure(\"2\") do |config|\n  # a comment: do\n  config.vm.define \"web\" do |m|\n    m.vm.box = \"bento/debian-12\"\n    m.vm.provision \"shell\", inline: \"cat > x <<'EOF'\\nEOF\\n\"\n    m.vm.provision \"shell\", inline: <<~'SH'\n      if true; then\n      echo do\n      SH\n    if ENV[\"X\"]\n      m.vm.box = \"other\"\n    end\n    m.vm.provider \"libvirt\" do |v| v.memory = 512 end\n  end\n  config.vm.define \"db\" do |m|\n    m.vm.box = \"bento/debian-12\"\n  end\nend\n";
+
+    #[test]
+    fn a_vagrantfile_is_read_by_block_its_here_documents_inside_their_statement() {
+        let file = ruby_blocks(VAGRANTFILE);
+        let web = file.block("config.vm.define \"web\"");
+        assert_eq!(web.statements("m.vm.box"), ["m.vm.box = \"bento/debian-12\""]);
+        let provision = web.statements("m.vm.provision");
+        assert_eq!(
+            provision,
+            [
+                "m.vm.provision \"shell\", inline: \"cat > x <<'EOF'\\nEOF\\n\"",
+                "m.vm.provision \"shell\", inline: <<~'SH'\nif true; then\necho do\nSH",
+            ],
+            "a `<<` in a string opens no here-document, `echo do` opens no block"
+        );
+        assert_eq!(
+            web.statements("m.vm.provider"),
+            ["m.vm.provider \"libvirt\" do |v| v.memory = 512 end"],
+            "a one-line block is a statement"
+        );
+        assert_eq!(web.block("if ENV").statements, ["m.vm.box = \"other\""]);
+        assert_eq!(
+            web.every_statement().last(),
+            Some(&"m.vm.box = \"other\""),
+            "the nested block's statements, after its head"
+        );
+        assert!(web.every_statement().contains(&"if ENV[\"X\"]"));
+    }
+
+    #[test]
+    fn blocks_are_found_anywhere_outermost_first() {
+        let file = ruby_blocks(VAGRANTFILE);
+        let heads: Vec<&str> = file.find("config.vm.define").iter().map(|b| b.head.as_str()).collect();
+        assert_eq!(heads, ["config.vm.define \"web\" do |m|", "config.vm.define \"db\" do |m|"]);
+        assert_eq!(file.find("Vagrant.configure").len(), 1);
+        assert_eq!(file.find("config.vm.network").len(), 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "2 blocks open with `config.vm.define`")]
+    fn one_block_asked_for_where_there_are_two_fails_the_test() {
+        let _block = ruby_blocks(VAGRANTFILE).block("config.vm.define");
+    }
+
+    #[test]
+    #[should_panic(expected = "never closed")]
+    fn an_unclosed_block_fails_the_test() {
+        let _file = ruby_blocks("config.vm.define \"web\" do |m|\n  m.vm.box = \"x\"\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "`end` closes no block")]
+    fn an_end_that_closes_nothing_fails_the_test() {
+        let _file = ruby_blocks("m.vm.box = \"x\"\nend\n");
+    }
+}

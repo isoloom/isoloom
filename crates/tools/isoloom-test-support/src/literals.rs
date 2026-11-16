@@ -113,3 +113,88 @@ pub fn b64_decode(text: &str) -> Option<Vec<u8>> {
     }
     Some(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Each `(literal, what it reads as)`: `None` where the language would expand or end it.
+    fn reads(decode: fn(&str) -> Option<String>, cases: &[(&str, Option<&str>)]) {
+        for (literal, text) in cases {
+            assert_eq!(decode(literal).as_deref(), *text, "{literal}");
+        }
+    }
+
+    #[test]
+    fn a_sh_word_reads_as_its_quoted_runs_and_escapes_and_nothing_bare() {
+        reads(
+            sh_decode,
+            &[
+                ("'it'\\''s'", Some("it's")),
+                ("'$HOME `x`'", Some("$HOME `x`")),
+                ("\\$", Some("$")),
+                ("''", Some("")),
+                ("$HOME", None),
+                ("'open", None),
+                ("'a' b", None),
+                ("trailing\\", None),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_ruby_string_reads_its_escapes_and_refuses_an_interpolation() {
+        reads(
+            rb_decode,
+            &[
+                (r#""a \"b\" \\ \#{x}""#, Some(r#"a "b" \ #{x}"#)),
+                (r##""# a #""##, Some("# a #")),
+                (r##""#{x}""##, None),
+                (r##""#$x""##, None),
+                (r##""#@y""##, None),
+                (r#""a"b""#, None),
+                (r#""\n""#, None),
+                ("'single'", None),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_powershell_string_reads_a_doubled_quote_of_any_kind_as_one() {
+        reads(
+            ps_decode,
+            &[
+                ("'it''s $x'", Some("it's $x")),
+                ("'a\u{2019}\u{2019}b'", Some("a\u{2019}b")),
+                ("'it's'", None),
+                ("'a\u{2018}b'", None),
+                ("\"double\"", None),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_systemd_word_reads_its_escapes_and_doubled_specifiers_and_refuses_lone_ones() {
+        reads(
+            systemd_decode,
+            &[
+                (r#""a \"b\" \\ \n %% $$""#, Some("a \"b\" \\ \n % $")),
+                (r#""%h""#, None),
+                (r#""$HOME""#, None),
+                (r#""a"b""#, None),
+                (r#""\t""#, None),
+                ("bare", None),
+            ],
+        );
+    }
+
+    #[test]
+    fn base64_reads_as_rfc_4648_writes_it_and_refuses_anything_else() {
+        for (text, bytes) in [("", &b""[..]), ("TQ==", b"M"), ("TWE=", b"Ma"), ("TWFu", b"Man"), ("+/+/", b"\xfb\xff\xbf")] {
+            assert_eq!(b64_decode(text).as_deref(), Some(bytes), "{text}");
+        }
+        for wrong in ["TQ=", "TW!u", "TWFu\n"] {
+            assert_eq!(b64_decode(wrong), None, "{wrong:?}");
+        }
+    }
+}

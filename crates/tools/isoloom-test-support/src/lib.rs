@@ -296,6 +296,11 @@ mod tests {
         assert_every!([1, -2, 3], |n: &i32| *n > 0);
     }
 
+    #[test]
+    fn assert_every_passes_when_each_item_holds() {
+        assert_every!([1, 2, 3], |n: &i32| *n > 0);
+    }
+
     #[cfg(unix)]
     #[test]
     fn a_script_sees_only_the_tools_given_it_and_its_calls_are_read_back() -> Outcome<()> {
@@ -310,11 +315,60 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn a_stand_in_runs_its_body_with_the_arguments_and_only_the_environment_given() -> Outcome<()> {
+        let bin = FakeBin::named("stand-in")?;
+        let name = bin.dir().file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        assert!(name.starts_with("isoloom-stand-in-"), "a leftover is found by its name: {name}");
+        bin.stand_in("greet", "echo \"$1 from $AT, home: ${HOME:-none}\"")?;
+        let out = bin.run("greet hello", &[("AT", Path::new("/srv"))])?;
+        assert_eq!(String::from_utf8(out.stdout)?, "hello from /srv, home: none\n");
+        assert_eq!(bin.calls()?, Vec::<Vec<String>>::new(), "nothing recorded yet");
+        assert_eq!(bin.log(), bin.dir().join("calls.log"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_real_tool_is_linked_in_and_one_the_host_lacks_is_an_error_naming_it() -> Outcome<()> {
+        let bin = FakeBin::new()?;
+        bin.link_real(&["tr"])?;
+        let out = bin.run("echo abc | tr a-z A-Z", &[])?;
+        assert_eq!(String::from_utf8(out.stdout)?, "ABC\n");
+        let missing = bin.link_real(&["isoloom-no-such-tool"]).err().map(|e| e.to_string());
+        assert_eq!(missing.as_deref(), Some("`isoloom-no-such-tool` isn't on this host's PATH"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[should_panic(expected = "the script failed: boom")]
+    fn the_calls_of_a_script_that_failed_fail_the_test() {
+        let bin = FakeBin::new().unwrap();
+        let _calls = bin.calls_of("echo boom >&2; exit 1", &[]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_program_is_written_with_its_mode_and_runs() -> Outcome<()> {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::tempdir()?;
+        let (program, data) = (dir.path().join("hello"), dir.path().join("data"));
+        write_executable(&program, "#!/bin/sh\necho hi\n", true)?;
+        write_executable(&data, "x", false)?;
+        let mode = |p: &Path| std::fs::metadata(p).map(|m| m.permissions().mode() & 0o777);
+        assert_eq!((mode(&program)?, mode(&data)?), (0o755, 0o644));
+        assert_eq!(Command::new(&program).output()?.stdout, b"hi\n");
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn a_guarded_helper_and_what_it_started_end_with_the_guard() -> Outcome<()> {
         let dir = tempfile::tempdir()?;
         let file = dir.path().join("pid");
         let script = format!("sleep 300 & echo $! > '{}'; wait", file.display());
         let guard = ChildGuard::spawn(Command::new("sh").args(["-c", &script]))?;
+        assert!(guard.id() > 0);
         let mut pid = None;
         for _ in 0..500 {
             pid = std::fs::read_to_string(&file).ok().and_then(|p| p.trim().parse::<u32>().ok());
@@ -337,55 +391,10 @@ mod tests {
     }
 
     #[test]
-    fn a_yaml_value_is_read_by_its_path() {
-        let v = yaml("services:\n  web:\n    labels: { isoloom.managed: 'true' }\n    ports: ['8080:80']\n    networks: { lan: { ipv4_address: 10.0.0.2 } }\n");
-        assert_eq!(yaml_str(&v, "services.web.networks.lan.ipv4_address"), "10.0.0.2");
-        assert_eq!(yaml_str(&v, "services.web.labels.`isoloom.managed`"), "true");
-        assert_eq!(yaml_strs(&v, "services.web.ports"), ["8080:80"]);
-        assert_eq!(yaml_str(&v, "services.web.ports.0"), "8080:80");
-        assert_eq!(yaml_keys_at(&v, "services"), ["web"]);
-        assert!(yaml_at(&v, "services.db").is_none());
-    }
-
-    #[test]
-    fn a_vagrantfile_is_read_by_block_its_heredocs_left_whole() {
-        let vf = "Vagrant.configure(\"2\") do |config|\n  config.vm.define \"web\" do |m|\n    m.vm.box = \"bento/debian-12\"\n    m.vm.provision \"shell\", inline: \"cat > x <<'EOF'\\nEOF\\n\"\n    m.vm.provision \"shell\", inline: <<~'SH'\n      if true; then\n      echo end\n      SH\n    if ENV[\"X\"]\n      m.vm.box = \"other\"\n    end\n  end\nend\n";
-        let file = ruby_blocks(vf);
-        let web = file.block("config.vm.define \"web\"");
-        assert_eq!(web.statements("m.vm.box"), ["m.vm.box = \"bento/debian-12\""]);
-        let provision = web.statements("m.vm.provision");
-        assert_eq!(provision.len(), 2, "a `<<` in a string opens no here-document: {provision:?}");
-        assert_eq!(provision[1], "m.vm.provision \"shell\", inline: <<~'SH'\nif true; then\necho end\nSH");
-        assert_eq!(web.block("if ENV").statements, ["m.vm.box = \"other\""]);
-        assert!(web.every_statement().contains(&"m.vm.box = \"other\""));
-    }
-
-    #[test]
-    #[should_panic(expected = "never closed")]
-    fn an_unclosed_ruby_block_fails() {
-        let read = ruby_blocks("config.vm.define \"web\" do |m|\n  m.vm.box = \"x\"\n");
-        assert!(read.blocks.is_empty(), "{read:?}");
-    }
-
-    #[test]
-    fn an_hcl_map_is_read_by_entry_from_every_object_written_in_it() {
-        let body = hcl_body("locals {\n  tags = merge({ \"Cost.Center\" = \"R&D\", team = local.team }, var.x == \"\" ? {} : { at = var.x })\n}\n");
-        let locals = hcl_blocks(&body, "locals", &[]);
-        let tags = locals.first().map(|l| hcl_map(l.body(), "tags")).unwrap_or_default();
-        let entries = [("Cost.Center", "R&D"), ("team", "local.team"), ("at", "var.x")].map(|(k, v)| (k.to_owned(), v.to_owned()));
-        assert_eq!(tags, entries);
-        assert_eq!(hcl_map(&body, "nothing"), Vec::new());
-    }
-
-    #[test]
-    fn a_rendered_hcl_file_is_read_by_block_and_attribute() {
-        let body = hcl_body("resource \"aws_instance\" \"web\" {\n  instance_type = \"t3.micro\"\n}\nresource \"aws_vpc\" \"lab\" {}\n");
-        let web = hcl_blocks(&body, "resource", &["aws_instance", "web"]);
-        assert_eq!(web.len(), 1);
-        let kind = web
-            .first()
-            .and_then(|b| b.body().attributes().find(|a| a.key() == "instance_type"))
-            .map(|a| a.expr().to_string());
-        assert_eq!(kind.as_deref(), Some("\"t3.micro\""));
+    fn a_tool_on_the_path_is_there_and_a_missing_one_is_named() {
+        let shell = if cfg!(windows) { "cmd" } else { "sh" };
+        assert!(needs(&[shell]).is_ok());
+        let missing = needs(&[shell, "isoloom-no-such-tool"]).err().map(|e| e.to_string());
+        assert_eq!(missing.as_deref(), Some("needs `isoloom-no-such-tool` on PATH"));
     }
 }
