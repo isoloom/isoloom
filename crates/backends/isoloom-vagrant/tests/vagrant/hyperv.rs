@@ -1,7 +1,7 @@
 //! Hyper-V's part of a Vagrantfile: the relay of each published port, and the host port a
 //! forward takes.
 
-use isoloom_test_support::needs;
+use isoloom_test_support::{assert_every, needs};
 
 use crate::testing::{Outcome, VAGRANT_STAND_IN_RB, loadable, printed, vagrantfile};
 
@@ -12,13 +12,31 @@ use crate::testing::{Outcome, VAGRANT_STAND_IN_RB, loadable, printed, vagrantfil
 #[test]
 fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     let file = vagrantfile("solo-web")?;
+    let r = isoloom_test_support::ruby_blocks(&file);
+    let web = r.block("config.vm.define \"web\"");
     let host = "ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)).to_i";
-    assert!(file.contains(&format!("forwarded_port\", guest: 80, host: {host},")), "the forward");
-    assert!(file.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")), "the relay at start");
-    assert!(file.contains(&format!("IsoloomHyperV.unports([[80, {host}]])")), "the relay gone with the VM");
-    let controller = file.split("config.vm.define \"isoloom-controller\"").nth(1).ok_or("no controller")?;
-    let hyperv = controller.split("provider \"hyperv\" do |v, o|").nth(1).ok_or("no hyperv block")?;
-    assert!(hyperv.split("\n    end").next().unwrap_or_default().contains("o.vm.hostname = nil"));
+    assert_eq!(
+        web.statements("m.vm.network \"forwarded_port\""),
+        [format!(
+            "m.vm.network \"forwarded_port\", guest: 80, host: {host}, host_ip: \"127.0.0.1\", auto_correct: true"
+        )],
+        "the forward"
+    );
+    let started = web
+        .block("m.trigger.after :\"VagrantPlugins::HyperV::Action::WaitForIPAddress\"")
+        .block("t.ruby do |_, machine|");
+    assert!(
+        started.statements.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")),
+        "the relay at start: {:?}",
+        started.statements
+    );
+    let deleted = web.block("m.trigger.after :\"VagrantPlugins::HyperV::Action::DeleteVM\"");
+    assert_eq!(deleted.statements("t.ruby").len(), 1, "{:?}", deleted.statements);
+    assert_every!(deleted.statements("t.ruby"), |s: &&str| s
+        .contains(&format!("IsoloomHyperV.unports([[80, {host}]])")));
+    let controller = r.block("config.vm.define \"isoloom-controller\"");
+    let hyperv = controller.block("m.vm.provider \"hyperv\" do |v, o|");
+    assert!(hyperv.statements.iter().any(|s| s == "o.vm.hostname = nil"), "{:?}", hyperv.statements);
     Ok(())
 }
 

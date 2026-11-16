@@ -9,16 +9,12 @@ use crate::testing::{Outcome, field, keywords, libvirt_networks, vagrantfile};
 #[test]
 fn libvirts_own_boxes_are_pinned_to_an_architecture() -> Outcome {
     let file = vagrantfile("ansible-pair")?;
-    let libvirt_blocks: Vec<&str> = file.split("provider \"libvirt\" do |v, o|").skip(1).collect();
-    assert!(!libvirt_blocks.is_empty(), "no libvirt box of its own");
-    for block in libvirt_blocks {
-        let body = block.split("\n    end").next().unwrap_or_default();
-        assert!(
-            body.contains("o.vm.box_architecture = \"amd64\"") || body.contains("o.vm.box_architecture = :auto"),
-            "{body}"
-        );
+    let r = isoloom_test_support::ruby_blocks(&file);
+    for (vm, arch) in [("web", "\"amd64\""), ("cache", "\"amd64\""), ("isoloom-controller", ":auto")] {
+        let define = r.block(&format!("config.vm.define \"{vm}\""));
+        let libvirt = define.block("m.vm.provider \"libvirt\" do |v, o|");
+        assert_eq!(libvirt.statements("o.vm.box_architecture"), [format!("o.vm.box_architecture = {arch}")], "{vm}");
     }
-    assert!(file.contains("o.vm.box_architecture = :auto"), "the controller takes the host's");
     Ok(())
 }
 
@@ -81,17 +77,13 @@ fn every_network_is_made(vagrantfile: &str) {
     }
 }
 
+/// An environment's networks are made where another network holds their block, one VM on them
+/// or more: supplier-portal-api's block is invoice-portal-api's too (10.20.0.0/24).
 #[test]
-fn a_multi_machine_labs_network_is_made_even_where_another_network_holds_its_block() -> Outcome {
-    // supplier-portal-api and invoice-portal-api are both on 10.20.0.0/24.
-    every_network_is_made(&vagrantfile("supplier-portal-api")?);
-    every_network_is_made(&vagrantfile("segmented")?);
-    Ok(())
-}
-
-#[test]
-fn a_one_machine_labs_network_is_made_too() -> Outcome {
-    every_network_is_made(&vagrantfile("solo-web")?);
+fn an_environments_networks_are_made_even_where_another_network_holds_their_block() -> Outcome {
+    for example in ["supplier-portal-api", "segmented", "solo-web"] {
+        every_network_is_made(&vagrantfile(example)?);
+    }
     Ok(())
 }
 
@@ -113,7 +105,10 @@ fn the_lookup_this_test_follows_fails_on_a_network_found_by_its_block() {
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect();
     let host: std::collections::BTreeMap<String, String> = [("isoloom-b-lab".to_owned(), "10.20.0.0/24".to_owned())].into_iter().collect();
-    assert!(attached(&kw, &host).is_err());
+    assert_eq!(
+        attached(&kw, &host),
+        Err("10.20.0.0/24 is already isoloom-b-lab's: nothing makes `isoloom-a-lab`, which the VM's interface names".to_owned())
+    );
     let mut isolated = kw;
     isolated.insert("libvirt__forward_mode".to_owned(), "veryisolated".to_owned());
     assert_eq!(attached(&isolated, &host), Ok("isoloom-a-lab".to_owned()));
