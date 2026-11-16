@@ -244,6 +244,9 @@ machines:
         assert!(out.status.success(), "{}\n{sh}", String::from_utf8_lossy(&out.stderr));
     }
 
+    /// What `web`'s command, setup and healthcheck run in: the inputs, the environment, the folder.
+    const CONTEXT: &str = "set -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /var/lib/isoloom/inputs.env\nset +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\n";
+
     #[test]
     fn the_command_runs_as_a_service_and_the_setup_steps_once_after_it() {
         let env = env();
@@ -256,21 +259,24 @@ machines:
             "the service reads the inputs at every boot"
         );
         let sh = super::super::linux(&env, "web", &setup).expect("renders");
-        assert!(
-            sh.contains(
-                "set -a\n# shellcheck source=/dev/null # the inputs file, written on the machine when it starts\n. /var/lib/isoloom/inputs.env\nset +a\nexport MODE='lab'\nmkdir -p '/srv/site' && cd '/srv/site'\nsh '/opt/isoloom/secret.sh'\n"
+        assert_eq!(
+            sh,
+            format!(
+                "[ -f /var/lib/isoloom/setup.done ] || (\nset -e\n{CONTEXT}sh '/opt/isoloom/secret.sh'\nmkdir -p /var/lib/isoloom && touch /var/lib/isoloom/setup.done\n)\n"
             ),
-            "{sh}"
-        );
-        assert!(
-            sh.starts_with("[ -f /var/lib/isoloom/setup.done ] || (\n") && sh.contains("touch /var/lib/isoloom/setup.done\n)"),
-            "once: {sh}"
+            "once, in the command's environment and folder"
         );
         parses(&sh);
         let command = super::super::linux(&env, "web", &Step::Command).expect("renders");
-        assert!(
-            command.contains("exec 'python3' '-m' 'http.server' '8000'\n") && !command.contains("isoloom-before"),
-            "{command}"
+        assert_eq!(
+            command,
+            crate::boot::service(
+                "command",
+                "The machine's own command",
+                &format!("{CONTEXT}exec 'python3' '-m' 'http.server' '8000'\n"),
+                &[]
+            ),
+            "a service of its own, after nothing"
         );
         parses(&command);
     }
@@ -279,9 +285,13 @@ machines:
     fn the_healthcheck_is_tried_before_the_machine_is_ready() {
         let env = env();
         let sh = super::super::linux(&env, "web", &Step::Ready).expect("renders");
-        assert!(sh.contains("curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8000/health || wget"), "{sh}");
-        assert!(sh.contains("sleep 0; n=0; until isoloom_healthy; do n=$((n+1)); if [ \"$n\" -ge 30 ]"), "{sh}");
-        assert!(sh.ends_with("echo ready > /var/lib/isoloom/ready\n"), "{sh}");
+        assert_eq!(
+            sh,
+            format!(
+                "isoloom_healthy() {{ (\n{CONTEXT}curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:8000/health || wget -q -O /dev/null -T 3 http://127.0.0.1:8000/health\n) >/dev/null 2>&1; }}\nsleep 0; n=0; until isoloom_healthy; do n=$((n+1)); if [ \"$n\" -ge 30 ]; then echo 'web: its healthcheck didn'\\''t pass after 30 tries' >&2; exit 1; fi; sleep 2; done\nmkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\n"
+            ),
+            "its start period, then a try every interval up to its retries, then the ready mark"
+        );
         parses(&sh);
     }
 
@@ -289,25 +299,30 @@ machines:
     fn windows_runs_the_command_as_a_startup_task_and_the_setup_once() {
         let env = env();
         let setup = step(&env, "win", |s| matches!(s, Step::Setup { .. }));
-        let once = super::super::windows(&env, "win", &setup).expect("renders");
-        assert!(
-            once.contains("secret.ps1")
-                && once.contains("C:\\ProgramData\\isoloom\\setup.done")
-                && !once.contains("C:\\isoloom\\setup.done")
-                && !once.contains("Register-ScheduledTask"),
-            "run once, not a startup task: {once}"
+        let once = super::super::windows(&env, "win", &setup);
+        assert_eq!(
+            once.as_deref(),
+            Some(
+                "if (-not (Test-Path 'C:\\ProgramData\\isoloom\\setup.done')) { Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'secret.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }; New-Item -ItemType Directory -Force 'C:\\ProgramData\\isoloom' | Out-Null; Set-Content 'C:\\ProgramData\\isoloom\\setup.done' done }"
+            ),
+            "run once, its mark outside the project folder, not a startup task"
         );
-        let command = super::super::windows(&env, "win", &Step::Command).expect("renders");
-        assert!(
-            !command.contains("before.ps1") && command.contains("python -m http.server 80") && command.contains("-TaskName 'isoloom-command'"),
-            "{command}"
+        let command = super::super::windows(&env, "win", &Step::Command);
+        assert_eq!(
+            command.as_deref(),
+            Some(
+                "New-Item -ItemType Directory -Force 'C:\\ProgramData\\isoloom' | Out-Null; Set-Content -Path 'C:\\ProgramData\\isoloom\\command.ps1' -Value 'New-Item -ItemType Directory -Force ''C:\\isoloom'' | Out-Null; Set-Location ''C:\\isoloom''\npython -m http.server 80'; $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File C:\\ProgramData\\isoloom\\command.ps1'; Register-ScheduledTask -TaskName 'isoloom-command' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-command'"
+            ),
+            "a startup task of its own"
         );
-        let ready = super::super::windows(&env, "win", &Step::Ready).expect("renders");
-        assert!(
-            ready.contains("Set-Location ''C:\\isoloom''; $r = & { & ''python'' ''check.py'' };") && ready.contains("WaitForExit(3000)"),
-            "the test runs in a PowerShell of its own, stopped after its timeout: {ready}"
+        let ready = super::super::windows(&env, "win", &Step::Ready);
+        assert_eq!(
+            ready.as_deref(),
+            Some(
+                "$ok = { try { $c = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes('$ErrorActionPreference = ''Stop''; Set-Location ''C:\\isoloom''; $r = & { & ''python'' ''check.py'' }; if ($LASTEXITCODE) { exit $LASTEXITCODE }; $last = @($r)[-1]; if ($last -is [bool] -and -not $last) { exit 1 }; exit 0')); $p = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $c -NoNewWindow -PassThru; $null = $p.Handle; if ($p.WaitForExit(3000)) { $p.ExitCode -eq 0 } else { $p.Kill(); $false } } catch { $false } }; Start-Sleep -Seconds 10; $n = 0; while (-not (& $ok)) { $n++; if ($n -ge 60) { throw 'win: its healthcheck didn''t pass after 60 tries' }; Start-Sleep -Seconds 5 }; New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
+            ),
+            "the test runs in a PowerShell of its own, stopped after its timeout"
         );
-        assert!(ready.contains("Set-Content C:\\isoloom\\ready ready"), "{ready}");
     }
 
     /// `db` (Linux) and `iis` (Windows) get a secret, run a command of their own and say when
@@ -340,41 +355,41 @@ machines:
     #[test]
     fn a_command_starts_once_its_secrets_are_back_in_place() {
         let env = kept();
-        let linux = super::super::linux(&env, "db", &Step::Command).expect("renders");
-        assert!(
-            linux.contains("After=network-online.target isoloom-apply-secrets.service\nWants=network-online.target\nRequires=isoloom-apply-secrets.service\n"),
-            "{linux}"
+        assert_eq!(
+            super::super::linux(&env, "db", &Step::Command),
+            Some(crate::boot::service(
+                "command",
+                "The machine's own command",
+                "mkdir -p '/opt/isoloom' && cd '/opt/isoloom'\nexec '/bin/sh' '-c' 'postgres'\n",
+                &["apply-secrets"]
+            )),
+            "after, and requiring, the secrets' service"
         );
-        assert!(
-            linux.contains("mkdir -p '/opt/isoloom' && cd '/opt/isoloom'\nexec '/bin/sh' '-c' 'postgres'\n"),
-            "{linux}"
-        );
-        let windows = super::super::windows(&env, "iis", &Step::Command).expect("renders");
-        assert!(
-            windows.starts_with("New-Item -ItemType Directory -Force 'C:\\ProgramData\\isoloom' | Out-Null; Set-Content -Path 'C:\\ProgramData\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1'';"),
-            "{windows}"
-        );
-        assert!(
-            windows.contains("New-Item -ItemType Directory -Force ''/site'' | Out-Null; Set-Location ''/site''\n& ''iis.exe'' ''-x'''"),
-            "{windows}"
+        assert_eq!(
+            super::super::windows(&env, "iis", &Step::Command).as_deref(),
+            Some(
+                "New-Item -ItemType Directory -Force 'C:\\ProgramData\\isoloom' | Out-Null; Set-Content -Path 'C:\\ProgramData\\isoloom\\command.ps1' -Value '& powershell -NoProfile -ExecutionPolicy Bypass -File ''C:\\ProgramData\\isoloom\\apply-secrets.ps1''; if ($LASTEXITCODE) { exit $LASTEXITCODE }\nNew-Item -ItemType Directory -Force ''/site'' | Out-Null; Set-Location ''/site''\n& ''iis.exe'' ''-x'''; $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File C:\\ProgramData\\isoloom\\command.ps1'; Register-ScheduledTask -TaskName 'isoloom-command' -Action $a -Trigger (New-ScheduledTaskTrigger -AtStartup) -User 'SYSTEM' -RunLevel Highest -Force | Out-Null; Start-ScheduledTask -TaskName 'isoloom-command'"
+            ),
+            "the secrets placed, then the command, in its folder"
         );
     }
 
     #[test]
     fn a_command_healthcheck_runs_within_its_timeout() {
         let env = kept();
-        let sh = super::super::linux(&env, "db", &Step::Ready).expect("renders");
-        assert!(sh.contains("timeout 4 sh -c ''\\''pg_isready'\\'''\n) >/dev/null 2>&1; }"), "{sh}");
-        assert!(sh.contains("echo 'db: its healthcheck didn'\\''t pass after 60 tries' >&2"), "{sh}");
+        assert_eq!(
+            super::super::linux(&env, "db", &Step::Ready).as_deref(),
+            Some(
+                "isoloom_healthy() { (\nmkdir -p '/opt/isoloom' && cd '/opt/isoloom'\ntimeout 4 sh -c ''\\''pg_isready'\\'''\n) >/dev/null 2>&1; }\nsleep 10; n=0; until isoloom_healthy; do n=$((n+1)); if [ \"$n\" -ge 60 ]; then echo 'db: its healthcheck didn'\\''t pass after 60 tries' >&2; exit 1; fi; sleep 5; done\nmkdir -p /var/lib/isoloom && echo ready > /var/lib/isoloom/ready\n"
+            ),
+            "within its timeout, the defaults' start period, interval and retries"
+        );
     }
 
     #[test]
+    #[ignore = "needs pwsh: runs the healthcheck's PowerShell, one waiting out its timeout; `cargo xtask test` runs it"]
     fn a_windows_command_healthcheck_runs_in_a_powershell_of_its_own() {
-        // A PowerShell to run it with (pwsh standing in for Windows PowerShell), else the test
-        // passes without running it.
-        if std::process::Command::new("pwsh").args(["-NoProfile", "-Command", "exit 0"]).output().is_err() {
-            return;
-        }
+        // pwsh stands in for Windows PowerShell.
         let env = env();
         let mp = &env.machines["win"];
         let passes = |text: &str, timeout: u32| {
@@ -403,11 +418,11 @@ machines:
     #[test]
     fn windows_tries_a_page_at_its_quoted_address() {
         let env = kept();
-        let ps = super::super::windows(&env, "iis", &Step::Ready).expect("renders");
-        assert!(
-            ps.contains("(Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 -Uri 'http://127.0.0.1:80/it''s').StatusCode -lt 400"),
-            "{ps}"
+        assert_eq!(
+            super::super::windows(&env, "iis", &Step::Ready).as_deref(),
+            Some(
+                "$ok = { try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 -Uri 'http://127.0.0.1:80/it''s').StatusCode -lt 400 } catch { $false } }; Start-Sleep -Seconds 10; $n = 0; while (-not (& $ok)) { $n++; if ($n -ge 3) { throw 'iis: its healthcheck didn''t pass after 3 tries' }; Start-Sleep -Seconds 5 }; New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
+            )
         );
-        assert!(ps.contains("if ($n -ge 3) { throw 'iis: its healthcheck didn''t pass after 3 tries' }"), "{ps}");
     }
 }

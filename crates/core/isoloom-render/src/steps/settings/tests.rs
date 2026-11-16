@@ -29,31 +29,46 @@ fn a_machine_with_no_settings_has_no_step() {
 fn each_kind_of_setting_lands_where_logins_and_services_read_it() {
     let spec = testing::spec(SPEC);
     let sh = linux(&spec.machines["web"]).expect("settings");
-    assert!(
-        sh.starts_with("set -e\nmkdir -p /etc/systemd/system.conf.d\ngrep -v -E '^(MODE)=' /etc/environment"),
-        "{sh}"
+    let Some(run) = run_settings(&sh, false, "nameserver 10.0.2.3\n") else {
+        return;
+    };
+    assert_eq!(
+        run.etc("environment"),
+        "PATH=/usr/bin\nMODE=it's \"on\"\n",
+        "the old value replaced, the others kept"
     );
-    assert!(
-        sh.contains("printf '[Manager]\\nDefaultEnvironment=%s\\n' '\"MODE=it'\\''s \\\"on\\\"\"'"),
-        "{sh}"
+    assert_eq!(
+        run.etc("systemd/system.conf.d/90-isoloom-environment.conf"),
+        "[Manager]\nDefaultEnvironment=\"MODE=it's \\\"on\\\"\"\n"
     );
-    assert!(
-        sh.contains("printf %s 'net.core.somaxconn = 4096\n' > /etc/sysctl.d/90-isoloom.conf\nsysctl -q -p"),
-        "{sh}"
+    assert_eq!(run.etc("sysctl.d/90-isoloom.conf"), "net.core.somaxconn = 4096\n");
+    assert_eq!(
+        run.etc("security/limits.d/90-isoloom.conf"),
+        "* soft nofile 1024\n* hard nofile 4096\nroot soft nofile 1024\nroot hard nofile 4096\n"
     );
-    assert!(
-        sh.contains("'* soft nofile 1024\n* hard nofile 4096\nroot soft nofile 1024\nroot hard nofile 4096\n'"),
-        "{sh}"
+    assert_eq!(
+        run.etc("systemd/system.conf.d/90-isoloom-limits.conf"),
+        "[Manager]\nDefaultLimitNOFILE=1024:4096\n"
     );
-    assert!(sh.contains("'[Manager]\nDefaultLimitNOFILE=1024:4096\n'"), "{sh}");
-    assert!(sh.ends_with("systemctl daemon-reexec 2>/dev/null || true\n"), "{sh}");
+    assert_eq!(
+        run.calls(),
+        ["sysctl -q -p $ETC/sysctl.d/90-isoloom.conf", "systemctl daemon-reexec"],
+        "applied now"
+    );
 }
 
 #[test]
 fn only_what_is_set_is_written() {
     let spec = testing::spec(SPEC);
     let sh = linux(&spec.machines["env"]).expect("an environment");
-    assert!(sh.contains("/etc/environment") && !sh.contains("sysctl") && !sh.contains("limits"), "{sh}");
+    let Some(run) = run_settings(&sh, false, "nameserver 10.0.2.3\n") else {
+        return;
+    };
+    assert_eq!(run.etc("environment"), "PATH=/usr/bin\nMODE=old\nA=x\n");
+    assert_eq!(run.etc("sysctl.d/90-isoloom.conf"), "", "no kernel parameter");
+    assert_eq!(run.etc("security/limits.d/90-isoloom.conf"), "", "no limit");
+    assert_eq!(run.etc("systemd/system.conf.d/90-isoloom-limits.conf"), "");
+    assert_eq!(run.calls(), ["systemctl daemon-reexec"]);
 }
 
 #[test]
@@ -77,18 +92,17 @@ fn a_value_of_several_lines_keeps_every_other_variable_and_reaches_logins_and_se
         "version: 1\nname: s\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web:\n    networks: { lan: 10 }\n    os: debian@12\n    environment: { A: x, NOTE: \"line1\\nB=injected\" }\n",
     );
     let sh = linux(&spec.machines["web"]).expect("settings");
+    let Some(run) = run_settings(&sh, false, "nameserver 10.0.2.3\n") else {
+        return;
+    };
     // `/etc/environment` is a variable a line: the second line would be a variable of its own, so
-    // only the one-line value is written there.
-    assert!(sh.contains("printf %s 'A=x\n' >> /etc/environment.isoloom"), "{sh}");
-    assert!(
-        sh.contains("printf %s 'export NOTE='\\''line1\nB=injected'\\''\n' > /etc/profile.d/90-isoloom-environment.sh\n"),
-        "{sh}"
-    );
+    // only the one-line value is written there; a login shell's profile reads the other.
+    assert_eq!(run.etc("environment"), "PATH=/usr/bin\nMODE=old\nA=x\n");
+    assert_eq!(run.etc("profile.d/90-isoloom-environment.sh"), "export NOTE='line1\nB=injected'\n");
     // systemd's assignment is one line: a raw line break would end it, an unclosed quote and all.
-    let systemd = sh.lines().find(|l| l.contains("DefaultEnvironment=")).expect("the systemd assignment");
-    assert!(
-        systemd.ends_with("'\"A=x\" \"NOTE=line1\\nB=injected\"' > /etc/systemd/system.conf.d/90-isoloom-environment.conf"),
-        "{sh}"
+    assert_eq!(
+        run.etc("systemd/system.conf.d/90-isoloom-environment.conf"),
+        "[Manager]\nDefaultEnvironment=\"A=x\" \"NOTE=line1\\nB=injected\"\n"
     );
 }
 
@@ -141,31 +155,50 @@ machines:
     assert!(root.join("srv/t").is_dir() && root.join("srv/cache").is_dir());
 }
 
-/// `web`'s settings script run with `/etc` and `systemctl` stood in for: `resolved` says whether
-/// systemd-resolved is active. Returns the stand-in `/etc`.
-fn run_dns(sh: &str, resolved: bool, resolv_conf: &str) -> Option<tempfile::TempDir> {
+/// A settings script run by [`run_settings`]: its stand-in `/etc`, and the commands it ran.
+struct Ran {
+    dir: tempfile::TempDir,
+}
+
+impl Ran {
+    /// The file at `path` under the stand-in `/etc`, empty when there's none.
+    fn etc(&self, path: &str) -> String {
+        std::fs::read_to_string(self.dir.path().join("etc").join(path)).unwrap_or_default()
+    }
+
+    /// The `systemctl` and `sysctl` calls, in order, the stand-in `/etc` written `$ETC`.
+    fn calls(&self) -> Vec<String> {
+        let etc = self.dir.path().join("etc").display().to_string();
+        self.etc("../calls").lines().map(|l| l.replace(&etc, "$ETC")).collect()
+    }
+}
+
+/// A settings script run with `/etc`, `systemctl` and `sysctl` stood in for: `resolved` says
+/// whether systemd-resolved is active; `/etc/environment` holds `PATH` and an old `MODE`.
+fn run_settings(sh: &str, resolved: bool, resolv_conf: &str) -> Option<Ran> {
     let mut posix = crate::test_support::posix_sh()?;
     let dir = tempfile::tempdir().expect("a folder");
     let etc = dir.path().join("etc");
-    for sub in ["dhcp", "udhcpc", "systemd/system.conf.d"] {
+    for sub in ["dhcp", "udhcpc", "systemd/system.conf.d", "sysctl.d", "profile.d"] {
         std::fs::create_dir_all(etc.join(sub)).expect("a folder");
     }
     std::fs::write(etc.join("resolv.conf"), resolv_conf).expect("resolv.conf");
+    std::fs::write(etc.join("environment"), "PATH=/usr/bin\nMODE=old\n").expect("environment");
     std::fs::write(
         etc.join("dhcp/dhclient.conf"),
         "request subnet-mask;\nsupersede domain-name-servers 1.1.1.1; # isoloom\n",
     )
     .expect("dhclient.conf");
-    let calls = dir.path().join("systemctl");
+    let calls = dir.path().join("calls");
     let shim = format!(
-        "systemctl() {{ printf '%s\\n' \"$*\" >> {calls}; case \"$*\" in 'is-active -q systemd-resolved') {resolved} ;; is-active*) false ;; esac; }}\n",
+        "systemctl() {{ printf 'systemctl %s\\n' \"$*\" >> {calls}; case \"$*\" in 'is-active -q systemd-resolved') {resolved} ;; is-active*) false ;; esac; }}\nsysctl() {{ printf 'sysctl %s\\n' \"$*\" >> {calls}; }}\n",
         calls = calls.display(),
         resolved = if resolved { "true" } else { "false" }
     );
     let script = sh.replace("/etc/", &format!("{}/", etc.display()));
     let out = posix.arg("-c").arg(format!("{shim}{script}")).output().expect("sh runs");
     assert!(out.status.success(), "{}\n{script}", String::from_utf8_lossy(&out.stderr));
-    Some(dir)
+    Some(Ran { dir })
 }
 
 const DNS: &str = r#"
@@ -186,8 +219,10 @@ fn a_vms_resolver_is_written_where_its_resolver_manager_keeps_it() {
     let spec = testing::spec(DNS);
     let sh = linux(&spec.machines["web"]).expect("the resolver is a setting");
     // A plain resolv.conf, which no lease rewrites.
-    let Some(plain) = run_dns(&sh, false, "nameserver 10.0.2.3\n") else { return };
-    let read = |f: &str| std::fs::read_to_string(plain.path().join("etc").join(f)).unwrap_or_default();
+    let Some(plain) = run_settings(&sh, false, "nameserver 10.0.2.3\n") else {
+        return;
+    };
+    let read = |f: &str| plain.etc(f);
     assert_eq!(
         read("resolv.conf"),
         "nameserver 10.9.0.53\nnameserver 10.9.0.54\nsearch lab.test corp.test\noptions ndots:2\n"
@@ -198,31 +233,26 @@ fn a_vms_resolver_is_written_where_its_resolver_manager_keeps_it() {
     );
     assert_eq!(read("udhcpc/udhcpc.conf"), "RESOLV_CONF=\"no\"\n");
     // systemd-resolved's own configuration, and its stub's resolv.conf for the options.
-    let Some(stub) = run_dns(&sh, true, "nameserver 127.0.0.53\n") else { return };
-    let in_stub = |f: &str| std::fs::read_to_string(stub.path().join("etc").join(f)).unwrap_or_default();
+    let Some(stub) = run_settings(&sh, true, "nameserver 127.0.0.53\n") else {
+        return;
+    };
+    let in_stub = |f: &str| stub.etc(f);
     assert_eq!(
         in_stub("systemd/resolved.conf.d/90-isoloom.conf"),
         "[Resolve]\nDNS=10.9.0.53 10.9.0.54\nDomains=lab.test corp.test ~.\n"
     );
     assert_eq!(in_stub("resolv.conf"), "nameserver 127.0.0.53\nsearch lab.test corp.test\noptions ndots:2\n");
-    assert!(
-        std::fs::read_to_string(stub.path().join("systemctl"))
-            .unwrap_or_default()
-            .contains("restart systemd-resolved")
-    );
+    assert!(stub.calls().iter().any(|c| c == "systemctl restart systemd-resolved"), "{:?}", stub.calls());
 }
 
 #[test]
 fn a_resolver_with_no_servers_keeps_the_ones_the_machine_has() {
     let spec = testing::spec(DNS);
     let sh = linux(&spec.machines["plain"]).expect("the resolver is a setting");
-    let Some(dir) = run_dns(&sh, false, "nameserver 10.0.2.3\nsearch old.test\n") else {
+    let Some(run) = run_settings(&sh, false, "nameserver 10.0.2.3\nsearch old.test\n") else {
         return;
     };
-    assert_eq!(
-        std::fs::read_to_string(dir.path().join("etc/resolv.conf")).unwrap_or_default(),
-        "nameserver 10.0.2.3\nsearch corp.test\n"
-    );
+    assert_eq!(run.etc("resolv.conf"), "nameserver 10.0.2.3\nsearch corp.test\n");
 }
 
 #[test]
@@ -233,4 +263,18 @@ fn windows_asks_its_servers_on_every_interface_with_its_suffixes() {
         ps,
         "Get-NetAdapter | Where-Object Status -eq 'Up' | Set-DnsClientServerAddress -ServerAddresses @('10.9.0.53'); Set-DnsClientGlobalSetting -SuffixSearchList @('lab.test', 'corp.test')"
     );
+}
+
+#[test]
+fn a_resolver_of_options_alone_asks_systemd_resolved_nothing_and_gives_its_stub_the_options() {
+    let spec = testing::spec(
+        "version: 1\nname: s\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12, dns: { options: [\"ndots:2\"] } }\n",
+    );
+    let sh = linux(&spec.machines["web"]).expect("the resolver is a setting");
+    let Some(run) = run_settings(&sh, true, "nameserver 127.0.0.53\nsearch lan\n") else {
+        return;
+    };
+    assert_eq!(run.etc("systemd/resolved.conf.d/90-isoloom.conf"), "[Resolve]\n");
+    // The stub's resolv.conf is written whole: the options, and no search line of its own.
+    assert_eq!(run.etc("resolv.conf"), "nameserver 127.0.0.53\noptions ndots:2\n");
 }

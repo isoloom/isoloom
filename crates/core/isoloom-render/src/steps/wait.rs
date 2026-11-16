@@ -49,14 +49,11 @@ mod tests {
             sh,
             "i=0; until (bash -c '</dev/tcp/db/5432' 2>/dev/null || nc -z -w 2 db 5432 2>/dev/null) && (bash -c '</dev/tcp/db/6379' 2>/dev/null || nc -z -w 2 db 6379 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"db didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"db answers\"\n"
         );
-        let ps = super::windows("db", &[5432, 6379]).expect("ports to wait on");
-        assert!(
-            ps.starts_with("$t = (Get-Date).AddSeconds(900); foreach ($p in @(5432, 6379)) { while (-not (Test-NetConnection 'db' -Port $p"),
-            "{ps}"
-        );
-        assert!(
-            ps.ends_with("throw ('db didn''t answer on port ' + $p) }; Start-Sleep 5 } }; 'db answers'"),
-            "{ps}"
+        assert_eq!(
+            super::windows("db", &[5432, 6379]).as_deref(),
+            Some(
+                "$t = (Get-Date).AddSeconds(900); foreach ($p in @(5432, 6379)) { while (-not (Test-NetConnection 'db' -Port $p -WarningAction SilentlyContinue).TcpTestSucceeded) { if ((Get-Date) -gt $t) { throw ('db didn''t answer on port ' + $p) }; Start-Sleep 5 } }; 'db answers'"
+            )
         );
         assert_eq!(super::windows("db", &[]), None);
     }

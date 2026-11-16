@@ -98,22 +98,18 @@ mod tests {
             mode: Some("0644 /etc/shadow; rm -rf /".into()),
             ..file("/b.conf", None, Some("x"))
         };
-        let sh = super::linux(&[crafted]);
-        assert!(sh.contains("chmod '0644 /etc/shadow; rm -rf /' '/b.conf'"), "{sh}");
-        assert!(!sh.contains("chmod 0644 "), "the mode reached the shell unquoted: {sh}");
+        assert_eq!(
+            super::linux(&[crafted]),
+            "set -e\nprintf '%s' 'x' > '/b.conf' && chown 0:0 '/b.conf' && chmod '0644 /etc/shadow; rm -rf /' '/b.conf'\n"
+        );
     }
 
     #[test]
     fn windows_creates_the_folder_then_copies_or_writes() {
         let ps = super::windows(&[file("C:\\app\\a.ini", None, Some("x'y")), file("C:\\app\\b.ini", Some("conf/b.ini"), None)]);
-        assert!(ps.contains("[IO.File]::WriteAllText('C:\\app\\a.ini', 'x''y')"), "{ps}");
-        assert!(
-            ps.contains("Copy-Item -Force -Path 'C:\\isoloom\\conf\\b.ini' -Destination 'C:\\app\\b.ini'"),
-            "{ps}"
-        );
-        assert!(
-            ps.starts_with("New-Item -ItemType Directory -Force -Path (Split-Path -Parent 'C:\\app\\a.ini')"),
-            "{ps}"
+        assert_eq!(
+            ps,
+            "New-Item -ItemType Directory -Force -Path (Split-Path -Parent 'C:\\app\\a.ini') | Out-Null; [IO.File]::WriteAllText('C:\\app\\a.ini', 'x''y')\nNew-Item -ItemType Directory -Force -Path (Split-Path -Parent 'C:\\app\\b.ini') | Out-Null; Copy-Item -Force -Path 'C:\\isoloom\\conf\\b.ini' -Destination 'C:\\app\\b.ini'"
         );
     }
 }
