@@ -17,7 +17,6 @@
 //!
 //! The Ruby doing the work is `IsoloomHyperV` ([`HYPERV_RB`]), in every Vagrantfile's preamble.
 
-use std::fmt::Write as _;
 use std::net::Ipv4Addr;
 
 use crate::boxes::{self, HyperVBox};
@@ -290,11 +289,10 @@ pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
 fn networkd_addresses(nics: &[Nic], macs: &[String]) -> String {
     let mut files = String::new();
     for (i, (n, m)) in nics.iter().zip(macs).enumerate() {
-        let _ = writeln!(
-            files,
-            "  printf '[Match]\\nMACAddress={m}\\n\\n[Network]\\nAddress={}/{}\\nDHCP=no\\nLinkLocalAddressing=no\\nIPv6AcceptRA=no\\n' > /etc/systemd/network/05-isoloom-env-net-{i}.network",
+        files.push_str(&format!(
+            "  printf '[Match]\\nMACAddress={m}\\n\\n[Network]\\nAddress={}/{}\\nDHCP=no\\nLinkLocalAddressing=no\\nIPv6AcceptRA=no\\n' > /etc/systemd/network/05-isoloom-env-net-{i}.network\n",
             n.ip, n.len
-        );
+        ));
     }
     format!(
         "# systemd-networkd would drop the addresses on its next restart.\nif [ -d /etc/systemd/network ]; then\n{files}  networkctl reload 2>/dev/null || true\nfi\n"
