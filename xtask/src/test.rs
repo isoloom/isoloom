@@ -113,7 +113,7 @@ fn finish(temp: &Path) {
 
 #[cfg(test)]
 mod tests {
-    use super::{SHOWN, leftovers, report};
+    use super::{KEEP, SHOWN, leftovers, report};
 
     #[test]
     fn an_empty_folder_has_no_leftovers_and_each_file_or_folder_is_one_by_name() {
@@ -127,19 +127,26 @@ mod tests {
     #[test]
     fn a_missing_folder_is_an_error_not_a_clean_run() {
         let dir = tempfile::Builder::new().prefix("isoloom-xtask-leftovers-").tempdir().unwrap();
-        assert!(leftovers(&dir.path().join("gone")).is_err());
+        let gone = leftovers(&dir.path().join("gone")).map_err(|e| e.kind());
+        assert_eq!(gone, Err(std::io::ErrorKind::NotFound));
     }
 
     #[test]
     fn the_report_names_the_first_leftovers_and_counts_the_rest() {
         let left: Vec<String> = (0..SHOWN + 3).map(|i| format!("isoloom-spec-{i:02}")).collect();
         let text = report(&left);
-        assert!(text.starts_with(&format!("the tests left {} file(s)", SHOWN + 3)), "{text}");
-        assert!(
-            text.contains("\n  isoloom-spec-00\n") && text.contains(&format!("\n  isoloom-spec-{:02}", SHOWN - 1)),
-            "{text}"
+        let (head, names) = text.split_once('\n').unwrap_or_default();
+        assert_eq!(
+            head,
+            format!(
+                "the tests left {} file(s) or folder(s) in their temporary folder: a test's scratch folder must be a tempfile::TempDir (rerun with {KEEP}=1 to keep them)",
+                SHOWN + 3
+            )
         );
-        assert!(!text.contains(&format!("isoloom-spec-{SHOWN:02}")), "{text}");
-        assert!(text.ends_with("\n  and 3 more"), "{text}");
+        let shown: Vec<String> = (0..SHOWN)
+            .map(|i| format!("  isoloom-spec-{i:02}"))
+            .chain(["  and 3 more".to_owned()])
+            .collect();
+        assert_eq!(names.lines().collect::<Vec<_>>(), shown);
     }
 }

@@ -2029,6 +2029,7 @@ dependencies = [
  "isoloom-render",
  "isoloom-spec",
  "isoloom-targets",
+ "isoloom-test-support",
  "serde_json",
  "serde_yaml_ng",
  "sha1",

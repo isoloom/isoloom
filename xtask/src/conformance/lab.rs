@@ -216,6 +216,8 @@ pub(super) fn container_files(family: Family) -> Res<Vec<GeneratedFile>> {
 
 #[cfg(test)]
 mod tests {
+    use isoloom_test_support::{assert_every, yaml, yaml_values};
+
     use super::*;
 
     #[test]
@@ -232,17 +234,38 @@ mod tests {
             assert!(files.iter().any(|f| f.path.ends_with("rendered/files/app.conf")), "{}", family.id);
             let doc = cloud_config(family).unwrap();
             assert!(doc.starts_with("#cloud-config\n"), "{}", family.id);
-            assert!(doc.contains("encoding: gz+b64"), "{}", family.id);
-            assert!(doc.contains("  - [sh, /var/lib/isoloom/configure/configure-0.sh]"), "{}: {doc}", family.id);
+            let config = yaml(&doc);
+            assert_every!(yaml_values(&config["write_files"], "encoding"), |e: &String| e == "gz+b64");
+            let runs: Vec<Vec<String>> = config["runcmd"]
+                .as_sequence()
+                .into_iter()
+                .flatten()
+                .map(|c| c.as_sequence().into_iter().flatten().filter_map(|w| w.as_str().map(str::to_owned)).collect())
+                .collect();
+            assert!(
+                runs.contains(&vec!["sh".to_owned(), "/var/lib/isoloom/configure/configure-0.sh".to_owned()]),
+                "{}: {runs:?}",
+                family.id
+            );
             let ansible = ansible_files(family).unwrap();
             let tasks = ansible
                 .iter()
                 .find(|f| f.path == "roles/isoloom_machine_m/tasks/main.yml")
-                .map(|f| f.contents.as_str())
+                .map(|f| yaml(&f.contents))
                 .unwrap_or_default();
-            assert!(tasks.contains("ansible.posix.firewalld:"), "{}: {tasks}", family.id);
+            let modules: Vec<String> = tasks
+                .as_sequence()
+                .into_iter()
+                .flatten()
+                .flat_map(|t| t.as_mapping().into_iter().flat_map(|m| m.keys().filter_map(|k| k.as_str().map(str::to_owned))))
+                .collect();
+            assert!(modules.iter().any(|m| m == "ansible.posix.firewalld"), "{}: {modules:?}", family.id);
+            assert!(
+                !modules.iter().any(|m| m.starts_with("community.")),
+                "{}: no community modules: {modules:?}",
+                family.id
+            );
             assert!(ansible.iter().any(|f| f.path == "site.yml"), "{}", family.id);
-            assert!(!tasks.contains("community"), "{}: no community modules: {tasks}", family.id);
         }
     }
 }

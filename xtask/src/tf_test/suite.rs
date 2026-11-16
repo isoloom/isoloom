@@ -136,15 +136,25 @@ mod tests {
     fn a_module_line_names_another_folder_of_the_example() {
         let s = parse(&rel("proxmox/segmented.tftest.hcl"), "# module: terraform").unwrap();
         assert_eq!(s.module, "segmented/terraform");
-        for outside in ["# module: ../x", "# module: a//b", "# module:"] {
-            assert!(parse(&rel("proxmox/segmented.tftest.hcl"), outside).is_err(), "{outside}");
+        for (outside, folder) in [("# module: ../x", "../x"), ("# module: a//b", "a//b"), ("# module:", "")] {
+            let refused = parse(&rel("proxmox/segmented.tftest.hcl"), outside).err();
+            assert_eq!(
+                refused,
+                Some(format!("`# module: {folder}` must name a folder inside the example")),
+                "{outside}"
+            );
         }
     }
 
     #[test]
     fn a_file_outside_the_layout_is_refused() {
-        assert!(parse(&rel("segmented.tftest.hcl"), "").is_err(), "no target");
-        assert!(parse(&rel("a/b/c/segmented.tftest.hcl"), "").is_err(), "too deep");
-        assert!(parse(&rel("proxmox/notes.txt"), "").is_err(), "not a test file");
+        let layout = format!("expected {DIR}/<target>[/<cloud>]/<example>.tftest.hcl");
+        for (path, why, said) in [
+            ("segmented.tftest.hcl", "no target", layout.as_str()),
+            ("a/b/c/segmented.tftest.hcl", "too deep", layout.as_str()),
+            ("proxmox/notes.txt", "not a test file", "not a .tftest.hcl file"),
+        ] {
+            assert_eq!(parse(&rel(path), "").err().as_deref(), Some(said), "{path}: {why}");
+        }
     }
 }

@@ -143,19 +143,80 @@ fn container(image: &str, input: &Path, cpus: u16) -> Res<String> {
     Ok(String::from_utf8_lossy(&done.stdout).into_owned())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
+    /// `run.sh` with its folders (`/work`, `/out`, `/cache`, `/tmp`) under `at`.
+    fn script_under(at: &std::path::Path) -> String {
+        let marked = SCRIPT
+            .replace("/tmp/", "\u{1}tmp/")
+            .replace("/cache", "\u{1}cache")
+            .replace("/out", "\u{1}out")
+            .replace("/work", "\u{1}work");
+        marked.replace('\u{1}', &format!("{}/", at.display()))
+    }
+
+    /// The script against a stand-in `terraform` (each call logged with its module's folder): a
+    /// module whose init fails offline and online, one whose provider starts too slowly once, one
+    /// that isn't there. Every module is reported in the list's order, whatever order the jobs
+    /// ended in, with its status and what Terraform said.
     #[test]
     fn the_script_reports_every_module_in_the_list_s_order() {
-        assert!(SCRIPT.contains("@@module") && SCRIPT.contains("@@status") && SCRIPT.contains("@@log"));
-        assert!(SCRIPT.contains("terraform test -json"), "the report reads Terraform's JSON");
-        assert!(SCRIPT.contains("-backend=false"), "no state backend is ever configured");
-        assert!(SCRIPT.contains("timeout while waiting for plugin to start"), "a slow provider start is retried");
-        assert!(
-            SCRIPT.contains("for pass in init_one test_one"),
-            "no test runs while an init writes in the tree"
+        let bin = isoloom_test_support::FakeBin::named("tf-test").unwrap();
+        let at = bin.dir().join("root");
+        let log = bin.log();
+        bin.stand_in(
+            "terraform",
+            &format!(
+                r#"here=$(basename "$PWD")
+echo "terraform $* @$here" >> '{log}'
+case "$1" in
+  init) [ "$here" != broken ] || {{ echo "Error: no provider"; exit 1; }} ;;
+  test)
+    if [ "$here" = slow ] && [ ! -f retried ]; then : > retried; echo '{{"note":"timeout while waiting for plugin to start"}}'; exit 1; fi
+    echo "{{\"ran\":\"$here\"}}" ;;
+esac"#,
+                log = log.display()
+            ),
+        )
+        .unwrap()
+        // `flock` holds the cache's lock around the online init: here, it only runs the command.
+        .stand_in("flock", "shift; exec \"$@\"")
+        .unwrap()
+        .link_real(&["bash", "awk", "xargs", "cat", "sed", "grep", "mkdir", "env", "basename"])
+        .unwrap();
+        for module in ["a/.isoloom/proxmox", "broken", "slow"] {
+            std::fs::create_dir_all(at.join("work/tree").join(module)).unwrap();
+        }
+        std::fs::write(at.join("work/modules"), "a/.isoloom/proxmox\nbroken\nslow\nmissing\n").unwrap();
+        std::fs::create_dir_all(at.join("tmp")).unwrap();
+        std::fs::write(at.join("run.sh"), script_under(&at)).unwrap();
+        let out = bin.run(&format!("bash '{}'", at.join("run.sh").display()), &[]).unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "@@module a/.isoloom/proxmox\n@@status 0\n{\"ran\":\"proxmox\"}\n\
+             @@module broken\n@@status init-failed\n@@log Error: no provider\n\
+             @@module slow\n@@status 0\n{\"ran\":\"slow\"}\n\
+             @@module missing\n@@status missing\n@@log no such module\n"
         );
+        let calls = bin.calls().unwrap();
+        let of = |verb: &str, here: &str| {
+            calls
+                .iter()
+                .filter(|c| c.get(1).map(String::as_str) == Some(verb) && c.last().map(String::as_str) == Some(here))
+                .count()
+        };
+        // No state backend is ever configured; a failed init is tried once more online; a slow
+        // provider start is retried; a module whose init failed is never tested.
+        isoloom_test_support::assert_every!(calls.iter().filter(|c| c.get(1).map(String::as_str) == Some("init")), |c: &&Vec<String>| c
+            .iter()
+            .any(|w| w == "-backend=false"));
+        assert_eq!((of("init", "@broken"), of("test", "@broken")), (2, 0), "{calls:?}");
+        assert_eq!((of("test", "@slow"), of("test", "@proxmox")), (2, 1), "{calls:?}");
+        isoloom_test_support::assert_every!(calls.iter().filter(|c| c.get(1).map(String::as_str) == Some("test")), |c: &&Vec<String>| c
+            .iter()
+            .any(|w| w == "-json"));
     }
 }

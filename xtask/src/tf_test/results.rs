@@ -176,7 +176,9 @@ mod tests {
         assert_eq!((aws.module.as_str(), aws.status.as_str()), ("segmented/.isoloom/cloud-vm/aws", "1"));
         let names: Vec<(&str, &str)> = aws.runs.iter().map(|r| (r.name.as_str(), r.status.as_str())).collect();
         assert_eq!(names, [("routing", "fail"), ("firewall", "pass")]);
-        assert_eq!(aws.planned.len(), 3, "outputs never finished: {:?}", aws.planned);
+        let file = "tests/segmented.tftest.hcl".to_owned();
+        let planned = ["routing", "firewall", "outputs"].map(|n| (file.clone(), n.to_owned()));
+        assert_eq!(aws.planned, planned, "outputs is planned though it never finished");
         let d = &aws.runs[0].diagnostics[0];
         assert_eq!((d.detail.as_str(), d.line), ("back has no internet route", Some(16)));
         assert_eq!(d.values, [("aws_subnet.back.cidr_block".to_owned(), "is \"10.61.20.0/24\"".to_owned())]);
@@ -195,7 +197,7 @@ mod tests {
     fn an_error_no_run_owns_is_the_module_s() {
         let out = "@@module m\n{\"type\":\"diagnostic\",\"diagnostic\":{\"severity\":\"error\",\"summary\":\"unknown provider\"}}\n{\"type\":\"diagnostic\",\"diagnostic\":{\"severity\":\"warning\",\"summary\":\"deprecated\"}}\n";
         let ms = parse(out);
-        assert_eq!(ms[0].errors.len(), 1, "warnings are left out");
-        assert_eq!(ms[0].errors[0].summary, "unknown provider");
+        let summaries: Vec<&str> = ms[0].errors.iter().map(|e| e.summary.as_str()).collect();
+        assert_eq!(summaries, ["unknown provider"], "warnings are left out");
     }
 }

@@ -259,7 +259,15 @@ mod tests {
         let o = read(&failed);
         assert!(!o.passed());
         assert!(o.kinds.contains(&("user", Some("no such user".to_owned()))), "{o:?}");
-        assert!(table(&[("debian-12", Renderer::Shell, o)]).contains("debian-12 shell user: no such user"));
+        let printed = table(&[("debian-12", Renderer::Shell, o)]);
+        let rows: Vec<&str> = printed.lines().collect();
+        let cells: Vec<&str> = ["debian-12", "shell"]
+            .into_iter()
+            .chain(lab::KINDS.iter().map(|k| if *k == "user" { "FAIL" } else { "ok" }))
+            .chain(["ok"])
+            .collect();
+        assert_eq!(rows.get(1).map(|row| row.split_whitespace().collect::<Vec<_>>()), Some(cells), "{printed}");
+        assert_eq!(rows.get(2..), Some(&["  debian-12 shell user: no such user"][..]), "{printed}");
     }
 
     #[test]
