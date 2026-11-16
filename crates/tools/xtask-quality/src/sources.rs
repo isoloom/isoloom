@@ -179,7 +179,8 @@ mod tests {
 
     #[test]
     fn a_folder_that_cant_be_read_is_an_error_not_an_empty_crate() {
-        let missing = std::env::temp_dir().join(format!("xtask-quality-none-{}", std::process::id()));
-        assert!(rust_files(&missing).is_err());
+        let root = tempfile::tempdir().unwrap();
+        let missing = rust_files(&root.path().join("none")).map_err(|e| e.kind());
+        assert_eq!(missing, Err(std::io::ErrorKind::NotFound));
     }
 }

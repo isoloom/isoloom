@@ -201,26 +201,101 @@ mod tests {
         Ok(tempfile::Builder::new().prefix(&format!("xtask-quality-{name}-")).tempdir()?)
     }
 
+    /// Counts of `clippy/x` in crate `a`, `n` of them.
+    fn of(n: u64) -> Counts {
+        let mut counts = Counts::new();
+        for _ in 0..n {
+            add(&mut counts, "clippy/x", "a");
+        }
+        counts
+    }
+
     #[test]
     fn a_missing_baseline_fails_unless_init_writes_it() -> Res<()> {
         let dir = folder("missing")?;
-        let dir = dir.path();
-        let file = dir.join("baseline.json");
-        let mut counts = Counts::new();
-        add(&mut counts, "clippy/x", "a");
-        let refused = against_baseline(&args(false, false), &file, &counts, &CONFIG)?;
-        assert!(
-            !refused.success && refused.output.contains("--init` writes the first one"),
-            "{}",
-            refused.output
+        let file = dir.path().join("baseline.json");
+        let refused = against_baseline(&args(false, false), &file, &of(1), &CONFIG)?;
+        assert!(!refused.success);
+        assert_eq!(
+            refused.output,
+            format!(
+                "quality: no baseline at {}; `cargo xtask quality --init` writes the first one\n",
+                file.display()
+            )
         );
         assert!(!file.exists(), "nothing is written without --init");
-        let first = against_baseline(&args(true, false), &file, &counts, &CONFIG)?;
-        assert!(first.success && file.exists(), "{}", first.output);
-        // Once there, --init doesn't rewrite it; the counts are checked against it.
-        add(&mut counts, "clippy/x", "a");
-        assert!(!against_baseline(&args(true, false), &file, &counts, &CONFIG)?.success);
-        assert!(!against_baseline(&args(false, false), &file, &counts, &CONFIG)?.success, "a count went up");
+        let first = against_baseline(&args(true, false), &file, &of(1), &CONFIG)?;
+        assert!(first.success);
+        assert_eq!(first.output, format!("{}quality: {} written\n", baseline::table(&of(1)), file.display()));
+        assert_eq!(baseline::read(&file)?, Some(of(1)));
+        // Once there, --init doesn't rewrite it.
+        let again = against_baseline(&args(true, false), &file, &of(2), &CONFIG)?;
+        assert!(!again.success);
+        assert_eq!(
+            again.output,
+            format!("quality: {} is there already; `--update` lowers its counts\n", file.display())
+        );
+        assert_eq!(baseline::read(&file)?, Some(of(1)));
         Ok(())
+    }
+
+    #[test]
+    fn a_count_that_went_up_fails_even_with_update_and_nothing_is_written() -> Res<()> {
+        let dir = folder("up")?;
+        let file = dir.path().join("baseline.json");
+        baseline::write(&file, &of(1))?;
+        for update in [false, true] {
+            let up = against_baseline(&args(false, update), &file, &of(2), &CONFIG)?;
+            assert!(!up.success, "update: {update}");
+            assert!(
+                up.output
+                    .ends_with("up    clippy/x in a: 1 -> 2\nquality: 1 count(s) went up; bring them back down (see above)\n"),
+                "{}",
+                up.output
+            );
+        }
+        assert_eq!(baseline::read(&file)?, Some(of(1)), "never raised");
+        Ok(())
+    }
+
+    #[test]
+    fn a_count_that_went_down_passes_and_only_update_writes_it() -> Res<()> {
+        let dir = folder("down")?;
+        let file = dir.path().join("baseline.json");
+        baseline::write(&file, &of(2))?;
+        let down = against_baseline(&args(false, false), &file, &of(1), &CONFIG)?;
+        assert!(down.success);
+        assert_eq!(
+            down.output,
+            "down  clippy/x in a: 2 -> 1\nquality: 1 count(s) went down: `cargo xtask quality --update` writes them\n"
+        );
+        assert_eq!(baseline::read(&file)?, Some(of(2)), "not without --update");
+        let written = against_baseline(&args(false, true), &file, &of(1), &CONFIG)?;
+        assert!(written.success);
+        assert!(
+            written.output.ends_with(&format!("quality: {} written\n", file.display())),
+            "{}",
+            written.output
+        );
+        assert_eq!(baseline::read(&file)?, Some(of(1)));
+        let same = against_baseline(&args(false, false), &file, &of(1), &CONFIG)?;
+        assert_eq!((same.success, same.output.as_str()), (true, ""), "nothing changed, nothing said");
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_belongs_to_the_crate_with_the_longest_folder_holding_it() {
+        let crates = [("outer", "crates/a"), ("inner", "crates/a/inner"), ("ab", "crates/ab")].map(|(name, dir)| Crate {
+            name: name.into(),
+            dir: dir.into(),
+        });
+        for (file, krate) in [
+            ("crates/a/src/lib.rs", "outer"),
+            ("crates/a/inner/src/lib.rs", "inner"),
+            ("crates/ab/src/lib.rs", "ab"),
+            ("xtask/src/main.rs", "workspace"),
+        ] {
+            assert_eq!(crate_of(&crates, file), krate, "{file}");
+        }
     }
 }

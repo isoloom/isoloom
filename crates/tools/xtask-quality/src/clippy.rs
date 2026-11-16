@@ -98,9 +98,35 @@ mod tests {
         let error =
             r#"{"reason":"compiler-message","message":{"level":"error","code":{"code":"E0308"},"rendered":"error[E0308]: mismatched types","spans":[]}}"#;
         let (findings, errors) = read(&format!("{warning}\n{warning}\n{error}\nnot json\n"));
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings.first().map(|f| f.rule.as_str()), Some("clippy/indexing_slicing"));
+        let found = Finding {
+            rule: "clippy/indexing_slicing".into(),
+            file: "crates/core/a/src/lib.rs".into(),
+            line: 3,
+            column: 5,
+        };
+        assert_eq!(findings.into_iter().collect::<Vec<_>>(), [found]);
         assert_eq!(errors, ["error[E0308]: mismatched types"]);
         assert_eq!(rule_name("dead_code"), "rustc/dead_code");
+    }
+
+    #[test]
+    fn a_warning_in_a_macro_from_elsewhere_counts_where_the_workspace_called_it() {
+        let outside = if cfg!(windows) {
+            r"C:\rustc\library\core\src\macros\mod.rs"
+        } else {
+            "/rustc/library/core/src/macros/mod.rs"
+        };
+        let expanded = serde_json::json!({ "message": { "level": "warning", "code": { "code": "unused_must_use" }, "spans": [{
+            "file_name": outside, "line_start": 9, "column_start": 1, "is_primary": true,
+            "expansion": { "span": { "file_name": r"crates\b\src\x.rs", "line_start": 12, "column_start": 4 } }
+        }] } });
+        let (findings, _) = read(&expanded.to_string());
+        let found = Finding {
+            rule: "rustc/unused_must_use".into(),
+            file: "crates/b/src/x.rs".into(),
+            line: 12,
+            column: 4,
+        };
+        assert_eq!(findings.into_iter().collect::<Vec<_>>(), [found]);
     }
 }
