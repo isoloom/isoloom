@@ -80,11 +80,7 @@ mod tests {
     fn every_feature_has_its_own_kebab_case_name_and_is_listed_in_order() {
         let names: BTreeSet<&str> = Feature::ALL.iter().map(|f| f.id()).collect();
         assert_eq!(names.len(), Feature::ALL.len());
-        assert!(
-            names
-                .iter()
-                .all(|n| n.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'))
-        );
+        isoloom_test_support::assert_every!(&names, |n: &&&str| n.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'));
         assert!(Feature::ALL.is_sorted(), "in the order the enum declares them");
     }
 }

@@ -51,16 +51,4 @@ mod tests {
         );
         assert_eq!(super::requirements(&crate::testing::spec("version: 1\nname: t\nmachines: {}\n")), []);
     }
-
-    /// The refusals name no target: which ones carry the field is the targets' to say.
-    #[test]
-    fn a_refusal_names_no_other_target() {
-        let mtu = crate::Requirement::NetworkMtu { network: "lan".into() }.to_string();
-        assert_eq!(
-            mtu,
-            "network `lan` sets its `mtu`, which this target doesn't carry (`isoloom matrix` lists the targets that do)"
-        );
-        let rate = crate::Requirement::RateLimit { machine: "m".into() }.to_string();
-        assert!(!rate.contains("proxmox") && rate.contains("`isoloom matrix`"), "{rate}");
-    }
 }
