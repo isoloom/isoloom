@@ -252,4 +252,60 @@ mod tests {
         let text = "ARG V=2.462.3-lts-jdk17\nFROM jenkins/jenkins:${V} AS j\nFROM php:8.2-apache\nFROM jenkins/jenkins:lts-jdk21\nFROM j\nFROM scratch\n";
         assert_eq!(wanted(text, &Sources::default()), ["jenkins/jenkins:2.462.3-lts-jdk17"]);
     }
+
+    #[test]
+    fn the_vendored_index_reads_each_dockerfile_from_its_context_and_names_where_it_came_from() {
+        let vendored = |directory: &str, context: &str| Vendored {
+            origin: Origin {
+                repo: "https://github.com/jenkinsci/docker".into(),
+                commit: "1a2b3c".into(),
+                directory: directory.into(),
+                file: "Dockerfile".into(),
+                args: vec![("JAVA_RELEASE".into(), "17".into())],
+            },
+            context: context.into(),
+        };
+        let index = Index::from([
+            (
+                "docker.io/library/jenkins/jenkins:2.462.3".to_owned(),
+                vendored("debian", "vendor/bases/jenkins/"),
+            ),
+            ("tomcat:8.5".to_owned(), vendored(".", "vendor/bases/tomcat")),
+            ("gone:1".to_owned(), vendored("", "vendor/bases/gone")),
+        ]);
+        let mut read = Vec::new();
+        let sources = Sources::of(&index, |path| {
+            read.push(path.to_owned());
+            (!path.contains("gone")).then(|| format!("FROM debian:12 # {path}"))
+        });
+        assert_eq!(
+            read,
+            [
+                "vendor/bases/jenkins/Dockerfile",
+                "vendor/bases/gone/Dockerfile",
+                "vendor/bases/tomcat/Dockerfile"
+            ]
+        );
+        let jenkins = sources.get("jenkins/jenkins:2.462.3").expect("vendored");
+        assert_eq!(
+            (
+                jenkins.dockerfile.as_str(),
+                jenkins.context.as_str(),
+                jenkins.origin.as_str(),
+                jenkins.args.len()
+            ),
+            (
+                "FROM debian:12 # vendor/bases/jenkins/Dockerfile",
+                "vendor/bases/jenkins/",
+                "https://github.com/jenkinsci/docker@1a2b3c debian/Dockerfile",
+                1
+            )
+        );
+        assert_eq!(
+            sources.get("tomcat:8.5").map(|f| f.origin.as_str()),
+            Some("https://github.com/jenkinsci/docker@1a2b3c Dockerfile"),
+            "a context at the repository's root"
+        );
+        assert_eq!(sources.get("gone:1"), None, "a Dockerfile that can't be read is left out");
+    }
 }

@@ -550,6 +550,24 @@ mod tests {
     }
 
     #[test]
+    fn a_service_machine_of_a_lab_whose_catalogue_doesnt_load_is_refused_at_its_service() {
+        let mut lab = testing::lab(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { os: debian@12, service: postgres, networks: { lan: 10 } }\n  web: { os: debian@12, networks: { lan: 11 } }\n",
+        );
+        lab.loaded.broken = Some("catalogue/postgres.yml: not YAML".to_owned());
+        let refused: Vec<String> = lab
+            .problems()
+            .iter()
+            .filter(|p| p.code == Code::Refused)
+            .map(|p| format!("{}: {}", p.path, p.reason))
+            .collect();
+        assert_eq!(
+            refused,
+            ["machines.db.service: this Isoloom's catalogue doesn't load: catalogue/postgres.yml: not YAML"]
+        );
+    }
+
+    #[test]
     fn two_labs_of_one_spec_are_equal_whatever_each_has_worked_out() {
         let (a, b) = (testing::lab(LAB), testing::lab(LAB));
         assert_eq!(a.problems(), []);

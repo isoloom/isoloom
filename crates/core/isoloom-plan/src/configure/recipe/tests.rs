@@ -119,3 +119,20 @@ fn what_windows_cant_carry_is_refused_at_its_field() {
         ]
     );
 }
+
+#[test]
+fn a_windows_account_group_or_defined_service_is_refused_what_windows_lacks() {
+    let found = resolved(
+        "{ os: windows-server@2022, app: { steps: [{ user: { name: a, home: 'C:\\a' } }, { group: { name: g, gid: 10 } }, { service: { name: api, run: ['C:\\api.exe'], user: a } }] } }",
+    )
+    .unwrap_err();
+    let at: Vec<String> = found.iter().map(|u| format!("{} {:?}: {}", u.step, u.field, u.reason)).collect();
+    assert_eq!(
+        at,
+        [
+            "0 Some(\"home\"): a Windows account has no `home`",
+            "1 Some(\"gid\"): a Windows group has no `gid`",
+            "2 Some(\"user\"): a Windows service Isoloom defines runs as SYSTEM"
+        ]
+    );
+}
