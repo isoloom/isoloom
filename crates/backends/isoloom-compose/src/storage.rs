@@ -180,8 +180,37 @@ machines:
     #[test]
     fn a_kept_volume_is_labelled_for_down_to_keep() {
         let volumes = super::declared(&environment(SPEC));
-        assert_eq!(volumes.len(), 1);
-        assert!(volumes.values().all(|v| v.labels.get(PERSISTENT_LABEL).is_some_and(|l| l == "true")));
+        assert_eq!(volumes.keys().collect::<Vec<_>>(), ["data"]);
+        isoloom_test_support::assert_every!(volumes.values(), |v: &&crate::file::Volume| v
+            .labels
+            .get(PERSISTENT_LABEL)
+            .is_some_and(|l| l == "true"));
+    }
+
+    /// A machine taking a folder of a shared volume mounts that folder, which a one-shot job
+    /// makes first (Docker mounts only a folder that exists), once the volume's owner started.
+    #[test]
+    fn a_folder_of_a_shared_volume_is_made_before_the_machine_taking_it_starts() {
+        let env = environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nvolumes: { site: { owner: web } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx }, volumes: { site: /srv } }\n  docs: { networks: { lan: 11 }, app: { image: nginx }, volumes: { site: { path: /usr/share/nginx/html, subpath: 'docs site' } } }\n",
+        );
+        let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).expect("renders").file;
+        let job = &file.services[super::FOLDERS_JOB];
+        assert_eq!(job.entrypoint, ["sh", "-c", "mkdir -p '/volumes/site/docs site'"]);
+        assert_eq!(serde_yaml_ng::to_string(&job.volumes).expect("serializes"), "- site:/volumes/site\n");
+        assert_eq!(job.network_mode, Some(crate::file::NetworkMode::None));
+        assert!(job.runs_once(), "a one-shot job");
+        let after = |s: &crate::file::Service| s.depends_on.iter().map(|(n, d)| (n.clone(), d.condition)).collect::<Vec<_>>();
+        assert_eq!(after(job), [("web".to_owned(), crate::file::Condition::Started)]);
+        assert!(
+            after(&file.services["docs"]).contains(&(super::FOLDERS_JOB.to_owned(), crate::file::Condition::CompletedSuccessfully)),
+            "{:?}",
+            after(&file.services["docs"])
+        );
+        assert_eq!(
+            serde_yaml_ng::to_string(&super::volume_mounts(&env.machines["docs"])).expect("serializes"),
+            "- type: volume\n  source: site\n  target: /usr/share/nginx/html\n  volume:\n    subpath: docs site\n"
+        );
     }
 
     #[test]

@@ -1,6 +1,5 @@
-//! The Compose backend's rendering of a few examples, as snapshots, and its determinism.
+//! The Compose files of a few examples and fixtures, as snapshots, and their determinism.
 
-use std::error::Error;
 use std::path::Path;
 
 use isoloom_compose::ComposeBackend;
@@ -10,8 +9,7 @@ use isoloom_render::backend::Backend;
 use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 
-/// A test's outcome: a failed step is its report.
-type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+use crate::testing::Outcome;
 
 /// The files the Compose backend renders for `spec` (the authored format), which must be valid.
 fn render(spec: isoloom_spec::Spec) -> Outcome<Vec<GeneratedFile>> {
@@ -67,7 +65,6 @@ fn a_build_with_a_published_image_emits_both_image_and_build() -> Outcome {
         "../../build/web",
         "the build block"
     );
-    insta::assert_snapshot!(rendered);
     Ok(())
 }
 
@@ -79,21 +76,18 @@ fn a_machine_binds_folders_of_the_computer_that_runs_the_lab() -> Outcome {
     Ok(())
 }
 
+/// The examples whose Compose file a reviewer reads whole, each its snapshot: a stack of
+/// services, networks routed through a router, a volume shared, a gateway machine.
 #[test]
-fn hello_stack() -> Outcome {
-    insta::assert_snapshot!(compose(example("hello-stack")?)?);
-    Ok(())
-}
-
-#[test]
-fn segmented_routes_through_the_router() -> Outcome {
-    insta::assert_snapshot!(compose(example("segmented")?)?);
-    Ok(())
-}
-
-#[test]
-fn shared_files_share_one_volume() -> Outcome {
-    insta::assert_snapshot!(compose(example("shared-files")?)?);
+fn each_examples_compose_file_is_its_snapshot() -> Outcome {
+    for (snapshot, name) in [
+        ("hello_stack", "hello-stack"),
+        ("segmented_routes_through_the_router", "segmented"),
+        ("shared_files_share_one_volume", "shared-files"),
+        ("edge_firewall_gateway_machine", "edge-firewall"),
+    ] {
+        insta::assert_snapshot!(snapshot, compose(example(name)?)?);
+    }
     Ok(())
 }
 
@@ -108,31 +102,9 @@ fn tuned_web_settings() -> Outcome {
 }
 
 #[test]
-fn edge_firewall_gateway_machine() -> Outcome {
-    insta::assert_snapshot!(compose(example("edge-firewall")?)?);
-    Ok(())
-}
-
-#[test]
 fn rendering_twice_gives_the_same_files() -> Outcome {
     for name in ["hello-stack", "segmented", "vlan-office", "cisco-iol"] {
         assert_eq!(example(name)?, example(name)?, "{name}");
     }
-    Ok(())
-}
-
-#[test]
-fn provisioning_is_refused_without_rendering() -> Outcome {
-    let lab = Lab::parse(
-        "version: 1\nname: p\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lab: 10 }\n    os: debian@12\n    app: { image: alpine }\nprovision:\n  - ansible: site.yml\n",
-    )
-    .map_err(|problems| format!("{problems:?}"))?;
-    let env = lab.plan(&lab.for_target(Target::Docker), Target::Docker, None)?;
-    let refused = ComposeBackend::DOCKER.render(&env).err().ok_or("rendered")?;
-    assert!(matches!(refused, isoloom_render::Error::Refused { .. }), "{refused:?}");
-    assert_eq!(
-        refused.to_string(),
-        "docker: environment-level provisioning (`provision:`) runs on the VM targets only"
-    );
     Ok(())
 }

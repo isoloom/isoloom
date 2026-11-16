@@ -121,10 +121,25 @@ mod tests {
         );
         let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).unwrap().file;
         let r = &file.services["r"];
-        let mounts = serde_yaml_ng::to_string(&r.volumes).unwrap();
-        for wanted in ["data:/data", "target: /shared", "./appliances/r/"] {
-            assert!(mounts.contains(wanted), "{wanted}: {mounts}");
-        }
+        // Each mount as Compose reads it: a short one's text, a long one's target.
+        let mounts: Vec<String> = r
+            .volumes
+            .iter()
+            .map(|m| match m {
+                crate::file::Mount::Short(short) => short.clone(),
+                long @ crate::file::Mount::Long(_) => {
+                    let yaml = isoloom_test_support::yaml(&serde_yaml_ng::to_string(long).unwrap());
+                    format!(
+                        "{} {}",
+                        isoloom_test_support::yaml_str(&yaml, "type"),
+                        isoloom_test_support::yaml_str(&yaml, "target")
+                    )
+                }
+            })
+            .collect();
+        assert!(mounts.contains(&"data:/data".to_owned()), "the spec's volume: {mounts:?}");
+        assert!(mounts.contains(&"bind /shared".to_owned()), "the spec's host folder: {mounts:?}");
+        assert!(mounts.iter().any(|m| m.starts_with("./appliances/r/")), "its own: {mounts:?}");
         let environment = r.environment.as_ref().unwrap();
         assert_eq!(environment.get("SITE").map(String::as_str), Some("lab"), "{environment:?}");
         assert_eq!(environment.get("IOL_PID").map(String::as_str), Some("1"), "{environment:?}");

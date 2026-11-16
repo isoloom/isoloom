@@ -53,5 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tool_is_found_back_from_its_service() {}
+    fn a_tools_service_is_named_after_it_under_isoloom() {
+        assert_eq!(tool_service("shell"), "isoloom-tool-shell");
+    }
 }
