@@ -107,5 +107,15 @@ fn what_windows_cant_carry_is_refused_at_its_field() {
     .unwrap_err();
     let at: Vec<(usize, Option<&str>)> = found.iter().map(|u| (u.step, u.field)).collect();
     assert_eq!(at, [(0, None), (1, Some("owner")), (2, Some("mode")), (3, Some("link")), (4, None)]);
-    assert!(found[0].reason.contains("no package repository") && found[1].reason.contains("ACL"));
+    let reasons: Vec<&str> = found.iter().map(|u| u.reason.as_str()).collect();
+    assert_eq!(
+        reasons,
+        [
+            "Windows has no package repository Isoloom drives",
+            "a Windows file's `owner` is an ACL, which the model doesn't set",
+            "a Windows file's `mode` is an ACL, which the model doesn't set",
+            "Windows links need privileges a set-up step doesn't have",
+            "a Windows feature has no version"
+        ]
+    );
 }

@@ -159,7 +159,10 @@ mod tests {
         let p = process("{ os: debian@12, app: { steps: [{ service: myd }] } }");
         assert_eq!(p, Err(NoProcess::NoForeground { unit: "myd".parse().unwrap() }));
         // Alpine's cron is BusyBox's: the table has no form of it there.
-        assert!(process("{ os: alpine, app: { steps: [{ service: cron }] } }").is_err());
+        assert_eq!(
+            process("{ os: alpine, app: { steps: [{ service: cron }] } }"),
+            Err(NoProcess::NoForeground { unit: "cron".parse().unwrap() })
+        );
     }
 
     /// The rule of `4bfd8d5f`, now the model's: steps that install a service and ports, with
