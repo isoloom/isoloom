@@ -1,26 +1,15 @@
 //! The builders' literals, as properties: each reads back as its text (round trip) and nothing
 //! in it can end the literal early or expand (injection safety): shell, Ruby and PowerShell
 //! strings, and the HCL builder's strings (its templates and structure are its own crate's
-//! properties, `isoloom-terraform`'s `hcl_builder/tests.rs`). The decoders (`quoting/literals.rs`,
+//! properties, `isoloom-terraform`'s `hcl_builder/tests.rs`). The decoders (`isoloom-test-support`'s,
 //! which the fuzz target shares) follow each language's own rules for that kind of literal.
-
-#![cfg_attr(
-    not(windows),
-    expect(
-        clippy::disallowed_methods,
-        reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
-    )
-)]
 
 use isoloom_render::powershell;
 use isoloom_spec::shell::quote;
 use isoloom_vagrant::ruby_quote;
 use proptest::prelude::*;
 
-#[path = "quoting/literals.rs"]
-mod literals;
-
-use literals::{b64_decode, hcl_decode, ps_decode, rb_decode, sh_decode, systemd_decode};
+use isoloom_test_support::{b64_decode, hcl_decode, ps_decode, rb_decode, sh_decode, systemd_decode};
 
 /// Characters that matter to some quoting rule, mixed with ordinary text.
 fn tricky() -> impl Strategy<Value = String> {

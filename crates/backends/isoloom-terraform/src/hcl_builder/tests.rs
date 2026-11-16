@@ -8,10 +8,7 @@ use proptest::prelude::*;
 
 use super::{Block, Module, Template, list, object, quote, reference, string};
 
-#[path = "../../../../targets/isoloom-targets/tests/quoting/hcl.rs"]
-mod literals;
-
-use literals::{Piece, hcl_decode, hcl_pieces};
+use isoloom_test_support::{HclPiece as Piece, hcl_decode, hcl_pieces};
 
 /// Characters that matter to HCL's quoting, mixed with ordinary text.
 fn tricky() -> impl Strategy<Value = String> {

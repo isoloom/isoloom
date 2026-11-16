@@ -27,6 +27,7 @@ isoloom-render = { path = "../crates/core/isoloom-render" }
 isoloom-terraform = { path = "../crates/backends/isoloom-terraform" }
 isoloom-vagrant = { path = "../crates/backends/isoloom-vagrant" }
 isoloom-topology = { path = "../crates/frontends/isoloom-topology" }
+isoloom-test-support = { path = "../crates/tools/isoloom-test-support" }
 # The drawing target reads its input as the editor sends it: JSON.
 serde_json = "1"
 

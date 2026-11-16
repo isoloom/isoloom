@@ -11,6 +11,8 @@
 //! - [`assert_every!`]: fails on an empty collection, where `iter().all(..)` passes.
 //! - [`hcl_body`], [`yaml`], [`ruby_blocks`]: a rendered file parsed, so a test asserts on its values rather than on
 //!   substrings of its text.
+//! - [`sh_decode`], [`hcl_decode`] and the other decoders: a literal the builders write read back
+//!   as its language reads it, for the quoting properties and the fuzz target.
 //!
 //! A test-only crate: it panics where a test should fail.
 
@@ -242,6 +244,8 @@ macro_rules! assert_every {
     }};
 }
 
+mod hcl_template;
+mod literals;
 mod parsed_hcl;
 mod parsed_ini;
 mod parsed_ruby;
@@ -249,6 +253,8 @@ mod parsed_yaml;
 
 /// The HCL crate the readers parse with, for tests that name its types.
 pub use hcl;
+pub use hcl_template::{HclPiece, hcl_decode, hcl_pieces};
+pub use literals::{b64_decode, ps_decode, rb_decode, sh_decode, systemd_decode};
 pub use parsed_hcl::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_resource, hcl_text, hcl_values};
 pub use parsed_ini::ini_groups;
 pub use parsed_ruby::{RubyBlock, ruby_blocks};

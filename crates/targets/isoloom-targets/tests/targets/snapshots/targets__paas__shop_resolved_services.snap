@@ -1,5 +1,5 @@
 ---
-source: crates/targets/isoloom-targets/tests/paas.rs
+source: crates/targets/isoloom-targets/tests/targets/paas.rs
 expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
 ---
 {
