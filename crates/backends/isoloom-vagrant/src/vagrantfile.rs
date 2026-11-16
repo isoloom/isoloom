@@ -102,8 +102,8 @@ pub(crate) fn chosen_host(key: &str, publish: u16) -> Value {
     Value::raw(format!("{HOSTPORTS}.fetch({}, {publish})", Value::str(key)))
 }
 
-/// [`chosen_host`], unless the runner keeps the port from an earlier operation: Isothrum's
-/// `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` ([`kept_port_variable`]) wins, so a parked
+/// [`chosen_host`], unless the runner keeps the port from an earlier operation:
+/// `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` ([`kept_port_variable`]) wins, so a parked
 /// environment's ports come back where they were (qemu, UTM and VMware forward afresh at each
 /// start).
 pub(crate) fn kept_or_chosen_host(machine: &str, guest: u16, protocol: Protocol, key: &str, publish: u16) -> Value {
@@ -111,8 +111,8 @@ pub(crate) fn kept_or_chosen_host(machine: &str, guest: u16, protocol: Protocol,
     Value::raw(format!("ENV.fetch({}, {}).to_i", Value::str(&variable), chosen_host(key, publish)))
 }
 
-/// The variable Isothrum keeps machine `machine`'s host port of `guest` in:
-/// `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>`, the machine's name upper-cased with every
+/// The variable a runner keeps machine `machine`'s host port of `guest` in:
+/// `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>`, the machine's name upper-cased with every
 /// character other than `A`–`Z` and `0`–`9` written `_` (one each), the guest port in decimal,
 /// `TCP` or `UDP`.
 pub(crate) fn kept_port_variable(machine: &str, guest: u16, protocol: Protocol) -> String {
@@ -122,7 +122,7 @@ pub(crate) fn kept_port_variable(machine: &str, guest: u16, protocol: Protocol) 
         .map(|c| if c.is_ascii_uppercase() || c.is_ascii_digit() { c } else { '_' })
         .collect();
     let proto = if protocol.is_tcp() { "TCP" } else { "UDP" };
-    format!("ISOTHRUM_HOST_PORT_{name}_{guest}_{proto}")
+    format!("HOST_PORT_{name}_{guest}_{proto}")
 }
 
 /// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine (a
@@ -172,11 +172,11 @@ mod tests {
     use crate::ruby::Ruby;
 
     #[test]
-    fn the_kept_port_variable_is_named_as_isothrum_writes_it() {
-        assert_eq!(kept_port_variable("web", 80, Protocol::Tcp), "ISOTHRUM_HOST_PORT_WEB_80_TCP");
-        assert_eq!(kept_port_variable("web-1.lab", 53, Protocol::Udp), "ISOTHRUM_HOST_PORT_WEB_1_LAB_53_UDP");
+    fn the_kept_port_variable_names_the_machine_the_guest_port_and_the_protocol() {
+        assert_eq!(kept_port_variable("web", 80, Protocol::Tcp), "HOST_PORT_WEB_80_TCP");
+        assert_eq!(kept_port_variable("web-1.lab", 53, Protocol::Udp), "HOST_PORT_WEB_1_LAB_53_UDP");
         // One `_` per character, a non-ASCII one too.
-        assert_eq!(kept_port_variable("web\u{b7}1", 8080, Protocol::Tcp), "ISOTHRUM_HOST_PORT_WEB_1_8080_TCP");
+        assert_eq!(kept_port_variable("web\u{b7}1", 8080, Protocol::Tcp), "HOST_PORT_WEB_1_8080_TCP");
     }
 
     #[test]

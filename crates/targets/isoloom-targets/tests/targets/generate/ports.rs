@@ -223,7 +223,7 @@ fn a_udp_service_is_published_and_opened_as_udp_on_kubernetes_and_the_vms() -> O
     // Vagrant: forwarded as UDP; app waits for dns on TCP 53.
     let vf = vagrantfile(&spec)?;
     let forwards = define(&vf, "dns").statements("m.vm.network \"forwarded_port\", guest: 53,");
-    let forward = "m.vm.network \"forwarded_port\", guest: 53, host: ENV.fetch(\"ISOTHRUM_HOST_PORT_DNS_53_UDP\", ISOLOOM_HOSTPORTS.fetch(\"dns/dns\", 10053)).to_i, host_ip: \"127.0.0.1\", protocol: \"udp\", auto_correct: true # not on libvirt";
+    let forward = "m.vm.network \"forwarded_port\", guest: 53, host: ENV.fetch(\"HOST_PORT_DNS_53_UDP\", ISOLOOM_HOSTPORTS.fetch(\"dns/dns\", 10053)).to_i, host_ip: \"127.0.0.1\", protocol: \"udp\", auto_correct: true # not on libvirt";
     assert!(matches!(forwards.as_slice(), [one] if one.starts_with(forward)), "{forwards:?}");
     assert!(!any_define_holds(&vf, "/dev/tcp/syslog/514"), "{vf:?}");
 

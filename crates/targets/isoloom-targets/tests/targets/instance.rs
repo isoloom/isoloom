@@ -56,7 +56,7 @@ fn vagrant_instances_differ_by_name_only() -> Outcome {
     // falls back to, so two instances can both forward even without a runner choosing.
     let forwards = web.statements("m.vm.network \"forwarded_port\", guest: 80,");
     assert!(
-        matches!(forwards.as_slice(), [one] if one.contains("host: ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(") && one.contains(", 8180)).to_i")),
+        matches!(forwards.as_slice(), [one] if one.contains("host: ENV.fetch(\"HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(") && one.contains(", 8180)).to_i")),
         "{forwards:?}"
     );
     // The project copy leaves every instance folder behind.

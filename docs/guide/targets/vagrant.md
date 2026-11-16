@@ -116,6 +116,30 @@ ports bind to `127.0.0.1` on the host. On Hyper-V, machines join the switch name
 relays each published TCP port from `127.0.0.1` with Windows' port proxy, and a UDP one is reached
 at the machine's address. A Windows box's RDP forward is disabled.
 
+### Host ports
+
+The generated Vagrantfile takes each published port's host port from its environment, so whatever
+runs it can keep a port where it was across boots. For a forwarded port of machine `<machine>`,
+guest port `<guest>`, it reads, first that is set:
+
+1. `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>`: the host port to forward from.
+   - `<MACHINE>` is the machine's name upper-cased, every character other than `A`–`Z` and `0`–`9`
+     written `_`, one each (`web-1.lab` is `WEB_1_LAB`).
+   - `<GUEST>` is the guest port in decimal (`80`).
+   - `<PROTO>` is `TCP` or `UDP`.
+2. `ISOLOOM_HOSTPORTS`: a JSON object of host ports by `"<machine>/<port name>"`
+   (`{"web/http": 41001}`).
+3. The port's `publish` number.
+
+`auto_correct` stays on, so Vagrant still moves a port that is taken. A port the spec fixes
+([`publish.fixed`](../../spec.md#machinesportspublishfixed)) reads only the last two and is never
+moved. Hyper-V's relay listens on the same number as the forward. With none of them set, the file
+runs on the spec's numbers; to pick one by hand:
+
+```sh
+HOST_PORT_WEB_80_TCP=8180 vagrant up
+```
+
 Windows machines are reached over WinRM, by default plain HTTP on port 5985 with basic
 authentication and the box's `vagrant` account, as Vagrant's Windows boxes are built. That traffic
 stays on the host's private network; see [security considerations](../../explanation/security.md).
