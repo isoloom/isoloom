@@ -27,6 +27,8 @@ thiserror.workspace = true
 
 [dev-dependencies]
 isoloom-targets.workspace = true
+# The compiled spec and starters read back by path (`yaml`, `yaml_str`).
+isoloom-test-support.workspace = true
 insta.workspace = true
 proptest.workspace = true
 serde_json.workspace = true

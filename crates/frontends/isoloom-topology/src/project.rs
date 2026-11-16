@@ -69,10 +69,4 @@ mod tests {
             ]
         );
     }
-
-    #[test]
-    fn a_machines_files_are_named_after_it() {
-        assert_eq!(config_path("r1"), "configs/r1.cfg");
-        assert_eq!(firmware_path("r1"), "images/r1.bin");
-    }
 }

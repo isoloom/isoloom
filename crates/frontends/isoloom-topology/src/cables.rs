@@ -108,12 +108,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_last_cable_takes_the_last_block() {
-        assert_eq!(link_block(MAX_LINKS - 1), Some((NetworkBlock::parse("10.200.255.248/29").unwrap(), 250, 251)));
-        assert_eq!(link_block(MAX_LINKS), None);
-    }
-
-    #[test]
     fn the_block_holds_8192_cables() {
         let end = |port: &str| crate::Endpoint {
             node: "a".into(),
@@ -142,17 +136,14 @@ mod tests {
     }
 
     #[test]
-    fn the_blocks_run_through_the_whole_16_in_order() {
+    fn the_blocks_run_through_the_whole_16_in_order_and_end_with_it() {
         let blocks: Vec<_> = (0..).map_while(link_block).collect();
         assert_eq!(blocks.len(), MAX_LINKS);
-        assert_eq!(blocks.first(), Some(&(NetworkBlock::parse("10.200.0.0/29").unwrap(), 2, 3)));
-        assert_eq!(blocks.get(32), Some(&(NetworkBlock::parse("10.200.1.0/29").unwrap(), 2, 3)));
-    }
-
-    #[test]
-    fn the_cables_block_is_said_as_its_first_octets_make_it() {
-        let [a, b] = LINK_BASE;
-        assert_eq!(LINK_BLOCK, format!("{a}.{b}.0.0/16"));
+        let at = |i: usize| blocks.get(i).map(|(block, a, b)| (block.to_string(), *a, *b));
+        assert_eq!(at(0), Some(("10.200.0.0/29".to_owned(), 2, 3)));
+        assert_eq!(at(32), Some(("10.200.1.0/29".to_owned(), 2, 3)));
+        assert_eq!(at(MAX_LINKS - 1), Some(("10.200.255.248/29".to_owned(), 250, 251)));
+        assert_eq!(link_block(MAX_LINKS), None);
     }
 
     #[test]

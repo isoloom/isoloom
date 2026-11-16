@@ -132,7 +132,13 @@ mod tests {
     #[test]
     fn plain_tcp_is_written_as_its_number() {
         assert_eq!(doc(service(80, PortProtocol::Tcp)), PortDoc::Tcp(NonZeroU16::new(80).unwrap()));
-        assert!(matches!(doc(service(443, PortProtocol::Https)), PortDoc::Speaking { .. }));
+        assert_eq!(
+            doc(service(443, PortProtocol::Https)),
+            PortDoc::Speaking {
+                port: NonZeroU16::new(443).unwrap(),
+                protocol: PortProtocol::Https
+            }
+        );
     }
 
     proptest::proptest! {

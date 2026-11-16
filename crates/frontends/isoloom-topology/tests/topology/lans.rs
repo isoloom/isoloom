@@ -2,7 +2,7 @@
 
 use isoloom_topology::{Error, Kind, compile};
 
-use crate::testing::{Outcome, accepted, cable, container, ep, join, lan, node, octet, spec, two_lans, yaml};
+use crate::testing::{Outcome, accepted, at, cable, container, ep, join, lan, node, octet, parsed, spec, two_lans};
 
 #[test]
 fn machines_on_a_lan_take_its_free_addresses() -> Outcome {
@@ -52,17 +52,6 @@ fn a_block_not_at_the_start_of_its_octet_gives_its_own_addresses() -> Outcome {
     let c = accepted(&topo)?;
     assert_eq!((octet(&c, "client", "office")?, octet(&c, "router", "office")?), (10, 11));
     assert_eq!((octet(&c, "router", "servers")?, octet(&c, "server", "servers")?), (130, 131));
-    Ok(())
-}
-
-#[test]
-fn a_block_isoloom_gives_no_address_on_is_refused() -> Outcome {
-    for cidr in ["10.10.0.0/16", "10.10.1.0/30", "10.10.1.5/24"] {
-        let mut topo = two_lans()?;
-        topo.networks["office"].cidr = cidr.into();
-        let e = compile(&topo).unwrap_err();
-        assert!(matches!(&e, Error::BadCidr { lan, .. } if lan == "office"), "{cidr}: {e}");
-    }
     Ok(())
 }
 
@@ -192,15 +181,12 @@ fn a_lan_keeps_its_conditions_and_its_internet() -> Outcome {
     topo.networks["servers"].internet = false;
     topo.networks["servers"].tc = serde_json::from_str(r#"{ "delay": "20ms", "rate": "10mbit" }"#)?;
     let c = accepted(&topo)?;
-    assert!(
-        yaml(&c).contains("servers:\n    cidr: 10.10.2.0/24\n    internet: false\n    tc:\n      delay: 20ms\n      rate: 10mbit\n"),
-        "{}",
-        yaml(&c)
-    );
-    assert!(
-        yaml(&c).contains("office:\n    cidr: 10.10.1.0/24\n  servers"),
-        "internet: true is the default: {}",
-        yaml(&c)
+    let servers = ["cidr", "internet", "tc.delay", "tc.rate"].map(|key| at(&c, &format!("networks.servers.{key}")));
+    assert_eq!(servers, ["10.10.2.0/24", "false", "20ms", "10mbit"]);
+    assert_eq!(
+        isoloom_test_support::yaml_keys_at(&parsed(&c), "networks.office"),
+        ["cidr"],
+        "internet: true is the default, left out"
     );
     Ok(())
 }

@@ -180,7 +180,7 @@ mod tests {
         lan.vlans.insert(20, vlan("10.10.20.0/24", false));
         settle_parent(&mut lan);
         assert_eq!((lan.cidr.to_string().as_str(), lan.internet), ("10.10.0.0/19", Some(false)));
-        assert!(lan.vlans.values().all(|v| v.internet.is_none()));
+        assert_eq!(lan.vlans.values().map(|v| v.internet).collect::<Vec<_>>(), [None, None]);
     }
 
     #[test]
