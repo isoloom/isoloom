@@ -1,3 +1,5 @@
+use isoloom_test_support::assert_every;
+
 use super::*;
 
 #[test]
@@ -46,7 +48,8 @@ fn an_image_table_name_is_its_os_once_parsed_never_a_spelling() {
         assert_eq!(resolve(&os.id()).ok(), Some(os), "{name} is {}", os.id());
     }
     for name in ["debian-12", "windows-server-2019", "almalinux-9", "ubuntu-24.04"] {
-        assert!(resolve(name).is_err(), "{name}");
+        let e = resolve(name).unwrap_err().to_string();
+        assert!(e.starts_with(&format!("unknown OS `{name}`")), "{name}: {e}");
     }
     assert_eq!(by_name("debian@12"), None);
 }
@@ -71,7 +74,6 @@ fn unknown_families_and_versions_list_the_known_ones() {
     assert!(family.contains("windows-server (2008r2, 2012r2, 2016, 2019, 2022, 2025)"), "{family}");
     let version = resolve("debian@10").unwrap_err().to_string();
     assert_eq!(version, "debian has no version `10`; use one of: 11, 12, 13 (`debian` alone is debian@12)");
-    assert!(resolve("debian-10").is_err());
 }
 
 #[test]
@@ -80,7 +82,7 @@ fn spellings_cover_every_form_once() {
     for s in ["debian", "debian@12", "kali", "kali@rolling", "windows-server@2022"] {
         assert_eq!(all.iter().filter(|x| *x == s).count(), 1, "{s}");
     }
-    assert!(all.iter().all(|s| resolve(s).is_ok()));
+    assert_every!(&all, |s: &&String| resolve(s).is_ok());
     assert!(!all.iter().any(|s| s == "debian-12"), "image-table names are not spellings");
 }
 

@@ -80,7 +80,8 @@ mod tests {
         }
         let unset: MachineFile = serde_yaml_ng::from_str("{ path: /a, content: x }").unwrap();
         assert_eq!((unset.mode_or_default(), unset.sets_owner_or_mode()), ("0644", false));
-        assert!(serde_yaml_ng::from_str::<MachineFile>("{ path: /a, mode: [1] }").is_err());
+        let list = serde_yaml_ng::from_str::<MachineFile>("{ path: /a, mode: [1] }").unwrap_err().to_string();
+        assert!(list.contains("mode"), "{list}");
     }
 
     #[test]

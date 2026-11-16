@@ -60,12 +60,14 @@ fn layers_merge_in_order_and_each_leaf_names_the_last_that_set_it() -> Outcome {
 fn a_layer_file_that_cant_be_read_is_an_error_unlike_a_missing_one() -> Outcome {
     let project = folder("defaults-unreadable")?;
     let project = project.path();
+    // A home folder that doesn't exist: no user file.
+    let home = project.join("no-home").to_string_lossy().into_owned();
     let sources = |folder| Sources {
         project: folder,
         images_file: None,
         profile: None,
         sets: &[],
-        host: host(&[("ISOLOOM_HOME", "/nonexistent/isoloom")]),
+        host: host(&[("ISOLOOM_HOME", &home)]),
     };
     assert_eq!(load(&sources(project))?.defaults, Defaults::default(), "no file, no layer");
     std::fs::create_dir(project.join(PROJECT_FILE))?;
@@ -111,8 +113,9 @@ fn a_tag_from_the_environment_or_a_set_keeps_its_text() {
     let tags = resolve(&layers).unwrap().defaults.tags;
     assert_eq!((tags["account"].as_str(), tags["run"].as_str()), ("0x1F", "1e3"));
     let spec = override_spec_with("version: 1\n", None, &["tags.account=0x1F".to_owned(), "x.port=8080".to_owned()]).unwrap();
-    assert!(spec.contains("account: '0x1F'"), "a tag stays text: {spec}");
-    assert!(spec.contains("port: 8080"), "another value is as YAML reads it: {spec}");
+    let spec: Value = serde_yaml_ng::from_str(&spec).unwrap();
+    assert_eq!(spec["tags"]["account"], Value::from("0x1F"), "a tag stays text");
+    assert_eq!(spec["x"]["port"], Value::from(8080), "another value is as YAML reads it");
 }
 
 #[test]
@@ -185,7 +188,8 @@ fn a_set_is_a_dotted_key_then_its_value() {
 fn no_spec_set_leaves_the_text_untouched() -> Outcome {
     let text = "# The lab.\nname: lab # its name\nmachines:\n  web: { os: debian@12 }\n";
     assert_eq!(override_spec(text, &["defaults.cloud.aws.region=eu-west-1".into()])?, text, "comments and all");
-    assert_ne!(override_spec(text, &["machines.web.os=ubuntu@24.04".into()])?, text);
+    let set: Value = serde_yaml_ng::from_str(&override_spec(text, &["machines.web.os=ubuntu@24.04".into()])?)?;
+    assert_eq!(set["machines"]["web"]["os"], Value::from("ubuntu@24.04"));
     Ok(())
 }
 

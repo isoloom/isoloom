@@ -271,7 +271,8 @@ mod tests {
         assert_eq!(gpus("{}").unwrap().fixed_count(), Some(1));
         assert_eq!(gpus("{}").unwrap().driver(), DEFAULT_GPU_DRIVER);
         assert!(gpus("some").unwrap_err().contains("a number, `all` or a mapping"));
-        assert!(gpus("{ count: many }").is_err());
+        let many = gpus("{ count: many }").unwrap_err();
+        assert!(many.contains("many"), "{many}");
     }
 
     #[test]
@@ -284,7 +285,8 @@ mod tests {
             let d: Device = serde_yaml_ng::from_str(yaml).unwrap();
             assert_eq!((d.guest(), d.permissions.as_deref()), (guest, permissions), "{yaml}");
         }
-        assert!(serde_yaml_ng::from_str::<Device>("/a:/b:r:x").is_err());
+        let four = serde_yaml_ng::from_str::<Device>("/a:/b:r:x").unwrap_err().to_string();
+        assert!(four.contains("/a:/b:r:x"), "{four}");
     }
 
     #[test]

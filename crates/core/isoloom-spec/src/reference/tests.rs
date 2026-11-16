@@ -178,13 +178,6 @@ fn alternatives_of_alternatives_of_constants_are_one_closed_set() {
 }
 
 #[test]
-fn a_closed_set_of_fractions_is_numbers() {
-    let numbers = json!({ "properties": { "loss": { "enum": [0.5, 1.5] }, "level": { "enum": [1, 2] } } });
-    let kinds: Vec<String> = fields(&numbers).into_iter().map(|f| f.kind).collect();
-    assert_eq!(kinds, ["number", "integer"]);
-}
-
-#[test]
 fn a_null_or_empty_text_default_is_not_shown() {
     let defaults = json!({ "properties": { "a": { "default": null }, "b": { "default": "" }, "c": { "default": 0 } } });
     let shown: Vec<Option<String>> = fields(&defaults).into_iter().map(|f| f.default).collect();
@@ -204,7 +197,7 @@ fn a_closed_sets_type_is_its_first_values() {
     let kind = |set: Value| fields(&json!({ "properties": { "x": set } }))[0].kind.clone();
     assert_eq!(kind(json!({ "const": true })), "boolean");
     assert_eq!(kind(json!({ "enum": [1, 2] })), "integer");
-    assert_eq!(kind(json!({ "enum": [0.5] })), "number");
+    assert_eq!(kind(json!({ "enum": [0.5, 1.5] })), "number");
     assert_eq!(kind(json!({ "anyOf": [{ "const": "a" }, { "const": 1 }] })), "string");
     assert_eq!(kind(json!({ "const": null })), "value");
 }
