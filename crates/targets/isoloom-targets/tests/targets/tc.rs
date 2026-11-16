@@ -2,9 +2,10 @@
 //! validated and generated.
 
 use isoloom_spec::{Target, parse};
-use isoloom_targets::{Lab, generate, refusal};
+use isoloom_targets::{Lab, refusal};
+use isoloom_test_support::{yaml, yaml_str, yaml_strs};
 
-use crate::testing::{Outcome, example, generated};
+use crate::testing::{Outcome, define, example, generated, vagrantfile};
 
 /// The `slow-link` example.
 fn slow_link() -> Outcome<Lab> {
@@ -19,21 +20,32 @@ fn the_router_applies_netem_on_its_interface_into_the_network() -> Outcome {
         spec.source().networks["far"].tc.as_ref().unwrap().netem(),
         "delay 80ms 10ms loss 1% rate 10mbit"
     );
-    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
-    assert!(compose.contains("iproute2"), "{compose}");
+    let compose = yaml(&generated(&spec, Target::Docker, "docker/compose.yml")?);
+    let router = [
+        yaml_strs(&compose, "services.isoloom-router.entrypoint"),
+        yaml_strs(&compose, "services.isoloom-router.command"),
+    ]
+    .concat()
+    .join("\n");
+    assert!(router.contains("apk add --no-cache nftables dnsmasq iproute2"), "{router}");
+    // Its interface into `far` (the router's address there), shaped.
+    let tc = yaml_str(&compose, "services.isoloom-router.environment.TC");
     assert!(
-        compose.contains("10\\.75\\.2\\.254") && compose.contains("tc qdisc replace dev \"$$IF\" root netem delay 80ms 10ms loss 1% rate 10mbit"),
-        "{compose}"
+        tc.contains("10\\.75\\.2\\.254") && tc.contains("tc qdisc replace dev \"$$IF\" root netem delay 80ms 10ms loss 1% rate 10mbit"),
+        "{tc}"
     );
-    let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
-    assert!(vf.contains("isoloom-tc.service") && vf.contains("netem delay 80ms 10ms loss 1%"), "{vf}");
+    let vf = vagrantfile(&spec)?;
+    let vm = define(&vf, "isoloom-router").every_statement().join("\n");
+    assert!(vm.contains("isoloom-tc.service") && vm.contains("netem delay 80ms 10ms loss 1%"), "{vm}");
     // No router in the path on Kubernetes or in the cloud (asked without its toolbox, which
     // those targets refuse first).
     let mut source = spec.source().clone();
     source.tools.clear();
     let without_tools = Lab::new(source);
-    assert!(refusal(&without_tools, Target::Kubernetes).unwrap().unwrap().contains("router"));
-    assert!(refusal(&without_tools, Target::CloudVm).unwrap().unwrap().contains("router"));
+    for target in [Target::Kubernetes, Target::CloudVm] {
+        let why = refusal(&without_tools, target)?.ok_or("not refused")?;
+        assert!(why.contains("router"), "{target:?}: {why}");
+    }
     Ok(())
 }
 
@@ -54,11 +66,19 @@ fn impairment_is_checked() {
         p("  x: { cidr: 10.9.0.0/24, tc: { delay: 50ms } }\n  y: { cidr: 10.9.1.0/24 }\n", reach),
         Vec::<String>::new()
     );
-    assert!(p("  x: { cidr: 10.9.0.0/24, tc: { delay: fast } }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("isn't a time"));
-    assert!(p("  x: { cidr: 10.9.0.0/24, tc: { jitter: 5ms } }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("set one"));
-    assert!(p("  x: { cidr: 10.9.0.0/24, tc: { rate: 10mbps2 } }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("isn't a rate"));
-    assert!(p("  x: { cidr: 10.9.0.0/24, tc: { loss: 120 } }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("0 to 100"));
-    assert!(p("  x: { cidr: 10.9.0.0/24, tc: {} }\n  y: { cidr: 10.9.1.0/24 }\n", reach)[0].contains("say what to impair"));
+    for (tc, says) in [
+        ("{ delay: fast }", "isn't a time"),
+        ("{ jitter: 5ms }", "set one"),
+        ("{ rate: 10mbps2 }", "isn't a rate"),
+        ("{ loss: 120 }", "0 to 100"),
+        ("{}", "say what to impair"),
+    ] {
+        let found = p(&format!("  x: {{ cidr: 10.9.0.0/24, tc: {tc} }}\n  y: {{ cidr: 10.9.1.0/24 }}\n"), reach);
+        assert!(
+            matches!(found.as_slice(), [one] if one.starts_with("networks.x.tc") && one.contains(says)),
+            "{tc}: {found:?}"
+        );
+    }
     // Without a reach rule there is no router on the network: the machines' own interfaces
     // carry it (a direct link between two machines).
     assert_eq!(
@@ -70,16 +90,19 @@ fn impairment_is_checked() {
 #[test]
 fn machines_apply_netem_on_their_own_interface() -> Outcome {
     let spec = slow_link()?;
-    let compose = &generate(&spec, Target::Docker).unwrap()[0].contents;
+    let compose = yaml(&generated(&spec, Target::Docker, "docker/compose.yml")?);
     // `web` is on `far`: its network sidecar has `tc` (netshoot) and shapes its interface there.
-    let sidecar = compose.split("\n  isoloom-routes-web:\n").nth(1).expect("web has a network sidecar");
-    assert!(sidecar.contains("netshoot"), "{sidecar}");
+    let sidecar = "services.isoloom-routes-web";
+    assert!(yaml_str(&compose, &format!("{sidecar}.image")).starts_with("nicolaka/netshoot:"));
+    let command = yaml_strs(&compose, &format!("{sidecar}.entrypoint")).join("\n");
     assert!(
-        sidecar.contains("10\\.75\\.2\\.10") && sidecar.contains("netem delay 80ms 10ms loss 1% rate 10mbit"),
-        "{sidecar}"
+        command.contains("10\\.75\\.2\\.10") && command.contains("netem delay 80ms 10ms loss 1% rate 10mbit"),
+        "{command}"
     );
-    assert!(sidecar.contains("tc qdisc show | grep -q netem"));
-    let vf = generated(&spec, Target::Vagrant, "Vagrantfile")?;
-    assert!(vf.contains("name: \"tc\"") && vf.contains("this machine's interfaces"), "{vf}");
+    let health = yaml_strs(&compose, &format!("{sidecar}.healthcheck.test")).join("\n");
+    assert!(health.contains("tc qdisc show | grep -q netem"), "{health}");
+    let vf = vagrantfile(&spec)?;
+    let steps = define(&vf, "web").statements("m.vm.provision \"shell\", name: \"tc\"");
+    assert!(matches!(steps.as_slice(), [one] if one.contains("this machine's interfaces")), "{steps:?}");
     Ok(())
 }

@@ -104,13 +104,6 @@ pub(crate) fn at(text: &str, what: &str) -> Outcome<usize> {
     text.find(what).ok_or_else(|| format!("`{what}` missing in:\n{text}").into())
 }
 
-/// The part of `text` before the first `end`.
-pub(crate) fn before<'a>(text: &'a str, end: &str) -> Outcome<&'a str> {
-    text.split_once(end)
-        .map(|(head, _)| head)
-        .ok_or_else(|| format!("no `{end}` in:\n{text}").into())
-}
-
 /// A one-network environment named `name`: `web` (a published HTTP port, on `web_os`) and `db` (Ubuntu),
 /// each set up by a script.
 pub(crate) fn web_and_db(name: &str, web_os: &str) -> String {

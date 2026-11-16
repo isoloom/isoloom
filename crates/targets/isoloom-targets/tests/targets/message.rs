@@ -62,5 +62,5 @@ fn a_placeholder_pointing_at_nothing_is_an_error_and_syntax_is_validated() {
     let bad = Lab::new(parse(&format!("{base}message: \"see {{{{ }}}} and {{{{ a..b }}}} and {{{{ open\"\n")).unwrap());
     let problems: Vec<String> = bad.problems().iter().map(isoloom_spec::syntax::Problem::line).collect();
     assert_eq!(problems.len(), 3, "{problems:?}");
-    assert!(problems.iter().all(|p| p.starts_with("message:")), "{problems:?}");
+    isoloom_test_support::assert_every!(&problems, |p: &&String| p.starts_with("message:"));
 }
