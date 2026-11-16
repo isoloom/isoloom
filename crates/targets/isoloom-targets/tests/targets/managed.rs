@@ -6,25 +6,26 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
+use isoloom_test_support::{assert_every, hcl, hcl_blocks, hcl_body, hcl_map, hcl_one, hcl_values, yaml_at, yaml_documents};
+
 use crate::testing::{Outcome, example, file};
 
 #[test]
 fn every_kubernetes_object_is_labelled_as_isoloom_s() -> Outcome {
     let files = generate(&example("hello-stack")?, Target::Kubernetes)?;
     let env = file(&files, "kubernetes/environment.yaml")?;
-    let objects: Vec<&str> = env.split("\n---\n").filter(|d| d.contains("\nkind: ")).collect();
+    let objects = yaml_documents(env);
     assert!(objects.len() > 3, "{env}");
-    for o in objects {
-        let metadata = o.split("\nmetadata:\n").nth(1).ok_or("no metadata")?;
-        let own = metadata.lines().take_while(|l| l.starts_with("  ")).collect::<Vec<_>>().join("\n");
-        assert!(own.contains("    app.kubernetes.io/managed-by: isoloom"), "{o}");
-    }
-    let chart: String = files
+    assert_every!(&objects, |o: &&serde_yaml_ng::Value| {
+        yaml_at(o, "metadata.labels.`app.kubernetes.io/managed-by`").and_then(serde_yaml_ng::Value::as_str) == Some("isoloom")
+    });
+    // The chart's templates (Helm's, not YAML until rendered): each that makes an object labels it.
+    let templates: Vec<&str> = files
         .iter()
-        .filter(|f| f.path.contains("kubernetes/chart/templates/"))
+        .filter(|f| f.path.contains("kubernetes/chart/templates/") && f.contents.lines().any(|l| l.starts_with("kind: ")))
         .map(|f| f.contents.as_str())
         .collect();
-    assert!(chart.contains("app.kubernetes.io/managed-by: isoloom"), "the chart's objects too");
+    assert_every!(&templates, |t: &&str| t.lines().any(|l| l.trim() == "app.kubernetes.io/managed-by: isoloom"));
     Ok(())
 }
 
@@ -34,22 +35,16 @@ fn google_clouds_project_and_linodes_firewalls_carry_the_environments_labels() -
     let vm = generate(&lab, Target::CloudVm)?;
     let docker = generate(&lab, Target::CloudDocker)?;
     for gcp in [file(&vm, "cloud-vm/gcp/main.tf")?, file(&docker, "cloud-docker/gcp/main.tf")?] {
-        let project = gcp.split("resource \"google_project\" \"env\"").nth(1).ok_or("no project")?;
-        let project = project.split("\n}\n").next().unwrap_or_default();
-        let labels = project.split("\n  labels = {\n").nth(1).ok_or("no labels on the project")?;
-        let labels = labels.split("\n  }\n").next().unwrap_or_default();
-        assert!(
-            labels.contains("isoloom-environment = \"solo-web\"") && labels.contains("managed-by          = \"isoloom\""),
-            "{labels}"
-        );
+        let body = hcl_body(gcp);
+        let labels = hcl_map(hcl_one(&body, "google_project", "env"), "labels");
+        for label in [("isoloom-environment", "solo-web"), ("managed-by", "isoloom")] {
+            assert!(labels.contains(&(label.0.to_owned(), label.1.to_owned())), "{label:?}: {labels:?}");
+        }
     }
     for linode in [file(&vm, "cloud-vm/linode/main.tf")?, file(&docker, "cloud-docker/linode/main.tf")?] {
-        let firewalls: Vec<&str> = linode.split("resource \"linode_firewall\"").skip(1).collect();
-        assert!(!firewalls.is_empty(), "{linode}");
-        for f in firewalls {
-            let f = f.split("\n}\n").next().unwrap_or_default();
-            assert!(f.contains("tags ") && f.contains("isoloom"), "{f}");
-        }
+        let body = hcl_body(linode);
+        let firewalls = hcl_blocks(&body, "resource", &["linode_firewall"]);
+        assert_every!(&firewalls, |f: &&&hcl::Block| hcl_values(f.body(), "tags").contains(&"isoloom".to_owned()));
     }
     Ok(())
 }

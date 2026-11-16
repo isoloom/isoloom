@@ -4,7 +4,7 @@
 use isoloom_spec::{Spec, Target};
 use isoloom_targets::Lab;
 
-use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_map, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 
 use crate::testing::{Outcome, generated, source as example};
 
@@ -28,12 +28,14 @@ fn azure_uses_azurerm_with_static_addresses() -> Outcome {
     // The azurerm provider and an Azure VM, not an AWS instance.
     let terraform = hcl_blocks(&body, "terraform", &[]);
     let required = terraform.first().map(|t| hcl_nested(t.body(), "required_providers")).unwrap_or_default();
-    let azurerm = required
-        .first()
-        .and_then(|r| hcl_attribute(r.body(), "azurerm"))
-        .map(ToString::to_string)
-        .unwrap_or_default();
-    assert!(azurerm.contains("hashicorp/azurerm") && azurerm.contains("~> 5.8.0"), "{azurerm}");
+    let required_azurerm: Vec<(String, String)> = required.first().map(|r| hcl_map(r.body(), "azurerm")).unwrap_or_default();
+    assert_eq!(
+        required_azurerm,
+        [
+            ("source".to_owned(), "hashicorp/azurerm".to_owned()),
+            ("version".to_owned(), "~> 5.8.0".to_owned())
+        ]
+    );
     assert!(hcl_names(&body, "resource", "azurerm_linux_virtual_machine").contains(&"web".to_owned()));
     assert!(hcl_names(&body, "resource", "aws_instance").is_empty(), "{tf}");
     // The module interface: a `region` var and ARM_SUBSCRIPTION_ID from the environment.
@@ -78,7 +80,15 @@ fn azure_has_the_shared_outputs() -> Outcome {
     let ready = hcl_blocks(&body, "output", &["ready_file"]);
     assert_eq!(ready.first().map(|o| hcl_text(o.body(), "value")).as_deref(), Some("/var/lib/isoloom/ready"));
     // Each machine by its public address.
-    assert!(value("machines").contains("web = azurerm_public_ip.web.ip_address"), "{}", value("machines"));
+    let machines = hcl_blocks(&body, "output", &["machines"])
+        .first()
+        .map(|o| hcl_map(o.body(), "value"))
+        .unwrap_or_default();
+    assert!(
+        machines.contains(&("web".to_owned(), "azurerm_public_ip.web.ip_address".to_owned())),
+        "{} {machines:?}",
+        value("machines")
+    );
     Ok(())
 }
 
@@ -136,9 +146,6 @@ fn azure_runs_windows_over_winrm_and_a_controller_runs_the_checks() -> Outcome {
             _ => None,
         })
         .collect();
-    assert!(
-        !on_controller.is_empty() && on_controller.iter().all(|h| h == "azurerm_public_ip.isoloom_controller.ip_address"),
-        "{on_controller:?}"
-    );
+    isoloom_test_support::assert_every!(&on_controller, |h: &&String| *h == "azurerm_public_ip.isoloom_controller.ip_address");
     Ok(())
 }

@@ -5,6 +5,8 @@ use isoloom_plan::Environment;
 use isoloom_spec::model::Target;
 use isoloom_targets::{Lab, backend};
 
+use isoloom_test_support::{assert_every, hcl_body, hcl_literals};
+
 use crate::testing::{Outcome, plan};
 
 /// The example `name`, planned for `cloud-docker`.
@@ -30,7 +32,8 @@ fn a_machine_needing_a_controller_is_refused_by_capabilities() -> Outcome {
     let e = env("ansible-pair")?;
     let why = backend(Target::CloudDocker).refusal(&e).expect("refused");
     assert!(why.contains("provision"), "{why}");
-    assert!(backend(Target::CloudDocker).render(&e).is_err());
+    let err = backend(Target::CloudDocker).render(&e).err().ok_or("rendered")?.to_string();
+    assert!(err.ends_with(&why), "{err}");
     Ok(())
 }
 
@@ -82,12 +85,14 @@ fn containers_needing_more_than_the_largest_host_are_refused_not_squeezed() {
 fn linodes_root_host_brings_the_project_in_without_sudo_the_others_through_it() -> Outcome {
     // The module brings the project in the same way: as root on Linode, through `sudo` elsewhere.
     let files = backend(Target::CloudDocker).render(&env("configured-app")?).unwrap();
-    let module = |cloud: &str| crate::testing::file(&files, &format!("cloud-docker/{cloud}/main.tf")).map(str::to_owned);
-    assert!(module("aws")?.contains("sudo sh -c 'rm -rf /opt/isoloom"));
-    let linode_module = module("linode")?;
-    assert!(
-        linode_module.contains("\"sh -c 'rm -rf /opt/isoloom") && !linode_module.contains("sudo "),
-        "{linode_module}"
-    );
+    // The commands that replace the project on the host, wherever the module runs them.
+    let copies = |cloud: &str| -> Outcome<Vec<String>> {
+        let body = hcl_body(crate::testing::file(&files, &format!("cloud-docker/{cloud}/main.tf"))?);
+        Ok(hcl_literals(&body).into_iter().filter(|l| l.contains("rm -rf /opt/isoloom")).collect())
+    };
+    assert_every!(copies("aws")?, |c: &String| c.starts_with("sudo sh -c 'rm -rf /opt/isoloom"));
+    assert_every!(copies("linode")?, |c: &String| c.starts_with("sh -c 'rm -rf /opt/isoloom"));
+    let linode = hcl_literals(&hcl_body(crate::testing::file(&files, "cloud-docker/linode/main.tf")?));
+    assert!(!linode.iter().any(|l| l.contains("sudo ")), "Linode's host is root: {linode:?}");
     Ok(())
 }

@@ -4,7 +4,7 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
-use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
+use isoloom_test_support::{hcl, hcl_attribute, hcl_blocks, hcl_body, hcl_map, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 
 use crate::testing::{Outcome, example};
 
@@ -29,12 +29,14 @@ fn gcp_uses_the_google_provider_and_static_internal_ips() -> Outcome {
     let body = hcl_body(&tf);
     let terraform = hcl_blocks(&body, "terraform", &[]);
     let required = terraform.first().map(|t| hcl_nested(t.body(), "required_providers")).unwrap_or_default();
-    let google = required
-        .first()
-        .and_then(|r| hcl_attribute(r.body(), "google"))
-        .map(ToString::to_string)
-        .unwrap_or_default();
-    assert!(google.contains("hashicorp/google") && google.contains("~> 8.5.0"), "{google}");
+    let provider: Vec<(String, String)> = required.first().map(|r| hcl_map(r.body(), "google")).unwrap_or_default();
+    assert_eq!(
+        provider,
+        [
+            ("source".to_owned(), "hashicorp/google".to_owned()),
+            ("version".to_owned(), "~> 8.5.0".to_owned())
+        ]
+    );
     assert_eq!(hcl_names(&body, "resource", "google_compute_network"), ["app"]);
     assert_ne!(hcl_names(&body, "resource", "google_compute_subnetwork"), Vec::<String>::new());
     // Every address of the spec is kept: each machine at its octet, pinned on its NIC.

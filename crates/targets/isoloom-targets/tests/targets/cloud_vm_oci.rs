@@ -64,7 +64,6 @@ fn a_machine_on_two_networks_gets_a_vnic_on_each() -> Outcome {
     assert_eq!(hcl_names(&body, "resource", "oci_core_vnic_attachment"), ["web_back"]);
     let scripts: Vec<String> = hcl_literals(&body).into_iter().filter(|l| l.contains('\n')).collect();
     assert!(scripts.iter().any(|s| s.contains("http://169.254.169.254/opc/v2/vnics/")), "{tf}");
-    assert!(hcl_values(&body, "skip_source_dest_check").iter().all(|v| v == "true"), "{tf}");
-    assert_ne!(hcl_values(&body, "skip_source_dest_check"), Vec::<String>::new());
+    isoloom_test_support::assert_every!(hcl_values(&body, "skip_source_dest_check"), |v: &String| v == "true");
     Ok(())
 }

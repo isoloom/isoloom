@@ -4,6 +4,8 @@
 use isoloom_spec::Target;
 use isoloom_targets::Lab;
 
+use isoloom_test_support::{assert_every, hcl, hcl_blocks, hcl_body, hcl_map, hcl_nested, hcl_one, hcl_values};
+
 use crate::testing::{Outcome, examples, generated as file, lab, problems, valid};
 
 /// segmented with a cost centre and a team.
@@ -12,27 +14,45 @@ fn tagged() -> Outcome<Lab> {
     valid(&format!("{text}\ntags:\n  Cost.Center: \"R&D 42\"\n  team: platform\n"))
 }
 
+/// A module's tags: its `locals` `tags` (Azure, Oracle Cloud), else AWS's provider's
+/// `default_tags`, as (name, value) pairs.
+fn module_tags(body: &hcl::Body) -> Vec<(String, String)> {
+    let locals = hcl_blocks(body, "locals", &[]).into_iter().flat_map(|l| hcl_map(l.body(), "tags"));
+    let aws = hcl_blocks(body, "provider", &["aws"])
+        .into_iter()
+        .flat_map(|p| hcl_nested(p.body(), "default_tags"))
+        .flat_map(|d| hcl_map(d.body(), "tags"));
+    locals.chain(aws).collect()
+}
+
+/// `pairs` as owned (name, value) pairs.
+fn owned(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
+}
+
 #[test]
 fn every_cloud_tags_its_resources_with_the_specs_tags() -> Outcome {
     let lab = tagged()?;
     for cloud in ["aws", "azure", "oci"] {
-        let tf = file(&lab, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
-        assert!(
-            tf.contains("\"Cost.Center\"") && tf.contains("\"R&D 42\"") && tf.contains("\"platform\""),
-            "{cloud}: {tf}"
-        );
-        assert!(tf.contains("managed-by"), "Isoloom's own stay: {cloud}");
+        let tags = module_tags(&hcl_body(&file(&lab, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?));
+        // The spec's, and Isoloom's own beside them.
+        for tag in owned(&[("Cost.Center", "R&D 42"), ("team", "platform"), ("managed-by", "isoloom")]) {
+            assert!(tags.contains(&tag), "{cloud}: {tag:?} in {tags:?}");
+        }
     }
-    let aws = file(&lab, Target::CloudVm, "cloud-vm/aws/main.tf")?;
-    let default_tags = aws.split("default_tags").nth(1).ok_or("no default_tags")?;
-    assert!(default_tags.contains("\"Cost.Center\"") && default_tags.contains("= \"R&D 42\""), "{aws}");
     // Google Cloud's labels take lowercase letters, digits, `_` and `-`.
-    let gcp = file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?;
-    assert!(gcp.contains("cost_center") && gcp.contains("= \"r_d_42\""), "{gcp}");
-    assert!(!gcp.contains("Cost.Center"), "{gcp}");
+    let gcp = hcl_body(&file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?);
+    let labels = hcl_map(hcl_one(&gcp, "google_project", "env"), "labels");
+    assert!(labels.contains(&owned(&[("cost_center", "r_d_42")])[0]), "{labels:?}");
+    assert!(!labels.iter().any(|(k, _)| k == "Cost.Center"), "{labels:?}");
+    // DigitalOcean and Linode take tags as `name:value` words.
     for cloud in ["digitalocean", "linode"] {
-        let tf = file(&lab, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?;
-        assert!(tf.contains("\"Cost_Center:R_D_42\"") && tf.contains("\"team:platform\""), "{cloud}: {tf}");
+        let tf = hcl_body(&file(&lab, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?);
+        let tags = hcl_values(&tf, "tags");
+        assert!(
+            tags.contains(&"Cost_Center:R_D_42".to_owned()) && tags.contains(&"team:platform".to_owned()),
+            "{cloud}: {tags:?}"
+        );
     }
     Ok(())
 }
@@ -75,17 +95,20 @@ fn every_kubernetes_object_carries_the_tags_as_labels() -> Outcome {
 fn google_cloud_labels_its_boot_disks_and_its_private_zone() -> Outcome {
     let text = std::fs::read_to_string(examples().join("segmented/isoloom.yml"))?;
     let lab = valid(&format!("{text}\ndns: {{ private: true }}\ntags:\n  team: platform\n"))?;
-    let vm = file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?;
-    let docker = file(&tagged()?, Target::CloudDocker, "cloud-docker/gcp/main.tf")?;
-    for tf in [vm.as_str(), docker.as_str()] {
-        assert!(tf.contains("initialize_params {"), "{tf}");
-        for disk in tf.split("initialize_params {").skip(1) {
-            let params = disk.split('}').next().unwrap_or_default();
-            assert!(params.contains("labels") && disk.contains("\"platform\""), "{params}");
-        }
+    let vm = hcl_body(&file(&lab, Target::CloudVm, "cloud-vm/gcp/main.tf")?);
+    let docker = hcl_body(&file(&tagged()?, Target::CloudDocker, "cloud-docker/gcp/main.tf")?);
+    let team = owned(&[("team", "platform")]).remove(0);
+    for (module, body) in [("cloud-vm", &vm), ("cloud-docker", &docker)] {
+        let disks: Vec<Vec<(String, String)>> = hcl_blocks(body, "resource", &["google_compute_instance"])
+            .iter()
+            .flat_map(|i| hcl_nested(i.body(), "boot_disk"))
+            .flat_map(|d| hcl_nested(d.body(), "initialize_params"))
+            .map(|p| hcl_map(p.body(), "labels"))
+            .collect();
+        assert_every!(&disks, |labels: &&Vec<(String, String)>| labels.contains(&team));
+        assert!(!disks.is_empty(), "{module}");
     }
-    let zone = vm.split("resource \"google_dns_managed_zone\"").nth(1).ok_or("no private zone")?;
-    assert!(zone.split("\nresource ").next().unwrap_or_default().contains("\"platform\""), "{zone}");
+    assert!(hcl_map(hcl_one(&vm, "google_dns_managed_zone", "private"), "labels").contains(&team));
     Ok(())
 }
 
