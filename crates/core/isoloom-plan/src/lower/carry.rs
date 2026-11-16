@@ -101,7 +101,13 @@ mod tests {
             "[{ run: a.sh }, { packages: [{ name: nginx, version: \"1.2\" }] }, { user: { name: a } }, { service: nginx }, { firewall: { allow: [80] } }]",
         )
         .unwrap();
-        assert!(steps.iter().all(|s| in_container(s).is_none()));
-        assert!(in_container(&Step::Reboot).is_some());
+        isoloom_test_support::assert_every!(&steps, |s: &&Step| in_container(s).is_none());
+        assert_eq!(
+            in_container(&Step::Reboot),
+            Some((
+                "a reboot needs a machine with its own kernel and boot: a container has neither".to_owned(),
+                "a VM target".to_owned()
+            ))
+        );
     }
 }

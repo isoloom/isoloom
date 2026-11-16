@@ -778,6 +778,7 @@ dependencies = [
  "insta",
  "isoloom-catalogue",
  "isoloom-spec",
+ "isoloom-test-support",
  "proptest",
  "serde",
  "serde_json",

@@ -210,6 +210,6 @@ overrides:
             ],
             "a Linux existing host's steps now run through Ansible, so only the missing hosts are refused"
         );
-        assert!(found.iter().all(|p| p.code == Code::Refused));
+        isoloom_test_support::assert_every!(&found, |p: &&Problem| p.code == Code::Refused);
     }
 }

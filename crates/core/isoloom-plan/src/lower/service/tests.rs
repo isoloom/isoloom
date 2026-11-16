@@ -133,14 +133,20 @@ fn an_endpoint_reaches_the_template_as_the_machines_address_on_each_target() {
         .find(|(k, _)| k.as_str().ends_with("php.conf"))
         .map(|(_, t)| t.as_str())
         .unwrap_or_default();
-    assert!(php.contains("fastcgi_pass  {{ machines.fpm.addresses.lab }}:9000;"), "{php}");
+    let pass: Vec<&str> = php.lines().map(str::trim).filter(|l| l.starts_with("fastcgi_pass")).collect();
+    assert_eq!(pass, ["fastcgi_pass  {{ machines.fpm.addresses.lab }}:9000;"], "{php}");
 }
 
 #[test]
 fn several_services_are_refused_on_a_container_target() {
     let found = refused("{ os: debian@12, service: [nginx, nginx@1.31], networks: { lab: 10 } }", Target::Docker);
-    assert_eq!(found[0].0, "machines.web.service");
-    assert!(found[0].1.contains("a container runs one"), "{found:?}");
+    assert_eq!(
+        found,
+        [(
+            "machines.web.service".to_owned(),
+            "several services share a VM, but a container runs one".to_owned()
+        )]
+    );
 }
 
 #[test]
@@ -159,13 +165,9 @@ fn every_form_renders_the_recipe_of_an_entry_including_a_linux_host_that_exists(
 #[test]
 fn a_setting_naming_a_project_folder_it_lacks_is_a_problem_with_files() {
     let l = lab("{ os: debian@12, service: nginx, with: { root: site/ }, networks: { lab: 10 } }");
-    let dir = std::env::temp_dir();
-    let found: Vec<String> = l
-        .problems_with_files(&dir.join("isoloom-no-such-project"))
-        .iter()
-        .map(|p| p.path.to_string())
-        .collect();
-    assert!(found.contains(&"machines.web.with.root".to_owned()), "{found:?}");
+    let dir = tempfile::tempdir().unwrap();
+    let found: Vec<String> = l.problems_with_files(dir.path()).iter().map(isoloom_spec::syntax::Problem::line).collect();
+    assert_eq!(found, ["machines.web.with.root: `site/` doesn't exist in the project folder"]);
 }
 
 /// nginx's entry, each of its files as `edit` (its path, its text) writes it.
@@ -249,11 +251,14 @@ fn a_service_whose_recipe_its_os_cant_carry_is_a_problem_not_a_machine_left_unse
     )
     .unwrap();
     let lowered = crate::lower::lower(&source, &windows_nginx(), crate::lower::Scope::Lab);
-    let found: Vec<(String, String)> = lowered.problems.iter().map(|p| (p.path.to_string(), p.reason.clone())).collect();
-    assert!(
-        found
-            .iter()
-            .any(|(path, why)| path == "machines.web.service" && why.starts_with("nginx's recipe on windows-server@2022: ")),
-        "{found:?}"
+    let found: Vec<String> = lowered.problems.iter().map(isoloom_spec::syntax::Problem::line).collect();
+    let at = "machines.web.service: nginx's recipe on windows-server@2022";
+    assert_eq!(
+        found,
+        [
+            format!("{at}: a Windows feature has no version"),
+            format!("{at}: a Windows file's `mode` is an ACL, which the model doesn't set"),
+            format!("{at}: a Windows file's `mode` is an ACL, which the model doesn't set"),
+        ]
     );
 }

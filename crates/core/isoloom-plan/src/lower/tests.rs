@@ -81,14 +81,9 @@ fn each_target_gets_its_own_overrides() {
     assert!(status.docker.as_ref().is_some_and(|d| d.lxc) && status.vm.is_none());
     assert!(docker.spec.machines["status"].vm.is_some() && !docker.spec.machines["status"].docker.as_ref().unwrap().lxc);
     assert_eq!(docker.refusals, []);
-    // The portal's and the scanner's `copy` and `packages` steps wait for VM configuration
-    // steps; the status board's VM recipe is a script.
-    assert!(
-        proxmox
-            .refusals
-            .iter()
-            .all(|r| r.path.as_str().starts_with("machines.portal.") || r.path.as_str().starts_with("machines.scanner."))
-    );
+    // The portal's and the scanner's `copy` and `packages` steps render on Proxmox's VMs too, and
+    // the status board's VM recipe is a script: nothing is refused.
+    assert_eq!(proxmox.refusals, []);
 }
 
 #[test]
@@ -111,7 +106,8 @@ fn a_windows_domain_lowers_onto_vms() {
     assert_eq!(l.spec.machines["srv01"].vm.as_ref().unwrap().provision, ["provision/iis.ps1"]);
     // Windows has no container form: the container targets refuse it at `os`.
     let docker = on("forest-mini", Target::Docker);
-    assert!(docker.refusals.iter().any(|r| r.path.as_str() == "machines.dc01.os"), "{:?}", docker.refusals);
+    let refused: Vec<String> = docker.refusals.iter().map(|r| r.path.to_string()).collect();
+    assert_eq!(refused, ["machines.dc01.os", "machines.srv01.os", "machines.ws01.os"]);
 }
 
 #[test]
@@ -124,8 +120,8 @@ fn the_lab_scope_applies_no_targets_own_facts() {
 #[test]
 fn configuration_steps_render_on_a_vm_and_in_a_container() {
     for target in [Target::Vagrant, Target::Docker] {
-        let l = on("branch-office", target);
-        assert!(l.refusals.iter().all(|r| !r.path.as_str().contains("steps")), "{target:?}: {:?}", l.refusals);
+        let refused: Vec<String> = on("branch-office", target).refusals.iter().map(|r| r.path.to_string()).collect();
+        assert_eq!(refused, Vec::<String>::new(), "{target:?}");
     }
 }
 
@@ -225,7 +221,8 @@ fn a_dns_server_named_by_machine_is_its_address_on_a_network_both_share() {
     assert_eq!(servers("pc"), ["10.2.0.53", "9.9.9.9"]);
     assert_eq!(servers("far"), ["pc"], "they share no network: the name stays");
     let docker = lower(lab.source(), built_in(), Scope::Target(Target::Docker));
-    assert!(docker.spec.machines["pc"].dns.as_ref().is_some_and(|d| d.servers[0] != "dns"));
+    let on_docker = docker.spec.machines["pc"].dns.as_ref().map(|d| d.servers.clone()).unwrap_or_default();
+    assert_eq!(on_docker, ["10.2.0.53", "9.9.9.9"], "the same on a target");
 }
 
 #[test]

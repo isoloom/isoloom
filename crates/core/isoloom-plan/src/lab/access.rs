@@ -92,24 +92,51 @@ mod tests {
     #[test]
     fn a_target_the_image_table_gives_no_form_for_the_supplied_access_machine_refuses_it() {
         let none = lab("{}");
-        for t in [Target::Docker, Target::Vagrant, Target::Proxmox, Target::Esxi, Target::CloudVm] {
-            let why = refused(&none, t).unwrap_or_default();
-            assert!(why.starts_with("machines.user.os: without `os`, the access machine"), "{t:?}: {why}");
-            assert!(!none.possible().contains(&t), "{t:?}");
-        }
-        assert_eq!(refused(&none, Target::External).filter(|w| w.contains("machines.user")), None);
-        let warned = none.warnings();
-        assert_eq!(warned.iter().map(|w| w.path.to_string()).collect::<Vec<_>>(), ["machines.user.access"]);
-        assert!(warned[0].reason.contains("all but `external`)"), "{}", warned[0].reason);
+        let refusals: Vec<String> = [
+            Target::Docker,
+            Target::Vagrant,
+            Target::Proxmox,
+            Target::Esxi,
+            Target::CloudVm,
+            Target::External,
+        ]
+        .into_iter()
+        .map(|t| format!("{}: {}", t.id(), refused(&none, t).unwrap_or_default()))
+        .collect();
+        assert_eq!(
+            refusals,
+            [
+                "docker: machines.user.os: without `os`, the access machine's container comes from the image table's `access.docker`, which gives none",
+                "vagrant: machines.user.os: without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none",
+                "proxmox: machines.user.os: without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none",
+                "esxi: machines.user.os: without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none",
+                "cloud-vm: machines.user.os: without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none",
+                "external: overrides.external.machines.web: the external target reaches machines that exist already, and `web` names no host"
+            ]
+        );
+        assert_eq!(none.possible(), [], "external needs a host for `web` too");
+        let warned: Vec<String> = none.warnings().iter().map(|w| format!("{}: {}", w.path, w.reason)).collect();
+        assert_eq!(
+            warned,
+            [
+                "machines.user.access: without `os`, the access machine comes from the image table's `access:`, and none is given here: every target that creates the machines (all but `external`) refuses it unless `isoloom generate --images` gives one"
+            ]
+        );
 
         let vm = lab("access: { vm: debian@12 }");
         assert_eq!(refused(&vm, Target::Vagrant), None);
-        assert!(refused(&vm, Target::Docker).is_some_and(|w| w.contains("`access.docker`")));
+        assert_eq!(
+            refused(&vm, Target::Docker).into_iter().collect::<Vec<_>>(),
+            ["machines.user.os: without `os`, the access machine's container comes from the image table's `access.docker`, which gives none"]
+        );
         assert_eq!(vm.warnings().len(), 0, "{:?}", vm.warnings());
 
         let container = lab("access: { docker: registry.example.com/workstation:1 }");
         assert_eq!(refused(&container, Target::Docker), None);
-        assert!(refused(&container, Target::Proxmox).is_some_and(|w| w.contains("`access.vm`")));
+        assert_eq!(
+            refused(&container, Target::Proxmox).into_iter().collect::<Vec<_>>(),
+            ["machines.user.os: without `os`, the access machine's VM comes from the image table's `access.vm`, which gives none"]
+        );
     }
 
     #[test]

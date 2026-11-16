@@ -563,9 +563,17 @@ mod tests {
             "version: 1\nname: t\nnetworks:\n  office: { cidr: 10.10.0.0/16, gateway: pc, vlans: { 5000: { cidr: 10.10.50.0/24 }, 20: { cidr: 10.99.0.0/24 } } }\nmachines:\n  pc: { networks: { office.vlan20: 10 }, app: { image: alpine } }\n",
         );
         let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
-        for at in ["networks.office", "networks.office.vlans.5000", "networks.office.vlans.20.cidr"] {
-            assert!(paths.contains(&at.to_owned()), "{at} in {paths:?}");
-        }
+        assert_eq!(
+            paths,
+            [
+                "networks.office",
+                "networks.office.cidr",
+                "networks.office.gateway",
+                "networks.office.vlans.5000",
+                "networks.office.vlans.20.cidr",
+                "machines.pc.networks.office.vlan20"
+            ]
+        );
     }
 
     #[test]
@@ -574,8 +582,8 @@ mod tests {
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\noverrides:\n  proxmox: { networks: { lan: { external: 'vmbr 1' } } }\n  docker: { networks: { lan: { external: 'corp net' } } }\n",
         );
         let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
-        assert!(paths.contains(&"overrides.proxmox.networks.lan.external".to_owned()), "{paths:?}");
-        assert!(paths.contains(&"overrides.docker.networks.lan.external".to_owned()), "{paths:?}");
+        let overrides: Vec<&String> = paths.iter().filter(|p| p.starts_with("overrides.")).collect();
+        assert_eq!(overrides, ["overrides.proxmox.networks.lan.external", "overrides.docker.networks.lan.external"]);
     }
 
     #[test]
@@ -584,18 +592,15 @@ mod tests {
             "version: 1\nname: t\ngroups: { windows: { members: [dc1] } }\nmachines:\n  dc1: { os: debian@12 }\n  w: { os: debian@12, count: 2 }\n  a: { os: debian@12 }\noverrides:\n  vagrant: { machines: { windows: { box: 'bad box' }, w: { box: 'bad box' }, a: { box: 'bad box' } } }\n",
         );
         let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
-        for written in [
-            "overrides.vagrant.machines.windows.box",
-            "overrides.vagrant.machines.w.box",
-            "overrides.vagrant.machines.a.box",
-        ] {
-            assert!(paths.contains(&written.to_owned()), "{written}: {paths:?}");
-        }
-        assert!(
-            !paths
-                .iter()
-                .any(|p| p.starts_with("overrides.vagrant.machines.dc1") || p.starts_with("overrides.vagrant.machines.w-0")),
-            "no problem at a key nobody wrote: {paths:?}"
+        // Each at the key it is written at, none at a key nobody wrote (`dc1`, `w-01`).
+        let overrides: Vec<&String> = paths.iter().filter(|p| p.starts_with("overrides.")).collect();
+        assert_eq!(
+            overrides,
+            [
+                "overrides.vagrant.machines.windows.box",
+                "overrides.vagrant.machines.w.box",
+                "overrides.vagrant.machines.a.box"
+            ]
         );
     }
 
@@ -606,23 +611,26 @@ mod tests {
             "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  db: { networks: { lan: 10 }, app: { steps: [{ run: a.sh }] }, depends_on: [ghost] }\n  web: { networks: { lan: 11 }, app: { image: nginx }, depends_on: [nowhere] }\n",
         );
         let paths: Vec<String> = lab.problems().iter().map(|p| p.path.to_string()).collect();
-        assert!(paths.contains(&"machines.db.os".to_owned()), "{paths:?}");
-        assert!(!paths.iter().any(|p| p.starts_with("machines.db.depends_on")), "{paths:?}");
-        assert!(
-            paths.iter().any(|p| p.starts_with("machines.web.depends_on")),
-            "an unrefused machine's: {paths:?}"
-        );
+        // `db`'s own and an unrefused machine's, not `db.depends_on`.
+        assert_eq!(paths, ["machines.db.os", "machines.web.depends_on[0]"]);
     }
 
     #[test]
     fn a_secret_no_machine_gets_is_a_problem_unless_a_catalogue_service_may_read_it() {
-        let paths = |machines: &str| -> Vec<String> {
+        let secrets = |machines: &str| -> Vec<String> {
             let lab = testing::lab(&format!("version: 1\nname: t\nsecrets: {{ db: {{ env: DB }} }}\nmachines:\n{machines}"));
-            lab.problems().iter().map(|p| p.path.to_string()).collect()
+            lab.problems()
+                .iter()
+                .map(|p| p.path.to_string())
+                .filter(|p| p.starts_with("secrets."))
+                .collect()
         };
-        assert!(paths("  web: { app: { image: nginx } }\n").contains(&"secrets.db".to_owned()));
-        let with_service = paths("  db: { os: debian@12, service: postgres }\n");
-        assert!(!with_service.iter().any(|p| p.starts_with("secrets.")), "{with_service:?}");
+        assert_eq!(secrets("  web: { app: { image: nginx } }\n"), ["secrets.db"], "no machine gets it");
+        assert_eq!(
+            secrets("  db: { os: debian@12, service: postgres }\n"),
+            Vec::<String>::new(),
+            "a catalogue service may"
+        );
     }
 
     #[test]
