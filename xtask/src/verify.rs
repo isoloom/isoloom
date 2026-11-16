@@ -33,7 +33,7 @@
 use std::fs::File;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::process::{ExitCode, Stdio};
 
 use crate::{Res, generate_all, process, repo};
 
@@ -78,7 +78,7 @@ fn verify(a: &Args) -> Res<ExitCode> {
         generate_all::generate(&generate_all::binary(&root)?, &generate_all::examples(&root)?, &tree)?;
         tree
     };
-    if process::quiet(Command::new("docker").arg("info")).is_err() {
+    if process::quiet(process::tool("docker").arg("info")).is_err() {
         return Err("Docker isn't running".into());
     }
     let image = image(&root)?;
@@ -93,7 +93,7 @@ pub(crate) fn image(root: &Path) -> Res<String> {
     let mut inputs = std::fs::read(dir.join("Dockerfile"))?;
     inputs.extend(std::fs::read(dir.join("requirements.txt"))?);
     let image = format!("isoloom-verify:{}", cksum(&inputs));
-    if process::quiet(Command::new("docker").args(["image", "inspect", &image])).is_ok() {
+    if process::quiet(process::tool("docker").args(["image", "inspect", &image])).is_ok() {
         return Ok(image);
     }
     eprintln!("verify: building {image} ({DIR}/Dockerfile)");
@@ -103,7 +103,7 @@ pub(crate) fn image(root: &Path) -> Res<String> {
         context.append_path_with_name(dir.join(name), name)?;
     }
     let bytes = context.into_inner()?;
-    let mut build = Command::new("docker");
+    let mut build = process::tool("docker");
     build
         .args(["build", "--platform", "linux/amd64", "-t", &image, "-"])
         .stdin(Stdio::piped())
@@ -168,7 +168,7 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
     add_tree(&mut input, tree, Path::new("tree"))?;
     add_tree(&mut input, &root.join(DIR), Path::new("verify"))?;
     input.into_inner()?;
-    let id = process::output(Command::new("docker").args(["image", "inspect", "-f", "{{.Id}}", image]))?;
+    let id = process::output(process::tool("docker").args(["image", "inspect", "-f", "{{.Id}}", image]))?;
     let cache = std::env::var("VERIFY_CACHE").unwrap_or_else(|_| "isoloom-verify-cache".into());
     let jobs = std::env::var("VERIFY_JOBS").ok();
     let container = Container {
@@ -178,7 +178,7 @@ fn run_image(image: &str, tree: &Path, root: &Path, out: &Path, update: bool) ->
         cpus: cpus(std::env::var("ISOLOOM_VERIFY_CPUS").ok().as_deref())?,
         jobs: jobs.as_deref(),
     };
-    let mut docker = Command::new("docker");
+    let mut docker = process::tool("docker");
     docker.args(run_args(&container, update));
     docker.stdin(File::open(work.join("in.tar"))?).stdout(File::create(work.join("out.tar"))?);
     let status = docker.status()?;
@@ -359,5 +359,162 @@ mod tests {
         // `printf abc | cksum` and `printf '' | cksum`.
         assert_eq!(cksum(b"abc"), 1_219_131_554);
         assert_eq!(cksum(b""), 4_294_967_295);
+    }
+
+    /// A checkout holding the image's inputs and the runner, under `bin`'s folder.
+    #[cfg(unix)]
+    fn checkout(bin: &isoloom_test_support::FakeBin) -> PathBuf {
+        let root = bin.dir().join("root");
+        std::fs::create_dir_all(root.join(DIR)).unwrap();
+        for (name, text) in [("Dockerfile", "FROM scratch\n"), ("requirements.txt", "yamllint\n"), ("runner", "print()\n")] {
+            std::fs::write(root.join(DIR).join(name), text).unwrap();
+        }
+        root
+    }
+
+    /// The names in the archive `at`.
+    #[cfg(unix)]
+    fn names(at: &Path) -> Vec<String> {
+        let mut archive = tar::Archive::new(File::open(at).unwrap());
+        let mut out: Vec<String> = archive.entries().unwrap().map(|e| e.unwrap().path().unwrap().display().to_string()).collect();
+        out.sort();
+        out
+    }
+
+    /// A stand-in `docker`: each call logged; `image inspect` finds the image once it was built;
+    /// `build` keeps its context (standard input) as `context.tar`, failing when `fail-build` is
+    /// there.
+    #[cfg(unix)]
+    fn docker(bin: &isoloom_test_support::FakeBin) {
+        let (log, dir) = (bin.log(), bin.dir());
+        let body = format!(
+            r#"echo "docker $*" >> '{log}'
+case "$1 $2" in
+  "image inspect") [ -f '{dir}/built' ] ;;
+  "build "*) cat > '{dir}/context.tar'; [ ! -f '{dir}/fail-build' ] || exit 1; : > '{dir}/built' ;;
+esac"#,
+            log = log.display(),
+            dir = dir.display()
+        );
+        bin.stand_in("docker", &body).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_image_is_built_once_tagged_with_its_inputs_checksum_from_a_streamed_context() {
+        let bin = isoloom_test_support::FakeBin::named("xtask-verify").unwrap();
+        let root = checkout(&bin);
+        docker(&bin);
+        let tag = format!("isoloom-verify:{}", cksum(b"FROM scratch\nyamllint\n"));
+        let (first, second) = crate::process::testing::with_stand_ins(&bin.path(), || (image(&root).unwrap(), image(&root).unwrap()));
+        assert_eq!((first.as_str(), second.as_str()), (tag.as_str(), tag.as_str()));
+        let calls: Vec<String> = bin.calls().unwrap().iter().map(|c| c.join(" ")).collect();
+        assert_eq!(
+            calls,
+            [
+                format!("docker image inspect {tag}"),
+                format!("docker build --platform linux/amd64 -t {tag} -"),
+                format!("docker image inspect {tag}"),
+            ],
+            "built once, then found"
+        );
+        assert_eq!(
+            names(&bin.dir().join("context.tar")),
+            ["Dockerfile", "requirements.txt"],
+            "no host path in the context"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_build_is_an_error_naming_the_image() {
+        let bin = isoloom_test_support::FakeBin::named("xtask-verify").unwrap();
+        let root = checkout(&bin);
+        docker(&bin);
+        std::fs::write(bin.dir().join("fail-build"), "").unwrap();
+        let e = crate::process::testing::with_stand_ins(&bin.path(), || image(&root)).unwrap_err().to_string();
+        assert_eq!(e, format!("building isoloom-verify:{} failed", cksum(b"FROM scratch\nyamllint\n")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_tree_and_the_runner_go_in_as_one_archive_and_the_results_come_back() {
+        let bin = isoloom_test_support::FakeBin::named("xtask-verify").unwrap();
+        let root = checkout(&bin);
+        let tree = bin.dir().join("tree");
+        for dir in ["web/.isoloom/docker", "web/.terraform/providers", "web/.git"] {
+            std::fs::create_dir_all(tree.join(dir)).unwrap();
+        }
+        std::fs::write(tree.join("web/.isoloom/docker/compose.yaml"), "services: {}\n").unwrap();
+        std::fs::write(tree.join("web/.terraform/providers/big"), "x").unwrap();
+        let results = bin.dir().join("results");
+        std::fs::create_dir_all(&results).unwrap();
+        std::fs::write(results.join("summary.txt"), "1 finding\n").unwrap();
+        // `run` keeps what it was given and answers the results archive, the runner's status 3
+        // (findings).
+        let body = format!(
+            r#"echo "docker $*" >> '{log}'
+case "$1" in
+  image) echo sha256:the-id ;;
+  run) cat > '{dir}/in.tar'; tar -cf - -C '{results}' .; exit 3 ;;
+esac"#,
+            log = bin.log().display(),
+            dir = bin.dir().display(),
+            results = results.display()
+        );
+        bin.stand_in("docker", &body).unwrap();
+        let out = bin.dir().join("out");
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(out.join("stale.jsonl"), "from the last run").unwrap();
+        let code = crate::process::testing::with_stand_ins(&bin.path(), || run_image("isoloom-verify:1", &tree, &root, &out, false)).unwrap();
+        assert_eq!(code, 3);
+        assert_eq!(std::fs::read_to_string(out.join("summary.txt")).unwrap(), "1 finding\n");
+        assert!(!out.join("stale.jsonl").exists(), "the last run's results are cleared first");
+        assert_eq!(
+            names(&bin.dir().join("in.tar")),
+            [
+                "tree",
+                "tree/web",
+                "tree/web/.isoloom",
+                "tree/web/.isoloom/docker",
+                "tree/web/.isoloom/docker/compose.yaml",
+                "verify",
+                "verify/Dockerfile",
+                "verify/requirements.txt",
+                "verify/runner",
+            ],
+            "the tools' caches and .git left out"
+        );
+        let run = bin
+            .calls()
+            .unwrap()
+            .into_iter()
+            .find(|c| c.get(1).map(String::as_str) == Some("run"))
+            .unwrap_or_default();
+        assert!(
+            run.windows(3).any(|w| w == ["-e", "VERIFY_IMAGE=isoloom-verify:1", "sha256:the-id"]),
+            "the image's id, as docker says it, recorded: {run:?}"
+        );
+    }
+
+    #[test]
+    fn the_runners_status_is_the_tasks_and_no_summary_is_a_failed_run() {
+        let dir = scratch("finish");
+        let (out, root) = (dir.path().join("out"), dir.path().join("root"));
+        std::fs::create_dir_all(root.join(DIR)).unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        let e = finish(&out, &root, false, 5).unwrap_err().to_string();
+        assert_eq!(e, "the run failed (exit status 5), no results");
+        std::fs::write(out.join("summary.txt"), "clean\n").unwrap();
+        assert_eq!(finish(&out, &root, false, 0).unwrap(), ExitCode::SUCCESS);
+        assert_eq!(finish(&out, &root, false, 3).unwrap(), ExitCode::FAILURE, "findings");
+        assert_eq!(finish(&out, &root, false, 2).unwrap_err().to_string(), "the runner failed (exit status 2)");
+        std::fs::write(out.join("baseline.json"), "{\"new\":1}").unwrap();
+        assert_eq!(finish(&out, &root, true, 0).unwrap(), ExitCode::SUCCESS);
+        assert_eq!(
+            std::fs::read_to_string(root.join(DIR).join("baseline.json")).unwrap(),
+            "{\"new\":1}",
+            "--update-baseline keeps the new one"
+        );
     }
 }

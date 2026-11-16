@@ -48,3 +48,49 @@ pub(crate) fn release(name: &str, version: &str) -> Res<Release> {
         sha256: field("/artifact/sha256")?,
     })
 }
+
+#[cfg(test)]
+#[cfg(unix)]
+mod tests {
+    use super::super::fetch::testing::Web;
+    use super::*;
+
+    #[test]
+    fn a_collection_s_highest_version_and_its_release_are_read_from_galaxy() {
+        let web = Web::new();
+        web.serves(&format!("{INDEX}/ansible/posix/"), &[], br#"{"highest_version":{"version":"2.1.0"}}"#)
+            .serves(
+                &format!("{INDEX}/ansible/posix/versions/2.1.0/"),
+                &[],
+                br#"{"download_url":"https://galaxy.example/ansible-posix-2.1.0.tar.gz","artifact":{"sha256":"ab12"}}"#,
+            );
+        assert_eq!(web.browse(|| highest("ansible.posix")).ok().as_deref(), Some("2.1.0"));
+        let release = web.browse(|| release("ansible.posix", "2.1.0")).unwrap();
+        assert_eq!(
+            release,
+            Release {
+                version: "2.1.0".into(),
+                url: "https://galaxy.example/ansible-posix-2.1.0.tar.gz".into(),
+                sha256: "ab12".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn a_name_or_an_answer_galaxy_wouldn_t_give_is_refused_naming_it() {
+        let web = Web::new();
+        web.serves(&format!("{INDEX}/ansible/posix/"), &[], b"{}").serves(
+            &format!("{INDEX}/ansible/posix/versions/2.1.0/"),
+            &[],
+            br#"{"download_url":"https://x"}"#,
+        );
+        assert_eq!(highest("posix").unwrap_err().to_string(), "`posix` isn't `<namespace>.<name>`");
+        assert_eq!(release("posix", "1").unwrap_err().to_string(), "`posix` isn't `<namespace>.<name>`");
+        assert_eq!(
+            web.browse(|| highest("ansible.posix")).unwrap_err().to_string(),
+            "Galaxy lists no version of ansible.posix"
+        );
+        let e = web.browse(|| release("ansible.posix", "2.1.0")).unwrap_err().to_string();
+        assert_eq!(e, "Galaxy's ansible.posix 2.1.0 has no `/artifact/sha256`");
+    }
+}
