@@ -71,7 +71,7 @@ fn a_vm_per_machine_set_up_through_the_router() {
         .iter()
         .map(|c| isoloom_test_support::hcl_text(c.body(), "bastion_host"))
         .collect();
-    assert!(!bastions.is_empty() && bastions.iter().all(|b| b == "local.router_address"), "{bastions:?}");
+    isoloom_test_support::assert_every!(bastions, |b: &String| b == "local.router_address");
     let locals = isoloom_test_support::hcl_blocks(&body, "locals", &[]);
     let router = locals
         .iter()
@@ -114,7 +114,8 @@ fn windows_and_ipv6_are_hosted_within_limits() {
     assert!(why.contains("PowerShell scripts"), "{why}");
     let v6 = PAIR.replace("back: { cidr: 10.20.2.0/24 }", "back: { cidr: 10.20.2.0/24, ipv6: { cidr: \"fd00:20::/64\" } }");
     assert_eq!(EsxiBackend.refusal(&env(&v6)), None);
-    let router_addresses = isoloom_test_support::hcl_literals(&isoloom_test_support::hcl_body(&module(&v6)));
+    let router = isoloom_test_support::hcl_resource(&module(&v6), "esxi_guest", "isoloom_router");
+    let router_addresses = isoloom_test_support::hcl_literals(&router);
     assert!(router_addresses.iter().any(|l| l == "fd00:20::254/64"), "the router's IPv6 address");
     let kali = PAIR.replace("os: debian@12", "os: kali");
     let no_image = EsxiBackend.refusal(&env(&kali)).unwrap();
@@ -134,10 +135,12 @@ fn a_linux_machines_secrets_come_from_the_modules_variables_and_a_windows_ones_a
             "version: 1\nname: s\n{top}\nnetworks: {{ lan: {{ cidr: 10.20.1.0/24 }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, os: debian@12, files: [{file}] }}\n"
         );
         assert_eq!(EsxiBackend.refusal(&env(&spec)), None, "{spec}");
-        let tf = module(&spec);
+        let set_up = isoloom_test_support::hcl_literals(&isoloom_test_support::hcl_resource(&module(&spec), "terraform_data", "web"));
         assert!(
-            tf.contains(". /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env"),
-            "{tf}"
+            set_up
+                .iter()
+                .any(|c| c.contains(". /var/lib/isoloom/secrets.env && set +a && rm -f /var/lib/isoloom/secrets.env")),
+            "{set_up:?}"
         );
         let windows = spec.replace("os: debian@12", "os: windows-server@2022").replace("/etc/token", "C:\\\\token");
         let why = crate::server::secrets_refusal(&env(&windows)).unwrap_or_default();

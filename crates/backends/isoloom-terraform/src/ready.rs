@@ -226,40 +226,61 @@ mod tests {
         }
     }
 
-    fn rendered(w: Wait) -> String {
+    /// The wait's resource, parsed.
+    fn rendered(w: Wait) -> hcl::Body {
         let mut m = Module::default();
         m.block(w.block());
-        m.render().unwrap()
+        isoloom_test_support::hcl_resource(&m.render().unwrap(), "terraform_data", "isoloom_ready_web")
+    }
+
+    /// Each provisioner of `wait`, in order: its kind, its inline commands, its `on_failure`.
+    fn provisioners(wait: &hcl::Body) -> Vec<(String, Vec<String>, Option<String>)> {
+        isoloom_test_support::hcl_nested(wait, "provisioner")
+            .iter()
+            .map(|p| {
+                let kind = p.labels().first().map(|l| l.as_str().to_owned()).unwrap_or_default();
+                let on_failure = isoloom_test_support::hcl_attribute(p.body(), "on_failure").map(ToString::to_string);
+                (kind, isoloom_test_support::hcl_values(p.body(), "inline"), on_failure)
+            })
+            .collect()
     }
 
     #[test]
     fn the_wait_signs_in_with_the_operators_key_and_is_made_again_with_the_machine() {
+        use isoloom_test_support::{hcl_nested, hcl_text};
         let tf = rendered(wait(0, false));
-        assert!(tf.contains("resource \"terraform_data\" \"isoloom_ready_web\""), "{tf}");
-        assert!(tf.contains("triggers_replace = [aws_instance.web.id]"), "{tf}");
-        assert!(tf.contains("private_key = file(pathexpand(var.ssh_private_key_file))"), "{tf}");
-        assert_eq!(tf.matches("provisioner \"remote-exec\"").count(), 1, "{tf}");
-        assert!(!tf.contains("on_failure"), "{tf}");
-        assert!(!tf.contains("provisioner \"file\""), "no project: {tf}");
+        let triggers: String = hcl_text(&tf, "triggers_replace").split_whitespace().collect();
+        assert_eq!(triggers, "[aws_instance.web.id]");
+        let connection = hcl_nested(&tf, "connection");
+        assert_eq!(connection.len(), 1);
+        assert_eq!(hcl_text(connection[0].body(), "private_key"), "file(pathexpand(var.ssh_private_key_file))");
+        // One wait, which fails the apply; no project to bring in.
+        let kinds: Vec<(String, Option<String>)> = provisioners(&tf).into_iter().map(|(k, _, f)| (k, f)).collect();
+        assert_eq!(kinds, [("remote-exec".to_owned(), None)]);
     }
 
     #[test]
     fn a_restart_of_the_set_up_is_one_more_wait_going_on_when_its_session_drops() {
-        let tf = rendered(wait(2, false));
-        assert_eq!(tf.matches("provisioner \"remote-exec\"").count(), 3, "{tf}");
-        assert_eq!(tf.matches("on_failure = continue").count(), 2, "{tf}");
-        let (_, last) = tf.rsplit_once("provisioner \"remote-exec\"").unwrap();
-        assert!(!last.contains("on_failure"), "the last wait fails the apply: {tf}");
+        let kinds: Vec<(String, Option<String>)> = provisioners(&rendered(wait(2, false))).into_iter().map(|(k, _, f)| (k, f)).collect();
+        let going_on = ("remote-exec".to_owned(), Some("continue".to_owned()));
+        // The last wait fails the apply.
+        assert_eq!(kinds, [going_on.clone(), going_on, ("remote-exec".to_owned(), None)]);
     }
 
     #[test]
     fn the_project_comes_in_before_the_wait_then_the_mark_the_set_up_waits_for() {
-        let tf = rendered(wait(0, true));
-        let upload = tf.find("provisioner \"file\"").unwrap();
-        let deliver = tf.find("touch /var/lib/isoloom/project-delivered").unwrap();
-        let wait = tf.find("cloud-init status --wait").unwrap();
-        assert!(upload < deliver && deliver < wait, "{tf}");
-        assert!(tf.contains("tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1"), "{tf}");
+        let steps = provisioners(&rendered(wait(0, true)));
+        let kinds: Vec<&str> = steps.iter().map(|(k, ..)| k.as_str()).collect();
+        // The project archived where Terraform runs, uploaded, unpacked and its delivery marked,
+        // then the wait.
+        assert_eq!(kinds, ["local-exec", "file", "remote-exec", "remote-exec"]);
+        let deliver = steps[2].1.join("\n");
+        assert!(
+            deliver.contains("tar -xzf /tmp/isoloom-project.tgz -C /opt/isoloom --strip-components=1"),
+            "{deliver}"
+        );
+        assert!(deliver.contains("touch /var/lib/isoloom/project-delivered"), "{deliver}");
+        assert!(steps[3].1.join("\n").contains("cloud-init status --wait"), "{:?}", steps[3]);
     }
 
     /// The wait under `sh`, against a ready file it reads: `ready` ends it well, `failed: …`

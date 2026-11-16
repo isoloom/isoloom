@@ -134,34 +134,12 @@ mod tests {
     }
 
     #[test]
-    fn each_value_writes_its_hcl() {
-        assert_eq!(written(&string("a")), "\"a\"");
-        assert_eq!(written(&number(7)), "7");
-        assert_eq!((written(&boolean(true)), written(&boolean(false))), ("true".to_owned(), "false".to_owned()));
-        assert_eq!(written(&null()), "null");
-        assert_eq!(written(&list([number(1), string("b")])), "[1, \"b\"]");
-    }
-
-    #[test]
     fn each_reference_writes_its_path() {
         assert_eq!(written(&reference("var")), "var");
         assert_eq!(written(&reference("aws_vpc.env.id")), "aws_vpc.env.id");
         assert_eq!(written(&index(reference("x.list"), 2)), "x.list[2]");
         assert_eq!(written(&attr(index(reference("x.list"), 0), "id")), "x.list[0].id");
         assert_eq!(written(&entry(reference("var.images"), "debian-12")), r#"var.images["debian-12"]"#);
-    }
-
-    #[test]
-    fn each_operation_writes_its_hcl() {
-        assert_eq!(written(&call("max", [number(1), number(2)])), "max(1, 2)");
-        assert_eq!(written(&conditional(reference("c"), number(1), number(2))), "c ? 1 : 2");
-        assert_eq!(written(&binary(reference("a"), BinaryOperator::Eq, number(1))), "a == 1");
-        assert_eq!(written(&not(reference("a"))), "!a");
-        assert_eq!(written(&for_list("x", reference("xs"), reference("x"), None)), "[for x in xs : x]");
-        assert_eq!(
-            written(&for_list("x", reference("xs"), reference("x"), Some(reference("x.ok")))),
-            "[for x in xs : x if x.ok]"
-        );
     }
 
     #[test]

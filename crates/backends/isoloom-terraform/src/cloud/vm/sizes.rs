@@ -231,13 +231,17 @@ mod tests {
     }
 
     #[test]
-    fn fit_picks_the_smallest_size_that_takes_the_need() {
-        assert_eq!(Sizes::ordered(&GROWS).fit(&Need::new(1, 1500, 10)), "b");
-    }
-
-    #[test]
-    fn fit_falls_back_to_the_largest_when_none_takes_the_need() {
-        assert_eq!(Sizes::ordered(&GROWS).fit(&Need::new(1, 1500, 10).on(4)), "b");
+    fn fit_picks_the_smallest_size_that_takes_the_need_else_the_largest() {
+        for (need, size) in [
+            (Need::new(1, 512, 10), "a"),
+            (Need::new(1, 1500, 10), "b"),
+            (Need::new(1, 512, 10).on(3), "b"),
+            // None takes it: the largest, which the cloud's refusal rules out.
+            (Need::new(1, 1500, 10).on(4), "b"),
+            (Need::new(4, 512, 10), "b"),
+        ] {
+            assert_eq!(Sizes::ordered(&GROWS).fit(&need), size, "{need:?}");
+        }
     }
 
     #[test]

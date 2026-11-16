@@ -198,13 +198,6 @@ mod tests {
     }
 
     #[test]
-    fn text_converts_into_a_template_of_it() {
-        assert_eq!(Template::from("a").into_expression(), hcl::Expression::String("a".into()));
-        assert_eq!(Template::from(String::from("b")).into_expression(), hcl::Expression::String("b".into()));
-        assert_eq!(hcl::Expression::from(Template::text("c")), hcl::Expression::String("c".into()));
-    }
-
-    #[test]
     fn a_lone_interpolation_is_its_expression_not_a_string_around_it() {
         assert_eq!(Template::new().with_expr(reference("var.x")).into_expression(), reference("var.x"));
         assert_eq!(

@@ -186,11 +186,8 @@ mod tests {
         assert_eq!(size(1, 40_000, 5), "Standard_D16as_v5");
         assert_eq!(size(4, 1024, 1), "Standard_B4s_v2");
         assert_eq!(size(16, 1024, 1), "Standard_D16as_v5");
-        assert!(
-            SIZES
-                .names()
-                .all(|name| name.starts_with("Standard_B") && name.ends_with("_v2") || name.ends_with("as_v5"))
-        );
+        isoloom_test_support::assert_every!(SIZES.names(), |name: &&str| name.starts_with("Standard_B") && name.ends_with("_v2")
+            || name.ends_with("as_v5"));
     }
 
     #[test]

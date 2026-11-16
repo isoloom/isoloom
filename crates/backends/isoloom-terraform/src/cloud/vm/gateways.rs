@@ -153,6 +153,19 @@ mod tests {
     }
 
     #[test]
+    fn the_gateway_moves_in_the_private_zone_too() {
+        // fw's name is at its address on its first network, dmz, the one it routes.
+        let named = EDGE
+            .replace("name: e\n", "name: e\ndns: { private: true, domain: corp.internal }\n")
+            .replace("networks: { out: 5, dmz: 1 }", "networks: { dmz: 1, out: 5 }");
+        let e = env(&named);
+        let r = relocated(&e);
+        let zone = r.private_dns.as_ref().expect("the zone");
+        let fw: Vec<Ipv4Addr> = zone.records.iter().filter(|rec| rec.machine == "fw").map(|rec| rec.address).collect();
+        assert_eq!(fw, [Ipv4Addr::new(10, 70, 10, 254)]);
+    }
+
+    #[test]
     fn the_covering_block_holds_every_network() {
         let e = env(EDGE);
         assert_eq!(covering(&e, 16), Cidr::parse("10.70.0.0/20"));

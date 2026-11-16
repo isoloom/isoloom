@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn gpus_are_passed_by_name_only() {
         assert!(why("a", &gpus(json!(1))).is_some_and(|w| w.contains("`gpus.ids`")));
-        assert!(why("a", &gpus(json!("all"))).is_some());
+        assert!(why("a", &gpus(json!("all"))).is_some_and(|w| w.contains("`gpus.ids`")));
         assert!(why("a", &gpus(json!({ "ids": ["gpu0"], "options": { "a": "b" } }))).is_some_and(|w| w.contains("`gpus.options`")));
         assert_eq!(why("a", &gpus(json!({ "ids": ["gpu0"], "capabilities": ["compute"] }))), None);
     }
@@ -84,14 +84,19 @@ mod tests {
         }
         let mut m = crate::hcl_builder::Module::new("");
         m.blocks(hostpci(Some(&gpus(json!({ "ids": ["0000:01:00.0", "rtx"] })))));
-        let text = m.render().unwrap();
-        assert!(
-            text.contains("hostpci {\n  device = \"hostpci0\"\n  id     = \"0000:01:00.0\"\n  pcie   = true\n}"),
-            "{text}"
-        );
-        assert!(
-            text.contains("hostpci {\n  device  = \"hostpci1\"\n  mapping = \"rtx\"\n  pcie    = true\n}"),
-            "{text}"
+        let body = isoloom_test_support::hcl_body(&m.render().unwrap());
+        // A PCI address passes that device, a name the server's mapping of it.
+        let devices: Vec<Vec<(String, String)>> = isoloom_test_support::hcl_blocks(&body, "hostpci", &[])
+            .iter()
+            .map(|d| d.body().attributes().map(|a| (a.key().to_owned(), a.expr().to_string())).collect())
+            .collect();
+        let pair = |k: &str, v: &str| (k.to_owned(), v.to_owned());
+        assert_eq!(
+            devices,
+            [
+                vec![pair("device", "\"hostpci0\""), pair("id", "\"0000:01:00.0\""), pair("pcie", "true")],
+                vec![pair("device", "\"hostpci1\""), pair("mapping", "\"rtx\""), pair("pcie", "true")],
+            ]
         );
     }
 

@@ -177,16 +177,24 @@ mod tests {
     fn the_secrets_step_hands_each_value_over_in_base64_and_waits_for_nothing() {
         let env = crate::testing::planned(SPEC, Target::CloudVm);
         let step = secrets_step(&env.machines["web"]).unwrap();
+        // Each value in base64, from its variable, in the environment of the step.
+        let values: Vec<String> = step
+            .pieces()
+            .filter_map(|p| match p {
+                Piece::Expr(e) => Some(e.to_string()),
+                Piece::Text(_) => None,
+            })
+            .collect();
+        assert_eq!(values, ["base64encode(var.TOKEN)", "base64encode(var.ISOLOOM_SECRET_DB_PASSWORD)"]);
         let text: String = step
             .pieces()
             .map(|p| match p {
                 Piece::Text(s) => s.to_owned(),
-                Piece::Expr(e) => format!("<{e:?}>"),
+                Piece::Expr(_) => "<value>".to_owned(),
             })
             .collect();
-        assert!(text.starts_with("env ISOLOOM_SECRET_INPUT_TOKEN=<"), "{text}");
         assert!(
-            text.contains("Identifier(TOKEN)") && text.contains("Identifier(ISOLOOM_SECRET_DB_PASSWORD)"),
+            text.starts_with("env ISOLOOM_SECRET_INPUT_TOKEN=<value> ISOLOOM_SECRET_DB_PASSWORD=<value> sh -c "),
             "{text}"
         );
         assert!(!text.contains("waiting"), "nothing waits: {text}");

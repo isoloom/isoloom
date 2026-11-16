@@ -71,20 +71,28 @@ fn every_cloud_opens_ssh_and_the_published_ports() {
 
 #[test]
 fn the_host_sets_itself_up_and_the_module_waits_for_it() {
+    use isoloom_test_support::{hcl_blocks, hcl_body, hcl_names, hcl_nested, hcl_one};
     for cloud in Cloud::ALL {
-        let tf = module(cloud);
-        // Terraform brings the project and the Compose file's folder in, then waits for the set-up.
-        for part in [
-            "resource \"terraform_data\" \"isoloom_ready_docker_host\"",
-            "local_file\" \"isoloom_project\"",
-            "/.isoloom-outputs-docker_host.tgz",
-            "tar -xzf /tmp/isoloom-outputs.tgz -C /opt/isoloom",
-            "cloud-init status --wait",
-            "variable \"ssh_private_key_file\"",
-        ] {
-            assert!(tf.contains(part), "{cloud:?} lacks {part}: {tf}");
-        }
-        assert!(tf.contains(".isoloom/docker"), "{cloud:?}: {tf}");
+        let tf = hcl_body(&module(cloud));
+        // Terraform brings the project and the Compose file's folder in, then waits for the set-up,
+        // signing in with the operator's key.
+        assert_eq!(hcl_names(&tf, "resource", "local_file"), ["isoloom_project"], "{cloud:?}");
+        assert_eq!(hcl_blocks(&tf, "variable", &["ssh_private_key_file"]).len(), 1, "{cloud:?}");
+        let wait = hcl_one(&tf, "terraform_data", "isoloom_ready_docker_host");
+        let steps: Vec<(String, String)> = hcl_nested(wait, "provisioner")
+            .iter()
+            .map(|p| {
+                let kind = p.labels().first().map(|l| l.as_str().to_owned()).unwrap_or_default();
+                let values = isoloom_test_support::hcl_literals(p.body()).join("\n");
+                (kind, values)
+            })
+            .collect();
+        let step = |kind: &str, what: &str| steps.iter().position(|(k, v)| k == kind && v.contains(what));
+        let archived = step("local-exec", ".isoloom/docker").unwrap_or_else(|| panic!("{cloud:?}: {steps:?}"));
+        let uploaded = step("file", "/.isoloom-outputs-docker_host.tgz").unwrap_or_else(|| panic!("{cloud:?}: {steps:?}"));
+        let unpacked = step("remote-exec", "tar -xzf /tmp/isoloom-outputs.tgz -C /opt/isoloom").unwrap_or_else(|| panic!("{cloud:?}: {steps:?}"));
+        let waited = step("remote-exec", "cloud-init status --wait").unwrap_or_else(|| panic!("{cloud:?}: {steps:?}"));
+        assert!(archived < uploaded && uploaded <= unpacked && unpacked <= waited, "{cloud:?}: {steps:?}");
     }
     // The input is a sensitive variable of its own name, handed to the start in base64.
     let tf = module(Cloud::Aws);
@@ -115,23 +123,40 @@ fn the_host_sets_itself_up_and_the_module_waits_for_it() {
     );
 }
 
+/// The expression of `key` in `body`: an attribute of its own or of a nested block, or an
+/// object's key (`metadata = { user_data = ... }`).
+fn value_of<'b>(body: &'b hcl::Body, key: &str) -> Option<&'b hcl::Expression> {
+    body.iter().find_map(|s| match s {
+        hcl::Structure::Attribute(a) if a.key() == key => Some(a.expr()),
+        hcl::Structure::Attribute(a) => match a.expr() {
+            hcl::Expression::Object(o) => o.iter().find(|(k, _)| k.to_string().trim_matches('"') == key).map(|(_, v)| v),
+            _ => None,
+        },
+        hcl::Structure::Block(b) => value_of(b.body(), key),
+    })
+}
+
 #[test]
 fn each_cloud_hands_the_set_up_to_its_own_first_boot() {
     let cases = [
-        (Cloud::Aws, "user_data_base64", "base64gzip("),
-        (Cloud::Azure, "custom_data", "base64encode("),
-        (Cloud::Gcp, "startup-script", ""),
-        (Cloud::DigitalOcean, "user_data", ""),
-        (Cloud::Linode, "user_data", "base64encode("),
-        (Cloud::Oci, "user_data", "base64encode("),
+        (Cloud::Aws, "aws_instance", "user_data_base64", Some("base64gzip")),
+        (Cloud::Azure, "azurerm_linux_virtual_machine", "custom_data", Some("base64encode")),
+        (Cloud::Gcp, "google_compute_instance", "startup-script", None),
+        (Cloud::DigitalOcean, "digitalocean_droplet", "user_data", None),
+        (Cloud::Linode, "linode_instance", "user_data", Some("base64encode")),
+        (Cloud::Oci, "oci_core_instance", "user_data", Some("base64encode")),
     ];
-    for (cloud, key, wrap) in cases {
-        let tf = module(cloud);
-        let line = tf
-            .lines()
-            .find(|l| l.trim_start().starts_with(&format!("{key} ")))
-            .unwrap_or_else(|| panic!("no {key} in {cloud:?}: {tf}"));
-        assert!(line.contains(&format!("= {wrap}\"#!/bin/sh\\n")), "{cloud:?}: {line}");
+    for (cloud, kind, key, wrap) in cases {
+        let host = isoloom_test_support::hcl_resource(&module(cloud), kind, "env");
+        let value = value_of(&host, key).unwrap_or_else(|| panic!("{cloud:?}: no {key}"));
+        // The script itself, or the one argument of the encoding the cloud takes.
+        let script = match (wrap, value) {
+            (Some(f), hcl::Expression::FuncCall(call)) if call.name.name.as_str() == f => call.args.first(),
+            (None, script) => Some(script),
+            _ => None,
+        };
+        let text = script.map(ToString::to_string).unwrap_or_default();
+        assert!(text.trim_start_matches('"').starts_with("#!/bin/sh"), "{cloud:?}: {key} = {value}");
     }
 }
 

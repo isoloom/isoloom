@@ -46,11 +46,14 @@ machines:
         );
         let mut m = Module::default();
         super::outputs(&env, &mut m);
-        let text = m.render().unwrap();
-        assert!(
-            text.contains("output \"vm_id_web\"") && text.contains("proxmox_virtual_environment_vm.web.vm_id"),
-            "{text}"
-        );
-        assert!(!text.contains("vm_id_pi"), "{text}");
+        let body = isoloom_test_support::hcl_body(&m.render().unwrap());
+        let outputs: Vec<(String, String)> = isoloom_test_support::hcl_blocks(&body, "output", &[])
+            .iter()
+            .map(|o| {
+                let name = o.labels().first().map(|l| l.as_str().to_owned()).unwrap_or_default();
+                (name, isoloom_test_support::hcl_text(o.body(), "value"))
+            })
+            .collect();
+        assert_eq!(outputs, [("vm_id_web".to_owned(), "proxmox_virtual_environment_vm.web.vm_id".to_owned())]);
     }
 }

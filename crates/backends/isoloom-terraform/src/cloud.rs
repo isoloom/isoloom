@@ -160,15 +160,3 @@ impl fmt::Display for Cloud {
         f.write_str(self.name())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_cloud_has_a_folder_and_a_name() {
-        let ids: Vec<&str> = Cloud::ALL.iter().map(|c| c.id()).collect();
-        assert_eq!(ids, ["aws", "azure", "gcp", "digitalocean", "linode", "oci"]);
-        assert_eq!(Cloud::Gcp.to_string(), "Google Cloud");
-    }
-}

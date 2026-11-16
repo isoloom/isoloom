@@ -198,3 +198,21 @@ fn the_default_ova_is_pinned_to_a_dated_release() -> Outcome {
     );
     Ok(())
 }
+
+#[test]
+fn more_networks_than_an_esxi_vm_has_interfaces_are_refused() -> Outcome {
+    // The router takes one interface per network and its uplink: ten networks are one too many.
+    let networks = |n: usize| (0..n).map(|i| format!("  n{i}: {{ cidr: 10.7{i}.0.0/24 }}\n")).collect::<Vec<_>>().concat();
+    let yaml = |n: usize| {
+        format!(
+            "version: 1\nname: wide\nnetworks:\n{}machines:\n  w: {{ networks: {{ n0: 10 }}, os: debian@12, app: {{ steps: [{{ run: s.sh }}] }} }}\n",
+            networks(n)
+        )
+    };
+    assert_eq!(
+        EsxiBackend.refusal(&lab(&yaml(10))?).as_deref(),
+        Some("10 networks: an ESXi VM has at most 10 network interfaces, and the router needs one per network and its uplink")
+    );
+    assert_eq!(EsxiBackend.refusal(&lab(&yaml(9))?), None);
+    Ok(())
+}

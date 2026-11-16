@@ -7,7 +7,9 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::{Cloud, CloudVmBackend, CloudVmModule};
-use isoloom_test_support::{assert_every, hcl_attribute, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_resource, hcl_text, hcl_values};
+use isoloom_test_support::{
+    assert_every, hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_map, hcl_names, hcl_nested, hcl_one, hcl_resource, hcl_text, hcl_values,
+};
 
 /// Example `name`'s plan on `cloud-vm`.
 fn env(name: &str) -> Outcome<Environment> {
@@ -270,6 +272,94 @@ fn an_open_network_on_the_allow_only_clouds_lets_in_ssh_and_the_published_ports_
             .collect();
         from_outside.sort_unstable();
         assert_eq!(from_outside, ["22", "8080"], "{cloud}: only SSH and the published port from outside");
+    }
+    Ok(())
+}
+
+/// One machine, `db`, with `disks` in its spec.
+fn with_disks(disks: &str) -> String {
+    format!(
+        "version: 1\nname: d\nnetworks: {{ lab: {{ cidr: 10.60.0.0/24, internet: true }} }}\nmachines:\n  db: {{ os: debian@12, networks: {{ lab: 10 }}, disks: {{ {disks} }}, app: {{ steps: [{{ run: s.sh }}] }} }}\n"
+    )
+}
+
+#[test]
+fn each_cloud_refuses_the_data_disks_it_cant_attach_naming_the_machine_and_the_disk() -> Outcome {
+    let three = "a: { size_gb: 10, mount: /a }, b: { size_gb: 10, mount: /b }, c: { size_gb: 10, mount: /c }";
+    let small = "data: { size_gb: 5, mount: /data }";
+    for (cloud, disks, why) in [
+        (Cloud::Azure, three, "machine `db`: Azure attaches at most 2 data disks to a VM"),
+        (Cloud::Gcp, small, "machine `db`, disk `data`: Google Cloud's volumes are 10 GB at least"),
+        (Cloud::Linode, small, "machine `db`, disk `data`: Linode's volumes are 10 GB at least"),
+        (Cloud::Oci, small, "machine `db`, disk `data`: Oracle Cloud's volumes are 50 GB at least"),
+    ] {
+        let e = planned(&spec(&with_disks(disks))?, Target::CloudVm)?;
+        assert_eq!(CloudVmModule::new(cloud).refusal(&e).as_deref(), Some(why), "{cloud}");
+    }
+    // Within every cap: taken.
+    let e = planned(&spec(&with_disks("data: { size_gb: 50, mount: /data }"))?, Target::CloudVm)?;
+    for module in Cloud::ALL.map(CloudVmModule::new) {
+        assert_eq!(module.refusal(&e), None, "{}", module.cloud());
+    }
+    Ok(())
+}
+
+#[test]
+fn a_windows_vm_publishing_a_udp_port_on_another_is_refused_its_port_proxy_being_tcp_only() -> Outcome {
+    let yaml = |publish: u16| {
+        format!(
+            "version: 1\nname: w\nnetworks: {{ lab: {{ cidr: 10.60.0.0/24 }} }}\nmachines:\n  dc: {{ os: windows-server@2022, networks: {{ lab: 10 }}, ports: {{ dns: {{ port: 53, protocol: udp, publish: {publish} }} }}, app: {{ steps: [{{ run: s.ps1 }}] }} }}\n"
+        )
+    };
+    let moved = planned(&spec(&yaml(5353))?, Target::CloudVm)?;
+    for cloud in [Cloud::Aws, Cloud::Azure] {
+        assert_eq!(
+            CloudVmModule::new(cloud).refusal(&moved).as_deref(),
+            Some("machine `dc`: UDP port 53 published as 5353 on a Windows VM in the cloud (its port proxy is TCP only): publish it on its own port"),
+            "{cloud}"
+        );
+    }
+    // On its own port, nothing to proxy.
+    let own = planned(&spec(&yaml(53))?, Target::CloudVm)?;
+    assert_eq!(CloudVmModule::new(Cloud::Aws).refusal(&own), None);
+    Ok(())
+}
+
+/// A cloud gives no console Isoloom reaches: a Windows VM opening Remote Desktop is reached
+/// through a Linux machine beside it, at its public address, or through the controller when
+/// there is none.
+#[test]
+fn a_windows_vms_remote_desktop_is_tunnelled_through_a_linux_vm_beside_it_or_the_controller() -> Outcome {
+    let yaml = "version: 1\nname: w\nnetworks: { lab: { cidr: 10.60.0.0/24 }, back: { cidr: 10.61.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, app: { steps: [{ run: s.sh }] } }\n  dc: { os: windows-server@2022, networks: { lab: 20 }, ports: { rdp: 3389 }, app: { steps: [{ run: s.ps1 }] } }\n  alone: { os: windows-server@2022, networks: { back: 20 }, ports: { rdp: 3389 }, app: { steps: [{ run: s.ps1 }] } }\nprovision: [{ ansible: site.yml }]\n";
+    for (cloud, beside, controller, user) in [
+        (Cloud::Aws, "aws_instance.web.public_ip", "aws_eip.isoloom_controller.public_ip", "admin"),
+        (
+            Cloud::Azure,
+            "azurerm_public_ip.web.ip_address",
+            "azurerm_public_ip.isoloom_controller.ip_address",
+            "isoloom",
+        ),
+    ] {
+        let tf = hcl_body(&crate::testing::cloud_vm(cloud, yaml)?);
+        let consoles = hcl_blocks(&tf, "output", &["consoles"]);
+        let entries = hcl_map(consoles.first().ok_or(format!("{cloud}: no consoles output"))?.body(), "value");
+        // Each entry an object: read as a body of its fields.
+        let fields: Vec<(String, [String; 4])> = entries
+            .iter()
+            .map(|(name, object)| {
+                let body = hcl_body(object.trim().trim_start_matches('{').trim_end_matches('}'));
+                (name.clone(), ["host", "port", "via", "user"].map(|k| hcl_text(&body, k)))
+            })
+            .collect();
+        let want = |host: &str, via: &str| [host, "3389", via, user].map(str::to_owned);
+        assert_eq!(
+            fields,
+            [
+                ("dc".to_owned(), want("10.60.0.20", beside)),
+                ("alone".to_owned(), want("10.61.0.20", controller))
+            ],
+            "{cloud}"
+        );
     }
     Ok(())
 }
