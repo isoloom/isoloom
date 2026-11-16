@@ -1,14 +1,14 @@
-//! Golden fixtures, one folder per Dockerfile shape under `fixtures/`: its `Dockerfile`, and the
-//! VM form it translates to (`vm.yml`) or why it is refused (`refused.txt`). A folder with a
-//! `base.Dockerfile` vendors it as the fetched base its `FROM` names. `ISOLOOM_WRITE_FIXTURES=1`
-//! rewrites the expected files.
+//! Golden fixtures, one folder per Dockerfile shape under the crate's
+//! `tests/fixtures/dockerfile/`: its `Dockerfile`, and the VM form it translates to (`vm.yml`) or
+//! why it is refused (`refused.txt`). A folder with a `base.Dockerfile` vendors it as the fetched
+//! base its `FROM` names. `ISOLOOM_WRITE_FIXTURES=1` rewrites the expected files.
 
 use std::path::{Path, PathBuf};
 
 use super::*;
 
 fn fixtures() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("src/dockerfile/fixtures")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/dockerfile")
 }
 
 /// The fetched bases a fixture vendors: `base.Dockerfile` as the image its `FROM` names.
@@ -75,21 +75,6 @@ fn every_fixture_translates_to_its_golden_form() {
     assert!(wrong.is_empty(), "not as expected (ISOLOOM_WRITE_FIXTURES=1 rewrites them): {wrong:?}");
 }
 
-#[test]
-fn a_refusal_names_the_file_the_line_and_the_instruction() {
-    let (copied, _) = outcome(&fixtures().join("refused-copy-from-image"));
-    assert!(
-        copied.starts_with("refused: build/refused-copy-from-image/Dockerfile line 2 (`COPY`): `--from=mlocati/php-extension-installer:2`"),
-        "{copied}"
-    );
-    let (unknown, _) = outcome(&fixtures().join("refused-unknown-base"));
-    assert!(
-        unknown.contains("line 1 (`FROM`): `vulhub/tomcat:8.5` is in neither the service matrix nor the fetched bases"),
-        "{unknown}"
-    );
-    assert!(unknown.contains("isoloom bases fetch"), "{unknown}");
-}
-
 /// `text` as the Dockerfile of `build/db`, with no argument and no `os`.
 fn db(text: &str) -> Build<'_> {
     Build {
@@ -106,11 +91,58 @@ fn translated_db(text: &str) -> Translation {
     translate(&db(text), &Sources::default()).unwrap()
 }
 
-/// The translation's YAML writes the catalogue entry's recipe for `release` out as steps (no
-/// `catalogue:` line a spec can't hold).
+/// The translation's steps as its YAML writes them (`app.steps`).
+fn written(t: &Translation) -> Vec<serde_yaml_ng::Value> {
+    let yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(&t.yaml).unwrap_or_else(|e| panic!("{e}\n{}", t.yaml));
+    yaml["app"]["steps"].as_sequence().cloned().unwrap_or_default()
+}
+
+/// Each written step's kind: its one key.
+fn kinds(t: &Translation) -> Vec<String> {
+    written(t)
+        .iter()
+        .filter_map(|s| s.as_mapping().and_then(|m| m.keys().next()).and_then(|k| k.as_str()).map(str::to_owned))
+        .collect()
+}
+
+/// What the written steps pin: each `packages` entry's version and each fetched `file`'s URL.
+fn pinned(t: &Translation) -> Vec<String> {
+    let mut out = Vec::new();
+    for step in written(t) {
+        for package in step["packages"].as_sequence().into_iter().flatten() {
+            out.extend(package["version"].as_str().map(str::to_owned));
+        }
+        out.extend(step["file"]["url"].as_str().map(str::to_owned));
+    }
+    out
+}
+
+/// The lines of the written `command` steps' scripts.
+fn script_lines(t: &Translation) -> Vec<String> {
+    written(t)
+        .iter()
+        .filter_map(|s| s["command"].as_str())
+        .flat_map(|script| script.lines().map(str::to_owned).collect::<Vec<_>>())
+        .collect()
+}
+
+/// The services the written steps run, by name.
+fn services(t: &Translation) -> Vec<String> {
+    written(t).iter().filter_map(|s| s["service"]["name"].as_str().map(str::to_owned)).collect()
+}
+
+/// The text of the file the translation brings at `path`.
+fn file<'t>(t: &'t Translation, path: &str) -> Option<&'t str> {
+    t.files.iter().find(|(p, _)| p.as_str() == path).map(|(_, text)| text.as_str())
+}
+
+/// The translation writes the catalogue entry's recipe for `release` out as steps (no
+/// `catalogue:` step a spec can't hold), pinning that release.
+#[track_caller]
 fn written_out(t: &Translation, release: &str) {
-    assert!(!t.yaml.contains("catalogue:"), "{}", t.yaml);
-    assert!(t.yaml.contains(release), "release {release}: {}", t.yaml);
+    isoloom_test_support::assert_every!(kinds(t), |k: &String| k != "catalogue");
+    let pins = pinned(t);
+    assert!(pins.iter().any(|p| p.contains(release)), "release {release} in none of {pins:?}");
 }
 
 #[test]
@@ -140,7 +172,9 @@ fn the_translation_is_an_explicit_vm_form_a_spec_can_hold() {
         "version: 1\nname: t\nnetworks: {{ lan: {{ cidr: 10.9.0.0/24 }} }}\nmachines:\n  web:\n    networks: {{ lan: 10 }}\n{}",
         t.yaml.lines().map(|l| format!("    {l}\n")).collect::<Vec<_>>().concat()
     );
-    assert!(isoloom_spec::parse(&spec).is_ok(), "{spec}");
+    if let Err(e) = isoloom_spec::parse(&spec) {
+        panic!("{e}\n{spec}");
+    }
     // The image's command is the VM's service, as the image's user and in its folder.
     assert!(matches!(t.steps.last(), Some(Step::Service(_))));
 }
@@ -157,7 +191,7 @@ fn a_build_argument_given_wins_over_the_default() {
         os: None,
     };
     let t = translate(&build, &Sources::default()).unwrap();
-    assert!(t.yaml.contains("export FLAG=given"), "{}", t.yaml);
+    assert!(script_lines(&t).contains(&"export FLAG=given".to_owned()), "{:?}", script_lines(&t));
 }
 
 #[test]
@@ -177,13 +211,11 @@ fn a_postgres_image_installs_the_exact_release_with_the_images_defaults() {
     let t = translated_db("FROM postgres:10.5\nENV POSTGRES_PASSWORD=s3cret\nCOPY init.sql /docker-entrypoint-initdb.d/\n");
     assert_eq!(t.os.to_string(), "ubuntu@18.04");
     written_out(&t, "10.5");
-    assert!(t.files.values().any(|v| v == "s3cret"), "{:?}", t.files.keys());
+    assert_eq!(file(&t, "catalogue/postgres/values/0"), Some("s3cret"), "the password's value file");
     // Without a password the image refuses to start: so does the translation.
-    assert!(
-        translate(&db("FROM postgres:16\n"), &Sources::default())
-            .unwrap_err()
-            .to_string()
-            .contains("POSTGRES_PASSWORD")
+    assert_eq!(
+        translate(&db("FROM postgres:16\n"), &Sources::default()).unwrap_err().to_string(),
+        "build/db/Dockerfile: the image's environment doesn't set `POSTGRES_PASSWORD`, which the catalogue's `postgres` needs"
     );
 }
 
@@ -193,17 +225,15 @@ fn a_catalogue_image_brings_its_entry_recipe_with_the_images_settings() {
     let t = translated_db(&text);
     assert_eq!(t.os.to_string(), "debian@11");
     written_out(&t, "5.7.44");
-    let files: Vec<&str> = t.files.keys().map(ProjectPath::as_str).collect();
     assert!(
-        files
-            .iter()
-            .any(|f| f.starts_with("catalogue/mysql/") && f.ends_with("files/docker-entrypoint.sh")),
-        "{files:?}"
+        file(&t, "catalogue/mysql/.isoloom/catalogue/mysql/files/docker-entrypoint.sh").is_some(),
+        "{:?}",
+        t.files.keys()
     );
     // The root password from the image's environment, in its value file.
-    assert!(t.files.values().any(|v| v == "trading_platform"), "{files:?}");
+    assert_eq!(file(&t, "catalogue/mysql/values/0"), Some("trading_platform"));
     // The entry's own service runs: the Dockerfile keeps the image's command.
-    assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
+    assert_eq!(services(&t), ["mysql"]);
 }
 
 #[test]
@@ -218,11 +248,20 @@ fn a_php_image_installs_its_series_release_and_its_variants_server() {
     let fpm = translate(&build("FROM php:7.4-fpm\nRUN docker-php-ext-install pdo_mysql\n"), &Sources::default()).unwrap();
     assert_eq!(fpm.os.to_string(), "debian@12");
     written_out(&fpm, "7.4.33");
-    let files: Vec<&str> = fpm.files.keys().map(ProjectPath::as_str).collect();
-    assert!(files.iter().any(|f| f.ends_with("files/php-fpm")), "{files:?}");
+    assert!(
+        file(&fpm, "catalogue/php/.isoloom/catalogue/php/files/php-fpm").is_some(),
+        "{:?}",
+        fpm.files.keys()
+    );
+    assert_eq!(services(&fpm), ["php-fpm"]);
     // A patch release the archive no longer carries: refused, naming the releases it has.
     let old = translate(&build("FROM php:7.1.3-apache\n"), &Sources::default()).unwrap_err().to_string();
-    assert!(old.contains("no release 7.1.3") && old.contains("7.1.33"), "{old}");
+    let (refusal, releases) = old.split_once(" (it has ").unwrap_or_else(|| panic!("{old}"));
+    assert_eq!(
+        refusal,
+        "build/web/Dockerfile line 1 (`FROM`): the catalogue's `php` has no release 7.1.3 with a VM form"
+    );
+    assert!(releases.split(", ").any(|r| r == "7.1.33"), "the series' release among {releases}");
 }
 
 #[test]
@@ -231,9 +270,22 @@ fn a_mongo_image_installs_the_exact_build_and_its_service_reads_the_images_envir
         translated_db("FROM mongo:4.0.4\nENV MONGO_INITDB_ROOT_USERNAME=admin MONGO_INITDB_ROOT_PASSWORD=s3cret\nCOPY seed.js /docker-entrypoint-initdb.d/\n");
     assert_eq!(t.os.to_string(), "ubuntu@18.04");
     written_out(&t, "4.0.4");
-    // The entry's own service runs, and reads the environment the Dockerfile set.
-    assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
-    assert!(t.yaml.contains(IMAGE_ENV), "{}", t.yaml);
+    // The entry's own service runs, and reads the environment the Dockerfile set, written to
+    // IMAGE_ENV.
+    assert_eq!(services(&t), ["mongodb"]);
+    let written_env: Vec<String> = script_lines(&t)
+        .iter()
+        .filter_map(|l| {
+            l.strip_prefix("printf %s ")?
+                .strip_suffix(&format!(" | base64 -d > {IMAGE_ENV}"))
+                .map(str::to_owned)
+        })
+        .map(|b64| String::from_utf8(isoloom_test_support::b64_decode(&b64).unwrap()).unwrap())
+        .collect();
+    assert_eq!(
+        written_env,
+        ["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nMONGO_INITDB_ROOT_USERNAME=admin\nMONGO_INITDB_ROOT_PASSWORD=s3cret\n"]
+    );
     let newest = translate(&db("FROM mongo:7\n"), &Sources::default()).unwrap();
     written_out(&newest, "7.0.28");
 }
@@ -252,9 +304,13 @@ fn a_jenkins_image_installs_the_lts_release_and_runs_the_dockerfiles_steps_as_je
     assert_eq!(t.os.to_string(), "debian@13");
     written_out(&t, "2.580.2");
     // `jenkins-plugin-cli` runs as the image's user, with its environment.
-    assert!(t.yaml.contains("export JENKINS_HOME=/var/jenkins_home"), "{}", t.yaml);
+    assert!(
+        script_lines(&t).contains(&"export JENKINS_HOME=/var/jenkins_home".to_owned()),
+        "{:?}",
+        script_lines(&t)
+    );
     // The entry's service runs Jenkins: the Dockerfile keeps the image's command.
-    assert!(!t.yaml.contains("isoloom-app"), "{}", t.yaml);
+    assert_eq!(services(&t), ["jenkins"]);
 }
 
 #[test]

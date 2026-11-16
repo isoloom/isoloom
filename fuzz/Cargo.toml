@@ -14,8 +14,8 @@ cargo-fuzz = true
 
 # The inputs each target starts from (folders, relative to this one), besides its own corpus.
 [package.metadata.seeds]
-spec_syntax = ["../crates/core/isoloom-plan/tests/fixtures", "../examples"]
-spec_model = ["../crates/core/isoloom-plan/tests/fixtures", "../examples"]
+spec_syntax = ["../crates/core/isoloom-plan/tests/fixtures/specs", "../examples"]
+spec_model = ["../crates/core/isoloom-plan/tests/fixtures/specs", "../examples"]
 quoting = []
 drawing = ["../crates/frontends/isoloom-topology/tests/fixtures", "seeds/drawing"]
 
