@@ -186,7 +186,7 @@ they explain what the shipped code does and how to use it. `docs/spec.md`, `docs
 `docs/reference/cli.md` are generated: change the code, then regenerate them
 (`.githooks/regenerate`). Every link between the pages must resolve and every spec in a page (a
 YAML block whose first line is `# isoloom.yml`) must validate: `cargo test -p isoloom-spec --test
-docs` checks both.
+spec docs::` checks both.
 
 The project's own process stays out of `docs/`: no decision records, no notes on how a change was
 decided or tested, no CI or test-host internals, no links pinned to a commit. Maintainer steps

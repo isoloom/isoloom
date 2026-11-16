@@ -1,12 +1,13 @@
 //! Profiles: one file per customer or site, merged into the spec and the defaults, checked
 //! against the spec, and pinning a target.
 
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use isoloom_spec::host::Host;
 use isoloom_spec::profile::{self, Profile};
 use isoloom_spec::{Target, defaults, load_profiled};
+
+use crate::testing::Outcome;
 
 const SPEC: &str = "version: 1
 name: shop
@@ -20,9 +21,6 @@ machines:
     ports: { web: 80 }
     app: { image: nginx }
 ";
-
-/// A test's outcome: a failed step is its report.
-type Outcome<T = ()> = Result<T, Box<dyn Error>>;
 
 /// A project holding SPEC and the given profiles, in a fresh folder removed when it goes out of
 /// scope.

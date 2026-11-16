@@ -1,5 +1,5 @@
 ---
-source: crates/core/isoloom-spec/tests/problems.rs
+source: crates/core/isoloom-spec/tests/spec/problems.rs
 expression: "serde_json::to_string_pretty(&found).unwrap_or_else(|e| panic!(\"{e}\"))"
 ---
 [

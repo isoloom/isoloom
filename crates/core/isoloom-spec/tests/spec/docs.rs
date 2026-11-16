@@ -4,17 +4,11 @@
 //! link between the docs reaches a file and, with an anchor, a heading in it. The docs are user
 //! documentation: no decision records, maintainer notes or test-host material (`DEV_MARKERS`).
 
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use isoloom_spec::reference::{markdown, slug};
 
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")
-}
-
-/// A test's outcome: a failed step is its report.
-type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+use crate::testing::{Outcome, workspace as root};
 
 /// Every file under `dir` with the extension `ext`, at any depth.
 fn files_under(dir: &Path, ext: &str) -> Outcome<Vec<PathBuf>> {
