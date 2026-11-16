@@ -139,9 +139,12 @@ mod tests {
     fn a_digest_is_sha256_and_64_hex_digits() {
         let d = format!("sha256:{}", "a".repeat(64));
         assert_eq!(d.parse::<Digest>().map(|x| x.as_str().to_owned()), Ok(d));
-        assert!(format!("sha256:{}", "A".repeat(64)).parse::<Digest>().is_err());
-        assert!("sha256:abc".parse::<Digest>().is_err());
-        assert!("a".repeat(64).parse::<Digest>().is_err());
+        for wrong in [format!("sha256:{}", "A".repeat(64)), "sha256:abc".to_owned(), "a".repeat(64)] {
+            assert_eq!(
+                wrong.parse::<Digest>(),
+                Err(format!("`{wrong}` isn't a digest: write `sha256:` and 64 lowercase hexadecimal digits"))
+            );
+        }
     }
 
     #[test]

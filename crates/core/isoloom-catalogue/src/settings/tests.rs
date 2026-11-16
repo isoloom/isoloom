@@ -108,6 +108,14 @@ fn a_required_setting_left_out_is_missing() {
 }
 
 #[test]
+fn an_integer_at_either_bound_is_taken() {
+    for workers in [1, 8] {
+        let s = read_with(&format!("{{ database: shop, workers: {workers} }}")).unwrap_or_else(|p| panic!("{workers}: {p:?}"));
+        assert_eq!(s.get("workers").and_then(|v| v.json().ok()), Some(serde_json::json!(workers)));
+    }
+}
+
+#[test]
 fn a_value_of_the_wrong_type_or_out_of_bounds_is_invalid() {
     for (with, path, reason) in [
         ("{ database: shop, port: 70000 }", "port", "`port` is a port number, 1 to 65535"),
@@ -115,7 +123,11 @@ fn a_value_of_the_wrong_type_or_out_of_bounds_is_invalid() {
         ("{ database: shop, debug: yes-please }", "debug", "`debug` is `true` or `false`"),
         ("{ database: shop, mode: slow }", "mode", "`slow` isn't one of `mode`'s values"),
         ("{ database: Shop }", "database", "`Shop` doesn't match `database`'s pattern `[a-z]+`"),
-        ("{ database: shop, root: /srv/site }", "root", "`root` is a folder of the project (`site/`)"),
+        (
+            "{ database: shop, root: /srv/site }",
+            "root",
+            "`root` is a folder of the project (`site/`): `/srv/site` isn't a valid project path: a project path is relative to the project folder and stays inside it: no leading `/` or drive, no `..`, `/` between folders (`provision/web.sh`)",
+        ),
         (
             "{ database: shop, backend: app }",
             "backend",
@@ -124,7 +136,7 @@ fn a_value_of_the_wrong_type_or_out_of_bounds_is_invalid() {
     ] {
         let (code, at, said) = problem(with);
         assert_eq!((code, at), (Code::InvalidValue, format!("machines.web.with.{path}")), "{with}");
-        assert!(said.starts_with(reason), "{with}: {said}");
+        assert_eq!(said, reason, "{with}");
     }
 }
 
@@ -135,15 +147,13 @@ fn a_secret_or_an_input_goes_only_to_a_password() {
         (not_a_password.0, not_a_password.1.as_str()),
         (Code::InvalidValue, "machines.web.with.database")
     );
-    assert!(
-        not_a_password.2.contains("only a `password` setting takes a secret or an input"),
-        "{not_a_password:?}"
-    );
+    assert_eq!(not_a_password.2, "`database` is text: only a `password` setting takes a secret or an input");
     let secret = problem("{ database: shop, password: { secret: nope } }");
     assert_eq!((secret.0, secret.1.as_str()), (Code::UnknownReference, "machines.web.with.password.secret"));
     let input = problem("{ database: shop, password: { input: NOPE } }");
     assert_eq!((input.0, input.1.as_str()), (Code::UnknownReference, "machines.web.with.password.input"));
-    assert!(read_with("{ database: shop, password: { input: DEMO_SECRET } }").is_ok());
+    let given = read_with("{ database: shop, password: { input: DEMO_SECRET } }").unwrap();
+    assert_eq!(given.get("password").map(SettingValue::path), Some(Ok("/run/isoloom/with/password")));
 }
 
 #[test]
@@ -168,6 +178,15 @@ fn a_list_types_each_item_and_keeps_to_its_most() {
     assert_eq!(items.len(), 2);
     assert_eq!(items[0].get("password").and_then(|p| p.path().ok()), Some("/run/isoloom/with/users/1/password"));
     assert_eq!(s.get("users").map(SettingValue::text), Some(Err(NotText::List)));
+    let flat = problem("{ database: shop, users: [ann] }");
+    assert_eq!(
+        flat,
+        (
+            Code::InvalidValue,
+            "machines.web.with.users[0]".to_owned(),
+            "an item of `users` is a map of its fields".to_owned()
+        )
+    );
     let unnamed = problem("{ database: shop, users: [{ password: x }] }");
     assert_eq!((unnamed.0, unnamed.1.as_str()), (Code::MissingField, "machines.web.with.users[0].name"));
     let nick = problem("{ database: shop, users: [{ name: a, nick: b }] }");

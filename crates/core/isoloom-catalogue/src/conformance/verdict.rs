@@ -159,15 +159,6 @@ mod tests {
     }
 
     #[test]
-    fn a_differing_fact_or_a_failed_check_fails_the_case() {
-        let container = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "ubuntu 24.04")]);
-        let vm = run(&[("answers", true, ""), ("version", false, "nginx/1.30.5"), ("fact: os", false, "debian 12")]);
-        let v = verdict(&lab(), Some(&container), Some(&vm));
-        assert!(!v.passed() && !v.facts[0].equal());
-        assert_eq!(v.checks[1].vm, CheckOutcome::Failed("nginx/1.30.5".into()));
-    }
-
-    #[test]
     fn a_differing_fact_alone_fails_the_case() {
         let container = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "debian 13")]);
         let vm = run(&[("answers", true, ""), ("version", true, ""), ("fact: os", false, "debian 12")]);
@@ -181,7 +172,8 @@ mod tests {
         let vm = run(&[("answers", true, ""), ("version", false, "nginx/1.30.5"), ("fact: os", false, "debian 12")]);
         let v = verdict(&lab(), Some(&container), Some(&vm));
         assert!(v.facts[0].equal(), "the facts agree, so only the failed check can fail the case");
-        assert!(!v.passed(), "a check must pass in both forms, not just one");
+        assert_eq!(v.checks[1].vm, CheckOutcome::Failed("nginx/1.30.5".into()), "the failure keeps what it saw");
+        assert!(!v.passed() && !v.passed_where_run(), "a check must pass in both forms, not just one");
     }
 
     #[test]

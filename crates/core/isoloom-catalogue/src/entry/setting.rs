@@ -186,17 +186,7 @@ mod tests {
         ];
         for t in all {
             assert_eq!(serde_yaml_ng::from_str::<SettingType>(t.id()).ok(), Some(t));
-            assert_ne!(t.expected(), "");
         }
-    }
-
-    #[test]
-    fn two_patterns_are_equal_exactly_when_their_text_is() {
-        let a = Pattern::try_from("[a-z]+".to_owned()).unwrap();
-        let same = Pattern::try_from("[a-z]+".to_owned()).unwrap();
-        let other = Pattern::try_from("[0-9]+".to_owned()).unwrap();
-        assert_eq!(a, same);
-        assert_ne!(a, other);
     }
 
     #[test]

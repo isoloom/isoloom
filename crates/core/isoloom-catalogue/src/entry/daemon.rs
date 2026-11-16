@@ -115,7 +115,10 @@ mod tests {
         assert_eq!(d.unit.families(), [Family::Debian, Family::RedHat]);
         let linux: Daemon = serde_yaml_ng::from_str("{ unit: nginx, foreground: [nginx] }").unwrap();
         assert_eq!(linux.unit.families(), [Family::Debian, Family::RedHat, Family::Alpine]);
-        assert!(serde_yaml_ng::from_str::<Daemon>("{ unit: { gentoo: x }, foreground: [x] }").is_err());
+        let gentoo = serde_yaml_ng::from_str::<Daemon>("{ unit: { gentoo: x }, foreground: [x] }")
+            .unwrap_err()
+            .to_string();
+        assert_eq!(gentoo, "unknown variant `gentoo`, expected one of `debian`, `redhat`, `alpine`, `windows`");
         let per: Daemon =
             serde_yaml_ng::from_str("{ unit: { debian: cron, redhat: crond }, foreground: { debian: [cron, -f], redhat: [crond, -n] } }").unwrap();
         assert_eq!(per.foreground.on(Family::RedHat).map(Argv::program), Some("crond"));

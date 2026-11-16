@@ -158,20 +158,20 @@ mod tests {
     }
 
     #[test]
-    fn a_prefix_picks_the_newest_release_it_starts_on_dot_boundaries() {
-        let releases = [v("16.9"), v("16.10"), v("17.6"), v("160.1")];
-        assert_eq!(pick(&releases, &v("16")), Some(&v("16.10")));
-        assert_eq!(pick(&releases, &v("16.9")), Some(&v("16.9")));
-        assert_eq!(pick(&releases, &v("17")), Some(&v("17.6")));
-        assert_eq!(pick(&releases, &v("1")), None, "never 16 nor 160 for `1`");
-        assert_eq!(pick(&releases, &v("18")), None);
-    }
-
-    #[test]
-    fn a_release_equal_to_the_version_asked_wins_over_longer_ones() {
-        let releases = [v("1.30"), v("1.30.6")];
-        assert_eq!(pick(&releases, &v("1.30")), Some(&v("1.30")));
-        assert_eq!(pick(&releases, &v("1")), Some(&v("1.30.6")));
+    fn a_prefix_picks_the_newest_release_it_starts_on_dot_boundaries_and_an_equal_one_wins() {
+        let releases = [v("16.9"), v("16.10"), v("17.6"), v("160.1"), v("1.30"), v("1.30.6")];
+        for (asked, picked) in [
+            ("16", Some("16.10")),
+            ("16.9", Some("16.9")),
+            ("17", Some("17.6")),
+            ("18", None),
+            ("1.30", Some("1.30")),
+            ("1", Some("1.30.6")),
+            ("16.1", None),
+        ] {
+            assert_eq!(pick(&releases, &v(asked)), picked.map(v).as_ref(), "{asked}");
+        }
+        assert_eq!(pick(&[v("16.9"), v("160.1")], &v("1")), None, "never 16 nor 160 for `1`");
     }
 
     #[test]
@@ -186,7 +186,7 @@ mod tests {
     fn a_version_is_parts_of_letters_and_digits() {
         assert!("1.30.6".parse::<Version>().is_ok() && "16".parse::<Version>().is_ok());
         for wrong in ["", "1..2", ".1", "1.", "1.2-3", "1 2"] {
-            assert!(wrong.parse::<Version>().is_err(), "{wrong}");
+            assert!(matches!(wrong.parse::<Version>(), Err(Error::Version(v)) if v == wrong), "{wrong}");
         }
         assert_eq!(serde_yaml_ng::from_str::<Version>("8.4").unwrap(), v("8.4"));
         assert_eq!(serde_yaml_ng::from_str::<Version>("16").unwrap(), v("16"));
