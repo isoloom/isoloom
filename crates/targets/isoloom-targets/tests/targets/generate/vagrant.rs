@@ -250,7 +250,7 @@ fn vagrant_on_hyperv_takes_windows_and_privileged_machines() -> Outcome {
         "{v}"
     );
     // Hyper-V forwards no port: the published one is relayed from the host port its forward takes.
-    let host = "ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB01_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web01/web\", 8082)).to_i";
+    let host = "ENV.fetch(\"HOST_PORT_WEB01_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web01/web\", 8082)).to_i";
     let forwards = web01.statements("m.vm.network \"forwarded_port\", guest: 80,");
     assert!(matches!(forwards.as_slice(), [one] if one.contains(&format!("host: {host},"))), "{forwards:?}");
     assert!(v.contains(&format!("IsoloomHyperV.ports(machine, [[80, {host}]])")), "{v}");

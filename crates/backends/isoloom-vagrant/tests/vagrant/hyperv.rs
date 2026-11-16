@@ -14,7 +14,7 @@ fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     let file = vagrantfile("solo-web")?;
     let r = isoloom_test_support::ruby_blocks(&file);
     let web = r.block("config.vm.define \"web\"");
-    let host = "ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)).to_i";
+    let host = "ENV.fetch(\"HOST_PORT_WEB_80_TCP\", ISOLOOM_HOSTPORTS.fetch(\"web/web\", 8080)).to_i";
     assert_eq!(
         web.statements("m.vm.network \"forwarded_port\""),
         [format!(
@@ -97,8 +97,8 @@ fn the_hyperv_relay_listens_on_the_host_port_the_forward_takes() -> Outcome {
     Ok(())
 }
 
-/// A port Isothrum keeps across operations comes back where it was: the forward (and Hyper-V's
-/// relay) read `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first, then the runner's choice for
+/// A port the runner keeps across operations comes back where it was: the forward (and Hyper-V's
+/// relay) read `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first, then the runner's choice for
 /// this run, then the published number, `auto_correct` kept.
 #[test]
 #[ignore = "needs ruby: runs the Vagrantfile's Ruby here, as Vagrant's own Ruby would; `cargo xtask test` runs it"]
@@ -111,7 +111,7 @@ fn a_kept_host_port_wins_over_the_runs_choice_and_the_published_one() -> Outcome
     assert!(
         forwards
             .iter()
-            .any(|f| f.contains("host: ENV.fetch(\"ISOTHRUM_HOST_PORT_WEB_80_TCP\", ") && f.ends_with("auto_correct: true")),
+            .any(|f| f.contains("host: ENV.fetch(\"HOST_PORT_WEB_80_TCP\", ") && f.ends_with("auto_correct: true")),
         "{forwards:?}"
     );
     let scratch = tempfile::Builder::new().prefix("isoloom-kept-ports-").tempdir()?;
@@ -123,8 +123,8 @@ fn a_kept_host_port_wins_over_the_runs_choice_and_the_published_one() -> Outcome
             .arg(vagrantfile)
             .arg("web");
         match kept {
-            Some(port) => ruby.env("ISOTHRUM_HOST_PORT_WEB_80_TCP", port),
-            None => ruby.env_remove("ISOTHRUM_HOST_PORT_WEB_80_TCP"),
+            Some(port) => ruby.env("HOST_PORT_WEB_80_TCP", port),
+            None => ruby.env_remove("HOST_PORT_WEB_80_TCP"),
         };
         match run {
             Some(json) => ruby.env("ISOLOOM_HOSTPORTS", json),

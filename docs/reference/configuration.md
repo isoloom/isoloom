@@ -85,8 +85,9 @@ files by hand):
 
 Other `ISOLOOM_*` names in the generated files (`ISOLOOM_HOSTPORTS`, `ISOLOOM_FILE_*`,
 `ISOLOOM_HOST_FOLDER_*`, `ISOLOOM_RETRY_PAUSE`) are set by a runner; you don't
-set them. So is `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>`, the host port a runner kept for a
-Vagrant VM's forwarded port from an earlier operation, which each forward reads first.
+set them. So is `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>`, the host port a runner kept for a
+Vagrant VM's forwarded port from an earlier operation, which each forward reads first
+([Vagrant: host ports](../guide/targets/vagrant.md#host-ports)).
 
 ## Profiles
 
