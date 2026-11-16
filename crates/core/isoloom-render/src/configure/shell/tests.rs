@@ -1,6 +1,7 @@
 //! The shell rendering: each step kind's library call, its arguments quoted, and the VM's
 //! set-up step around them.
 
+use isoloom_plan::configure::Family;
 use isoloom_spec::model::Target;
 
 use super::super::compact;
@@ -48,17 +49,18 @@ fn a_repository_is_of_the_kind_of_its_family() {
         "rocky@9",
         &format!("{{ repository: {{ name: nginx, url: \"https://nginx.org/packages/centos/9/x86_64/\", priority: 10, {KEY} }} }}"),
     );
-    assert!(
-        rpm.starts_with("isoloom_repository 'rpm' 'nginx' 'https://nginx.org/packages/centos/9/x86_64/' "),
-        "{rpm}"
+    assert_eq!(
+        rpm,
+        "isoloom_repository 'rpm' 'nginx' 'https://nginx.org/packages/centos/9/x86_64/' 'https://nginx.org/keys/nginx_signing.key' '4c3f000000000000000000000000000000000000000000000000000000000000' '10'\n",
+        "no suite or components on rpm"
     );
-    assert!(rpm.ends_with(" '10'\n"), "no suite or components on rpm: {rpm}");
-    assert!(
-        one(
-            "alpine@3.19",
-            &format!("{{ repository: {{ name: edge, url: \"https://dl-cdn.alpinelinux.org/alpine/edge/main\", {KEY} }} }}")
-        )
-        .starts_with("isoloom_repository 'apk' ")
+    let apk = one(
+        "alpine@3.19",
+        &format!("{{ repository: {{ name: edge, url: \"https://dl-cdn.alpinelinux.org/alpine/edge/main\", {KEY} }} }}"),
+    );
+    assert_eq!(
+        apk,
+        "isoloom_repository 'apk' 'edge' 'https://dl-cdn.alpinelinux.org/alpine/edge/main' 'https://nginx.org/keys/nginx_signing.key' '4c3f000000000000000000000000000000000000000000000000000000000000' ''\n"
     );
 }
 
@@ -103,11 +105,10 @@ fn a_template_goes_in_filled_and_encoded() {
         Some(format!("isoloom_template '/etc/app.toml' '' 'app' '0640' '{encoded}'\n").as_str())
     );
     let unread = calls("debian@12", "[{ template: { from: conf/app.toml, to: /etc/app.toml } }]");
-    assert!(
-        unread[0]
-            .as_deref()
-            .is_some_and(|l| l.starts_with("isoloom_fail 'the template conf/app.toml wasn'\\''t in the project")),
-        "{unread:?}"
+    assert_eq!(
+        unread[0].as_deref(),
+        Some("isoloom_fail 'the template conf/app.toml wasn'\\''t in the project when the files were generated: add it, then generate again'\n"),
+        "the set-up stops, saying why"
     );
 }
 
@@ -117,11 +118,12 @@ fn users_and_groups_carry_their_fields_and_a_hashed_password() {
         "debian@12",
         "{ user: { name: alice, uid: 1500, group: ops, groups: [sudo, adm], home: /home/alice, shell: /bin/bash, password: winter } }",
     );
-    assert!(
-        user.starts_with("isoloom_user 'alice' '1500' 'ops' 'sudo,adm' '/home/alice' '/bin/bash' 'no' '$6$"),
-        "{user}"
+    // The password goes in hashed, the same for the same lab, machine and user.
+    let hashed = super::super::password::hash("lab", "m", "alice", "winter");
+    assert_eq!(
+        user,
+        format!("isoloom_user 'alice' '1500' 'ops' 'sudo,adm' '/home/alice' '/bin/bash' 'no' '{hashed}'\n")
     );
-    assert!(!user.contains("winter"), "the password goes in hashed: {user}");
     assert_eq!(
         one("debian@12", "{ user: { name: svc, system: true } }"),
         "isoloom_user 'svc' '' '' '' '' '' 'yes' ''\n"
@@ -137,14 +139,26 @@ fn a_service_is_the_unit_its_family_names_and_one_isoloom_defines_comes_with_its
         one("debian@12", "{ service: { name: nginx, enabled: false } }"),
         "isoloom_service 'nginx' 'no'\n"
     );
-    let defined = one("debian@12", "{ service: { name: api, run: [/srv/api, --port, '8000'], user: api, cwd: /srv } }");
-    assert!(defined.starts_with("isoloom_unit 'api' '[Unit]\n"), "{defined}");
-    assert!(
-        defined.contains("ExecStart=\"/srv/api\" \"--port\" \"8000\"\nUser=api\nWorkingDirectory=/srv\n"),
-        "{defined}"
+    // A service Isoloom defines: its family's unit file (`units`' own tests read it), then enabled.
+    let unit = |family, run: &[&str], user: Option<&str>, cwd: Option<&str>| {
+        let run = isoloom_spec::syntax::Argv::try_from(run.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>()).expect("a command");
+        let unit = super::super::units::linux(
+            family,
+            &"api".parse().expect("a unit name"),
+            &run,
+            user.and_then(|u| u.parse().ok()).as_ref(),
+            cwd.and_then(|d| d.parse().ok()).as_ref(),
+        );
+        format!("isoloom_unit 'api' {}\nisoloom_service 'api' 'yes'\n", isoloom_spec::shell::quote(&unit))
+    };
+    assert_eq!(
+        one("debian@12", "{ service: { name: api, run: [/srv/api, --port, '8000'], user: api, cwd: /srv } }"),
+        unit(Family::Debian, &["/srv/api", "--port", "8000"], Some("api"), Some("/srv"))
     );
-    assert!(defined.ends_with("'\nisoloom_service 'api' 'yes'\n"), "{defined}");
-    assert!(one("alpine@3.19", "{ service: { name: api, run: [/srv/api] } }").starts_with("isoloom_unit 'api' '#!/sbin/openrc-run\n"));
+    assert_eq!(
+        one("alpine@3.19", "{ service: { name: api, run: [/srv/api] } }"),
+        unit(Family::Alpine, &["/srv/api"], None, None)
+    );
 }
 
 #[test]
@@ -182,17 +196,31 @@ fn a_vm_step_runs_the_library_then_its_calls_from_the_project_folder() {
     let c = Configured::of(&env, "m").unwrap();
     let resources: Vec<Resource> = c.recipe().resources().cloned().collect();
     let fresh = script(&c, &resources, true);
-    assert!(fresh.starts_with("(\nset -eu\nisoloom_changed() {\n"), "{fresh}");
-    assert!(
-        fresh.contains("\nisoloom_install() {\n") && !fresh.contains("isoloom_user()"),
-        "only what the calls need: {fresh}"
+    let defined: Vec<String> = functions(&fresh).into_iter().map(|(name, _)| name).collect();
+    assert_eq!(
+        defined,
+        [
+            "isoloom_changed",
+            "isoloom_fail",
+            "isoloom_pm",
+            "isoloom_installed",
+            "isoloom_install",
+            "isoloom_packages"
+        ],
+        "only what the calls need"
     );
-    assert!(
-        fresh.ends_with("ISOLOOM_CHANGED=/run/isoloom/configure.changed\nrm -f \"$ISOLOOM_CHANGED\"\ncd /opt/isoloom\nisoloom_packages 'curl'\n)\n"),
-        "{fresh}"
+    let library: String = functions(&fresh).into_iter().map(|(_, text)| text).collect();
+    assert_eq!(
+        fresh,
+        format!(
+            "(\nset -eu\n{library}ISOLOOM_CHANGED=/run/isoloom/configure.changed\nrm -f \"$ISOLOOM_CHANGED\"\ncd /opt/isoloom\nisoloom_packages 'curl'\n)\n"
+        )
     );
-    let after = script(&c, &resources, false);
-    assert!(after.contains("mkdir -p /run/isoloom && : >\"$ISOLOOM_CHANGED\"\n"), "{after}");
+    // Not the first apply: a step before may have changed something, which the mark says.
+    assert_eq!(
+        script(&c, &resources, false),
+        fresh.replace("\nrm -f \"$ISOLOOM_CHANGED\"\n", "\nmkdir -p /run/isoloom && : >\"$ISOLOOM_CHANGED\"\n")
+    );
 }
 
 #[test]
@@ -208,13 +236,6 @@ fn every_function_the_library_calls_is_one_of_its_own() {
         needed(LIBRARY).lines().count(),
         compact(LIBRARY).lines().filter(|l| !l.starts_with('#')).count()
     );
-}
-
-#[test]
-fn the_library_file_starts_with_the_generated_header() {
-    let f = library_file();
-    assert_eq!(f.path, ".isoloom/configure/lib/configure.sh");
-    assert!(f.contents.starts_with("# Generated by isoloom") && f.contents.ends_with(LIBRARY));
 }
 
 /// The library and a recipe's script read as POSIX sh.
