@@ -1,5 +1,5 @@
 ---
-source: crates/core/isoloom-spec/tests/problems.rs
+source: crates/core/isoloom-spec/tests/spec/problems.rs
 expression: "rendered(&spec(\"machines:\\n  dc01:\\n    networks: { lab: 10 }\\n    vm: { os: windows-server@2019, provision: [dc.ps1], image: { vagrant: StefanScherer/windows_2019 } }\\n\"))"
 ---
 error[removed-field] machines.dc01.vm  (isoloom.yml:8:5)

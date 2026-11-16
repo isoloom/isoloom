@@ -1,5 +1,5 @@
 ---
-source: crates/core/isoloom-spec/tests/problems.rs
+source: crates/core/isoloom-spec/tests/spec/problems.rs
 expression: "rendered(&spec(\"machines:\\n  web:\\n    networks: { lab: 10 }\\n    app: { build: build/web }\\noverrides:\\n  vagrant:\\n    machines:\\n      web: { box: generic/debian12 }\\n\"))"
 ---
 error[unknown-reference] overrides.vagrant.machines.web  (isoloom.yml:12:7)

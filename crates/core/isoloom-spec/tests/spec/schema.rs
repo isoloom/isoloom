@@ -2,20 +2,16 @@
 //! caught, the examples point editors to it, and the committed copy
 //! (`schemas/spec-v1.schema.json`) is the one the types generate.
 
-use std::error::Error;
-use std::path::Path;
-
 use isoloom_spec::schema::{MODELINE, schema};
 
-/// A test's outcome: a failed step is its report.
-type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+use crate::testing::{Outcome, workspace};
 
 /// The committed schema is written by the catalogue, which adds each entry's `with:` rule.
 const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
 
 /// The committed copy of the schema.
 fn committed() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../schemas/spec-v1.schema.json")
+    workspace().join("schemas/spec-v1.schema.json")
 }
 
 #[test]
@@ -32,7 +28,7 @@ fn the_committed_schema_is_current() {
 
 /// Every example of the project: its folder's name and its spec's text.
 fn examples() -> Outcome<Vec<(String, String)>> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
+    let dir = workspace().join("examples");
     let mut out = Vec::new();
     for entry in std::fs::read_dir(dir)? {
         let path = entry?.path();

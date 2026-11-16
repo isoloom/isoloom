@@ -1,5 +1,5 @@
 ---
-source: crates/core/isoloom-spec/tests/problems.rs
+source: crates/core/isoloom-spec/tests/spec/problems.rs
 expression: "rendered(&spec(\"machines:\\n  web:\\n    networks: { lab: 10 }\\n    docker: { build: build/web, init: [data/secret.sh] }\\n\"))"
 ---
 error[removed-field] machines.web.docker  (isoloom.yml:8:5)
