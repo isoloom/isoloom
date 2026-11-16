@@ -87,21 +87,19 @@ fn an_appliance_has_no_files() {
 
 #[test]
 fn a_source_is_a_file_of_the_project() {
-    let dir = tempfile::Builder::new().prefix("isoloom-machine-files-").tempdir().unwrap();
+    let dir = tempfile::tempdir().unwrap();
     let dir = dir.path();
     std::fs::create_dir_all(dir.join("conf/sub")).unwrap();
     std::fs::write(dir.join("conf/a.ini"), "a=1\n").unwrap();
     let yaml =
         container("[{ path: /a, source: conf/a.ini }, { path: /b, source: conf/missing.ini }, { path: /c, source: conf/sub }, { path: /d, source: ../x }]");
     let found: Vec<String> = lab(&yaml).unwrap().problems_with_files(dir).iter().map(Problem::line).collect();
-    assert_eq!(found.len(), 3, "{found:#?}");
-    assert!(
-        found[0].starts_with("machines.m.files[1]: ") && found[0].contains("doesn't exist"),
-        "{found:#?}"
-    );
-    assert!(found[1].starts_with("machines.m.files[2]: ") && found[1].contains("is a folder"), "{found:#?}");
-    assert!(
-        found[2].starts_with("machines.m.files[3]: ") && found[2].contains("inside the project"),
-        "{found:#?}"
+    assert_eq!(
+        found,
+        [
+            "machines.m.files[1]: `conf/missing.ini` doesn't exist in the project folder",
+            "machines.m.files[2]: `conf/sub` is a folder: name a file",
+            "machines.m.files[3]: `../x` must be a path inside the project folder: it goes up a folder (`..`)"
+        ]
     );
 }

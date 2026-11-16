@@ -3,40 +3,13 @@
 //! normalization or lowering shows up here as a diff to review, not only as a changed generated
 //! file).
 
-use std::path::{Path, PathBuf};
-
-use crate::testing::ids;
-use isoloom_plan::Lab;
-
-fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
-}
-
-/// The examples' names, sorted: the folders with their isoloom.yml (examples/paas groups its own,
-/// out of this list).
-fn names() -> std::io::Result<Vec<String>> {
-    let mut out = Vec::new();
-    for entry in std::fs::read_dir(root())? {
-        let path = entry?.path();
-        if path.join("isoloom.yml").is_file()
-            && let Some(name) = path.file_name()
-        {
-            out.push(name.to_string_lossy().into_owned());
-        }
-    }
-    out.sort();
-    Ok(out)
-}
-
-fn example(name: &str) -> Result<Lab, String> {
-    isoloom_spec::load(&root().join(name)).map(Lab::new).map_err(|e| format!("{name}: {e}"))
-}
+use crate::testing::{example, example_names, ids};
 
 const ALL: [&str; 8] = ["docker", "hosted", "cloud-docker", "kubernetes", "vagrant", "proxmox", "esxi", "cloud-vm"];
 
 #[test]
 fn every_example_is_valid() {
-    let names = names().unwrap();
+    let names = example_names().unwrap();
     assert!(!names.is_empty(), "no examples found");
     for name in names {
         assert_eq!(example(&name).unwrap().problems(), [], "{name}");
@@ -45,7 +18,7 @@ fn every_example_is_valid() {
 
 #[test]
 fn every_example_lowers_as_snapshotted() {
-    for name in names().unwrap() {
+    for name in example_names().unwrap() {
         insta::assert_yaml_snapshot!(name.clone(), example(&name).unwrap().spec());
     }
 }
