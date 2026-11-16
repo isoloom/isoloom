@@ -43,16 +43,14 @@ fn the_run_index_names_the_script() {
 }
 
 #[test]
-fn gzip_is_deterministic_and_is_standard_base64() {
+fn the_carried_text_is_what_cloud_init_decodes_back_to_the_script() {
+    use std::io::Read as _;
     let script = "#!/bin/sh\nset -eu\nisoloom_packages 'nginx'\n";
-    let once = gz_b64(script);
-    assert_eq!(once, gz_b64(script), "the same script gives the same bytes");
-    // Standard base64 (what cloud-init decodes for `gz+b64`): its alphabet, padded.
-    assert!(
-        once.trim_end_matches('=').chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/'),
-        "{once}"
-    );
-    assert_eq!(once.len() % 4, 0, "{once}");
+    // `gz+b64`: standard base64 (padded), then gzip.
+    let compressed = isoloom_test_support::b64_decode(&gz_b64(script)).expect("standard base64");
+    let mut decoded = String::new();
+    flate2::read::GzDecoder::new(compressed.as_slice()).read_to_string(&mut decoded).expect("gzip");
+    assert_eq!(decoded, script);
 }
 
 /// The same script gives the same compressed bytes whatever else is in the build: the deflate

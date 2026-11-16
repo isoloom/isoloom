@@ -17,7 +17,7 @@ fn one(step: &str) -> String {
 }
 
 #[test]
-fn features_files_and_copies() {
+fn a_feature_a_file_and_a_copy_are_each_a_call_with_its_arguments_quoted() {
     assert_eq!(
         one("{ packages: [Web-Server, Web-Asp-Net45] }"),
         "Install-IsoloomFeature -Name 'Web-Server', 'Web-Asp-Net45'\n"
@@ -29,6 +29,10 @@ fn features_files_and_copies() {
     assert_eq!(
         one("{ file: { path: 'C:\\data', state: directory } }"),
         "Install-IsoloomFile -Path 'C:\\data' -State directory\n"
+    );
+    assert_eq!(
+        one("{ file: { path: 'C:\\old', state: absent } }"),
+        "Install-IsoloomFile -Path 'C:\\old' -State absent\n"
     );
     let sha = "0".repeat(64);
     assert_eq!(
@@ -50,6 +54,12 @@ fn a_template_goes_in_filled_and_encoded() {
         found[0].as_deref(),
         Some(format!("Install-IsoloomTemplate -To 'C:\\inetpub\\web.config' -Base64 '{encoded}'\n").as_str())
     );
+    let unread = calls("[{ template: { from: web.config, to: 'C:\\inetpub\\web.config' } }]", &[]);
+    assert_eq!(
+        unread[0].as_deref(),
+        Some("throw 'isoloom: the template web.config wasn''t in the project when the files were generated: add it, then generate again'\n"),
+        "the set-up stops, saying why"
+    );
 }
 
 #[test]
@@ -58,6 +68,7 @@ fn accounts_keep_their_password_plain_and_their_groups() {
         one("{ user: { name: Alice, password: \"it's\", group: Users, groups: [Administrators] } }"),
         "Add-IsoloomUser -Name 'Alice' -Phrase 'it''s' -Groups 'Users', 'Administrators'\n"
     );
+    assert_eq!(one("{ user: { name: svc } }"), "Add-IsoloomUser -Name 'svc'\n");
     assert_eq!(
         one("{ group: { name: Remote Desktop Users } }"),
         "Add-IsoloomGroup -Name 'Remote Desktop Users'\n"
@@ -65,8 +76,12 @@ fn accounts_keep_their_password_plain_and_their_groups() {
 }
 
 #[test]
-fn services_commands_and_the_firewall() {
+fn a_service_a_command_and_a_firewall_port_are_each_a_call_with_its_arguments_quoted() {
     assert_eq!(one("{ service: W3SVC }"), "Register-IsoloomService -Name 'W3SVC' -Enabled $true\n");
+    assert_eq!(
+        one("{ service: { name: Spooler, enabled: false } }"),
+        "Register-IsoloomService -Name 'Spooler' -Enabled $false\n"
+    );
     assert_eq!(
         one("{ service: { name: api, run: ['C:\\api\\api.exe', --port, '8000'], cwd: 'C:\\api' } }"),
         "Register-IsoloomTask -Name 'api' -Run 'C:\\api\\api.exe', '--port', '8000' -Directory 'C:\\api'\nRegister-IsoloomTaskState -Name 'api' -Enabled $true\n"
@@ -90,12 +105,22 @@ fn a_vm_step_runs_the_library_then_its_calls_from_the_project_folder() {
     let env = testing::machine("os: windows-server@2022, app: { steps: [{ packages: [Web-Server] }] }", Target::Vagrant, &[]);
     let c = Configured::of(&env, "m").unwrap();
     let resources: Vec<Resource> = c.recipe().resources().cloned().collect();
-    let s = script(&c, &resources, true);
-    assert!(s.starts_with("$ErrorActionPreference = 'Stop'\n[Net.ServicePointManager]"), "{s}");
-    assert!(!s.contains("\n# "), "the library goes in without its comments: {s}");
-    assert!(
-        s.ends_with("Set-Location -LiteralPath 'C:\\isoloom'\nInstall-IsoloomFeature -Name 'Web-Server'\n"),
-        "{s}"
+    let library = super::super::compact(LIBRARY);
+    isoloom_test_support::assert_every!(library.lines(), |l: &&str| !l.trim_start().starts_with('#'));
+    let fresh = script(&c, &resources, true);
+    assert_eq!(
+        fresh,
+        format!(
+            "$ErrorActionPreference = 'Stop'\n{library}$env:ISOLOOM_CHANGED = 'C:\\Windows\\Temp\\isoloom-configure.changed'\nRemove-Item -LiteralPath $env:ISOLOOM_CHANGED -Force -ErrorAction SilentlyContinue\nSet-Location -LiteralPath 'C:\\isoloom'\nInstall-IsoloomFeature -Name 'Web-Server'\n"
+        ),
+        "the library without its comments, then the calls from the project folder"
     );
-    assert!(library_file().contents.ends_with(LIBRARY));
+    // Not the first apply: a step before may have changed something, which the mark says.
+    assert_eq!(
+        script(&c, &resources, false),
+        fresh.replace(
+            "\nRemove-Item -LiteralPath $env:ISOLOOM_CHANGED -Force -ErrorAction SilentlyContinue\n",
+            "\nSet-Content -LiteralPath $env:ISOLOOM_CHANGED -Value 'changed'\n"
+        )
+    );
 }
