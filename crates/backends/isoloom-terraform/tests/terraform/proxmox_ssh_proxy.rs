@@ -7,7 +7,7 @@ use crate::testing::{Outcome, file, plan, proxmox};
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::EsxiBackend;
-use isoloom_test_support::{hcl_attribute, hcl_blocks, hcl_body, hcl_nested, hcl_one, hcl_text};
+use isoloom_test_support::{assert_every, hcl_attribute, hcl_blocks, hcl_body, hcl_nested, hcl_one, hcl_text};
 
 const SEALED: &str = "version: 1
 name: proxied
@@ -50,8 +50,11 @@ fn the_proxy_is_unset_by_default() -> Outcome {
 
 #[test]
 fn other_servers_connect_directly() -> Outcome {
-    let tf = file(&EsxiBackend.render(&plan(SEALED, Target::Esxi)?)?, "esxi/main.tf")?.to_owned();
-    assert!(!tf.contains("proxy_"), "{tf}");
-    assert!(!tf.contains("ssh_proxy_host"), "{tf}");
+    let tf = hcl_body(file(&EsxiBackend.render(&plan(SEALED, Target::Esxi)?)?, "esxi/main.tf")?);
+    // Its seal connects, and to the router directly: no proxy setting, no proxy variable.
+    let seal = connections(&tf, "isoloom_seal");
+    assert_eq!(seal.len(), 1);
+    assert_every!(seal, |c: &&hcl::Body| c.attributes().all(|a| !a.key().starts_with("proxy_")));
+    assert_eq!(hcl_blocks(&tf, "variable", &["ssh_proxy_host"]).len(), 0);
     Ok(())
 }

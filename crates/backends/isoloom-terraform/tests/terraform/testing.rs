@@ -1,6 +1,7 @@
 //! What the integration tests share: specs from the repository's examples or written in a
 //! test, checked valid, and the file a backend wrote at a path.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
 
@@ -188,5 +189,94 @@ fn texts_of(expr: &hcl::Expression, out: &mut Vec<String>) {
             texts_of(&c.false_expr, out);
         }
         _ => {}
+    }
+}
+
+/// The first line of `texts` that holds `what`.
+///
+/// # Errors
+///
+/// When none does.
+pub(crate) fn line_with<'t>(texts: &'t [String], what: &str) -> Outcome<&'t str> {
+    texts
+        .iter()
+        .flat_map(|t| t.lines())
+        .find(|l| l.contains(what))
+        .ok_or_else(|| format!("no line with {what} in {texts:?}").into())
+}
+
+/// Whether a line of one of `texts` holds `what`.
+pub(crate) fn has_line(texts: &[String], what: &str) -> bool {
+    texts.iter().flat_map(|t| t.lines()).any(|l| l.contains(what))
+}
+
+/// The files cloud-init writes for resource `kind` `name` of `tf` (each object of a
+/// `write_files` its user data encodes, with a `path`): each one's fields (`path`, `content`,
+/// `permissions`), as text, in order.
+///
+/// # Panics
+///
+/// When `tf` isn't HCL or doesn't have exactly one such resource.
+pub(crate) fn written_files(tf: &str, kind: &str, name: &str) -> Vec<BTreeMap<String, String>> {
+    fn in_body(body: &hcl::Body, out: &mut Vec<BTreeMap<String, String>>) {
+        for structure in body {
+            match structure {
+                hcl::Structure::Attribute(a) => files_in(a.expr(), out),
+                hcl::Structure::Block(b) => in_body(b.body(), out),
+            }
+        }
+    }
+    let mut out = Vec::new();
+    in_body(&hcl_resource(tf, kind, name), &mut out);
+    out
+}
+
+/// The file at `path` among `files` ([`written_files`]).
+///
+/// # Errors
+///
+/// When there is none.
+pub(crate) fn written<'a>(files: &'a [BTreeMap<String, String>], path: &str) -> Outcome<&'a BTreeMap<String, String>> {
+    files
+        .iter()
+        .find(|f| f.get("path").is_some_and(|p| p == path))
+        .ok_or_else(|| format!("no file {path} among {files:?}").into())
+}
+
+fn files_in(expr: &hcl::Expression, out: &mut Vec<BTreeMap<String, String>>) {
+    use hcl::Expression as E;
+    match expr {
+        E::Object(object) => {
+            let fields: BTreeMap<String, String> = object
+                .iter()
+                .filter_map(|(k, v)| {
+                    let hcl::ObjectKey::Identifier(id) = k else { return None };
+                    let mut texts = Vec::new();
+                    texts_of(v, &mut texts);
+                    texts.pop().map(|t| (id.to_string(), t))
+                })
+                .collect();
+            if fields.contains_key("path") {
+                out.push(fields);
+            }
+            object.values().for_each(|v| files_in(v, out));
+        }
+        E::Array(items) => items.iter().for_each(|e| files_in(e, out)),
+        E::Parenthesis(inner) => files_in(inner, out),
+        E::FuncCall(call) => call.args.iter().for_each(|e| files_in(e, out)),
+        E::Conditional(c) => {
+            files_in(&c.true_expr, out);
+            files_in(&c.false_expr, out);
+        }
+        _ => {}
+    }
+}
+
+/// The references attribute `key` of `body` lists (`depends_on`, `replace_triggered_by`), as HCL
+/// writes them.
+pub(crate) fn references(body: &hcl::Body, key: &str) -> Vec<String> {
+    match isoloom_test_support::hcl_attribute(body, key) {
+        Some(hcl::Expression::Array(items)) => items.iter().map(ToString::to_string).collect(),
+        _ => Vec::new(),
     }
 }

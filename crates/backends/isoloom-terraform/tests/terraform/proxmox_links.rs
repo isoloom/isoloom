@@ -1,7 +1,7 @@
 //! The Proxmox module's links, firewall, pool, arm64 VMs and LXC containers (not run on a real
 //! host): what the module writes for each.
 
-use crate::testing::{Outcome, proxmox};
+use crate::testing::{Outcome, has_line, proxmox, references, texts};
 use isoloom_spec::model::Target;
 use isoloom_terraform::ProxmoxBackend;
 use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text};
@@ -190,20 +190,21 @@ overrides: { proxmox: { machines: { web: { lxc: true } } } }
 #[test]
 fn an_lxc_machine_is_a_container_from_its_oci_image() -> Outcome {
     let tf = proxmox(LXC)?;
-    assert!(tf.contains("resource \"proxmox_oci_image\" \"web\""), "{tf}");
-    assert!(
-        tf.contains("reference           = \"docker.io/library/nginx:1.27\"") || tf.contains("\"docker.io/library/nginx:1.27\""),
-        "{tf}"
+    let body = hcl_body(&tf);
+    assert_eq!(
+        hcl_text(resource(&body, "proxmox_oci_image", "web"), "reference"),
+        "docker.io/library/nginx:1.27"
     );
-    assert!(tf.contains("resource \"proxmox_virtual_environment_container\" \"web\""), "{tf}");
-    assert!(tf.contains("container_id = proxmox_virtual_environment_container.web.vm_id"), "{tf}");
-    assert!(
-        tf.contains("proxmox_virtual_environment_container.web,") || tf.contains("proxmox_virtual_environment_container.web]"),
-        "{tf}"
-    );
+    assert_eq!(hcl_names(&body, "resource", "proxmox_virtual_environment_container"), ["web"]);
+    assert!(!hcl_names(&body, "resource", "proxmox_virtual_environment_vm").contains(&"web".to_owned()));
+    // Its firewall is the container's; box, which depends on web, waits for the container.
+    let firewall = resource(&body, "proxmox_virtual_environment_firewall_options", "web");
+    assert_eq!(hcl_text(firewall, "container_id"), "proxmox_virtual_environment_container.web.vm_id");
+    let after = references(resource(&body, "proxmox_virtual_environment_vm", "box"), "depends_on");
+    assert!(after.contains(&"proxmox_virtual_environment_container.web".to_owned()), "{after:?}");
     // The router answers the environment's names for it.
-    assert!(tf.contains("dnsmasq"), "{tf}");
-    assert!(tf.contains("10.9.0.10 web"), "{tf}");
+    let router = texts(&tf, "proxmox_virtual_environment_file", "isoloom_router");
+    assert!(has_line(&router, "dnsmasq") && has_line(&router, "10.9.0.10 web"), "{router:?}");
     Ok(())
 }
 

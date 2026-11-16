@@ -4,13 +4,12 @@
 use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_text, hcl_values};
 use std::path::Path;
 
-use crate::testing::{Outcome, example, file};
+use crate::testing::{Outcome, example, file, has_line, texts};
 use isoloom_plan::Lab;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::{Spec, Target, Virtiofs, VirtiofsCache};
 use isoloom_terraform::ProxmoxBackend;
 
-/// The module of `spec`, a lowered spec of `lab`, checked valid.
 /// Every VM's `virtiofs` block of the parsed module.
 fn virtiofs(body: &hcl::Body) -> Vec<&hcl::Body> {
     hcl_blocks(body, "resource", &["proxmox_virtual_environment_vm"])
@@ -20,6 +19,7 @@ fn virtiofs(body: &hcl::Body) -> Vec<&hcl::Body> {
         .collect()
 }
 
+/// The module of `spec`, a lowered spec of `lab`, checked valid.
 fn render(lab: &Lab, spec: &Spec) -> Outcome<String> {
     let problems = isoloom_spec::validate(spec);
     if !problems.is_empty() {
@@ -79,12 +79,12 @@ fn the_module_creates_the_mapping_and_each_vm_mounts_it() -> Outcome {
         assert_eq!(hcl_text(m, "mapping"), "proxmox_hardware_mapping_dir.shared.name");
         assert_eq!(hcl_text(m, "cache"), "auto");
     }
-    let scripts: Vec<String> = hcl_literals(&body).into_iter().filter(|l| l.contains('\n')).collect();
-    assert!(scripts.iter().all(|s| !s.contains("exportfs") && !s.contains("nfs")), "{scripts:?}");
-    assert!(
-        scripts.iter().any(|s| s.lines().any(|l| l.contains(" virtiofs defaults,nofail"))),
-        "{scripts:?}"
-    );
+    // Each VM mounts it by its tag in its own set-up; none exports or mounts NFS.
+    for vm in ["writer", "reader"] {
+        let setup = texts(&tf, "proxmox_virtual_environment_file", vm);
+        assert!(has_line(&setup, " virtiofs defaults,nofail"), "{vm}: {setup:?}");
+        assert!(!has_line(&setup, "exportfs") && !has_line(&setup, "nfs"), "{vm}: {setup:?}");
+    }
     Ok(())
 }
 
@@ -124,8 +124,9 @@ fn a_folder_of_the_volume_is_bound_from_the_whole() -> Outcome {
         + "\noverrides:\n  proxmox:\n    volumes: { shared: { virtiofs: {} } }\n";
     let lab = Lab::parse(&text).map_err(|problems| format!("{problems:?}"))?;
     let tf = render(&lab, &lab.for_target(Target::Proxmox))?;
-    assert!(tf.contains("/var/lib/isoloom/volumes/shared/out"), "{tf}");
-    assert!(tf.contains("none bind,nofail"), "{tf}");
+    let setup = texts(&tf, "proxmox_virtual_environment_file", "reader");
+    assert!(has_line(&setup, "/var/lib/isoloom/volumes/shared/out"), "{setup:?}");
+    assert!(has_line(&setup, "none bind,nofail"), "{setup:?}");
     Ok(())
 }
 
