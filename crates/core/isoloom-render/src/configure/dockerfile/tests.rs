@@ -107,6 +107,18 @@ fn a_template_is_copied_filled_in_with_its_owner_and_mode() {
         instructions(&found[0].contents).last().map(String::as_str),
         Some("COPY --chown=app:ops --chmod=0644 [\".isoloom/configure/m/rendered/conf/app.toml\", \"/etc/app.toml\"]")
     );
+    for (owner, chown) in [("owner: app", "--chown=app "), ("group: ops", "--chown=root:ops "), ("mode: \"0600\"", "")] {
+        let one = built(
+            &format!("os: debian@12, app: {{ steps: [{{ template: {{ from: conf/app.toml, to: /etc/app.toml, {owner} }} }}] }}"),
+            &[("conf/app.toml", "x\n")],
+        );
+        let mode = if chown.is_empty() { "0600" } else { "0644" };
+        assert_eq!(
+            instructions(&one[0].contents).last().map(String::as_str),
+            Some(format!("COPY {chown}--chmod={mode} [\".isoloom/configure/m/rendered/conf/app.toml\", \"/etc/app.toml\"]").as_str()),
+            "{owner}"
+        );
+    }
     let rendered = found
         .iter()
         .find(|f| f.path == ".isoloom/configure/m/rendered/conf/app.toml")

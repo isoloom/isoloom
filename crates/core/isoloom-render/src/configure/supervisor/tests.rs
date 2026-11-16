@@ -80,11 +80,12 @@ fn a_container_without_services_has_no_supervisor() {
 /// A machine whose recipe's steps are all `start` (an entry's, over its official image), and
 /// the process of an image whose start Isoloom's supervisor runs.
 fn started() -> (isoloom_plan::Environment, ContainerProcess) {
-    let mut env = testing::machine(
-        "os: debian@12, app: { steps: [{ command: [touch, /run/started], creates: /run/started }, { run: prepare.sh }] }",
-        Target::Docker,
-        &[],
-    );
+    started_with("[{ command: [touch, /run/started], creates: /run/started }, { run: prepare.sh }]")
+}
+
+/// [`started`] with `steps` (YAML) as the entry's start steps.
+fn started_with(steps: &str) -> (isoloom_plan::Environment, ContainerProcess) {
+    let mut env = testing::machine(&format!("os: debian@12, app: {{ steps: {steps} }}"), Target::Docker, &[]);
     if let Some(r) = env.machines.get_mut("m").and_then(|m| m.recipe.as_mut()) {
         r.start = std::mem::take(&mut r.install);
     }
@@ -139,4 +140,43 @@ fn the_supervisor_parses_as_sh() {
         let status = std::process::Command::new("sh").args(["-n", "-c", &r]).status().expect("sh runs");
         assert!(status.success(), "{r}");
     }
+}
+
+#[test]
+fn the_start_sources_the_library_only_for_its_calls_and_marks_a_quoted_dollar_for_shellcheck() {
+    let body = |steps: &str| {
+        let (env, process) = started_with(steps);
+        let r = script(&Configured::of(&env, "m").expect("a recipe"), &process).expect("a supervisor");
+        r.split_once("\nset -eu\n").map(|(_, body)| body.to_owned()).expect("the supervisor's body")
+    };
+    assert_eq!(
+        body("[{ run: a.sh, creates: /a }]"),
+        "cd /opt/isoloom\n[ -e '/a' ] || sh '/opt/isoloom/a.sh'\nexec '/docker-entrypoint.sh' \"$@\"\n",
+        "scripts alone: no library"
+    );
+    assert_eq!(
+        body("[{ command: 'echo $HOME > /x', creates: /x }]"),
+        ". /usr/local/lib/isoloom/configure.sh\ncd /opt/isoloom\n# shellcheck disable=SC2016\nisoloom_command 'creates' '1' '/x' 'sh' '-c' 'echo $HOME > /x'\nexec '/docker-entrypoint.sh' \"$@\"\n",
+        "a call: the library; its quoted `$` is meant"
+    );
+}
+
+#[test]
+fn a_start_copy_s_source_is_built_into_the_image_s_project_folder() {
+    let (env, process) = started_with("[{ copy: { from: site/, to: /srv/site/ } }]");
+    let d = super::super::dockerfile::render(&Configured::of(&env, "m").expect("a recipe"), "nginx@sha256:0", &process);
+    let instructions: Vec<&str> = d.lines().filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
+    assert_eq!(
+        instructions,
+        [
+            "FROM nginx@sha256:0",
+            "WORKDIR /opt/isoloom",
+            "COPY [\".isoloom/configure/lib/configure.sh\", \"/usr/local/lib/isoloom/configure.sh\"]",
+            "COPY [\"site/\", \"site/\"]",
+            "COPY --chmod=0755 [\".isoloom/configure/m/run\", \"/usr/local/bin/isoloom-run\"]",
+            "ENTRYPOINT [\"/usr/local/bin/isoloom-run\"]",
+            "CMD [\"nginx\",\"-g\",\"daemon off;\"]"
+        ],
+        "the copy runs at each start, from what the build put in the project folder"
+    );
 }
