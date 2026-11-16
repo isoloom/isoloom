@@ -89,7 +89,41 @@ mod tests {
         let before = counts(&[("clippy/a", "x", 3), ("clippy/b", "x", 1)]);
         let now = counts(&[("clippy/a", "x", 2), ("clippy/c", "y", 1)]);
         let changes = compare(&before, &now);
-        assert_eq!(changes.raised, [("clippy/c".to_owned(), "y".to_owned())]);
-        assert_eq!(changes.lowered.len(), 2);
+        let pair = |r: &str, c: &str| (r.to_owned(), c.to_owned());
+        assert_eq!(changes.raised, [pair("clippy/c", "y")]);
+        assert_eq!(changes.lowered, [pair("clippy/a", "x"), pair("clippy/b", "x")], "a rule gone is down to zero");
+        assert_eq!(
+            changes.lines,
+            ["down  clippy/a in x: 3 -> 2", "down  clippy/b in x: 1 -> 0", "up    clippy/c in y: 0 -> 1"]
+        );
+    }
+
+    #[test]
+    fn the_baseline_reads_back_what_was_written_and_none_is_no_baseline() -> Res<()> {
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("baseline.json");
+        assert_eq!(read(&file)?, None);
+        let c = counts(&[("clippy/a", "x", 3), ("dup/clone", "y", 1)]);
+        write(&file, &c)?;
+        assert_eq!(read(&file)?, Some(c));
+        std::fs::write(&file, "{not json")?;
+        assert!(
+            read(&file).is_err_and(|e| e.is::<serde_json::Error>()),
+            "a broken baseline is an error, not none"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_table_has_a_line_per_rule_with_its_total_and_each_crate() {
+        let c = counts(&[("clippy/a", "x", 3), ("clippy/a", "y", 2), ("dup/clone", "y", 1)]);
+        let lines: Vec<Vec<String>> = table(&c).lines().map(|l| l.split_whitespace().map(str::to_owned).collect()).collect();
+        assert_eq!(
+            lines,
+            [
+                ["clippy/a", "5", "x", "3,", "y", "2"].map(String::from).to_vec(),
+                ["dup/clone", "1", "y", "1"].map(String::from).to_vec()
+            ]
+        );
     }
 }

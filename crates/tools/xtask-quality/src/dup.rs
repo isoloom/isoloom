@@ -64,7 +64,14 @@ mod tests {
         let ok = serde_json::json!({ "duplicates": [{ "firstFile": { "name": "/r/crates/a/src/x.rs" } }] });
         assert_eq!(first_files(&ok).unwrap(), ["/r/crates/a/src/x.rs"]);
         assert_eq!(first_files(&serde_json::json!({ "duplicates": [] })).unwrap(), Vec::<&str>::new());
-        assert!(first_files(&serde_json::json!({ "clones": [] })).is_err());
-        assert!(first_files(&serde_json::json!({ "duplicates": [{ "secondFile": {} }] })).is_err());
+        let refused = |report: serde_json::Value| first_files(&report).err().map(|e| e.to_string()).unwrap_or_default();
+        assert_eq!(
+            refused(serde_json::json!({ "clones": [] })),
+            "jscpd's report has no `duplicates` list: its format changed"
+        );
+        assert_eq!(
+            refused(serde_json::json!({ "duplicates": [{ "secondFile": {} }] })),
+            r#"a clone in jscpd's report has no `firstFile.name`: {"secondFile":{}}"#
+        );
     }
 }
