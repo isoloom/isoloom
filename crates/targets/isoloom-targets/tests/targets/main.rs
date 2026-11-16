@@ -38,9 +38,12 @@ mod machine_settings;
 mod managed;
 mod message;
 mod own_image_boot;
+#[cfg(feature = "paas")]
+mod paas;
 mod possible;
 mod project_copy;
 mod proxmox_controller;
+mod quoting;
 mod readme;
 mod reboot;
 mod report;

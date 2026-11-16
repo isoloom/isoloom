@@ -1,15 +1,12 @@
 //! The literals the builders write, and decoders that read each back as its language would: a
 //! decoder gives `None` for a literal the language would not read back as plain text (it ends
-//! early, or something in it would expand). The quoting properties (`tests/quoting.rs`) and the fuzz
-//! target (`fuzz/fuzz_targets/quoting.rs`) both check that every literal reads back as its text.
-
-#[path = "hcl.rs"]
-mod hcl;
-
-pub(crate) use hcl::hcl_decode;
+//! early, or something in it would expand). The quoting properties (`isoloom-targets`'
+//! `tests/targets/quoting.rs`) and the fuzz target (`fuzz/fuzz_targets/quoting.rs`) both check
+//! that every literal reads back as its text; HCL's own is [`crate::hcl_decode`].
 
 /// A POSIX sh word made of single-quoted runs and backslash-escaped characters.
-pub(crate) fn sh_decode(word: &str) -> Option<String> {
+#[must_use]
+pub fn sh_decode(word: &str) -> Option<String> {
     let mut out = String::new();
     let mut chars = word.chars();
     while let Some(c) = chars.next() {
@@ -30,7 +27,8 @@ pub(crate) fn sh_decode(word: &str) -> Option<String> {
 
 /// A Ruby double-quoted string: `\\`, `\"` and `\#` are escapes; a bare `"` or an unescaped
 /// `#{`, `#$` or `#@` (an interpolation) is refused.
-pub(crate) fn rb_decode(lit: &str) -> Option<String> {
+#[must_use]
+pub fn rb_decode(lit: &str) -> Option<String> {
     let inner = lit.strip_prefix('"')?.strip_suffix('"')?;
     let mut out = String::new();
     let mut chars = inner.chars().peekable();
@@ -54,7 +52,8 @@ fn is_ps_quote(c: char) -> bool {
 
 /// A PowerShell single-quoted string: any single-quote character doubled stands for itself; a
 /// lone one ends the string, so it is refused inside.
-pub(crate) fn ps_decode(lit: &str) -> Option<String> {
+#[must_use]
+pub fn ps_decode(lit: &str) -> Option<String> {
     let inner = lit.strip_prefix('\'')?.strip_suffix('\'')?;
     let mut out = String::new();
     let mut chars = inner.chars();
@@ -70,7 +69,8 @@ pub(crate) fn ps_decode(lit: &str) -> Option<String> {
 /// A word of a systemd command line in double quotes, as systemd reads it: C escapes (`\\`,
 /// `\"`, `\n`) unescaped, `%%` a percent sign, `$$` a dollar sign; a lone `%` (a specifier) or
 /// `$` (a variable) would expand, so it isn't plain text.
-pub(crate) fn systemd_decode(word: &str) -> Option<String> {
+#[must_use]
+pub fn systemd_decode(word: &str) -> Option<String> {
     let inner = word.strip_prefix('"')?.strip_suffix('"')?;
     let mut out = String::new();
     let mut chars = inner.chars();
@@ -95,7 +95,8 @@ pub(crate) fn systemd_decode(word: &str) -> Option<String> {
 }
 
 /// Standard base64 (RFC 4648), padded, decoded.
-pub(crate) fn b64_decode(text: &str) -> Option<Vec<u8>> {
+#[must_use]
+pub fn b64_decode(text: &str) -> Option<Vec<u8>> {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     if !text.len().is_multiple_of(4) {
         return None;
