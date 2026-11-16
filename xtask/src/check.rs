@@ -64,6 +64,10 @@ const fn step(name: &'static str, fast: bool, about: &'static str, run: fn(&Path
     }
 }
 
+/// The tests' line coverage floor, in percent: about a point under what dev measures (96.05%,
+/// macOS, 2026-11-16), raised as it rises, never lowered to let a change in.
+const COVERAGE_FLOOR: &str = "95.0";
+
 /// Every step, in the order they run: the quick ones first, so a red one shows early.
 pub(crate) const STEPS: &[Step] = &[
     step("lockfile", true, "Cargo.lock is current (as --locked checks it)", lockfile),
@@ -81,6 +85,12 @@ pub(crate) const STEPS: &[Step] = &[
     step("test", true, "the tests under cargo-nextest, then the doctests (`cargo xtask test`)", |root| {
         xtask(root, &["test"])
     }),
+    step(
+        "coverage",
+        false,
+        "the tests' line coverage, at least COVERAGE_FLOOR (cargo-llvm-cov)",
+        coverage,
+    ),
     step("doc", false, "the API docs build without a warning", |root| {
         process::passed(
             process::cargo(root)
@@ -399,6 +409,25 @@ pub(crate) const SEMVER_CRATES: &[&str] = &["isoloom-spec", "isoloom-targets"];
 
 /// cargo-semver-checks over the supported library API (docs/reference/policies.md), against
 /// each crate's latest release on crates.io.
+/// The tests under cargo-nextest, instrumented, their line coverage held to [`COVERAGE_FLOOR`]
+/// (the xtask, a tool of the repository's own, left out).
+fn coverage(root: &Path) -> Res<bool> {
+    cargo(
+        root,
+        &[
+            "llvm-cov",
+            "nextest",
+            "--workspace",
+            "--exclude",
+            "xtask",
+            "--locked",
+            "--summary-only",
+            "--fail-under-lines",
+            COVERAGE_FLOOR,
+        ],
+    )
+}
+
 fn semver(root: &Path) -> Res<bool> {
     let mut fetch = Command::new("curl");
     fetch.args([
