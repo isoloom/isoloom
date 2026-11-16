@@ -156,8 +156,11 @@ mod tests {
         ]));
         let refusal = lab.refusal(Target::Vagrant).unwrap();
         assert_eq!(refusal.path.as_str(), "machines.web.app.build");
-        assert!(refusal.reason.contains("build/web/Dockerfile line 2 (`COPY`)"), "{}", refusal.reason);
-        assert!(lab.not_possible(Target::Vagrant).is_some());
+        assert_eq!(
+            refusal.reason,
+            "its Dockerfile has no VM form: build/web/Dockerfile line 2 (`COPY`): `--from=mlocati/php-extension-installer` copies out of another image, which the VM doesn't have"
+        );
+        assert!(matches!(lab.not_possible(Target::Vagrant), Some(crate::NotPossible::MissingForm(p)) if p == refusal));
         assert_eq!(lab.refusal(Target::Docker), None);
     }
 }

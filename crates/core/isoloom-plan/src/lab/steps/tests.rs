@@ -55,17 +55,12 @@ fn a_templates_placeholders_resolve_against_the_spec() {
     .unwrap();
     let dir = dir.path();
     let lab = testing::lab(&lab("[{ template: { from: ok.conf, to: /ok } }, { template: { from: bad.conf, to: /bad } }]"));
-    let found = lab.problems_with_files(dir);
-    assert_eq!(found.len(), 1, "{found:?}");
-    assert_eq!(found[0].path.as_str(), "machines.web.app.steps[1].template.from");
-    let reason = &found[0].reason;
-    assert!(
-        reason.starts_with("`bad.conf`: `{{ machines.db.ports.nope.port }}`: `db` has no port named `nope`"),
-        "{reason}"
-    );
-    assert!(
-        reason.contains("known only once the environment runs") && reason.contains("only a catalogue entry has it"),
-        "{reason}"
+    let found: Vec<String> = lab.problems_with_files(dir).iter().map(isoloom_spec::syntax::Problem::line).collect();
+    assert_eq!(
+        found,
+        [
+            "machines.web.app.steps[1].template.from: `bad.conf`: `{{ machines.db.ports.nope.port }}`: `db` has no port named `nope` (ports are named, never numbered); `{{ machines.db.ports.pg.published }}`: a published port and a URL are known only once the environment runs; a file gets `port`; `{{ with.x }}`: only a catalogue entry has it"
+        ]
     );
 }
 

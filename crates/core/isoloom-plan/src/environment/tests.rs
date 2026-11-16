@@ -43,17 +43,6 @@ fn the_controller_has_one_cpu_and_512_mb_unless_the_spec_sizes_it() {
 }
 
 #[test]
-fn settings_are_empty_until_one_is_set() {
-    assert!(super::Settings::default().is_empty());
-    let mut s = super::Settings::default();
-    s.sysctls.insert("net.ipv4.ip_forward".into(), "1".into());
-    assert!(!s.is_empty());
-    let mut u = super::Settings::default();
-    u.environment.insert("A".into(), "1".into());
-    assert!(!u.is_empty());
-}
-
-#[test]
 fn a_probe_reaches_a_machine_at_its_address_else_by_name() {
     let env = testing::environment(
         "version: 1\nname: t\nnetworks:\n  v4: { cidr: 10.9.0.0/24 }\n  v6: { cidr: 10.8.0.0/24, ipv6: { cidr: \"fd00:8::/64\", only: true } }\n  auto: { cidr: 10.7.0.0/24, ipv6: { cidr: \"fd00:7::/64\", only: true, addresses: auto } }\nmachines:\n  web: { networks: { v4: 10, v6: 10, auto: 10 }, app: { image: nginx } }\n",
@@ -116,12 +105,25 @@ fn each_target_produces_a_machine_in_the_form_it_runs() {
 
 #[test]
 fn every_vm_comes_with_its_os_and_nothing_else_is_one() {
-    for t in [Target::Proxmox, Target::Vagrant, Target::Docker] {
+    let vms = ["vm: debian-12", "both: debian-12", "win: windows-server-2022"];
+    for (t, want) in [
+        (Target::Proxmox, vms.as_slice()),
+        (Target::Vagrant, vms.as_slice()),
+        (Target::Docker, [].as_slice()),
+    ] {
         let env = testing::environment(SHAPES, t);
-        let vms: Vec<(&str, &str)> = env.vms().map(|vm| (vm.name, vm.os)).collect();
-        let shaped = env.machines.values().filter(|m| m.shape == super::MachineShape::Vm).count();
-        assert_eq!(vms.len(), shaped, "{t:?}: {vms:?}");
-        assert!(vms.iter().all(|(_, os)| !os.is_empty()), "{t:?}: {vms:?}");
+        let found: Vec<String> = env.vms().map(|vm| format!("{}: {}", vm.name, vm.os)).collect();
+        assert_eq!(found, want, "{t:?}");
+        let mut shaped: Vec<&str> = env
+            .machines
+            .iter()
+            .filter(|(_, m)| m.shape == super::MachineShape::Vm)
+            .map(|(n, _)| n.as_str())
+            .collect();
+        let mut named: Vec<&str> = env.vms().map(|vm| vm.name).collect();
+        shaped.sort_unstable();
+        named.sort_unstable();
+        assert_eq!(named, shaped, "{t:?}: the VMs are the machines shaped as one");
     }
     let env = testing::environment(SHAPES, Target::Proxmox);
     assert_eq!(env.vm("win").map(|vm| vm.os), Some("windows-server-2022"));
@@ -130,9 +132,10 @@ fn every_vm_comes_with_its_os_and_nothing_else_is_one() {
 
 #[test]
 fn a_vm_has_set_up_steps_and_a_container_none() {
-    let steps = |t: Target, m: &str| testing::environment(SHAPES, t).machines.get(m).map_or(0, |p| p.lifecycle.len());
-    assert!(steps(Target::Vagrant, "vm") > 0);
-    assert_eq!(steps(Target::Docker, "both"), 0);
+    let steps = |t: Target, m: &str| testing::environment(SHAPES, t).machines.get(m).map(|p| p.lifecycle.clone()).unwrap_or_default();
+    let vm = steps(Target::Vagrant, "vm");
+    assert_eq!((vm.first(), vm.last()), (Some(&crate::Step::Prelude), Some(&crate::Step::Ready)), "{vm:?}");
+    assert_eq!(steps(Target::Docker, "both"), []);
 }
 
 #[test]
