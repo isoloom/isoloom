@@ -110,15 +110,66 @@ POSIX sh and quick:
   one in another crate? Move it down the pipeline and export it.
 - **Deterministic output:** ordered maps (`IndexMap`, `BTreeMap`) in everything written, no
   timestamps or random names in generated files. A test renders every example twice.
-- **Tests:** a unit test per behavior, named for the behavior; `insta` snapshots for whole
-  rendered files only; `proptest` for parsing and quoting. A test's scratch folder is a
-  `tempfile::TempDir`, removed when the test ends (by a panic too): `cargo xtask test` runs the
-  tests in a temporary folder of their own and fails when they leave anything in it
-  (`ISOLOOM_KEEP_TEMP=1` keeps that folder to look at).
+- **Tests:** where they live, what they're named and how they assert: [Tests](#tests).
 - **Comment style:** plain sentences, colons to introduce detail, no em dashes.
 - **Lints** live in the root `Cargo.toml` `[lints]` table and are inherited by every crate
   (`lints.workspace = true`). Don't add an exception there; silence one locally only where the
   fix reads worse, with an `#[expect(lint, reason = "…")]` the ratchet counts.
+
+## Tests
+
+A test proves one behaviour a user, a target or a contract depends on, and proves it once. A
+test that can't fail, that tests the compiler, a getter or a constant, or that repeats another
+with the same class of input, is deleted; a behaviour nothing tests gets its test.
+
+**Where they live:**
+
+| What | Where |
+|---|---|
+| A unit test: one module's behaviour, private items included | Beside the code: `#[cfg(test)] mod tests { … }` at the end of the module, or, once that block outgrows the module (about 150 lines), `<module>/tests.rs` declared with `#[cfg(test)] mod tests;` |
+| An integration test: the crate's public API, as another crate uses it | One test binary per crate, `tests/<suite>/main.rs`, `<suite>` the crate's name without `isoloom-` (`tests/terraform/main.rs`), with a module per area it exercises beside it (`tests/terraform/cloud_docker.rs`) |
+| A helper for one crate's tests | `tests/<suite>/testing.rs` (integration), or the unit tests' own module |
+| A helper several crates use: reading a generated file, a stand-in tool | `isoloom-test-support` (`crates/tools/isoloom-test-support`) |
+| An input file | `tests/fixtures/` in the crate, one file or folder per case |
+| A snapshot | Where insta puts it: `snapshots/` beside the test module |
+| A property test's regressions | Where proptest writes them, committed |
+
+One binary per crate links once and shares its helpers without `#[path]` or a copied
+`testing` module; a test needing a separate process for its setup is the exception, and says
+why at its top.
+
+**Names:** a test's name is a sentence in snake case saying what it proves, its subject first:
+`a_volume_shared_by_two_machines_is_mounted_by_both`, not `test_volumes` or `volumes_work`. A
+module's name says the area (`cloud_docker`, `refusals`), not `tests2` or `misc`.
+
+**Asserts:**
+
+- Generated structured output (YAML, JSON, HCL, INI, a Vagrantfile's Ruby) is parsed with
+  `isoloom-test-support`'s readers (`yaml`, `hcl_body`, `ruby_blocks`, `ini_groups`) and asserted
+  on the value where it belongs; a script is asserted within the step or function it belongs to.
+  Never `contains` over a whole generated file: it passes when the text lands in the wrong place.
+- An error is asserted on what it says: its variant or the field path it names
+  (`matches!(err, Error::Field { .. })`), never a bare `is_err()`.
+- A snapshot (`insta`) is for a whole rendered file a reviewer reads as a file, never for a value
+  an assert could name. A changed snapshot is a changed behaviour: review it with
+  `cargo insta review` and explain it in the pull request; never accept one blind.
+- Several inputs proving one rule are one table-driven test (`for (input, expected) in [...]`,
+  the case named in the assert's message), or a `proptest` when the rule holds for a whole class
+  of inputs (parsing, quoting).
+- `assert_every!` over a collection, not `iter().all(..)`, which passes when it's empty.
+- An input that isn't the test's subject comes from a builder or a fixture, not a page of inline
+  YAML; the part that is the subject stays visible in the test.
+
+**No test depends on the host, on timing or on a real tool by default:**
+
+- A test makes what it needs in a `tempfile::TempDir`, removed when it ends (by a panic too); it
+  reads no host path, user or locale. `cargo xtask test` runs the tests in a temporary folder of
+  their own and fails when they leave anything in it (`ISOLOOM_KEEP_TEMP=1` keeps that folder to
+  look at).
+- A test waits on an event or polls to a deadline, never a bare `sleep`.
+- A tool the test runs is a stand-in (`FakeBin`) unless the real tool is the point; then the test
+  is ``#[ignore = "needs <tool>: <why>; `cargo xtask test` runs it"]``, so a machine without it
+  lists it as ignored with its reason, and `cargo xtask test` runs it.
 
 ## Commits and pull requests
 
