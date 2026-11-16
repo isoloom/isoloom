@@ -2,11 +2,12 @@
 //! and its refusals read from the plan without rendering. Validated with `terraform validate`,
 //! not run on a real host.
 
-use crate::testing::{Outcome, example, file};
+use crate::testing::{Outcome, example, file, written, written_files};
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 use isoloom_terraform::EsxiBackend;
+use isoloom_test_support::{hcl_blocks, hcl_body, hcl_map, hcl_names, hcl_nested, hcl_resource, hcl_text, hcl_values};
 
 /// Example `name`'s plan on ESXi.
 fn env(name: &str) -> Outcome<Environment> {
@@ -23,15 +24,12 @@ fn esxi(name: &str) -> Outcome<String> {
     module(&env(name)?)
 }
 
+/// The modules a reviewer reads as files.
 #[test]
-fn esxi_hello_stack() -> Outcome {
-    insta::assert_snapshot!(esxi("hello-stack")?);
-    Ok(())
-}
-
-#[test]
-fn esxi_segmented() -> Outcome {
-    insta::assert_snapshot!(esxi("segmented")?);
+fn the_esxi_module_of_the_examples() -> Outcome {
+    for name in ["hello-stack", "segmented", "ansible-pair", "windows-hello", "shared-files", "dual-stack"] {
+        insta::assert_snapshot!(format!("esxi_{}", name.replace('-', "_")), esxi(name)?);
+    }
     Ok(())
 }
 
@@ -42,30 +40,30 @@ fn esxi_segmented() -> Outcome {
 fn the_router_holds_the_sealed_ruleset_the_seal_applies() -> Outcome {
     let e = env("segmented")?;
     let sealed = module(&e)?;
-    assert!(sealed.contains("/etc/nftables.sealed.nft"), "{sealed}");
-    assert!(
-        sealed.contains("The module's seal (isoloom_seal) closes the internet to the internet: false networks"),
-        "{sealed}"
-    );
+    let files = written_files(&sealed, "esxi_guest", "isoloom_router");
+    let file = |path: &str| -> Outcome<String> { Ok(written(&files, path)?.get("content").cloned().unwrap_or_default()) };
     // The `internet: false` networks' traffic from elsewhere dropped, and only the others
     // forwarded out, in the sealed ruleset alone.
     let closed: Vec<String> = e.networks.values().filter(|n| !n.internet).map(|n| n.cidr.to_string()).collect();
     assert!(!closed.is_empty(), "segmented has an internet: false network");
-    assert!(sealed.contains(&format!("ip daddr {{ {} }} drop", closed.join(", "))), "{sealed}");
-    let (_, seal) = sealed.split_once("resource \"terraform_data\" \"isoloom_seal\"").ok_or("a seal")?;
-    assert!(seal.contains("\"sudo sh -c 'nft -f /etc/nftables.sealed.nft "), "{seal}");
-    let open = env("ansible-pair")?;
-    let open = module(&open)?;
+    let drop = format!("ip daddr {{ {} }} drop", closed.join(", "));
     assert!(
-        !open.contains("nftables.sealed") && !open.contains("isoloom_seal"),
-        "nothing to seal, no sealed ruleset"
+        file("/etc/nftables.sealed.nft")?.lines().any(|l| l.trim() == drop),
+        "the sealed ruleset drops {closed:?}"
     );
-    Ok(())
-}
-
-#[test]
-fn esxi_ansible_pair() -> Outcome {
-    insta::assert_snapshot!(esxi("ansible-pair")?);
+    assert!(!file("/etc/nftables.conf")?.contains(&drop), "the first boot's ruleset doesn't");
+    // The seal applies that very file and keeps it across reboots.
+    let seal = hcl_resource(&sealed, "terraform_data", "isoloom_seal");
+    let inline: Vec<String> = hcl_nested(&seal, "provisioner").iter().flat_map(|p| hcl_values(p.body(), "inline")).collect();
+    assert_eq!(
+        inline,
+        ["sudo sh -c 'nft -f /etc/nftables.sealed.nft && cp /etc/nftables.sealed.nft /etc/nftables.conf'"]
+    );
+    // Nothing to seal: neither.
+    let open = module(&env("ansible-pair")?)?;
+    assert!(!hcl_names(&hcl_body(&open), "resource", "terraform_data").contains(&"isoloom_seal".to_owned()));
+    let router = written_files(&open, "esxi_guest", "isoloom_router");
+    assert!(written(&router, "/etc/nftables.sealed.nft").is_err(), "{router:?}");
     Ok(())
 }
 
@@ -80,25 +78,17 @@ fn the_module_is_the_same_each_time() -> Outcome {
 
 #[test]
 fn refusals_come_from_the_plan() -> Outcome {
-    let tpm = EsxiBackend.refusal(&env("tuned-web")?).expect("refused");
-    assert!(tpm.contains("virtual TPM"), "{tpm}");
-    let gateway = EsxiBackend.refusal(&env("edge-firewall")?).expect("refused");
-    assert!(gateway.contains("gateway"), "{gateway}");
+    assert_eq!(
+        EsxiBackend.refusal(&env("tuned-web")?).as_deref(),
+        Some("machine `web` asks for a virtual TPM (`hardware.tpm: required`), which this target doesn't give (`isoloom matrix` lists the targets that do)")
+    );
+    assert_eq!(
+        EsxiBackend.refusal(&env("edge-firewall")?).as_deref(),
+        Some("Isoloom routes no network through a `gateway` machine on ESXi")
+    );
     for name in ["hello-stack", "windows-hello", "dual-stack", "shared-files"] {
         assert_eq!(EsxiBackend.refusal(&env(name)?), None, "{name}");
     }
-    Ok(())
-}
-
-#[test]
-fn esxi_windows_hello() -> Outcome {
-    insta::assert_snapshot!(esxi("windows-hello")?);
-    Ok(())
-}
-
-#[test]
-fn esxi_shared_files() -> Outcome {
-    insta::assert_snapshot!(esxi("shared-files")?);
     Ok(())
 }
 
@@ -108,18 +98,12 @@ fn esxi_shared_files() -> Outcome {
 fn virtiofs_is_ignored() -> Outcome {
     let lab = example("shared-files")?;
     let mut spec = lab.for_target(Target::Esxi);
-    let plain = lab.plan(&spec, Target::Esxi, None).expect("the spec plans");
-    spec.volumes.get_mut("shared").unwrap().virtiofs = Some(isoloom_spec::model::Virtiofs::default());
+    let plain = lab.plan(&spec, Target::Esxi, None)?;
+    spec.volumes.get_mut("shared").ok_or("no shared volume")?.virtiofs = Some(isoloom_spec::model::Virtiofs::default());
     assert_eq!(isoloom_spec::validate(&spec), vec![]);
-    let with = lab.plan(&spec, Target::Esxi, None).expect("the spec plans");
+    let with = lab.plan(&spec, Target::Esxi, None)?;
     assert_eq!(EsxiBackend.refusal(&with), None);
     assert_eq!(EsxiBackend.render(&with), EsxiBackend.render(&plain));
-    Ok(())
-}
-
-#[test]
-fn esxi_dual_stack() -> Outcome {
-    insta::assert_snapshot!(esxi("dual-stack")?);
     Ok(())
 }
 
@@ -159,9 +143,8 @@ fn lab(text: &str) -> Outcome<Environment> {
 }
 
 #[test]
-fn esxi_lab() -> Outcome {
-    let tf = module(&lab(LAB)?)?;
-    insta::assert_snapshot!(tf);
+fn firmware_mtu_bridged_networks_an_existing_port_group_and_data_disks_on_esxi() -> Outcome {
+    insta::assert_snapshot!("esxi_lab", module(&lab(LAB)?)?);
     Ok(())
 }
 
@@ -198,15 +181,20 @@ fn the_default_ova_is_pinned_to_a_dated_release() -> Outcome {
     // The `images` default points at a dated OVA, never the floating `current`, so a generated
     // environment keeps booting the same OS build; its SHA-256 is in the variable's description,
     // since the provider checks none.
-    let tf = esxi("hello-stack")?;
-    assert!(
-        tf.contains("https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova"),
-        "{tf}"
+    let tf = hcl_body(&esxi("hello-stack")?);
+    let images = hcl_blocks(&tf, "variable", &["images"]);
+    let images = images.first().ok_or("no images variable")?.body();
+    assert_eq!(
+        hcl_map(images, "default"),
+        [(
+            "ubuntu-24.04".to_owned(),
+            "https://cloud-images.ubuntu.com/noble/20260926/noble-server-cloudimg-amd64.ova".to_owned()
+        )]
     );
-    assert!(!tf.contains("/current/"), "the default OVA must be pinned, not `current`: {tf}");
+    let description = hcl_text(images, "description");
     assert!(
-        tf.contains("ubuntu-24.04 513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a"),
-        "{tf}"
+        description.contains("ubuntu-24.04 513a22ebe3982b9387b038f8a2a6dad1af980d4623dca03511312e55ba620b1a"),
+        "{description}"
     );
     Ok(())
 }

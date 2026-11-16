@@ -3,7 +3,7 @@
 //! name, a router that can't report its uplink address failing early and saying why, and the
 //! bootstrap's progress read from each machine's ready file.
 
-use crate::testing::{Outcome, example, file, planned};
+use crate::testing::{Outcome, example, file, has_line, line_with, planned, references, texts};
 use isoloom_plan::Environment;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
@@ -20,15 +20,6 @@ fn esxi(name: &str) -> Outcome<String> {
     Ok(file(&EsxiBackend.render(&env)?, "esxi/main.tf")?.to_owned())
 }
 
-/// The references attribute `key` of `body` lists (`depends_on`, `replace_triggered_by`), as HCL
-/// writes them.
-fn references(body: &hcl::Body, key: &str) -> Vec<String> {
-    match hcl_attribute(body, key) {
-        Some(hcl::Expression::Array(items)) => items.iter().map(ToString::to_string).collect(),
-        _ => Vec::new(),
-    }
-}
-
 /// Attribute `key` of the postcondition in `resource`'s lifecycle (`condition`,
 /// `error_message`), as HCL writes it.
 fn postcondition(resource: &hcl::Body, key: &str) -> Outcome<String> {
@@ -36,14 +27,6 @@ fn postcondition(resource: &hcl::Body, key: &str) -> Outcome<String> {
     let post = lifecycle.first().map(|l| hcl_nested(l.body(), "postcondition")).unwrap_or_default();
     let post = post.first().ok_or("no postcondition")?;
     Ok(hcl_attribute(post.body(), key).ok_or_else(|| format!("no {key}"))?.to_string())
-}
-
-/// The block of `tf` that starts with `head`, up to the next top-level block (empty when there
-/// is none).
-fn block(tf: &str, head: &str) -> String {
-    let Some((_, rest)) = tf.split_once(head) else { return String::new() };
-    let body = rest.split_once("\n}\n").map_or(rest, |(b, _)| b);
-    format!("{head}{body}\n}}\n")
 }
 
 #[test]
@@ -141,12 +124,13 @@ fn the_lab_host_address_is_the_ip_output() -> Outcome {
 fn each_set_up_step_says_it_runs_and_a_failure_stops_the_rest() -> Outcome {
     // The ready file's grammar (`isoloom-ready/1`): `running: <step>` before each step,
     // `failed: <step>` and no further step when one fails, `ready` at the end.
-    let tf = proxmox("hello-stack")?;
-    let web = block(&tf, "resource \"proxmox_virtual_environment_file\" \"web\"");
-    assert!(web.contains("running: provision/web.sh"), "{web}");
-    assert!(web.contains("failed: provision/web.sh"), "{web}");
-    assert!(web.contains("exit 1"), "{web}");
-    assert!(web.contains("echo ready > /var/lib/isoloom/ready"), "{web}");
+    let web = texts(&proxmox("hello-stack")?, "proxmox_virtual_environment_file", "web");
+    let step = line_with(&web, "'running: provision/web.sh'")?;
+    assert!(
+        step.contains("|| { echo 'failed: provision/web.sh' > /var/lib/isoloom/ready; exit 1; }"),
+        "{step}"
+    );
+    assert!(has_line(&web, "echo ready > /var/lib/isoloom/ready"), "{web:?}");
     Ok(())
 }
 
@@ -155,12 +139,11 @@ fn an_esxi_machine_reports_its_set_up_progress_in_its_ready_file() -> Outcome {
     // The ESXi `remote-exec` set-up reports its progress as every target's does: each step marks
     // the ready file (`running:`) first, and a failed one marks it (`failed:`) and stops the
     // set-up, so the runner has the progress to report.
-    let tf = esxi("hello-stack")?;
-    let web = block(&tf, "resource \"terraform_data\" \"web\"");
-    assert!(web.contains("running: provision/web.sh"), "{web}");
-    assert!(web.contains("failed: provision/web.sh"), "{web}");
-    assert!(web.contains("running: health check"), "the final ready step is marked too: {web}");
-    assert!(web.contains("echo ready > /var/lib/isoloom/ready"), "{web}");
+    let web = texts(&esxi("hello-stack")?, "terraform_data", "web");
+    let step = line_with(&web, "'running: provision/web.sh'")?;
+    assert!(step.contains("'failed: provision/web.sh'"), "{step}");
+    assert!(has_line(&web, "running: health check"), "the final ready step is marked too: {web:?}");
+    assert!(has_line(&web, "echo ready > /var/lib/isoloom/ready"), "{web:?}");
     Ok(())
 }
 
@@ -169,9 +152,13 @@ fn a_vms_hosts_file_names_itself_in_the_zone() -> Outcome {
     // A VM's /etc/hosts names the VM itself and its aliases in the private zone, as it names the
     // others, so on web `www.corp.internal` (its own alias) resolves, as in the clouds' zones.
     let tf = proxmox("private-names")?;
-    let web = block(&tf, "resource \"proxmox_virtual_environment_file\" \"web\"");
-    assert!(web.contains("10.84.0.10 web www web.corp.internal www.corp.internal"), "{web}");
-    let client = block(&tf, "resource \"proxmox_virtual_environment_file\" \"client\"");
-    assert!(client.contains("10.84.0.20 client client.corp.internal"), "{client}");
+    for (name, own) in [
+        ("web", "10.84.0.10 web www web.corp.internal www.corp.internal"),
+        ("client", "10.84.0.20 client client.corp.internal"),
+    ] {
+        let hosts = texts(&tf, "proxmox_virtual_environment_file", name);
+        let line = line_with(&hosts, "/etc/hosts")?;
+        assert!(line.contains(&format!("'{own}'")), "{name}: {line}");
+    }
     Ok(())
 }
