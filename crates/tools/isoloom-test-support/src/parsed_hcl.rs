@@ -68,6 +68,46 @@ pub fn hcl_text(body: &hcl::Body, key: &str) -> String {
     }
 }
 
+/// The entries of the object attribute `key` set directly in `body` (`tags = { … }`), or of every
+/// object written in it (`merge({ … }, var.x == "" ? {} : { … })`), in order: each key as text,
+/// each value a string's text or as HCL writes anything else (`local.name`). Empty when `body`
+/// doesn't set `key`.
+#[must_use]
+pub fn hcl_map(body: &hcl::Body, key: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    if let Some(expr) = hcl_attribute(body, key) {
+        entries_of(expr, &mut out);
+    }
+    out
+}
+
+fn entries_of(expr: &hcl::Expression, out: &mut Vec<(String, String)>) {
+    use hcl::Expression as E;
+    let text = |e: &hcl::Expression| match e {
+        E::String(s) => s.clone(),
+        other => hcl::format::to_string(other).unwrap_or_default(),
+    };
+    match expr {
+        E::Object(object) => {
+            for (k, v) in object {
+                let key = match k {
+                    hcl::ObjectKey::Identifier(id) => id.to_string(),
+                    hcl::ObjectKey::Expression(e) => text(e),
+                    other => format!("{other:?}"),
+                };
+                out.push((key, text(v)));
+            }
+        }
+        E::FuncCall(call) => call.args.iter().for_each(|e| entries_of(e, out)),
+        E::Conditional(c) => {
+            entries_of(&c.true_expr, out);
+            entries_of(&c.false_expr, out);
+        }
+        E::Parenthesis(inner) => entries_of(inner, out),
+        _ => {}
+    }
+}
+
 /// The blocks named `kind` directly in `body` (an instance's `network_interface`).
 #[must_use]
 pub fn hcl_nested<'a>(body: &'a hcl::Body, kind: &str) -> Vec<&'a hcl::Block> {

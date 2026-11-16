@@ -255,7 +255,7 @@ mod parsed_yaml;
 pub use hcl;
 pub use hcl_template::{HclPiece, hcl_decode, hcl_pieces};
 pub use literals::{b64_decode, ps_decode, rb_decode, sh_decode, systemd_decode};
-pub use parsed_hcl::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_one, hcl_resource, hcl_text, hcl_values};
+pub use parsed_hcl::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_map, hcl_names, hcl_nested, hcl_one, hcl_resource, hcl_text, hcl_values};
 pub use parsed_ini::ini_groups;
 pub use parsed_ruby::{RubyBlock, ruby_blocks};
 pub use parsed_yaml::{manifest, manifest_names, named, yaml, yaml_at, yaml_documents, yaml_keys_at, yaml_str, yaml_strs, yaml_values};
@@ -345,6 +345,16 @@ mod tests {
     fn an_unclosed_ruby_block_fails() {
         let read = ruby_blocks("config.vm.define \"web\" do |m|\n  m.vm.box = \"x\"\n");
         assert!(read.blocks.is_empty(), "{read:?}");
+    }
+
+    #[test]
+    fn an_hcl_map_is_read_by_entry_from_every_object_written_in_it() {
+        let body = hcl_body("locals {\n  tags = merge({ \"Cost.Center\" = \"R&D\", team = local.team }, var.x == \"\" ? {} : { at = var.x })\n}\n");
+        let locals = hcl_blocks(&body, "locals", &[]);
+        let tags = locals.first().map(|l| hcl_map(l.body(), "tags")).unwrap_or_default();
+        let entries = [("Cost.Center", "R&D"), ("team", "local.team"), ("at", "var.x")].map(|(k, v)| (k.to_owned(), v.to_owned()));
+        assert_eq!(tags, entries);
+        assert_eq!(hcl_map(&body, "nothing"), Vec::new());
     }
 
     #[test]

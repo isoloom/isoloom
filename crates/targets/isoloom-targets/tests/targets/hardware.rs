@@ -4,9 +4,11 @@
 use isoloom_spec::Target;
 use isoloom_targets::{Error, GenerateError, Lab, generate};
 
-use isoloom_test_support::{hcl_blocks, hcl_body, hcl_literals, hcl_nested, hcl_one, hcl_values, manifest, yaml_documents};
+use isoloom_test_support::{
+    hcl_blocks, hcl_body, hcl_literals, hcl_nested, hcl_one, hcl_text, hcl_values, manifest, yaml, yaml_documents, yaml_str, yaml_strs,
+};
 
-use crate::testing::{Outcome, allowed, generated as file, lab};
+use crate::testing::{Outcome, allowed, define, generated as file, lab, vagrantfile};
 
 /// One machine with `hardware` set, as a container (an image) and as a VM (its OS and a step).
 fn spec(hardware: &str) -> Outcome<Lab> {
@@ -33,14 +35,14 @@ fn refusal(spec: &Lab, target: Target) -> Outcome<String> {
 #[test]
 fn a_container_gets_the_hosts_gpus_and_devices_on_docker_only() -> Outcome {
     let s = spec("gpus: { count: 2, capabilities: [compute] }, devices: ['/dev/fuse:/dev/fuse:rw']")?;
-    let compose = file(&s, Target::Docker, "docker/compose.yml")?;
-    assert!(
-        compose.contains("    devices:\n    - source: /dev/fuse\n      target: /dev/fuse\n      permissions: rw\n"),
-        "{compose}"
-    );
-    assert!(
-        compose.contains("          - capabilities:\n            - gpu\n            - compute\n            driver: nvidia\n            count: 2\n"),
-        "{compose}"
+    let compose = yaml(&file(&s, Target::Docker, "docker/compose.yml")?);
+    let device = |key: &str| yaml_str(&compose, &format!("services.a.devices.0.{key}"));
+    assert_eq!([device("source"), device("target"), device("permissions")], ["/dev/fuse", "/dev/fuse", "rw"]);
+    let gpus = "services.a.deploy.resources.reservations.devices.0";
+    assert_eq!(yaml_strs(&compose, &format!("{gpus}.capabilities")), ["gpu", "compute"]);
+    assert_eq!(
+        [yaml_str(&compose, &format!("{gpus}.driver")), yaml_str(&compose, &format!("{gpus}.count"))],
+        ["nvidia", "2"]
     );
     assert!(refusal(&s, Target::CloudDocker)?.contains("asks for GPUs (`gpus`): its container runs on a VM Isoloom creates"));
     let devices_only = spec("devices: [/dev/fuse]")?;
@@ -75,14 +77,15 @@ fn cloud_module(spec: &Lab, cloud: &str) -> Outcome<Option<String>> {
 #[test]
 fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
     let nested = vm("nested_virtualization: true")?;
-    let v = file(&nested, Target::Vagrant, "vagrant/Vagrantfile")?;
+    let vf = vagrantfile(&nested)?;
+    let v = define(&vf, "a").every_statement();
     for switch in [
         "\"--nested-hw-virt\", \"on\"",
         "v.vmx[\"vhv.enable\"] = \"TRUE\"",
         "v.nested = true",
         "if %i[qemu utm].include?(machine.provider_name)",
     ] {
-        assert!(v.contains(switch), "{switch}");
+        assert!(v.iter().any(|s| s.contains(switch)), "{switch}: {v:?}");
     }
     let values = |tf: &str, key: &str| hcl_values(&hcl_body(tf), key);
     let proxmox = hcl_body(&file(&nested, Target::Proxmox, "proxmox/main.tf")?);
@@ -93,11 +96,11 @@ fn vms_nest_on_vagrant_proxmox_and_three_clouds() -> Outcome {
         "the VM's CPU is the host's"
     );
     let module = |cloud: &str| cloud_module(&nested, cloud);
-    let aws = module("aws")?.unwrap();
+    let aws = module("aws")?.ok_or("AWS nests")?;
     assert!(hcl_literals(&hcl_body(&aws)).contains(&"m8i.large".to_owned()), "{aws}");
     assert_eq!(values(&aws, "nested_virtualization"), ["enabled"]);
-    assert_eq!(values(&module("gcp")?.unwrap(), "enable_nested_virtualization"), ["true"]);
-    assert_eq!(values(&module("oci")?.unwrap(), "are_virtual_instructions_enabled"), ["true"]);
+    assert_eq!(values(&module("gcp")?.ok_or("GCP nests")?, "enable_nested_virtualization"), ["true"]);
+    assert_eq!(values(&module("oci")?.ok_or("OCI nests")?, "are_virtual_instructions_enabled"), ["true"]);
     assert!(module("azure")?.is_none() && module("linode")?.is_none());
     assert_eq!(
         refusal(&spec("nested_virtualization: true")?, Target::Docker)?,
@@ -124,11 +127,15 @@ fn vms_get_gpus_on_proxmox_and_the_clouds() -> Outcome {
     let counted = vm("gpus: 4")?;
     assert!(refusal(&counted, Target::Proxmox)?.contains("list them in `gpus.ids`"));
     let module = |cloud: &str| cloud_module(&counted, cloud);
-    assert!(hcl_literals(&hcl_body(&module("aws")?.unwrap())).contains(&"g4dn.12xlarge".to_owned()));
-    let gcp = module("gcp")?.unwrap();
-    assert!(
-        gcp.contains("\"g2-standard-48\"") && gcp.contains("on_host_maintenance = \"TERMINATE\""),
-        "{gcp}"
+    let aws = hcl_body(&module("aws")?.ok_or("AWS gives GPUs")?);
+    assert_eq!(hcl_text(hcl_one(&aws, "aws_instance", "a"), "instance_type"), "g4dn.12xlarge");
+    let gcp = hcl_body(&module("gcp")?.ok_or("GCP gives GPUs")?);
+    let instance = hcl_one(&gcp, "google_compute_instance", "a");
+    assert_eq!(hcl_text(instance, "machine_type"), "g2-standard-48");
+    let scheduling = hcl_nested(instance, "scheduling");
+    assert_eq!(
+        scheduling.first().map(|s| hcl_text(s.body(), "on_host_maintenance")).as_deref(),
+        Some("TERMINATE")
     );
     assert!(module("oci")?.is_none(), "Oracle Cloud refuses GPUs");
     assert!(refusal(&vm("gpus: 9")?, Target::CloudVm)?.contains("at most 8 (g4dn.metal, NVIDIA T4)"));

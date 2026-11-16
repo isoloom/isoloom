@@ -65,10 +65,9 @@ machines:
         ["[user_data_base64]"],
         "{tf}"
     );
-    assert!(
-        lifecycles.iter().all(|l| hcl_nested(l.body(), "precondition").is_empty()),
-        "no TPM, no precondition: {tf}"
-    );
+    // No TPM, no precondition.
+    isoloom_test_support::assert_every!(&lifecycles, |l: &&&isoloom_test_support::hcl::Block| hcl_nested(l.body(), "precondition")
+        .is_empty());
     Ok(())
 }
 

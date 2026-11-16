@@ -82,7 +82,16 @@ machines:
         "{labels:?}"
     );
     // Routes to the other subnet through the VPC, at every boot.
-    assert!(tf.contains("sudo ip route replace 10.61.0.0/24 via 10.60.0.1"));
+    let routes: Vec<String> = hcl_literals(&body)
+        .into_iter()
+        .filter(|l| l.contains("ip route replace 10.61.0.0/24"))
+        .collect();
+    assert!(
+        routes
+            .iter()
+            .any(|r| r.lines().any(|l| l.trim().starts_with("sudo ip route replace 10.61.0.0/24 via 10.60.0.1"))),
+        "{routes:?}"
+    );
     Ok(())
 }
 
