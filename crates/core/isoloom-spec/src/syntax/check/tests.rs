@@ -53,6 +53,20 @@ fn sensitive_values_stay_out_of_the_environment() {
 }
 
 #[test]
+fn an_inputs_default_is_text_every_target_writes() {
+    let found =
+        problems("inputs:\n  OK: { default: dev-token }\n  EMPTY: { default: '' }\n  BRACE: { default: 'a}b' }\n  NUL: { default: \"a\\0b\" }\nmachines: {}\n");
+    // Empty is a default too: a sensitive input's file then starts empty rather than unset.
+    assert_eq!(
+        found,
+        [
+            (Code::InvalidValue, "inputs.BRACE.default".to_owned()),
+            (Code::InvalidValue, "inputs.NUL.default".to_owned()),
+        ]
+    );
+}
+
+#[test]
 fn a_windows_machine_has_no_playbook_step() {
     let found =
         problems("machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: dc.ps1 }, { playbook: site.yml }] }\n");

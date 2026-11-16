@@ -145,7 +145,7 @@ pub struct Spec {
 }
 
 /// A value a runner provides at launch, by its name: an environment variable name. Read from
-/// its name alone (a sensitive input) or from `{ name, sensitive }`.
+/// its name alone (a sensitive input with no default) or from `{ name, sensitive, default }`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(from = "InputForm")]
 pub struct Input {
@@ -154,9 +154,13 @@ pub struct Input {
     /// Whether the value must stay hidden: masked in a runner's events and logs. Every input is,
     /// unless the authored spec marks it `sensitive: false` (an URL, a mode).
     pub sensitive: bool,
+    /// The value the generated files use when the runner gives none (unset or empty), when the
+    /// spec declares one: written in them as it is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
 }
 
-/// An [`Input`] as written: its name alone, or the name with its sensitivity.
+/// An [`Input`] as written: its name alone, or the name with its sensitivity and default.
 #[derive(Deserialize, JsonSchema)]
 #[serde(untagged)]
 enum InputForm {
@@ -168,6 +172,9 @@ enum InputForm {
         name: String,
         /// Whether it is sensitive.
         sensitive: bool,
+        /// Its default, when it has one.
+        #[serde(default)]
+        default: Option<String>,
     },
 }
 
@@ -175,18 +182,19 @@ impl From<InputForm> for Input {
     fn from(form: InputForm) -> Input {
         match form {
             InputForm::Name(name) => Input::new(name),
-            InputForm::Full { name, sensitive } => Input { name, sensitive },
+            InputForm::Full { name, sensitive, default } => Input { name, sensitive, default },
         }
     }
 }
 
 impl Input {
-    /// A sensitive input named `name`.
+    /// A sensitive input named `name`, with no default.
     #[must_use]
     pub fn new(name: impl Into<String>) -> Input {
         Input {
             name: name.into(),
             sensitive: true,
+            default: None,
         }
     }
 }

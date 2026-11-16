@@ -22,6 +22,7 @@ use super::step::has_extension;
 #[must_use]
 pub fn check(spec: &Spec) -> Problems {
     let mut out = Problems::new();
+    values::input_defaults(spec, &mut out);
     for (name, m) in &spec.machines {
         let at = FieldPath::new("machines").key(name);
         what_it_is(&at, m, &mut out);

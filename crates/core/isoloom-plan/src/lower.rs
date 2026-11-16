@@ -68,11 +68,12 @@ pub(super) struct Lowering<'a> {
     services: &'a service::Services,
 }
 
-/// The spec's inputs, each with the sensitivity it is declared with.
+/// The spec's inputs, each with the sensitivity and the default it is declared with.
 fn inputs(source: &syntax::Spec) -> Vec<model::Input> {
     let input = |(name, i): (&syntax::InputName, &syntax::Input)| model::Input {
         name: name.to_string(),
         sensitive: i.sensitive,
+        default: i.default.clone(),
     };
     source.inputs.0.iter().map(input).collect()
 }

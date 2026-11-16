@@ -408,6 +408,13 @@ impl Environment {
         self.inputs.iter().map(|i| i.name.clone()).collect()
     }
 
+    /// The default of launch value `name`, when the spec declares one: what the generated files
+    /// use when the runner gives no value (unset or empty).
+    #[must_use]
+    pub fn input_default(&self, name: &str) -> Option<&str> {
+        self.inputs.iter().find(|i| i.name == name).and_then(|i| i.default.as_deref())
+    }
+
     /// The address `from` reaches `to` at: on a network they share, else `to`'s first.
     #[must_use]
     pub fn address_for(&self, from: &str, to: &str) -> Ipv4Addr {
