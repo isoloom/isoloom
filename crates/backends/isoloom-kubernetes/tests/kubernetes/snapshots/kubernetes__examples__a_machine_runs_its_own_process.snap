@@ -1,5 +1,5 @@
 ---
-source: crates/backends/isoloom-kubernetes/tests/snapshots.rs
+source: crates/backends/isoloom-kubernetes/tests/kubernetes/examples.rs
 expression: "joined(&files, |p| p.ends_with(\"environment.yaml\"))"
 ---
 === .isoloom/kubernetes/environment.yaml

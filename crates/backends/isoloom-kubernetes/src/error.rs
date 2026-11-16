@@ -94,4 +94,29 @@ mod tests {
         assert_eq!(reads, "kubernetes: a Kubernetes cluster routes no network through a `gateway` machine");
         assert_eq!(RenderError::from(e).to_string(), reads);
     }
+
+    /// What the backend couldn't write or read is its own failure, not a refusal, said with what
+    /// failed and its cause kept.
+    #[test]
+    fn a_failure_of_the_backend_is_internal_with_what_failed() {
+        let unreadable = Error::Read {
+            path: "setup/seed.sh".to_owned(),
+            source: std::io::Error::other("denied"),
+        };
+        let yaml = serde_yaml_ng::from_str::<u8>("x").expect_err("not a number");
+        let json = serde_json::from_str::<u8>("x").expect_err("not a number");
+        for (e, what) in [
+            (unreadable, "setup/seed.sh (copied into the Helm chart) can't be read"),
+            (Error::Unwritable { source: yaml }, UNWRITABLE),
+            (Error::Schema { source: json }, SCHEMA),
+        ] {
+            let reported = RenderError::from(e);
+            assert!(
+                matches!(&reported, RenderError::Internal { target: Target::Kubernetes, what: w, .. } if w == what),
+                "{reported:?}"
+            );
+            assert_eq!(reported.refusal(), None, "{what}: not a refusal");
+            assert!(std::error::Error::source(&reported).is_some(), "{what}: its cause kept");
+        }
+    }
 }
