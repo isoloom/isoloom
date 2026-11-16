@@ -215,11 +215,12 @@ mod tests {
         ] {
             let mut m = Module::new("");
             (driver.write)(&env, &mut m).unwrap();
-            let text = m.render().unwrap();
+            let body = isoloom_test_support::hcl_body(&m.render().unwrap());
             for vm in env.vms() {
                 let (name, user) = (vm.name, (driver.base.user)(vm.os));
-                let output = format!("output \"{}\" {{\n  value = \"{user}\"\n}}", super::ssh_user_output(name));
-                assert!(text.contains(&output), "{name}: {output}\n{text}");
+                let output = isoloom_test_support::hcl_blocks(&body, "output", &[&super::ssh_user_output(name)]);
+                let values: Vec<String> = output.iter().map(|o| isoloom_test_support::hcl_text(o.body(), "value")).collect();
+                assert_eq!(values, [user], "{name}");
             }
         }
     }

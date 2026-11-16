@@ -54,15 +54,18 @@ mod tests {
             body.block(device);
             body.block(ip);
         }
-        let text = body.render().unwrap();
-        assert!(text.contains("bridge = \"vmbr1\""), "{text}");
-        assert!(text.contains("address = \"10.50.0.5/24\""), "{text}");
-        assert!(
-            text.contains("bridge  = var.uplink_bridge") || text.contains("bridge = var.uplink_bridge"),
-            "{text}"
-        );
-        assert!(text.contains("vlan_id = 20"), "{text}");
-        assert!(text.contains("address = \"dhcp\""), "{text}");
+        let parsed = isoloom_test_support::hcl_body(&body.render().unwrap());
+        // Each device's bridge and tag, each interface's address, in the networks' order.
+        let devices: Vec<(String, Option<String>)> = isoloom_test_support::hcl_blocks(&parsed, "network_device", &[])
+            .iter()
+            .map(|d| {
+                let tag = isoloom_test_support::hcl_attribute(d.body(), "vlan_id").map(ToString::to_string);
+                (isoloom_test_support::hcl_text(d.body(), "bridge"), tag)
+            })
+            .collect();
+        assert_eq!(devices, [("vmbr1".to_owned(), None), ("var.uplink_bridge".to_owned(), Some("20".to_owned()))]);
+        let addresses = isoloom_test_support::hcl_values(&parsed, "address");
+        assert_eq!(addresses, ["10.50.0.5/24", "dhcp"]);
         assert!(!crate::server::router::is_default_gateway(&env, mp));
     }
 }

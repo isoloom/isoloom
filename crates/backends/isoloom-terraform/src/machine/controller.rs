@@ -251,30 +251,26 @@ mod inventory_tests {
         assert!(section(&inv, "linux:vars").starts_with("ansible_ssh_private_key_file=/etc/isoloom/id_ed25519\n"));
     }
 
+    /// The inventories a reviewer reads as files: a server's, and AWS's with Linux and Windows.
     #[test]
-    fn proxmox_ansible_pair_keeps_the_groups() {
-        insta::assert_snapshot!(render(
-            &example("ansible-pair", Target::Proxmox).unwrap(),
-            &server_access("${random_password.windows.result}")
-        ));
-    }
-
-    #[test]
-    fn aws_ansible_pair() {
-        insta::assert_snapshot!(render(&example("ansible-pair", Target::CloudVm).unwrap(), &aws()));
-    }
-
-    #[test]
-    fn aws_corp_ad_basics_windows() {
-        insta::assert_snapshot!(render(&example("corp-ad-basics", Target::CloudVm).unwrap(), &aws()));
+    fn the_inventories_of_the_examples() {
+        let server = server_access("${random_password.windows.result}");
+        for (name, example_name, target, access) in [
+            ("proxmox_ansible_pair_keeps_the_groups", "ansible-pair", Target::Proxmox, &server),
+            ("aws_ansible_pair", "ansible-pair", Target::CloudVm, &aws()),
+            ("aws_corp_ad_basics_windows", "corp-ad-basics", Target::CloudVm, &aws()),
+        ] {
+            insta::assert_snapshot!(name, render(&example(example_name, target).unwrap(), access));
+        }
     }
 
     #[test]
     fn azure_windows_hosts_authenticate_with_ntlm() {
         let azure = cloud_access(|_| "isoloom".to_owned(), "${random_password.windows.result}", WinrmAuth::Ntlm);
         let inv = render(&example("corp-ad-basics", Target::CloudVm).unwrap(), &azure);
-        assert!(inv.contains("ansible_winrm_transport=ntlm\n"), "{inv}");
-        assert!(!inv.contains("ansible_winrm_transport=basic"), "{inv}");
+        let windows = isoloom_test_support::ini_groups(&inv).remove("windows:vars").unwrap_or_default();
+        let transports: Vec<&String> = windows.iter().filter(|l| l.starts_with("ansible_winrm_transport=")).collect();
+        assert_eq!(transports, ["ansible_winrm_transport=ntlm"], "{inv}");
     }
 
     #[test]
@@ -283,12 +279,13 @@ mod inventory_tests {
             &example("windows-hello", Target::Proxmox).unwrap(),
             &server_access("${random_password.windows.result}"),
         );
+        let windows = isoloom_test_support::ini_groups(&inv).remove("windows:vars").unwrap_or_default();
         for v in [
             "ansible_user=isoloom",
             "ansible_password=${random_password.windows.result}",
             "ansible_connection=winrm",
         ] {
-            assert!(inv.contains(&format!("{v}\n")), "{v}: {inv}");
+            assert!(windows.iter().any(|l| l == v), "{v}: {inv}");
         }
     }
 

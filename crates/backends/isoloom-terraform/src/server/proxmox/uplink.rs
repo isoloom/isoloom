@@ -109,7 +109,7 @@ mod tests {
         let (last, waits) = calls.split_last().ok_or("no call")?;
         assert_eq!(last, &START_AGENT);
         assert_eq!(waits.len(), 84, "{calls:?}");
-        assert!(waits.iter().all(|c| c.first().map(String::as_str) == Some("sleep")), "{calls:?}");
+        isoloom_test_support::assert_every!(waits, |c: &&Vec<String>| c.first().map(String::as_str) == Some("sleep"));
         Ok(())
     }
 }

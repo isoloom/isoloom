@@ -148,21 +148,34 @@ mod tests {
 
     #[test]
     fn a_module_file_ends_with_the_project_lists_it_copies_with() {
+        use isoloom_test_support::{hcl_blocks, hcl_body, hcl_names};
+        // The resources of a module's file, and the names of its locals.
+        let read = |f: &GeneratedFile| {
+            let body = hcl_body(&f.contents);
+            let locals: Vec<String> = hcl_blocks(&body, "locals", &[])
+                .iter()
+                .flat_map(|l| l.body().attributes().map(|a| a.key().to_owned()).collect::<Vec<_>>())
+                .collect();
+            (hcl_names(&body, "resource", "local_file"), locals)
+        };
         let usage = Usage::with_key("t", "");
+        // An archive: the project's archive is a file of the module, and no list is read.
         let archived = file(Target::CloudVm, "t", start(&usage), ProjectCopy::Archive).unwrap();
         assert_eq!(archived.path, ".isoloom/t/main.tf");
-        assert!(archived.contents.contains("local_file\" \"isoloom_project\""), "{}", archived.contents);
-        assert!(!archived.contents.contains("project_paths"), "{}", archived.contents);
+        let (files, locals) = read(&archived);
+        assert_eq!(files, ["isoloom_project"]);
+        assert!(!locals.contains(&"project_paths".to_owned()), "{locals:?}");
+        // Files a module reads: the list of their paths, no archive.
         let mut reading = start(&usage);
         reading.block(output("files", crate::hcl_builder::reference("local.project_paths")));
-        let written = file(Target::Proxmox, "t", reading, ProjectCopy::Files).unwrap();
-        assert!(written.contents.contains("  project_paths = [for f"), "{}", written.contents);
+        let (none, listed) = read(&file(Target::Proxmox, "t", reading, ProjectCopy::Files).unwrap());
+        assert_eq!(none, Vec::<String>::new());
         assert!(
-            !written.contents.contains("local_file") && !written.contents.contains("project_ignored"),
-            "{}",
-            written.contents
+            listed.contains(&"project_paths".to_owned()) && !listed.contains(&"project_ignored".to_owned()),
+            "{listed:?}"
         );
-        let unread = file(Target::Proxmox, "t", start(&usage), ProjectCopy::Files).unwrap();
-        assert!(!unread.contents.contains("project_"), "{}", unread.contents);
+        // Files no part of the module reads: no list.
+        let (_, unread) = read(&file(Target::Proxmox, "t", start(&usage), ProjectCopy::Files).unwrap());
+        assert!(!unread.iter().any(|l| l.starts_with("project_")), "{unread:?}");
     }
 }

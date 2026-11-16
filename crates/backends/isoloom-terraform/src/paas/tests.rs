@@ -4,6 +4,7 @@ use isoloom_spec::model::Target;
 use crate::CloudVmBackend;
 use crate::cloud::Cloud;
 use crate::testing::environment;
+use isoloom_test_support::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_names, hcl_nested, hcl_resource, hcl_text, hcl_values};
 
 /// A shop: its web machine (a bucket and Kafka client with its keys), its worker (the same with
 /// its identity), its database, its bucket and its brokers.
@@ -18,46 +19,65 @@ fn file(yaml: &str, cloud: Cloud, name: &str) -> String {
     files(yaml).into_iter().find(|f| f.path == path).unwrap_or_else(|| panic!("no {path}")).contents
 }
 
+/// The files a reviewer reads as files: each cloud's services.tf.
 #[test]
-fn aws_renders_rds_s3_and_msk_beside_the_module() {
-    insta::assert_snapshot!(file(SPEC, Cloud::Aws, "services.tf"));
+fn each_cloud_renders_its_managed_services_beside_the_module() {
+    for (cloud, name) in [
+        (Cloud::Aws, "aws_renders_rds_s3_and_msk_beside_the_module"),
+        (Cloud::Azure, "azure_renders_a_flexible_server_a_storage_container_and_event_hubs"),
+        (Cloud::Gcp, "google_cloud_renders_cloud_sql_a_bucket_and_managed_kafka"),
+    ] {
+        insta::assert_snapshot!(name, file(SPEC, cloud, "services.tf"));
+    }
 }
 
-#[test]
-fn azure_renders_a_flexible_server_a_storage_container_and_event_hubs() {
-    insta::assert_snapshot!(file(SPEC, Cloud::Azure, "services.tf"));
+/// The comment lines of `tf`, as one text.
+fn comments(tf: &str) -> String {
+    tf.lines().filter_map(|l| l.strip_prefix("# ")).collect::<Vec<_>>().join(" ")
 }
 
-#[test]
-fn google_cloud_renders_cloud_sql_a_bucket_and_managed_kafka() {
-    insta::assert_snapshot!(file(SPEC, Cloud::Gcp, "services.tf"));
+/// The one `resource "<kind>" "<name>"` of `tf`, as HCL writes it: what a test reads within it.
+fn resource(tf: &str, kind: &str, name: &str) -> String {
+    hcl::format::to_string(&hcl_resource(tf, kind, name)).unwrap_or_default()
+}
+
+/// The `variable` blocks `tf` declares.
+fn variables(tf: &str) -> Vec<String> {
+    hcl_blocks(&hcl_body(tf), "variable", &[])
+        .iter()
+        .filter_map(|v| v.labels().first().map(|l| l.as_str().to_owned()))
+        .collect()
 }
 
 #[test]
 fn services_tf_says_the_zone_is_on_and_billed() {
-    let services = file(SPEC, Cloud::Aws, "services.tf");
-    assert!(services.contains("`dns.private` is on: a spec with services turns it on"), "{services}");
-    assert!(services.contains("Route 53 private hosted zone, about $0.50 a month"), "{services}");
+    let header = comments(&file(SPEC, Cloud::Aws, "services.tf"));
+    assert!(header.contains("`dns.private` is on: a spec with services turns it on"), "{header}");
+    assert!(header.contains("Route 53 private hosted zone, about $0.50 a month"), "{header}");
 }
 
 #[test]
 fn the_facts_a_cloud_issues_are_delivered_after_the_clients_set_up() {
     let services = file(SPEC, Cloud::Aws, "services.tf");
-    assert!(services.contains("resource \"terraform_data\" \"isoloom_service_files_to_web\""), "{services}");
+    let to_web = hcl_resource(&services, "terraform_data", "isoloom_service_files_to_web");
+    let after: String = hcl_text(&to_web, "depends_on").split_whitespace().collect();
+    assert_eq!(after, "[terraform_data.isoloom_ready_web]");
+    // Its key's secret, issued by the cloud, uploaded and installed where the client reads it.
+    let uploads: Vec<(String, String)> = hcl_nested(&to_web, "provisioner")
+        .iter()
+        .filter(|p| p.labels().first().is_some_and(|l| l.as_str() == "file"))
+        .map(|p| (hcl_text(p.body(), "content"), hcl_text(p.body(), "destination")))
+        .collect();
     assert!(
-        services.contains("depends_on       = [terraform_data.isoloom_ready_web]") || services.contains("depends_on = [terraform_data.isoloom_ready_web]"),
-        "{services}"
+        uploads.contains(&(
+            "aws_iam_access_key.isoloom_service_files.secret".to_owned(),
+            "/tmp/isoloom-service-files-secret-key".to_owned()
+        )),
+        "{uploads:?}"
     );
-    assert!(services.contains("content     = aws_iam_access_key.isoloom_service_files.secret"), "{services}");
-    assert!(services.contains("/etc/isoloom/services/files/secret-key"), "{services}");
+    assert!(hcl_literals(&to_web).iter().any(|l| l.contains("/etc/isoloom/services/files/secret-key")));
     // The identity client gets no key, its identity instead.
-    let worker = services
-        .split("\"isoloom_service_files_to_worker\"")
-        .nth(1)
-        .unwrap()
-        .split("\nresource ")
-        .next()
-        .unwrap();
+    let worker = resource(&services, "terraform_data", "isoloom_service_files_to_worker");
     assert!(
         !worker.contains("secret-key") && worker.contains("aws_iam_role.isoloom_client_worker.arn"),
         "{worker}"
@@ -67,39 +87,28 @@ fn the_facts_a_cloud_issues_are_delivered_after_the_clients_set_up() {
 #[test]
 fn an_identity_client_runs_as_its_identity_in_main_tf() {
     let aws = file(SPEC, Cloud::Aws, "main.tf");
-    let worker = aws
-        .split("resource \"aws_instance\" \"worker\"")
-        .nth(1)
-        .unwrap()
-        .split("\nresource ")
-        .next()
-        .unwrap();
-    assert!(
-        worker.contains("iam_instance_profile = aws_iam_instance_profile.isoloom_client_worker.name"),
-        "{worker}"
-    );
-    let web = aws
-        .split("resource \"aws_instance\" \"web\"")
-        .nth(1)
-        .unwrap()
-        .split("\nresource ")
-        .next()
-        .unwrap();
-    assert!(!web.contains("iam_instance_profile"), "only the identity client");
-    assert!(file(SPEC, Cloud::Azure, "main.tf").contains("type         = \"UserAssigned\""));
-    assert!(file(SPEC, Cloud::Gcp, "main.tf").contains("google_service_account.isoloom_client_worker.email"));
+    let worker = hcl_resource(&aws, "aws_instance", "worker");
+    assert_eq!(hcl_text(&worker, "iam_instance_profile"), "aws_iam_instance_profile.isoloom_client_worker.name");
+    let web = hcl_resource(&aws, "aws_instance", "web");
+    assert!(hcl_attribute(&web, "iam_instance_profile").is_none(), "only the identity client");
+    let azure = hcl_resource(&file(SPEC, Cloud::Azure, "main.tf"), "azurerm_linux_virtual_machine", "worker");
+    assert_eq!(hcl_values(&azure, "type"), ["UserAssigned"]);
+    let gcp = resource(&file(SPEC, Cloud::Gcp, "main.tf"), "google_compute_instance", "worker");
+    assert!(gcp.contains("google_service_account.isoloom_client_worker.email"), "{gcp}");
 }
 
 #[test]
 fn the_password_is_the_secret_variable_the_client_reads() {
-    let main = file(SPEC, Cloud::Aws, "main.tf");
-    assert!(main.contains("variable \"ISOLOOM_SECRET_DB_PASSWORD\""), "the client's file declares it");
+    // Declared once, in main.tf, whose client reads it; MSK's login, which no machine reads, in
+    // services.tf.
+    assert!(variables(&file(SPEC, Cloud::Aws, "main.tf")).contains(&"ISOLOOM_SECRET_DB_PASSWORD".to_owned()));
     let services = file(SPEC, Cloud::Aws, "services.tf");
-    assert!(services.contains("= var.ISOLOOM_SECRET_DB_PASSWORD"), "{services}");
-    assert!(!services.contains("variable \"ISOLOOM_SECRET_DB_PASSWORD\""), "declared once, in main.tf");
-    assert!(
-        services.contains("variable \"ISOLOOM_SECRET_BUS_PASSWORD\""),
-        "MSK's login, which no machine's file reads"
+    let declared = variables(&services);
+    assert!(!declared.contains(&"ISOLOOM_SECRET_DB_PASSWORD".to_owned()), "{declared:?}");
+    assert!(declared.contains(&"ISOLOOM_SECRET_BUS_PASSWORD".to_owned()), "{declared:?}");
+    assert_eq!(
+        hcl_text(&hcl_resource(&services, "aws_db_instance", "db"), "password"),
+        "var.ISOLOOM_SECRET_DB_PASSWORD"
     );
 }
 
@@ -110,12 +119,21 @@ fn a_published_database_is_allow_listed_by_its_input() {
         "    clients: { web: { env_prefix: DATABASE } }\n    publish: { allow: PLAYER_IP }\n",
     );
     let aws = file(&published, Cloud::Aws, "services.tf");
-    assert!(
-        aws.contains("publicly_accessible    = true") && aws.contains("var.PLAYER_IP") && aws.contains("variable \"PLAYER_IP\""),
-        "{aws}"
-    );
-    assert!(file(&published, Cloud::Azure, "services.tf").contains("azurerm_postgresql_flexible_server_firewall_rule"));
-    assert!(file(&published, Cloud::Gcp, "services.tf").contains("authorized_networks"));
+    assert_eq!(hcl_text(&hcl_resource(&aws, "aws_db_instance", "db"), "publicly_accessible"), "true");
+    let group = resource(&aws, "aws_security_group", "isoloom_service_db");
+    assert!(group.contains("var.PLAYER_IP"), "{group}");
+    assert!(variables(&aws).contains(&"PLAYER_IP".to_owned()));
+    let azure = hcl_body(&file(&published, Cloud::Azure, "services.tf"));
+    assert!(!hcl_names(&azure, "resource", "azurerm_postgresql_flexible_server_firewall_rule").is_empty());
+    let gcp = hcl_body(&file(&published, Cloud::Gcp, "services.tf"));
+    let sql: Vec<&hcl::Block> = hcl_blocks(&gcp, "resource", &["google_sql_database_instance"]);
+    let networks = sql
+        .iter()
+        .flat_map(|i| hcl_nested(i.body(), "settings"))
+        .flat_map(|s| hcl_nested(s.body(), "ip_configuration"))
+        .flat_map(|c| hcl_nested(c.body(), "authorized_networks"))
+        .count();
+    assert!(networks > 0, "Cloud SQL's authorized networks");
 }
 
 #[test]
@@ -164,10 +182,7 @@ fn a_service_is_reached_from_what_the_spec_defines_and_nothing_else() {
             "worker: { os: debian@12, networks: { lab: 11, dmz: 11 }",
         );
     let services = file(&two, Cloud::Aws, "services.tf");
-    let rds = services.split("\"isoloom_service_db\"").nth(1).unwrap().split("\nresource ").next().unwrap();
-    assert!(
-        rds.contains("\"10.30.0.0/24\", \"10.32.0.0/24\""),
-        "its network and the one reach lets in: {rds}"
-    );
-    assert!(!rds.contains("10.33.0.0/24"), "a client's other network gives no access: {rds}");
+    // Its network and the one reach lets in; a client's other network gives no access.
+    let group = hcl_resource(&services, "aws_security_group", "isoloom_service_db");
+    assert_eq!(hcl_values(&group, "cidr_blocks"), ["10.30.0.0/24", "10.32.0.0/24"]);
 }

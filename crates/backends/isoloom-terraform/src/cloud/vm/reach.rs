@@ -102,7 +102,7 @@ mod tests {
         let size = |c: &Cidr| 1u64 << (32 - c.prefix());
         let private: u64 = PRIVATE.iter().map(size).sum();
         assert_eq!(blocks.iter().map(size).sum::<u64>() + private, 1u64 << 32);
-        assert!(blocks.iter().all(|b| PRIVATE.iter().all(|p| !b.overlaps(*p))));
+        isoloom_test_support::assert_every!(&blocks, |b: &&Cidr| PRIVATE.iter().all(|p| !b.overlaps(*p)));
         assert!(blocks.len() < 40, "{}", blocks.len());
     }
 }

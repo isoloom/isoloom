@@ -319,9 +319,9 @@ mod tests {
     fn top_level_blocks_are_one_blank_line_apart() {
         let mut m = Module::new("");
         m.block(Block::builder("a").build());
-        m.block(Block::builder("b").build());
+        m.blocks([Block::builder("b").build(), Block::builder("c").build()]);
         m.fragment("\nlocals {}\n");
-        assert_eq!(m.render().unwrap(), "a {}\n\nb {}\n\nlocals {}\n");
+        assert_eq!(m.render().unwrap(), "a {}\n\nb {}\n\nc {}\n\nlocals {}\n");
     }
 
     #[test]
@@ -334,12 +334,5 @@ mod tests {
                 .build(),
         );
         assert_eq!(m.render().unwrap(), "# head\n\n# one\n# two\na {}\n\nb {\n  t = \"x${var.y}\"\n}\n");
-    }
-
-    #[test]
-    fn blocks_are_added_in_order() {
-        let mut m = Module::new("");
-        m.blocks([Block::builder("a").build(), Block::builder("b").build()]);
-        assert_eq!(m.render().unwrap(), "a {}\n\nb {}\n");
     }
 }

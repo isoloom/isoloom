@@ -132,16 +132,22 @@ machines:
     #[test]
     fn a_windows_vm_opening_rdp_is_tunnelled_through_a_linux_one_beside_it() {
         let env = crate::testing::environment(SPEC, isoloom_spec::model::Target::CloudVm);
-        let text = rendered(&env);
-        assert!(text.contains("output \"windows_password\"") && text.contains("sensitive = true"), "{text}");
-        assert!(text.contains("output \"windows_user\"") && text.contains("\"isoloom\""), "{text}");
-        assert!(
-            text.contains("dc = {") && text.contains("\"10.9.0.20\"") && text.contains("local.web"),
-            "{text}"
+        let body = isoloom_test_support::hcl_body(&rendered(&env));
+        let output = |name: &str| isoloom_test_support::hcl_blocks(&body, "output", &[name]).first().map(|b| b.body().clone());
+        let password = output("windows_password").expect("the password output");
+        assert_eq!(isoloom_test_support::hcl_text(&password, "sensitive"), "true");
+        assert_eq!(
+            isoloom_test_support::hcl_text(&output("windows_user").expect("the user output"), "value"),
+            "isoloom"
         );
-        assert!(text.contains("\"rdp\"") && text.contains("3389"), "{text}");
-        assert!(!text.contains("alone"), "no Linux machine beside it: no entry: {text}");
-        assert!(!text.contains("plain"), "its spec opens no Remote Desktop port: {text}");
+        // dc alone: alone has no Linux machine beside it, plain opens no Remote Desktop port.
+        let consoles = isoloom_test_support::hcl_map(&output("consoles").expect("the consoles output"), "value");
+        let names: Vec<&str> = consoles.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(names, ["dc"]);
+        let dc = &consoles[0].1;
+        for part in ["\"10.9.0.20\"", "local.web", "\"rdp\"", "3389"] {
+            assert!(dc.contains(part), "{part}: {dc}");
+        }
     }
 
     #[test]

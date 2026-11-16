@@ -104,8 +104,11 @@ mod tests {
         assert_eq!(Limit(Cloud::Oci).fits(&vec![b'x'; 23_232]), Ok(()));
         let err = Limit(Cloud::Oci).fits(&vec![b'x'; 23_233]).unwrap_err();
         assert_eq!((err.provider, err.size, err.cap), ("Oracle Cloud", 30_980, 30_976));
+        // DigitalOcean's cap is 64 KiB, Linode's a byte less.
         assert_eq!(Limit(Cloud::DigitalOcean).fits(&vec![b'x'; 64 * 1024]), Ok(()));
-        assert!(Limit(Cloud::DigitalOcean).fits(&vec![b'x'; 64 * 1024 + 1]).is_err());
-        assert!(Limit(Cloud::Linode).fits(&vec![b'x'; 65_536]).is_err());
+        let digitalocean = Limit(Cloud::DigitalOcean).fits(&vec![b'x'; 64 * 1024 + 1]).unwrap_err();
+        assert_eq!((digitalocean.provider, digitalocean.size, digitalocean.cap), ("DigitalOcean", 65_537, 65_536));
+        let linode = Limit(Cloud::Linode).fits(&vec![b'x'; 65_536]).unwrap_err();
+        assert_eq!((linode.provider, linode.size, linode.cap), ("Linode", 65_536, 65_535));
     }
 }
