@@ -458,8 +458,15 @@ mod tests {
     #[test]
     fn an_appliance_names_itself_under_the_environments_domain() {
         let plain = "version: 1\nname: shop\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  r: { networks: { lan: 1 }, app: { image: x, appliance: cisco-iol } }\n";
-        assert!(config(plain).contains("\nip domain name shop.internal\n"), "{}", config(plain));
+        let domain = |yaml: &str| {
+            config(yaml)
+                .lines()
+                .filter(|l| l.starts_with("ip domain name "))
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(domain(plain), ["ip domain name shop.internal"]);
         let private = format!("{plain}dns: {{ private: true, domain: corp.test }}\n");
-        assert!(config(&private).contains("\nip domain name corp.test\n"), "{}", config(&private));
+        assert_eq!(domain(&private), ["ip domain name corp.test"]);
     }
 }

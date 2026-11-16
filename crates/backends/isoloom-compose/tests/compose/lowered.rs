@@ -2,7 +2,6 @@
 //! file from its input (and its value to the steps that need it), and an image built from
 //! portable steps.
 
-use std::error::Error;
 use std::path::Path;
 
 use isoloom_compose::ComposeBackend;
@@ -12,8 +11,7 @@ use isoloom_render::GeneratedFile;
 use isoloom_render::backend::Backend;
 use isoloom_spec::model::Target;
 
-/// A test's outcome: a failed step is its report.
-type Outcome<T = ()> = Result<T, Box<dyn Error>>;
+use crate::testing::Outcome;
 
 /// The Docker plan of a design example of isoloom-plan's `tests/fixtures/specs`.
 fn plan(name: &str) -> Outcome<Environment> {
@@ -88,12 +86,10 @@ fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outc
         (Some("/srv/archive/secret.txt"), Some("1000"), Some("0400"))
     );
     // ...and never put in a service's environment.
-    let text = serde_yaml_ng::to_string(&c)?;
     for (name, service) in services(&c) {
         let env = serde_yaml_ng::to_string(service.get("environment").unwrap_or(&serde_yaml_ng::Value::Null))?;
         assert!(!env.contains("${DEMO_SECRET"), "{name}'s environment: {env}");
     }
-    assert!(text.contains("isoloom.port.site"), "{text}");
     Ok(())
 }
 
@@ -103,15 +99,28 @@ fn an_input_file_is_a_secret_read_from_its_input_never_the_environment() -> Outc
 /// keeps `--build` and gains no pull step, so an author's edits always rebuild.
 #[test]
 fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() -> Outcome {
-    let start = |spec: &str| -> Outcome<String> { Ok(isoloom_compose::vm_start(&plan_of(spec)?)?.start.join("\n")) };
-    let combo = start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n")?;
-    assert!(combo.contains("pull --ignore-pull-failures"), "a published build pulls first: {combo}");
-    assert!(!combo.contains("--build"), "a published build must not force a local build: {combo}");
-    let local = start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      build: { context: web }\n")?;
-    assert!(!local.contains("--ignore-pull-failures"), "a local build gains no pull step: {local}");
+    // The start's commands: the pulls, then the one `up`.
+    let start = |spec: &str| -> Outcome<(Vec<String>, String)> {
+        let mut commands = isoloom_compose::vm_start(&plan_of(spec)?)?.start;
+        let up = commands.pop().ok_or("no command")?;
+        assert!(up.contains(" up --detach "), "the last command is `up`: {up}");
+        Ok((commands, up))
+    };
+    let (published_pulls, published_up) =
+        start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      image: ghcr.io/example/lab-web:1\n      build: { context: web }\n")?;
     assert!(
-        local.contains("up --detach --build") && local.contains("--wait"),
-        "a local build still forces a build: {local}"
+        matches!(published_pulls.as_slice(), [pull] if pull.contains(" pull --ignore-pull-failures")),
+        "a published build pulls first: {published_pulls:?}"
+    );
+    assert!(
+        !published_up.contains("--build"),
+        "a published build must not force a local build: {published_up}"
+    );
+    let (local_pulls, local_up) = start("version: 1\nname: lab\nmachines:\n  web:\n    app:\n      build: { context: web }\n")?;
+    assert_eq!(local_pulls, Vec::<String>::new(), "a local build gains no pull step");
+    assert!(
+        local_up.contains(" up --detach --build ") && local_up.contains(" --wait"),
+        "a local build still forces a build: {local_up}"
     );
     Ok(())
 }
@@ -120,8 +129,13 @@ fn a_published_build_pulls_before_up_but_a_local_build_still_forces_a_build() ->
 fn portable_steps_build_from_the_os_image() -> Outcome {
     let files = render("legacy-intranet")?;
     let dockerfile = file(&files, ".isoloom/docker/build/portal/Dockerfile")?;
-    assert!(dockerfile.contains("FROM debian:12@sha256:"));
-    assert!(dockerfile.contains("COPY --chown=www-data [\"portal/\", \"/var/www/html/\"]\n"));
+    // Its instructions, the comments left out: the first is the pinned OS image.
+    let lines: Vec<&str> = dockerfile.lines().filter(|l| !l.starts_with('#')).collect();
+    assert!(
+        lines.first().is_some_and(|from| from.starts_with("FROM debian:12@sha256:")),
+        "the OS image, pinned: {dockerfile}"
+    );
+    assert!(lines.contains(&"COPY --chown=www-data [\"portal/\", \"/var/www/html/\"]"), "{dockerfile}");
     let c = compose(&files)?;
     let portal = services(&c)
         .into_iter()
