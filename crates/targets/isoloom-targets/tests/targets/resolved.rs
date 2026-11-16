@@ -6,7 +6,9 @@ use isoloom_spec::Target;
 use isoloom_targets::resolved::{lookup, resolve};
 use isoloom_targets::{Lab, generate};
 
-use crate::testing::{Outcome, example, file as contents, generated, lab};
+use isoloom_test_support::{yaml, yaml_at};
+
+use crate::testing::{Outcome, define, example, file as contents, generated, lab, vagrantfile};
 
 #[test]
 fn addresses_and_routers_match_the_generators() -> Outcome {
@@ -19,20 +21,30 @@ fn addresses_and_routers_match_the_generators() -> Outcome {
     assert_eq!(lookup(&r, "machines.cache.routes.0.via").unwrap(), "10.61.20.254");
     assert_eq!(lookup(&r, "machines.user.access").unwrap(), true);
     assert_eq!(lookup(&r, "start_order").unwrap(), &serde_json::json!(["cache", "web", "user"]));
-    // Every address the snapshot states is in the files the generators write.
-    let vagrant = generated(&spec, Target::Vagrant, "vagrant/Vagrantfile")?;
-    let compose = generated(&spec, Target::Docker, "docker/compose.yml")?;
-    for (_, m) in lookup(&r, "machines").unwrap().as_object().unwrap() {
-        for a in m["addresses"].as_object().unwrap().values() {
-            assert!(vagrant.contains(a.as_str().unwrap()), "{a} missing from the Vagrantfile");
+    // Every address the snapshot states is the one the generators give that machine there: its
+    // VM's card on the network, its container's address on Docker's.
+    let vagrant = vagrantfile(&spec)?;
+    let compose = yaml(&generated(&spec, Target::Docker, "docker/compose.yml")?);
+    let has_card = |vm: &str, address: &str| {
+        define(&vagrant, vm)
+            .statements("m.vm.network \"private_network\"")
+            .iter()
+            .any(|n| n.contains(&format!("ip: \"{address}\"")))
+    };
+    let machines = lookup(&r, "machines").and_then(serde_json::Value::as_object).ok_or("no machines")?;
+    for (name, m) in machines {
+        for a in m["addresses"].as_object().into_iter().flat_map(|a| a.values()) {
+            assert!(has_card(name, a.as_str().unwrap_or_default()), "{name}: {a} isn't its VM's");
         }
-        for a in m["docker_addresses"].as_object().unwrap().values() {
-            if m["shapes"].as_array().unwrap().iter().any(|s| s == "docker") {
-                assert!(compose.contains(a.as_str().unwrap()), "{a} missing from the Compose file");
+        if m["shapes"].as_array().into_iter().flatten().any(|s| s == "docker") {
+            for (net, a) in m["docker_addresses"].as_object().into_iter().flatten() {
+                let path = format!("services.{name}.networks.{net}.ipv4_address");
+                assert_eq!(yaml_at(&compose, &path).and_then(serde_yaml_ng::Value::as_str), a.as_str(), "{path}");
             }
         }
     }
-    assert!(vagrant.contains(lookup(&r, "router.addresses.front").unwrap().as_str().unwrap()));
+    let router = lookup(&r, "router.addresses.front").and_then(serde_json::Value::as_str).ok_or("no router")?;
+    assert!(has_card("isoloom-router", router), "the router's {router}");
     Ok(())
 }
 

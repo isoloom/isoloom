@@ -4,7 +4,7 @@
 use isoloom_plan::checks;
 
 use super::{BASE, runner};
-use crate::testing::{Outcome, example, lab};
+use crate::testing::{Outcome, check_line, example, lab};
 
 #[test]
 fn runner_scripts_come_by_position_and_end_with_their_counts() -> Outcome {
@@ -16,10 +16,18 @@ fn runner_scripts_come_by_position_and_end_with_their_counts() -> Outcome {
     assert_eq!(order, ["user", "cache", "web"]);
     let script = runner(&groups[0].0, &groups[0].1);
     assert!(script.starts_with("#!/bin/sh\n"));
-    assert!(script.contains("_retry 60 _http_is 'http://web/' 200"), "{script}");
-    assert!(script.contains("if _tcp 'cache' 6379; then fail"), "{script}");
-    // Derived checks can be switched off at run time.
-    assert!(script.contains("if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then\nif _tcp 'cache' 6379"), "{script}");
+    let page = check_line(&script, "the web page answers through the router")?;
+    assert!(page.starts_with("if _retry 60 _http_is 'http://web/' 200; "), "{page}");
+    // A blocked check passes when nothing connects.
+    let blocked = script
+        .lines()
+        .find(|l| l.contains("'cache:6379 blocked from user'"))
+        .ok_or("no blocked check")?;
+    assert!(blocked.starts_with("if _tcp 'cache' 6379; then fail"), "{blocked}");
+    // Derived checks can be switched off at run time: the line before each is the switch.
+    let lines: Vec<&str> = script.lines().collect();
+    let at = lines.iter().position(|l| *l == blocked).ok_or("the blocked check's line")?;
+    assert_eq!(lines.get(at.wrapping_sub(1)), Some(&"if [ \"${ISOLOOM_DERIVED:-1}\" != 0 ]; then"), "{script}");
     assert!(script.ends_with("echo \"isoloom-check: END $passed passed, $failed failed\"\n[ \"$failed\" -eq 0 ]\n"));
     Ok(())
 }
@@ -46,9 +54,14 @@ fn exec_checks_run_inside_the_machine_on_docker_and_kubernetes() -> Outcome {
         .iter()
         .find(|f| f.path.ends_with("docker/checks/isoloom-exec-web.sh"))
         .expect("an exec runner for web");
-    assert!(exec.contents.contains("_exec 'id' 'uid'"));
-    let beside = files.iter().find(|f| f.path.ends_with("docker/checks/web.sh")).unwrap();
-    assert!(!beside.contents.contains("_exec 'id'"));
+    let check = exec
+        .contents
+        .lines()
+        .find(|l| l.starts_with("if ") && l.contains("then pass "))
+        .ok_or("no check in the exec runner")?;
+    assert!(check.contains("_exec 'id' 'uid'"), "{check}");
+    let beside = files.iter().find(|f| f.path.ends_with("docker/checks/web.sh")).ok_or("no runner beside")?;
+    assert!(!beside.contents.contains("_exec 'id'"), "{}", beside.contents);
     Ok(())
 }
 

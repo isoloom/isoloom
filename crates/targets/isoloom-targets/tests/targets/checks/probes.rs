@@ -9,7 +9,7 @@ use isoloom_plan::checks::{self, Position, Probe};
 use isoloom_spec::check_line::CheckLine;
 
 use super::{BASE, runner};
-use crate::testing::{Outcome, lab};
+use crate::testing::{Outcome, check_line, lab};
 
 /// The runner's line for a check that passed.
 fn pass(name: &str) -> CheckLine {
@@ -107,6 +107,23 @@ fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer
 }
 
 #[test]
+fn tcp_checks_send_their_line_and_look_for_their_text() -> Outcome {
+    let spec = lab(&format!(
+        "{BASE}checks:\n  \
+         - {{ name: banner, tcp: '127.0.0.1:7001', contains: SSH-2.0, wait: 0 }}\n  \
+         - {{ name: ping, tcp: '127.0.0.1:7002', send: PING, contains: +PONG }}\n"
+    ))?;
+    let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
+    let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
+    let ping = check_line(&script, "ping")?;
+    assert!(ping.starts_with("if _retry 30 _tcp_read '127.0.0.1' 7002 'PING' '+PONG'; "), "{ping}");
+    let banner = check_line(&script, "banner")?;
+    assert!(banner.starts_with("if _retry 0 _tcp_read '127.0.0.1' 7001 '' 'SSH-2.0'; "), "{banner}");
+    Ok(())
+}
+
+#[test]
+#[ignore = "needs nc or bash, and waits on sockets for seconds: the runner's probes against servers on 127.0.0.1; `cargo xtask test` runs it"]
 fn tcp_checks_read_a_greeting_and_send_a_line() -> Outcome {
     let banner = serve(false, 0, |_| "SSH-2.0-OpenSSH_9.6\r\n".into())?;
     let late = serve(false, 1500, |_| "220 mail ESMTP ready\r\n".into())?;
@@ -123,7 +140,6 @@ fn tcp_checks_read_a_greeting_and_send_a_line() -> Outcome {
     assert_eq!(spec.problems(), vec![]);
     let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
     let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
-    assert!(script.contains(&format!("_retry 30 _tcp_read '127.0.0.1' {pong} 'PING' '+PONG'")), "{script}");
     let out = std::process::Command::new("sh").arg("-c").arg(&script).output().expect("sh runs");
     let lines: Vec<CheckLine> = String::from_utf8_lossy(&out.stdout).lines().filter_map(CheckLine::parse).collect();
     let text = String::from_utf8_lossy(&out.stdout).to_string();
@@ -200,10 +216,9 @@ fn which(tool: &str) -> Outcome<Option<String>> {
     Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_owned()).filter(|p| !p.is_empty()))
 }
 
-#[test]
-fn http_checks_follow_redirects_when_asked() -> Outcome {
-    let server = redirecting_server()?;
-    let u = format!("http://127.0.0.1:{server}");
+/// The redirect checks against `u`: the first answer, unfollowed, followed, looping, and those
+/// that send a body or look for text.
+fn redirect_checks(u: &str) -> Outcome<Vec<checks::Resolved>> {
     let spec = lab(&format!(
         "{BASE}checks:\n  \
          - {{ name: first, http: '{u}/old', expect: 302, wait: 0 }}\n  \
@@ -216,30 +231,62 @@ fn http_checks_follow_redirects_when_asked() -> Outcome {
          - {{ name: unfollowed post, http: '{u}/login', method: POST, body: 'user=a', expect: 302, wait: 0 }}\n"
     ))?;
     assert_eq!(spec.problems(), vec![]);
-    let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
+    Ok(checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect())
+}
+
+/// The checks of `plan` a runner with wget alone can run: no method of their own, no text to look for.
+fn plain_gets(plan: &[checks::Resolved]) -> Vec<&checks::Resolved> {
+    plan.iter()
+        .filter(|c| matches!(&c.probe, Probe::Http { request, .. } if request.method.is_none() && request.contains.is_none()))
+        .collect()
+}
+
+#[test]
+fn http_checks_follow_redirects_when_asked() -> Outcome {
+    let u = "http://127.0.0.1:7003";
+    let plan = redirect_checks(u)?;
     assert!(matches!(&plan[2].probe, Probe::Http { request, .. } if request.follow));
+    let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
+    let followed = check_line(&script, "followed")?;
+    assert!(followed.starts_with(&format!("if _retry 0 _http_is '{u}/old' 200 follow; ")), "{followed}");
+    for (name, request) in [
+        ("followed body", format!("-L --max-redirs 5 '{u}/old'")),
+        ("login", format!("-L --max-redirs 5 --data-binary 'user=a' '{u}/login'")),
+        ("empty post", format!("-L --max-redirs 5 -d '' '{u}/login'")),
+        ("unfollowed post", format!("-X 'POST' --data-binary 'user=a' '{u}/login'")),
+    ] {
+        let line = check_line(&script, name)?;
+        assert!(line.contains(&request), "{name}: {line}");
+    }
+    let unfollowed = check_line(&script, "unfollowed")?;
+    assert!(!unfollowed.contains(" follow;"), "{unfollowed}");
+    Ok(())
+}
+
+#[test]
+#[ignore = "needs curl, wget or busybox, run against a server on 127.0.0.1: the runner's HTTP client each way it finds one; `cargo xtask test` runs it"]
+fn http_checks_follow_redirects_with_curl_wget_and_busybox() -> Outcome {
+    let server = redirecting_server()?;
+    let u = format!("http://127.0.0.1:{server}");
+    let plan = redirect_checks(&u)?;
     let position = Position::Machine("user".into());
     let script = runner(&position, &plan.iter().collect::<Vec<_>>());
-    assert!(script.contains(&format!("_retry 0 _http_is '{u}/old' 200 follow;")), "{script}");
-    assert!(script.contains(&format!("-L --max-redirs 5 '{u}/old'")), "{script}");
+    let get_script = runner(&position, &plain_gets(&plan));
     let expect = |text: &str, with_body: bool| expect_redirect_lines(text, &u, with_body);
     // curl, else GNU wget, else busybox's: the same answers (wget follows whatever it's told).
+    let mut clients = 0;
     if let Some(curl) = which("curl")? {
         expect(&run_with_only(&script, &[("curl", &curl)])?, true);
+        clients += 1;
     }
-    assert!(script.contains(&format!("-L --max-redirs 5 --data-binary 'user=a' '{u}/login'")), "{script}");
-    assert!(script.contains(&format!("-L --max-redirs 5 -d '' '{u}/login'")), "{script}");
-    assert!(script.contains(&format!("-X 'POST' --data-binary 'user=a' '{u}/login'")), "{script}");
-    let gets: Vec<&checks::Resolved> = plan
-        .iter()
-        .filter(|c| matches!(&c.probe, Probe::Http { request, .. } if request.method.is_none() && request.contains.is_none()))
-        .collect();
-    let get_script = runner(&position, &gets);
     if let Some(gnu) = which("wget")? {
         expect(&run_with_only(&get_script, &[("wget", &gnu)])?, false);
+        clients += 1;
     }
     if let Some(busybox) = which("busybox")? {
         expect(&run_with_only(&get_script, &[("wget", &busybox)])?, false);
+        clients += 1;
     }
+    assert!(clients > 0, "none of curl, wget and busybox is on this host's PATH");
     Ok(())
 }

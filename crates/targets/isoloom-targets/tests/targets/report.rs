@@ -7,6 +7,16 @@ use isoloom_targets::resolved::resolve;
 
 use crate::testing::{Outcome, example};
 
+/// Whether a line of `text`, trimmed, is `line`.
+fn has_line(text: &str, line: &str) -> bool {
+    text.lines().any(|l| l.trim() == line)
+}
+
+/// Whether a line of `text`, trimmed, starts with `start`.
+fn starts_a_line(text: &str, start: &str) -> bool {
+    text.lines().any(|l| l.trim().starts_with(start))
+}
+
 /// The resolved snapshot of the example `name`.
 fn snapshot(name: &str) -> Outcome<serde_json::Value> {
     Ok(resolve(&example(name)?))
@@ -15,18 +25,22 @@ fn snapshot(name: &str) -> Outcome<serde_json::Value> {
 #[test]
 fn the_graph_shows_networks_machines_reach_and_the_router() -> Outcome {
     let d2 = graph::d2(&snapshot("segmented")?);
-    assert!(d2.contains("net_front: \"front\\n10.61.10.0/24\" { shape: hexagon }"), "{d2}");
-    assert!(d2.contains("net_back: \"back\\n10.61.20.0/24\\nno internet\""), "{d2}");
-    assert!(d2.contains("m_user: \"user\" { shape: person }"), "{d2}");
-    assert!(d2.contains("m_web -- net_front: \".10\""), "{d2}");
-    assert!(d2.contains("net_front -> net_back: \"6379\" { style.stroke-dash: 3 }"), "{d2}");
-    assert!(d2.contains("router -- net_access"), "{d2}");
+    for statement in [
+        "net_front: \"front\\n10.61.10.0/24\" { shape: hexagon }",
+        "m_user: \"user\" { shape: person }",
+        "m_web -- net_front: \".10\"",
+        "net_front -> net_back: \"6379\" { style.stroke-dash: 3 }",
+    ] {
+        assert!(has_line(&d2, statement), "{statement}: {d2}");
+    }
+    assert!(starts_a_line(&d2, "net_back: \"back\\n10.61.20.0/24\\nno internet\""), "{d2}");
+    assert!(starts_a_line(&d2, "router -- net_access"), "{d2}");
     // Graphviz says the same.
     let dot = graph::dot(&snapshot("edge-firewall")?);
     assert!(dot.starts_with("// edge-firewall") && dot.trim_end().ends_with('}'));
-    assert!(dot.contains("m_fw [label=\"fw\\n:8080\", shape=diamond]"), "{dot}");
-    assert!(dot.contains("net_outside -> net_dmz [label=\"80\", style=dashed"), "{dot}");
-    assert!(!dot.contains("router ["), "no router of Isoloom's: fw is the gateway\n{dot}");
+    assert!(starts_a_line(&dot, "m_fw [label=\"fw\\n:8080\", shape=diamond]"), "{dot}");
+    assert!(starts_a_line(&dot, "net_outside -> net_dmz [label=\"80\", style=dashed"), "{dot}");
+    assert!(!starts_a_line(&dot, "router ["), "no router of Isoloom's: fw is the gateway\n{dot}");
     Ok(())
 }
 
@@ -39,7 +53,7 @@ fn the_addressing_report_shows_each_machines_address_on_each_network() -> Outcom
         "{header}"
     );
     assert!(addressing.lines().any(|l| l.starts_with("web") && l.contains("10.61.10.10")), "{addressing}");
-    assert!(addressing.contains("(router)"), "{addressing}");
+    assert!(addressing.lines().any(|l| l.starts_with("(router)")), "{addressing}");
     Ok(())
 }
 
@@ -48,8 +62,8 @@ fn the_ports_report_says_from_where_each_service_answers() -> Outcome {
     let services = report("ports", &snapshot("segmented")?, true)?;
     assert!(services.starts_with("| machine | port | name | http | published | reachable from |"));
     // The cache answers on 6379 from its own network and from front (reach rule), not from access.
-    assert!(services.contains("| cache | 6379 | redis |  |  | front, back |"), "{services}");
-    assert!(services.contains("| web | 80 | web | yes |  | front, access |"), "{services}");
+    assert!(has_line(&services, "| cache | 6379 | redis |  |  | front, back |"), "{services}");
+    assert!(has_line(&services, "| web | 80 | web | yes |  | front, access |"), "{services}");
     Ok(())
 }
 
@@ -70,7 +84,7 @@ fn the_resources_report_totals_every_machines_size() -> Outcome {
     let total: Vec<&str> = resources.lines().last().ok_or("an empty report")?.split_whitespace().collect();
     assert_eq!(total.first(), Some(&"total"), "{resources}");
     let sizes = total.get(1..4).ok_or("cpus, memory and disk")?;
-    assert!(sizes.iter().all(|n| n.parse::<u64>().is_ok_and(|n| n > 0)), "{resources}");
+    isoloom_test_support::assert_every!(sizes, |n: &&&str| n.parse::<u64>().is_ok_and(|n| n > 0));
     Ok(())
 }
 
