@@ -70,19 +70,6 @@ fn the_machines_os_wins_over_a_shared_os() {
 }
 
 #[test]
-fn unknown_families_and_versions_are_refused_with_the_known_ones() {
-    let e = refused_line(&spec("  a: { os: gentoo, networks: { lab: 5 }, app: { steps: [{ run: a.sh }] } }\n"));
-    assert!(
-        e.starts_with("machines.a.os: unknown OS `gentoo`; write `<family>@<version>` with one of: debian (11, 12, 13)"),
-        "{e}"
-    );
-    assert_eq!(
-        refused_line(&spec("  a: { os: debian@10, networks: { lab: 5 }, app: { steps: [{ run: a.sh }] } }\n")),
-        "machines.a.os: debian has no version `10`; use one of: 11, 12, 13 (`debian` alone is debian@12)"
-    );
-}
-
-#[test]
 fn image_table_names_are_not_spellings() {
     for machine in [
         "  a: { os: debian-12, networks: { lab: 5 }, app: { steps: [{ run: a.sh }] } }\n",

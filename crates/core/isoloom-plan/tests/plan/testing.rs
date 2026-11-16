@@ -1,6 +1,8 @@
 //! What the integration tests share: environments written in a test, what an author sees of them, and
 //! their plans.
 
+use std::path::{Path, PathBuf};
+
 use isoloom_plan::{Environment, Lab};
 use isoloom_spec::model::Target;
 use isoloom_spec::syntax::{self, Problem, Problems};
@@ -81,4 +83,54 @@ pub(crate) fn plan(yaml: &str, target: Target) -> Outcome<Environment> {
 #[must_use]
 pub(crate) fn ids(targets: Vec<Target>) -> Vec<&'static str> {
     targets.into_iter().map(Target::id).collect()
+}
+
+/// The repository's `examples/` folder.
+fn examples_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples")
+}
+
+/// The examples' names, sorted: the folders with their isoloom.yml (examples/paas groups its own,
+/// out of this list).
+///
+/// # Errors
+///
+/// The folder can't be read.
+pub(crate) fn example_names() -> std::io::Result<Vec<String>> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(examples_root())? {
+        let path = entry?.path();
+        if path.join("isoloom.yml").is_file()
+            && let Some(name) = path.file_name()
+        {
+            out.push(name.to_string_lossy().into_owned());
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
+/// The example `name`'s lab.
+///
+/// # Errors
+///
+/// Why it doesn't load, named after the example.
+pub(crate) fn example(name: &str) -> Result<Lab, String> {
+    isoloom_spec::load(&examples_root().join(name))
+        .map(Lab::new)
+        .map_err(|e| format!("{name}: {e}"))
+}
+
+/// Every example, as its name and its lab.
+///
+/// # Errors
+///
+/// The folder can't be read, or an example doesn't load.
+pub(crate) fn examples() -> Result<Vec<(String, Lab)>, Box<dyn std::error::Error>> {
+    let mut out = Vec::new();
+    for name in example_names()? {
+        let lab = example(&name)?;
+        out.push((name, lab));
+    }
+    Ok(out)
 }

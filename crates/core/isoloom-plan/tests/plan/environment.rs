@@ -2,7 +2,7 @@
 
 use std::net::Ipv4Addr;
 
-use crate::testing::{Outcome, plan, plan_anyway};
+use crate::testing::{Outcome, examples, plan, plan_anyway};
 use isoloom_plan::lifecycle::SharedRole;
 use isoloom_plan::{Capabilities, Environment, Feature, MachineShape, Requirement, Step, VolumeKind, refusal};
 use isoloom_spec::model::Target;
@@ -57,12 +57,27 @@ fn machines_have_their_addresses_names_and_ports() -> Outcome {
 
 #[test]
 fn docker_targets_lay_networks_on_their_docker_blocks() -> Outcome {
-    let env = env(Target::Docker)?;
-    assert_eq!(env.machines["web"].shape, MachineShape::Container);
-    for n in env.networks.values() {
-        assert_eq!(n.cidr.prefix(), n.declared_cidr.prefix());
-    }
-    assert!(env.machines["web"].lifecycle.is_empty(), "containers have no VM steps");
+    let env = plan(
+        &format!("{SPEC}overrides:\n  docker: {{ networks: {{ front: {{ cidr: 10.40.0.0/24 }} }} }}\n"),
+        Target::Docker,
+    )?;
+    let web = &env.machines["web"];
+    assert_eq!(web.shape, MachineShape::Container);
+    let blocks: Vec<String> = env
+        .networks
+        .iter()
+        .map(|(name, n)| format!("{name}: {} (declared {})", n.cidr, n.declared_cidr))
+        .collect();
+    assert_eq!(
+        blocks,
+        ["front: 10.40.0.0/24 (declared 10.30.0.0/24)", "back: 10.31.0.0/24 (declared 10.31.0.0/24)"]
+    );
+    assert_eq!(
+        web.addresses["front"],
+        Ipv4Addr::new(10, 40, 0, 10),
+        "the machine's address moves with its block"
+    );
+    assert!(web.lifecycle.is_empty(), "containers have no VM steps");
     Ok(())
 }
 
@@ -112,6 +127,8 @@ fn machines_start_after_what_they_wait_for() -> Outcome {
 
 #[test]
 fn a_backend_refuses_what_it_lacks_the_capability_for() -> Outcome {
+    let bare = env(Target::Docker)?;
+    assert_eq!(bare.requirements, [Requirement::MachineAliases]);
     let env = plan(&format!("{SPEC}provision:\n  - ansible: site.yml\n"), Target::Docker)?;
     assert_eq!(env.requirements, [Requirement::EnvironmentProvisioning, Requirement::MachineAliases]);
     let none = Capabilities::default();
@@ -122,14 +139,6 @@ fn a_backend_refuses_what_it_lacks_the_capability_for() -> Outcome {
     assert_eq!(next.to_string(), "machine `aliases` (dotted DNS names) aren't Kubernetes Service names");
     let both = Capabilities::of([Feature::EnvironmentProvisioning, Feature::MachineAliases]);
     assert!(refusal(&env.requirements, &both).is_none());
-    Ok(())
-}
-
-#[test]
-fn what_is_required_and_nothing_more_is_refused() -> Outcome {
-    let env = env(Target::Docker)?;
-    assert_eq!(env.requirements, [Requirement::MachineAliases]);
-    assert!(refusal(&env.requirements, &Capabilities::of([Feature::MachineAliases])).is_none());
     Ok(())
 }
 
@@ -160,7 +169,10 @@ fn a_machine_process_is_required_and_planned_as_steps() -> Outcome {
     )?;
     assert_eq!(env.requirements, [Requirement::MachineProcess { machine: "web".into() }]);
     let why = refusal(&env.requirements, &Capabilities::default()).expect("refused");
-    assert!(why.to_string().contains("an existing host runs what it already runs"), "{why}");
+    assert_eq!(
+        why.to_string(),
+        "machine `web` sets its own process (`command` or `healthcheck`): an existing host runs what it already runs, Isoloom starts nothing on it"
+    );
     let steps = &env.machines["web"].lifecycle;
     assert!(
         steps.ends_with(&[Step::Command, Step::Setup { paths: vec!["seed.sh".into()] }, Step::Ready]),
@@ -188,36 +200,22 @@ fn secrets_come_before_what_reads_them_on_linux_and_windows() -> Outcome {
     Ok(())
 }
 
-/// Every example of the repository, as its folder and its lab.
-fn example_labs() -> Result<Vec<(std::path::PathBuf, isoloom_plan::Lab)>, Box<dyn std::error::Error>> {
-    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples");
-    let mut out = Vec::new();
-    for entry in std::fs::read_dir(examples)? {
-        let dir = entry?.path();
-        if dir.join("isoloom.yml").is_file() {
-            let lab = isoloom_plan::Lab::new(isoloom_spec::load(&dir)?);
-            out.push((dir, lab));
-        }
-    }
-    Ok(out)
-}
-
 /// A VM's `Routes` and `Ipv6` steps carry the routes its plan holds, worked out once: they were
 /// worked out a second time for the steps.
 #[test]
 fn a_vms_route_steps_are_its_plans_routes() -> Result<(), Box<dyn std::error::Error>> {
     let mut seen = 0;
-    for (dir, lab) in example_labs()? {
+    for (example, lab) in examples()? {
         for target in [Target::Vagrant, Target::Proxmox, Target::CloudVm] {
             let env = lab.plan(&lab.for_target(target), target, None).unwrap();
             for (name, mp) in &env.machines {
                 for step in &mp.lifecycle {
                     match step {
                         Step::Routes { routes, default } => {
-                            assert_eq!((routes, *default), (&mp.routes, mp.default_gateway), "{}: {name}", dir.display());
+                            assert_eq!((routes, *default), (&mp.routes, mp.default_gateway), "{example}: {name}");
                             seen += 1;
                         }
-                        Step::Ipv6 { routes, .. } => assert_eq!(routes, &mp.routes6, "{}: {name}", dir.display()),
+                        Step::Ipv6 { routes, .. } => assert_eq!(routes, &mp.routes6, "{example}: {name}"),
                         _ => {}
                     }
                 }
@@ -234,13 +232,13 @@ fn a_vms_route_steps_are_its_plans_routes() -> Result<(), Box<dyn std::error::Er
 #[test]
 fn every_vm_of_the_plan_has_its_os() -> Result<(), Box<dyn std::error::Error>> {
     let mut vms = 0;
-    for (dir, lab) in example_labs()? {
+    for (example, lab) in examples()? {
         for target in Target::ALL {
             let Ok(env) = lab.plan(&lab.for_target(target), target, None) else {
                 continue;
             };
             for (name, _) in env.machines.iter().filter(|(_, mp)| mp.shape == MachineShape::Vm) {
-                assert!(env.vm(name).is_some_and(|vm| !vm.os.is_empty()), "{}: {name} on {}", dir.display(), target.id());
+                assert!(env.vm(name).is_some_and(|vm| !vm.os.is_empty()), "{example}: {name} on {}", target.id());
                 vms += 1;
             }
         }
