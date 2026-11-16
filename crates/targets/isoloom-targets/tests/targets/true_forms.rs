@@ -8,7 +8,7 @@ use isoloom_plan::MachineShape;
 use isoloom_spec::model::{Shape, Target};
 use isoloom_targets::{Lab, generate, refusal};
 
-use crate::testing::{Outcome, between, example, examples, generated, lab};
+use crate::testing::{Outcome, example, examples, generated, lab};
 
 /// The forms a machine of `target` may take: the target's own, nothing in between.
 fn true_forms(target: Target) -> &'static [MachineShape] {
@@ -110,7 +110,7 @@ fn proxmox_runs_a_container_form_as_lxc_only_where_the_spec_asks() -> Outcome {
 #[test]
 fn a_container_only_machine_is_refused_on_the_vm_targets_never_put_in_a_helper_vm() -> Outcome {
     let image_only = one("app: { image: nginx }")?;
-    assert!(generate(&image_only, Target::Docker).is_ok());
+    generate(&image_only, Target::Docker)?;
     for target in [Target::Vagrant, Target::Esxi, Target::CloudVm] {
         let why = refusal(&image_only, target)?.ok_or_else(|| format!("{} takes an image-only machine", target.id()))?;
         assert!(why.starts_with("machines.m.app.image: "), "{}: {why}", target.id());
@@ -138,16 +138,18 @@ fn the_ctf_labs_vm_form_keeps_its_port_inputs_and_setup() -> Outcome {
         forms(&lab, Target::Vagrant)?,
         [("database".to_owned(), MachineShape::Vm), ("web".to_owned(), MachineShape::Vm)]
     );
-    let vf = generated(&lab, Target::Vagrant, ".isoloom/vagrant/Vagrantfile")?;
-    let web = between(&vf, "config.vm.define \"web\"", "\n  end\n")?;
-    assert!(web.contains("name: \"provision/web.sh\""), "{web}");
-    let forward = web.lines().find(|l| l.contains("\"forwarded_port\"")).ok_or("web forwards no port")?;
+    let vf = crate::testing::vagrantfile(&lab)?;
+    let web_vm = crate::testing::define(&vf, "web");
+    assert!(crate::testing::provisioners(web_vm).contains(&"provision/web.sh".to_owned()), "{web_vm:?}");
+    let forwards = web_vm.statements("m.vm.network \"forwarded_port\"");
+    let forward = forwards.first().ok_or("web forwards no port")?;
     assert!(
         forward.contains("guest: 80, host: ISOLOOM_HOSTPORTS.fetch(\"web/portal\", 8080)") && !forward.contains("auto_correct"),
         "the fixed port is never moved: {forward}"
     );
+    let web = web_vm.every_statement().join("\n");
     assert!(!web.contains("CTF_"), "web receives none of the database's inputs:\n{web}");
-    let database = between(&vf, "config.vm.define \"database\"", "\n  end\n")?;
+    let database = crate::testing::define(&vf, "database").every_statement().join("\n");
     assert!(
         database.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/CTF_LAUNCH_TOKEN '/run/lab/launch-token'"),
         "{database}"

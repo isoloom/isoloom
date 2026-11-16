@@ -2,7 +2,7 @@
 //! show every network, machine, address and rule the generators use.
 
 use isoloom_targets::graph;
-use isoloom_targets::report::{REPORTS, hyperv_ports_note, report};
+use isoloom_targets::report::{hyperv_ports_note, report};
 use isoloom_targets::resolved::resolve;
 
 use crate::testing::{Outcome, example};
@@ -85,14 +85,6 @@ fn the_resources_report_totals_every_machines_size() -> Outcome {
     assert_eq!(total.first(), Some(&"total"), "{resources}");
     let sizes = total.get(1..4).ok_or("cpus, memory and disk")?;
     isoloom_test_support::assert_every!(sizes, |n: &&&str| n.parse::<u64>().is_ok_and(|n| n > 0));
-    Ok(())
-}
-
-#[test]
-fn an_unknown_report_names_the_known_ones() -> Outcome {
-    let e = report("nope", &snapshot("segmented")?, false).expect_err("no report is named nope");
-    assert!(e.to_string().contains("addressing"), "{e}");
-    assert_eq!(REPORTS.len(), 4);
     Ok(())
 }
 

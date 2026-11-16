@@ -7,9 +7,9 @@ use isoloom_spec::model::Constraints;
 use isoloom_spec::{Target, load, parse};
 use isoloom_targets::{Lab, generate};
 
-use isoloom_test_support::{yaml, yaml_documents, yaml_values};
+use isoloom_test_support::{hcl_body, hcl_literals, hcl_names, hcl_one, hcl_values, yaml, yaml_documents, yaml_values};
 
-use crate::testing::{Outcome, between, examples, generated as file, valid};
+use crate::testing::{Outcome, between, cloud_config, define, defined, examples, generated as file, provisioners, set_up, strings, vagrantfile, valid};
 
 const CONSTRAINTS: &str = "
 constraints:
@@ -125,42 +125,56 @@ fn kubernetes_pulls_through_the_mirror_and_containers_get_the_proxy() -> Outcome
 #[test]
 fn every_linux_vm_runs_the_preamble_first() -> Outcome {
     let spec = constrained()?;
-    let vf = file(&spec, Target::Vagrant, "vagrant/Vagrantfile")?;
-    // cache, web, user and the router: each VM's first provisioner.
-    assert_eq!(vf.matches("name: \"constraints\"").count(), 4, "{vf}");
-    for block in vf.split("config.vm.define").skip(1) {
-        // After UTM's default-route provisioner (a no-op elsewhere), which comes first everywhere,
-        // and the addresses' (NetworkManager made to keep them before its DHCP times out): neither
-        // downloads anything.
-        let first = block
-            .lines()
-            .filter(|l| l.contains(".vm.provision"))
-            .find(|l| !l.contains("\"nat-route\"") && !l.contains("\"addresses\""))
-            .unwrap();
-        assert!(first.contains("name: \"constraints\""), "first provisioner: {first}");
+    let vf = vagrantfile(&spec)?;
+    // cache, web, user and the router: each VM's first provisioner, after UTM's default-route one
+    // (a no-op elsewhere), which comes first everywhere, and the addresses' (NetworkManager made
+    // to keep them before its DHCP times out): neither downloads anything.
+    let mut preambles = 0;
+    for vm in defined(&vf) {
+        let steps = provisioners(define(&vf, &vm));
+        let first = steps.iter().find(|s| *s != "nat-route" && *s != "addresses");
+        if steps.contains(&"constraints".to_owned()) {
+            preambles += 1;
+            assert_eq!(first.map(String::as_str), Some("constraints"), "{vm}: {steps:?}");
+        }
     }
-    assert!(vf.contains("Acquire::http::Proxy") && vf.contains("mirror.corp/debian") && vf.contains("ntp.corp") && vf.contains("timesyncd"));
+    assert_eq!(preambles, 4, "{:?}", defined(&vf));
+    let preamble = define(&vf, "web").statements("m.vm.provision \"shell\", name: \"constraints\"").concat();
+    for setting in ["Acquire::http::Proxy", "mirror.corp/debian", "ntp.corp", "timesyncd"] {
+        assert!(preamble.contains(setting), "{setting}: {preamble}");
+    }
 
+    // Proxmox: every VM's cloud-config runs it first among its commands that set the machine up.
     let pve = file(&spec, Target::Proxmox, "proxmox/main.tf")?;
-    assert_eq!(
-        pve.matches("\"sh -c 'set -e\\n# The proxy").count(),
-        pve.matches("#cloud-config").count(),
-        "every cloud-config"
-    );
+    let mut configs = 0;
+    for snippet in hcl_names(&hcl_body(&pve), "resource", "proxmox_virtual_environment_file") {
+        let Ok(config) = cloud_config(&pve, &snippet) else { continue };
+        configs += 1;
+        // Its commands (`runcmd`, or the router's `bootcmd`, before its packages).
+        let commands = [strings(&config, "runcmd"), strings(&config, "bootcmd")].concat();
+        assert!(commands.iter().any(|c| c.starts_with("sh -c 'set -e\n# The proxy")), "{snippet}: {commands:?}");
+    }
+    assert!(configs > 0, "no cloud-config");
 
-    // On the clouds, the `Prelude` step is the first of every VM's own set-up (its user data),
-    // once the project is in.
+    the_clouds_run_the_preamble_first(&spec)
+}
+
+/// On the clouds, the `Prelude` step is the first of every VM's own set-up (its user data), once
+/// the project is in; and the containers' Docker host's.
+fn the_clouds_run_the_preamble_first(spec: &Lab) -> Outcome {
     for cloud in ["aws", "azure", "gcp"] {
-        let tf = file(&spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
-        let set_ups = tf.matches("<<'ISOLOOM_SETUP'").count();
-        assert!(set_ups > 0, "{cloud}: {tf}");
-        assert_eq!(tf.matches("running: system constraints").count(), set_ups, "{cloud}: {tf}");
-        assert_eq!(tf.matches("{ sh -c 'set -e\\n# The proxy").count(), set_ups, "{cloud}: {tf}");
+        let tf = file(spec, Target::CloudVm, &format!("cloud-vm/{cloud}/main.tf"))?;
+        let set_ups: Vec<String> = hcl_literals(&hcl_body(&tf))
+            .into_iter()
+            .filter(|l| l.starts_with("#!/bin/sh\n# Isoloom: this machine sets itself up"))
+            .collect();
+        isoloom_test_support::assert_every!(&set_ups, |s: &&String| s.contains("running: system constraints")
+            && s.contains("{ sh -c 'set -e\n# The proxy"));
     }
     // The cloud Docker host sets itself up from its user data once the project is in: the
     // prelude leads its Docker step.
     for cloud in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
-        let setup = file(&spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?;
+        let setup = set_up(&file(spec, Target::CloudDocker, &format!("cloud-docker/{cloud}/main.tf"))?, "env")?;
         assert!(
             setup.contains("# The proxy") && setup.contains("mirror.corp/debian"),
             "the Docker host on {cloud}: {setup}"
@@ -227,22 +241,31 @@ fn with_ca() -> Outcome<Lab> {
 #[test]
 fn every_vm_trusts_the_sites_certificate_authority_once_the_project_is_in() -> Outcome {
     let lab = with_ca()?;
-    let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
+    let vf = vagrantfile(&lab)?;
     // cache, web and user: each spec VM, from the unpacked project, after it and before its
     // steps; and the router, before it installs nftables.
-    assert_eq!(vf.matches("name: \"certificate authorities\"").count(), 4, "{vf}");
-    assert!(
-        vf.contains("install -m 0644 '/opt/isoloom/certs/corp-ca.pem' /usr/local/share/ca-certificates/isoloom-0.crt"),
-        "{vf}"
-    );
-    assert!(vf.contains("update-ca-certificates") && vf.contains("update-ca-trust extract"), "{vf}");
-    for block in vf.split("config.vm.define").skip(1).filter(|b| b.contains("certificate authorities")) {
-        let at = |name: &str| block.find(&format!("name: \"{name}\"")).unwrap_or(usize::MAX);
-        assert!(at("project") < at("certificate authorities"), "{block}");
+    let mut trusting = 0;
+    for vm in defined(&vf) {
+        let steps = provisioners(define(&vf, &vm));
+        let Some(trust) = steps.iter().position(|s| s == "certificate authorities") else {
+            continue;
+        };
+        trusting += 1;
+        let project = steps.iter().position(|s| s == "project");
+        assert!(project.is_some_and(|p| p < trust), "{vm}: {steps:?}");
     }
+    assert_eq!(trusting, 4, "{:?}", defined(&vf));
+    let web = define(&vf, "web")
+        .statements("m.vm.provision \"shell\", name: \"certificate authorities\"")
+        .concat();
+    assert!(
+        web.contains("install -m 0644 '/opt/isoloom/certs/corp-ca.pem' /usr/local/share/ca-certificates/isoloom-0.crt"),
+        "{web}"
+    );
+    assert!(web.contains("update-ca-certificates") && web.contains("update-ca-trust extract"), "{web}");
     for (target, path) in [(Target::Proxmox, "proxmox/main.tf"), (Target::CloudVm, "cloud-vm/aws/main.tf")] {
-        let tf = file(&lab, target, path)?;
-        assert!(tf.contains("/opt/isoloom/certs/corp-ca.pem"), "{target:?}: {tf}");
+        let literals = hcl_literals(&hcl_body(&file(&lab, target, path)?));
+        assert!(literals.iter().any(|l| l.contains("/opt/isoloom/certs/corp-ca.pem")), "{target:?}");
     }
     Ok(())
 }
@@ -264,31 +287,33 @@ fn example_with_ca(example: &str) -> Outcome<Lab> {
 fn isoloom_s_own_vms_trust_the_certificate_authority_before_they_install_anything() -> Outcome {
     const TRUST: &str = "/opt/isoloom/certs/corp-ca.pem";
     let lab = with_ca()?;
-    let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
-    let router = between(&vf, "define \"isoloom-router\"", "config.vm.define")?;
-    in_order(router, &["name: \"project\"", TRUST, "apt-get install -y -qq nftables"]);
+    let vf = vagrantfile(&lab)?;
+    let router = define(&vf, "isoloom-router").every_statement().join("\n");
+    in_order(&router, &["name: \"project\"", TRUST, "apt-get install -y -qq nftables"]);
     // The containers' Docker host: its set-up from its user data, once the project is in.
-    let setup = file(&lab, Target::CloudDocker, "cloud-docker/aws/main.tf")?;
+    let setup = set_up(&file(&lab, Target::CloudDocker, "cloud-docker/aws/main.tf")?, "env")?;
     in_order(&setup, &[TRUST, "download.docker.com"]);
-    // The controller, before Ansible: on Vagrant and on the clouds.
+    // The controller, before Ansible: on Vagrant, the clouds and the servers, within its own
+    // definition.
     let paired = example_with_ca("ansible-pair")?;
-    let vagrant = file(&paired, Target::Vagrant, "vagrant/Vagrantfile")?;
+    let vagrant = vagrantfile(&paired)?;
     in_order(
-        between(&vagrant, "define \"isoloom-controller\"", "\nend\n")?,
+        &define(&vagrant, "isoloom-controller").every_statement().join("\n"),
         &["name: \"project\"", TRUST, "python3"],
     );
-    let aws = file(&paired, Target::CloudVm, "cloud-vm/aws/main.tf")?;
+    let resource = |target: Target, path: &str, kind: &str| -> Outcome<String> {
+        let body = hcl_body(&file(&paired, target, path)?);
+        Ok(hcl_literals(hcl_one(&body, kind, "isoloom_controller")).join("\n"))
+    };
     in_order(
-        between(&aws, "resource \"aws_instance\" \"isoloom_controller\"", "\n}\n")?,
+        &resource(Target::CloudVm, "cloud-vm/aws/main.tf", "aws_instance")?,
         &["project-delivered", TRUST, "python3"],
     );
-    let proxmox = file(&paired, Target::Proxmox, "proxmox/main.tf")?;
-    in_order(between(&proxmox, "The controller: runs", "\n}\n")?, &[TRUST, "installing Ansible"]);
-    let esxi = file(&paired, Target::Esxi, "esxi/main.tf")?;
     in_order(
-        between(&esxi, "resource \"terraform_data\" \"isoloom_controller\"", "\n}\n")?,
-        &[TRUST, "python3 -m venv"],
+        &resource(Target::Proxmox, "proxmox/main.tf", "proxmox_virtual_environment_file")?,
+        &[TRUST, "installing Ansible"],
     );
+    in_order(&resource(Target::Esxi, "esxi/main.tf", "terraform_data")?, &[TRUST, "python3 -m venv"]);
     Ok(())
 }
 
@@ -316,10 +341,13 @@ fn the_server_routers_trust_the_certificate_authority_before_they_install_their_
 #[test]
 fn a_windows_vm_imports_the_certificate_authority_into_its_root_store() -> Outcome {
     let lab = example_with_ca("windows-hello")?;
-    let vf = file(&lab, Target::Vagrant, "vagrant/Vagrantfile")?;
+    let vf = vagrantfile(&lab)?;
+    let web01 = define(&vf, "web01").every_statement();
     assert!(
-        vf.contains("Import-Certificate -FilePath 'C:\\\\isoloom\\\\certs\\\\corp-ca.pem' -CertStoreLocation Cert:\\\\LocalMachine\\\\Root"),
-        "{vf}"
+        web01
+            .iter()
+            .any(|s| s.contains("Import-Certificate -FilePath 'C:\\\\isoloom\\\\certs\\\\corp-ca.pem' -CertStoreLocation Cert:\\\\LocalMachine\\\\Root")),
+        "{web01:?}"
     );
     Ok(())
 }
@@ -394,17 +422,24 @@ fn the_sites_resolvers_replace_the_public_one_everywhere() -> Outcome {
     ] {
         let tf = file(&with_resolvers(example)?, target, path)?;
         assert!(!tf.contains("1.1.1.1"), "{example} on {target:?}: {tf}");
-        assert!(tf.contains("10.0.0.53") && tf.contains("fd00::53"), "{example} on {target:?}: {tf}");
+        let literals = hcl_literals(&hcl_body(&tf));
+        assert!(
+            literals
+                .iter()
+                .any(|l| l == "10.0.0.53" || l.contains("10.0.0.53\n") || l.contains("10.0.0.53 "))
+                && literals.iter().any(|l| l == "fd00::53" || l.contains("fd00::53")),
+            "{example} on {target:?}: {literals:?}"
+        );
     }
     // The router's resolver, for the containers on Proxmox, forwards their queries to each.
     let containers = valid(
         "version: 1\nname: lxc\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: nginx } }\noverrides: { proxmox: { machines: { web: { lxc: true } } } }\nconstraints:\n  dns: [10.0.0.53, \"fd00::53\"]\n",
     )?;
-    let lxc = file(&containers, Target::Proxmox, "proxmox/main.tf")?;
-    assert!(lxc.contains("no-resolv\\nserver=10.0.0.53\\nserver=fd00::53\\n"), "{lxc}");
+    let lxc = hcl_literals(&hcl_body(&file(&containers, Target::Proxmox, "proxmox/main.tf")?));
+    assert!(lxc.iter().any(|l| l.contains("no-resolv\nserver=10.0.0.53\nserver=fd00::53\n")), "{lxc:?}");
     // Without them, the public one.
-    let public = file(&crate::testing::example("segmented")?, Target::Proxmox, "proxmox/main.tf")?;
-    assert!(public.contains("\"1.1.1.1\""), "{public}");
+    let public = hcl_body(&file(&crate::testing::example("segmented")?, Target::Proxmox, "proxmox/main.tf")?);
+    assert!(hcl_values(&public, "servers").contains(&"1.1.1.1".to_owned()));
     Ok(())
 }
 

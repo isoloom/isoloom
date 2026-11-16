@@ -285,6 +285,11 @@ mod tests {
     fn an_unknown_report_names_the_known_ones() {
         let e = report("nope", &Value::Null, false).err().map(|e| e.to_string());
         assert_eq!(e.as_deref(), Some("no report named `nope`; one of: addressing, ports, wiring, resources"));
-        assert!(report("services", &Value::Null, false).is_err(), "only the names it lists");
+        let services = report("services", &Value::Null, false).err().map(|err| err.to_string());
+        assert_eq!(
+            services.as_deref(),
+            Some("no report named `services`; one of: addressing, ports, wiring, resources"),
+            "only the names it lists"
+        );
     }
 }
