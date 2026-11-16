@@ -112,7 +112,22 @@ pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
         variable::ssh_public_key(),
         variable::ssh_private_key_file(),
     ]);
+    v.extend(socks());
     v
+}
+
+/// The SOCKS5 proxy Terraform's SSH connections to the router and the machines go through first
+/// ([`crate::machine::provisioner::SOCKS_VARIABLES`]): none by default. A server whose lab
+/// bridge only its node reaches (a NAT bridge) has the router's uplink address out of this
+/// machine's reach; a tunnel to the node (`ssh -D`) is then the way in.
+fn socks() -> [Variable; 2] {
+    let [host, port] = crate::machine::provisioner::SOCKS_VARIABLES;
+    [
+        Variable::new(host, "string").default(string("")).describe(
+            "A SOCKS5 proxy (its host) Terraform's SSH connections go through first, for a server whose lab bridge only its node reaches; empty for none",
+        ),
+        Variable::new(port, "number").default(number(0)).describe("The port of ssh_proxy_host"),
+    ]
 }
 
 /// The node the VMs go on: no default, since a server's first node can be named anything (the

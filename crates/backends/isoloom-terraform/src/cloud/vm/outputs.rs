@@ -112,7 +112,11 @@ fn waits(env: &Environment, reach: &Reach, module: &mut Module) {
         module.block(
             Wait {
                 machine: name.to_owned(),
-                connection: Connection::Ssh { host, user: user.to_owned() },
+                connection: Connection::Ssh {
+                    host,
+                    user: user.to_owned(),
+                    socks: false,
+                },
                 replace_on: (reach.instance)(name),
                 as_root: AsRoot::of(user),
                 log: SETUP_LOG,

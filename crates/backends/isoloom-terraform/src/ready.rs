@@ -214,6 +214,7 @@ mod tests {
             connection: Connection::Ssh {
                 host: reference("aws_instance.web.public_ip"),
                 user: "admin".into(),
+                socks: false,
             },
             replace_on: reference("aws_instance.web.id"),
             as_root: AsRoot::Sudo,

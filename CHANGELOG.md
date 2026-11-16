@@ -12,6 +12,12 @@ stable spec format.
 
 ### Added
 
+- **A Proxmox server whose lab bridge only its node reaches.** The `proxmox` module takes a
+  SOCKS5 proxy, `ssh_proxy_host` and `ssh_proxy_port` (unset by default): Terraform's SSH
+  connections to the router and the machines (the waits for their set-up, the seal) go to it
+  first. A tunnel to the node (`ssh -N -D`) then reaches a router whose uplink is on a NAT bridge;
+  without one, the apply waited for the router until it timed out.
+
 - **A Vagrant environment's ports stay where they were across a park and a resume.** Each
   forwarded port that isn't fixed reads `ISOTHRUM_HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` first (the
   machine's name upper-cased, every other character `_`; the guest port; `TCP` or `UDP`), the

@@ -68,7 +68,7 @@ pub(super) fn guests(env: &Environment, module: &mut Module) {
     if controller::needed(env) {
         set_up.push(reference("terraform_data.isoloom_controller"));
     }
-    module.blocks(crate::server::router::seal(env, reference("esxi_guest.isoloom_router.id"), set_up));
+    module.blocks(crate::server::router::seal(env, reference("esxi_guest.isoloom_router.id"), set_up, false));
 }
 
 /// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.

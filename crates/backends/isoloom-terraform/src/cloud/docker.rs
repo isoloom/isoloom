@@ -226,6 +226,7 @@ pub(crate) fn module(cloud: Cloud, env: &Environment, host: &Host) -> Result<Gen
             connection: crate::machine::provisioner::Connection::Ssh {
                 host: address.clone(),
                 user: user.to_owned(),
+                socks: false,
             },
             replace_on: crate::hcl_builder::reference(&format!("{}.env.id", driver.instance)),
             as_root: AsRoot::of(user),

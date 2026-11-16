@@ -185,7 +185,11 @@ pub(crate) fn provisioner_waiting(c: Ssh, waits: &[String]) -> Provisioner {
     Provisioner {
         name: "isoloom_controller".to_owned(),
         replace_on: c.replace_on,
-        connection: Connection::Ssh { host: c.host, user: c.user },
+        connection: Connection::Ssh {
+            host: c.host,
+            user: c.user,
+            socks: false,
+        },
         uploads: vec![
             Upload::Project {
                 id: "isoloom_controller".to_owned(),

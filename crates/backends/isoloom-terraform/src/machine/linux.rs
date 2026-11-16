@@ -61,6 +61,7 @@ pub(crate) fn provisioner(m: Machine) -> Provisioner {
         connection: Connection::Ssh {
             host: m.remote.host,
             user: m.user,
+            socks: false,
         },
     }
 }
