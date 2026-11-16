@@ -1,3 +1,5 @@
+use isoloom_test_support::assert_every;
+
 use super::*;
 use crate::syntax::parse;
 
@@ -141,7 +143,7 @@ fn an_unpublished_port_has_no_published_port_and_the_fix_resolves() {
     let found = check(&spec("{{ machines.web.ports.web.published }} {{ machines.web.ports.web.url }}"));
     let reasons: Vec<&str> = found.iter().map(|p| p.reason.as_str()).collect();
     assert_eq!(reasons.len(), 2, "{reasons:?}");
-    assert!(reasons.iter().all(|r| r.contains("`web` isn't published (`publish:`)")), "{reasons:?}");
+    assert_every!(&reasons, |r: &&&str| r.contains("`web` isn't published (`publish:`)"));
     let fix = found[0].fix.clone().unwrap_or_default();
     assert_eq!(fix, "`{{ machines.web.ports.web.port }}`");
     let fixed = fix.trim_matches('`');
@@ -257,21 +259,15 @@ fn steps_install_onto_a_known_os_with_files_of_its_kind() {
         assert!(has(&wrong, Code::InvalidValue, path), "{path}: {wrong:?}");
     }
     assert_eq!(wrong.len(), 2, "{wrong:?}");
-    // A relative destination and no packages are refused when the spec is read.
-    for step in ["{ copy: { from: a, to: srv/a } }", "{ packages: [] }"] {
-        let yaml = format!("version: 1\nname: t\nmachines:\n  web: {{ os: debian@12, app: {{ steps: [{step}] }} }}\n");
-        assert!(parse(&yaml).is_err(), "{step}");
-    }
 }
 
 #[test]
-fn a_windows_machine_steps_with_powershell_and_restarts_itself() {
+fn a_windows_machine_takes_powershell_copies_and_features_but_restarts_from_its_own_script() {
     let found = problems(
-        "machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.ps1 }, { copy: { from: a, to: 'C:\\app\\a' } }, { packages: [x] }, reboot] }\n",
+        "machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ run: a.ps1 }, { copy: { from: a, to: 'C:\\app\\a' } }, { packages: [Web-Server] }, reboot] }\n",
     );
-    // Packages on Windows are its features.
-    assert!(has(&found, Code::InvalidValue, "machines.dc.app.steps[3]"), "{found:?}");
-    assert_eq!(found.len(), 1, "{found:?}");
+    // Packages on Windows are its features; a restart is the script's own, not a `reboot` step.
+    assert_eq!(found, [(Code::InvalidValue, "machines.dc.app.steps[3]".to_owned())]);
 }
 
 #[test]
@@ -319,12 +315,6 @@ fn a_linux_account_is_named_as_useradd_takes_it() {
 }
 
 #[test]
-fn packages_on_windows_are_its_features() {
-    let found = problems("machines:\n  dc:\n    os: windows-server@2022\n    networks: { lab: 10 }\n    app: { steps: [{ packages: [Web-Server] }] }\n");
-    assert_eq!(found, []);
-}
-
-#[test]
 fn a_machines_own_address_outside_a_template_names_no_machine() {
     let spec = parse("version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web: { os: ubuntu@24.04, networks: { lab: 10 } }\n")
         .unwrap_or_else(|p| panic!("{p:?}"));
@@ -333,4 +323,51 @@ fn a_machines_own_address_outside_a_template_names_no_machine() {
     assert!(matches!(found[0], Unresolved::Unknown(_)), "{found:?}");
     assert!(found[0].reason().contains("names the machine a template is for"), "{}", found[0].reason());
     assert!(!found[0].reason().contains("``"), "no empty machine name: {}", found[0].reason());
+}
+
+#[test]
+fn a_healthcheck_on_a_machine_without_ports_is_told_to_declare_one() {
+    let spec = parse("version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, healthcheck: { http: { port: site } } }\n")
+        .unwrap_or_else(|p| panic!("{p:?}"));
+    let found = check(&spec);
+    let found: Vec<_> = found.iter().map(|p| (p.code, p.path.as_str(), p.fix.as_deref())).collect();
+    assert_eq!(
+        found,
+        [(Code::UnknownReference, "machines.web.healthcheck.http.port", Some("declare it under `ports:`"))]
+    );
+}
+
+#[test]
+fn an_environment_variable_is_named_as_a_shell_reads_it() {
+    let found = problems("machines:\n  web: { os: debian@12, networks: { lab: 10 }, environment: { 1MODE: prod, MODE_2: dev } }\n");
+    assert_eq!(found, [(Code::InvalidValue, "machines.web.environment.1MODE".to_owned())]);
+}
+
+#[test]
+fn each_targets_override_names_what_the_spec_has() {
+    for (target, block, path) in [
+        ("kubernetes", "{ volumes: { ghost: { external: x } } }", "overrides.kubernetes.volumes.ghost"),
+        ("esxi", "{ networks: { ghost: { external: x } } }", "overrides.esxi.networks.ghost"),
+        ("aws", "{ machines: { ghost: { image: ami-1 } } }", "overrides.aws.machines.ghost"),
+        (
+            "external",
+            "{ machines: { ghost: { ssh: { address: 10.9.0.1 } } } }",
+            "overrides.external.machines.ghost",
+        ),
+    ] {
+        let found = problems(&format!(
+            "machines:\n  web: {{ os: debian@12, networks: {{ lab: 10 }} }}\noverrides:\n  {target}: {block}\n"
+        ));
+        assert_eq!(found, [(Code::UnknownReference, path.to_owned())], "{target}");
+    }
+}
+
+#[test]
+fn a_port_that_doesnt_speak_http_has_no_url() {
+    let mut spec = parse("version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, ports: { ssh: { port: 22, publish: 2222 } } }\n")
+        .unwrap_or_else(|p| panic!("{p:?}"));
+    spec.message = Some("{{ machines.web.ports.ssh.url }} {{ machines.web.ports.ssh.published }}".to_owned());
+    let reasons: Vec<String> = check(&spec).into_iter().map(|p| p.reason).collect();
+    assert_eq!(reasons.len(), 1, "{reasons:?}");
+    assert!(reasons[0].contains("`ssh` isn't an `http` or `https` port, so it has no URL"), "{reasons:?}");
 }

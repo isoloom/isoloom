@@ -115,12 +115,17 @@ impl JsonSchema for Inputs {
 
 #[cfg(test)]
 mod tests {
+    use isoloom_test_support::assert_every;
+
     use super::*;
 
     #[test]
-    fn an_input_is_sensitive_unless_it_says_otherwise() {
-        let map: Inputs = serde_yaml_ng::from_str("{ DEMO_SECRET: { description: the secret } }").unwrap();
-        assert!(map.0.values().all(|i| i.sensitive));
+    fn inputs_are_a_list_or_a_map_each_sensitive_unless_it_says_otherwise() {
+        let list: Inputs = serde_yaml_ng::from_str("[DEMO_SECRET, API_URL]").unwrap();
+        assert_every!(list.0.values(), |i: &&Input| i.sensitive);
+        let map: Inputs = serde_yaml_ng::from_str("{ DEMO_SECRET: , API_URL: { sensitive: false }, TOKEN: { description: the token } }").unwrap();
+        let secrets: Vec<bool> = map.0.values().map(|i| i.sensitive).collect();
+        assert_eq!(secrets, [true, false, true]);
         let none: Inputs = serde_yaml_ng::from_str("~").unwrap();
         assert_eq!(none, Inputs::default());
         let wrong = serde_yaml_ng::from_str::<Inputs>("5").unwrap_err().to_string();
@@ -128,21 +133,8 @@ mod tests {
             wrong.contains("a list of input names, or a map of name to `{ sensitive, description }`"),
             "{wrong}"
         );
-    }
-
-    #[test]
-    fn inputs_are_a_list_or_a_map() {
-        let list: Inputs = serde_yaml_ng::from_str("[DEMO_SECRET, API_URL]").unwrap();
-        assert!(list.0.values().all(|i| i.sensitive));
-        let map: Inputs = serde_yaml_ng::from_str("{ DEMO_SECRET: , API_URL: { sensitive: false } }").unwrap();
-        let secrets: Vec<bool> = map.0.values().map(|i| i.sensitive).collect();
-        assert_eq!(secrets, [true, false]);
-        assert!(
-            serde_yaml_ng::from_str::<Inputs>("[DEMO_SECRET, DEMO_SECRET]")
-                .unwrap_err()
-                .to_string()
-                .contains("twice")
-        );
+        let twice = serde_yaml_ng::from_str::<Inputs>("[DEMO_SECRET, DEMO_SECRET]").unwrap_err().to_string();
+        assert!(twice.contains("twice"), "{twice}");
         let e = serde_yaml_ng::from_str::<Inputs>("[1SECRET]").unwrap_err().to_string();
         assert!(e.contains("named like an environment variable"), "{e}");
     }

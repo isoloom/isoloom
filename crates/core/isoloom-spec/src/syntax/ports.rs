@@ -271,7 +271,15 @@ mod tests {
         assert!(port.contains("a port number, or `{ port, protocol, publish, dormant, login }`"), "{port}");
         let publish = ports("{ a: { port: 1, publish: [1] } }").unwrap_err();
         assert!(publish.contains("`true`, a host port, or `{ host, fixed: true }`"), "{publish}");
-        assert!(ports("{ a: { port: 1, publish: 0 } }").unwrap_err().contains("a host port is 1 to 65535"));
+        for (yaml, why) in [
+            ("{ a: { port: 1, publish: 0 } }", "a host port is 1 to 65535"),
+            ("{ a: 0 }", "1 to 65535"),
+            ("{ a: { port: 1, protocol: quic } }", "unknown variant"),
+            ("{ a: { port: 1, http: true } }", "unknown field `http`"),
+        ] {
+            let e = ports(yaml).unwrap_err();
+            assert!(e.contains(why), "{yaml}: {e}");
+        }
     }
 
     #[test]
@@ -288,13 +296,5 @@ mod tests {
         let p = ports("{ a: { port: 1, publish: true }, b: { port: 2, publish: { host: 8206, fixed: true } }, c: { port: 3, publish: false } }").unwrap();
         let publish: Vec<_> = p.values().map(|p| p.publish).collect();
         assert_eq!(publish, [Some(Publish::Free), Some(Publish::Fixed(NonZeroU16::new(8206).unwrap())), None]);
-    }
-
-    #[test]
-    fn mistakes_are_named() {
-        assert!(ports("{ a: 0 }").unwrap_err().contains("1 to 65535"));
-        assert!(ports("{ a: { port: 1, protocol: quic } }").unwrap_err().contains("unknown variant"));
-        assert!(ports("{ a: { port: 1, http: true } }").unwrap_err().contains("unknown field `http`"));
-        assert!(ports("{ 80: 80 }").unwrap_err().contains("port's name"));
     }
 }

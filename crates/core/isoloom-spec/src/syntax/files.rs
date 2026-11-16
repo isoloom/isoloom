@@ -231,8 +231,10 @@ mod tests {
         assert_eq!(serde_yaml_ng::from_str::<Mode>("\"0444\"").map(Mode::bits).ok(), Some(0o444));
         assert_eq!(serde_yaml_ng::from_str::<Mode>("640").map(Mode::bits).ok(), Some(0o640));
         assert_eq!(serde_json::to_string(&Mode::VALUE).ok().as_deref(), Some("\"0400\""));
-        let wrong = serde_yaml_ng::from_str::<Mode>("[4]").unwrap_err().to_string();
-        assert!(wrong.contains("octal digits, like \"0444\""), "{wrong}");
+        for wrong in ["[4]", "0999"] {
+            let e = serde_yaml_ng::from_str::<Mode>(wrong).unwrap_err().to_string();
+            assert!(e.contains("like \"0444\""), "{wrong}: {e}");
+        }
     }
 
     #[test]
@@ -243,6 +245,5 @@ mod tests {
         assert!(two.contains("`source` and `input`"), "{two}");
         let none = serde_yaml_ng::from_str::<File>("{ path: /a }").unwrap_err().to_string();
         assert!(none.contains("needs one of"), "{none}");
-        assert!(serde_yaml_ng::from_str::<File>("{ path: /a, content: x, mode: 0999 }").is_err());
     }
 }

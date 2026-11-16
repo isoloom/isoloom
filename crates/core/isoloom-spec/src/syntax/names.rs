@@ -223,19 +223,42 @@ mod tests {
 
     #[test]
     fn a_name_that_breaks_its_rule_is_refused_with_the_rule() {
-        assert!("dns-udp".parse::<PortName>().is_ok() && "80".parse::<PortName>().is_err() && "Web".parse::<PortName>().is_err());
-        assert!("a".repeat(31).parse::<PortName>().is_ok() && "a".repeat(32).parse::<PortName>().is_err());
-        assert!("DEMO_SECRET".parse::<InputName>().is_ok() && "1TOKEN".parse::<InputName>().is_err());
+        let long = "a".repeat(31);
+        let too_long = "a".repeat(32);
+        for (name, ok) in [
+            ("dns-udp", true),
+            (long.as_str(), true),
+            ("80", false),
+            ("Web", false),
+            (too_long.as_str(), false),
+        ] {
+            match name.parse::<PortName>() {
+                Ok(_) => assert!(ok, "the port name `{name}` is read"),
+                Err(e) => assert!(!ok && e.to_string().contains("isn't a valid port name"), "`{name}`: {e}"),
+            }
+        }
+        for (name, ok) in [("DEMO_SECRET", true), ("1TOKEN", false), ("ISOLOOM_X", false)] {
+            match name.parse::<InputName>() {
+                Ok(_) => assert!(ok, "the input `{name}` is read"),
+                Err(e) => assert!(!ok && e.to_string().contains(name), "`{name}`: {e}"),
+            }
+        }
         assert!("ISOLOOM_X".parse::<InputName>().unwrap_err().to_string().contains("ISOLOOM_"));
-        assert_eq!("postgres@16".parse::<ServiceRef>().unwrap().name(), "postgres");
-        assert_eq!("postgres@16".parse::<ServiceRef>().unwrap().version(), Some("16"));
+        let pinned = "postgres@16".parse::<ServiceRef>().unwrap();
+        assert_eq!((pinned.name(), pinned.version()), ("postgres", Some("16")));
         assert_eq!("nginx".parse::<ServiceRef>().unwrap().version(), None);
-        assert!("postgres@".parse::<ServiceRef>().is_err() && "Nginx".parse::<ServiceRef>().is_err());
+        for bad in ["postgres@", "Nginx"] {
+            let e = bad.parse::<ServiceRef>().unwrap_err().to_string();
+            assert!(e.contains(&format!("`{bad}`")), "{bad}: {e}");
+        }
     }
 
     #[test]
     fn only_version_one_is_read() {
-        assert!(serde_yaml_ng::from_str::<Version>("1").is_ok());
+        assert_eq!(
+            serde_json::to_string(&serde_yaml_ng::from_str::<Version>("1").unwrap()).ok().as_deref(),
+            Some("1")
+        );
         assert!(serde_yaml_ng::from_str::<Version>("2").unwrap_err().to_string().contains("version: 1"));
     }
 }

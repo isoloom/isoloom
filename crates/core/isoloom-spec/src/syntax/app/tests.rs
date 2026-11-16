@@ -32,9 +32,10 @@ fn an_app_is_an_image_a_build_an_appliance_or_steps() {
 }
 
 #[test]
-fn two_recipes_give_each_form_its_own() {
+fn an_image_and_steps_together_keep_both_recipes() {
     let a = app("{ image: example/board:2.1, steps: [{ run: provision/board.sh }] }").unwrap();
-    assert!(a.container.is_some() && a.steps.len() == 1);
+    assert_eq!(a.container, Some(Recipe::Image("example/board:2.1".into())));
+    assert!(matches!(a.steps.as_slice(), [Step::Run { .. }]), "{:?}", a.steps);
 }
 
 #[test]
@@ -58,6 +59,7 @@ fn recipes_that_cannot_go_together_are_refused() {
         ("{ appliance: cisco-iol }", "runs its `image`"),
         ("{ appliance: cisco-dynamips, image: x, firmware: f }", "no `image`"),
         ("{ appliance: cisco-dynamips }", "needs the `firmware`"),
+        ("{ appliance: cisco-iol, image: x, firmware: f }", "cisco-dynamips"),
         ("{ image: a, config: c }", "goes with `appliance`"),
         ("{ image: a, firmware: f }", "cisco-dynamips"),
         ("{ steps: [{ run: a.sh, copy: { from: a, to: /a } }] }", "does one thing"),
