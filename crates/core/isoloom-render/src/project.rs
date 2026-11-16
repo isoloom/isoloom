@@ -132,24 +132,44 @@ pub fn lists(copy: Copy, module: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use isoloom_test_support::{hcl, hcl_attribute, hcl_body, hcl_text};
+
     use super::{Copy, lists};
 
     /// A module's body that reads the files that go.
     const READS_PATHS: &str = "content = join(\"\\n\", local.project_paths)";
 
+    /// The locals the fragment `hcl` declares, in order, and the resources it adds.
+    fn declared(hcl: &str) -> (Vec<String>, Vec<String>) {
+        let body = hcl_body(hcl);
+        let locals = body
+            .blocks()
+            .filter(|b| b.identifier() == "locals")
+            .flat_map(|b| b.body().attributes().map(|a| a.key().to_owned()));
+        let resources = body
+            .blocks()
+            .filter(|b| b.identifier() == "resource")
+            .map(|b| b.labels().iter().map(hcl::BlockLabel::as_str).collect::<Vec<_>>().join("."));
+        (locals.collect(), resources.collect())
+    }
+
+    /// The rules' own locals, which every list is made from.
+    const RULES: [&str; 4] = ["project_ignore_lines", "project_ignore_pats", "project_ignore_globs", "project_ignore"];
+
     #[test]
     fn the_files_alone_list_only_the_files_that_go_when_the_module_reads_them() {
         let files = lists(Copy::Files, READS_PATHS);
-        assert!(files.contains("  project_keep  = { for f in fileset(local.root"), "{files}");
+        let (locals, resources) = declared(&files);
+        assert_eq!(locals, [&RULES[..], &["project_keep", "project_paths"]].concat());
+        assert_eq!(resources, Vec::<String>::new());
+        let body = hcl_body(&files);
+        let rules = body.blocks().find(|b| b.identifier() == "locals").expect("the rules' locals");
+        let lines = hcl::format::to_string(hcl_attribute(rules.body(), "project_ignore_lines").expect("the rules' lines")).unwrap_or_default();
+        let after_the_file = lines.split_once(".isoloomignore").map_or("", |(_, rest)| rest);
         assert!(
-            files.contains("  project_paths = [for f, keep in local.project_keep : f if keep]\n}\n"),
-            "{files}"
+            after_the_file.contains("\n/.isoloom*\n.git/\n.terraform/\n*.tfstate\n"),
+            "the copy's rules after the file's: {lines}"
         );
-        assert!(
-            files.contains("\\n/.isoloom*\\n.git/\\n.terraform/\\n*.tfstate\\n"),
-            "the copy's rules after the file's: {files}"
-        );
-        assert!(!files.contains("project_ignored") && !files.contains("local_file"), "{files}");
     }
 
     #[test]
@@ -162,19 +182,15 @@ mod tests {
     #[test]
     fn an_archive_lists_what_tar_leaves_out_and_the_files_that_go_only_when_read() {
         let archive = lists(Copy::Archive, "");
+        let (locals, resources) = declared(&archive);
+        assert_eq!(locals, [&RULES[..], &["project_keep", "project_ignored"]].concat());
+        assert_eq!(resources, ["local_file.isoloom_project"]);
+        let exclusions = isoloom_test_support::hcl_resource(&archive, "local_file", "isoloom_project");
         assert!(
-            archive.contains("  project_keep    = {") && archive.contains("  project_ignored = [for f, keep"),
-            "{archive}"
+            hcl_text(&exclusions, "content").contains("local.project_ignored"),
+            "tar's list is the files that don't go: {archive}"
         );
-        assert!(!archive.contains("project_paths"), "{archive}");
-        assert!(
-            archive.ends_with("\\n\"])\n}\n") && archive.contains("resource \"local_file\" \"isoloom_project\""),
-            "{archive}"
-        );
-        let both = lists(Copy::Archive, READS_PATHS);
-        assert!(
-            both.contains("  project_paths   = [for f") && both.contains("  project_ignored = [for f"),
-            "{both}"
-        );
+        let (both, _) = declared(&lists(Copy::Archive, READS_PATHS));
+        assert_eq!(both, [&RULES[..], &["project_keep", "project_paths", "project_ignored"]].concat());
     }
 }

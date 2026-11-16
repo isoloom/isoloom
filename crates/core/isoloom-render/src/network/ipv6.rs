@@ -103,24 +103,27 @@ mod tests {
 
     #[test]
     fn the_address_lands_on_the_interface_of_the_ipv4_one() {
-        let sh = linux(&addresses(), &routes());
-        assert!(sh.contains("grep -F ' inet 10.1.0.10/'"), "{sh}");
-        assert!(sh.contains("ip -6 addr replace fd00:1::10/64 dev \"$dev\" nodad"), "{sh}");
-        assert!(sh.ends_with("ip -6 route replace fd00:2::/64 via fd00:1::254\n"), "{sh}");
-        let ps = windows(&addresses(), &routes());
-        assert_eq!(ps.lines().count(), 2, "{ps}");
-        assert!(ps.contains("-IPAddress 'fd00:1::10' -PrefixLength 64"), "{ps}");
-        assert!(
-            ps.contains("New-NetRoute -DestinationPrefix 'fd00:2::/64'") && ps.contains("-NextHop 'fd00:1::254'"),
-            "{ps}"
+        assert_eq!(
+            linux(&addresses(), &routes()),
+            "dev=$(ip -o -4 addr show | grep -F ' inet 10.1.0.10/' | awk '{print $2; exit}')\nsysctl -q -w \"net.ipv6.conf.$dev.disable_ipv6=0\"\nip -6 addr replace fd00:1::10/64 dev \"$dev\" nodad\nip -6 route replace fd00:2::/64 via fd00:1::254\n"
+        );
+        assert_eq!(
+            windows(&addresses(), &routes()).lines().collect::<Vec<_>>(),
+            [
+                "if (-not (Get-NetIPAddress -IPAddress 'fd00:1::10' -ErrorAction SilentlyContinue)) { New-NetIPAddress -InterfaceIndex (Get-NetIPAddress -IPAddress '10.1.0.10').InterfaceIndex -IPAddress 'fd00:1::10' -PrefixLength 64 | Out-Null }",
+                "if (-not (Get-NetRoute -DestinationPrefix 'fd00:2::/64' -ErrorAction SilentlyContinue)) { New-NetRoute -DestinationPrefix 'fd00:2::/64' -InterfaceIndex (Find-NetRoute -RemoteIPAddress 'fd00:1::254' | Select-Object -First 1).InterfaceIndex -NextHop 'fd00:1::254' | Out-Null }"
+            ]
         );
     }
 
     #[test]
     fn the_router_forwards_ipv6_only_where_it_routes_an_ipv6_network() {
         assert_eq!(router_linux(&[]), None);
-        let sh = router_linux(&[("10.1.0.254".parse().unwrap(), "fd00:1::254".parse().unwrap())]).expect("an IPv6 network");
-        assert!(sh.starts_with("sysctl -q -w net.ipv6.conf.all.forwarding=1\ndev=$(ip"), "{sh}");
+        let addresses = [("10.1.0.254".parse().unwrap(), "fd00:1::254".parse().unwrap())];
+        assert_eq!(
+            router_linux(&addresses),
+            Some(format!("sysctl -q -w net.ipv6.conf.all.forwarding=1\n{}", linux(&addresses, &[])))
+        );
     }
 
     #[test]
@@ -141,7 +144,13 @@ mod tests {
             "version: 1\nname: r\nnetworks:\n  a: { cidr: 10.1.0.0/24, ipv6: { cidr: \"fd00:1::/64\" } }\n  b: { cidr: 10.2.0.0/24, ipv6: { cidr: \"fd00:2::/64\" } }\n  c: { cidr: 10.3.0.0/24 }\nmachines:\n  x: { networks: { a: 10 }, os: debian@12 }\n",
         );
         assert_eq!(forward_rules(&spec, "a", "b", &[]), vec!["ip6 saddr fd00:1::/64 ip6 daddr fd00:2::/64 accept"]);
-        assert_eq!(forward_rules(&spec, "a", "b", &[80]).len(), 2);
+        assert_eq!(
+            forward_rules(&spec, "a", "b", &[80]),
+            [
+                "ip6 saddr fd00:1::/64 ip6 daddr fd00:2::/64 meta l4proto { tcp, udp } th dport { 80 } accept",
+                "ip6 saddr fd00:1::/64 ip6 daddr fd00:2::/64 icmpv6 type echo-request accept"
+            ]
+        );
         assert_eq!(forward_rules(&spec, "a", "c", &[]), Vec::<String>::new());
     }
 }

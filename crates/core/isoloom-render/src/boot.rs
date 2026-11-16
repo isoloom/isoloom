@@ -140,19 +140,50 @@ fn install(u: &Unit) -> String {
 mod tests {
     use super::{Trigger, at_boot, service};
 
+    /// The text `command <<'TAG'` writes in `sh`, without its terminator.
+    fn heredoc<'a>(sh: &'a str, command: &str) -> &'a str {
+        let (_, rest) = sh
+            .split_once(&format!("{command} <<'"))
+            .unwrap_or_else(|| panic!("no `{command}` here-document in {sh}"));
+        let (tag, body) = rest.split_once("'\n").expect("the here-document's tag");
+        body.split_once(&format!("\n{tag}\n")).map_or(body, |(text, _)| text)
+    }
+
+    /// The `key=value` lines of section `[name]` of the systemd unit `isoloom-<unit>` in `sh`.
+    fn section<'a>(sh: &'a str, unit: &str, name: &str) -> Vec<&'a str> {
+        let file = heredoc(sh, &format!("cat > /etc/systemd/system/isoloom-{unit}.service"));
+        let (_, rest) = file.split_once(&format!("[{name}]\n")).unwrap_or_else(|| panic!("no [{name}] in {file}"));
+        rest.lines().take_while(|l| !l.is_empty()).collect()
+    }
+
+    /// What `sh` runs without systemd: its `else` branch.
+    fn without_systemd(sh: &str) -> &str {
+        sh.split_once("\nelse\n")
+            .and_then(|(_, rest)| rest.strip_suffix("fi\n"))
+            .expect("an else branch")
+    }
+
     #[test]
     fn a_daemon_restarts_and_requires_what_it_runs_after() {
         let sh = service("command", "The machine's command", "exec app\n", &["before"]);
+        assert_eq!(heredoc(&sh, "cat > /etc/isoloom/command.sh"), "#!/bin/sh\n# The machine's command\nexec app");
+        assert_eq!(
+            section(&sh, "command", "Unit"),
+            [
+                "Description=The machine's command",
+                "After=network-online.target isoloom-before.service",
+                "Wants=network-online.target",
+                "Requires=isoloom-before.service"
+            ]
+        );
+        assert_eq!(
+            section(&sh, "command", "Service"),
+            ["Type=simple", "ExecStart=/etc/isoloom/command.sh", "Restart=on-failure", "RestartSec=2"]
+        );
         assert!(
-            sh.contains("cat > /etc/isoloom/command.sh <<'COMMAND'\n#!/bin/sh\n# The machine's command\nexec app\nCOMMAND\n"),
+            without_systemd(&sh).ends_with("\nnohup /etc/isoloom/command.sh >/var/log/isoloom-command.log 2>&1 &\n"),
             "{sh}"
         );
-        assert!(sh.contains("Type=simple\nExecStart=/etc/isoloom/command.sh\nRestart=on-failure"), "{sh}");
-        assert!(
-            sh.contains("After=network-online.target isoloom-before.service\nWants=network-online.target\nRequires=isoloom-before.service\n"),
-            "{sh}"
-        );
-        assert!(sh.contains("nohup /etc/isoloom/command.sh >/var/log/isoloom-command.log 2>&1 &"), "{sh}");
     }
 
     #[test]
@@ -164,22 +195,47 @@ mod tests {
             Trigger::BootAndLinkUp,
             &["trunks"],
         );
-        assert!(
-            sh.contains("cat > /etc/isoloom/routes.sh <<'ROUTES'\n#!/bin/sh\n# Routes to the other networks\nip route replace"),
-            "{sh}"
+        assert_eq!(
+            heredoc(&sh, "cat > /etc/isoloom/routes.sh"),
+            "#!/bin/sh\n# Routes to the other networks\nip route replace 10.1.0.0/24 via 10.0.0.1\nexit 0",
+            "a kept script always succeeds"
         );
-        assert!(
-            sh.contains("ExecStart=-/etc/isoloom/routes.sh") && sh.contains("systemctl enable isoloom-routes.service"),
-            "{sh}"
+        assert_eq!(
+            section(&sh, "routes", "Unit"),
+            [
+                "Description=Routes to the other networks",
+                "After=network-online.target isoloom-trunks.service",
+                "Wants=network-online.target"
+            ],
+            "a kept script runs after the others without needing them"
         );
-        assert!(
-            sh.contains("zz-isoloom-routes") && sh.contains("After=network-online.target isoloom-trunks.service\n"),
-            "{sh}"
+        assert_eq!(
+            section(&sh, "routes", "Service"),
+            ["Type=oneshot", "RemainAfterExit=yes", "ExecStart=-/etc/isoloom/routes.sh"]
         );
-        assert!(!sh.contains("Requires="), "a kept script runs after the others without needing them: {sh}");
+        let (before, _) = sh.split_once("if command -v systemctl").expect("the systemd branch");
+        assert!(
+            before.ends_with(
+                "chmod +x /etc/isoloom/routes.sh\nfor d in /etc/network/if-up.d /etc/networkd-dispatcher/routable.d; do\n  if [ -d \"$d\" ]; then ln -sf /etc/isoloom/routes.sh \"$d/zz-isoloom-routes\"; fi\ndone\n"
+            ),
+            "it runs again whenever a link comes up: {sh}"
+        );
+        let systemd = sh
+            .split_once("if command -v systemctl >/dev/null; then\n")
+            .and_then(|(_, r)| r.split_once("\nelse\n"));
+        assert!(
+            systemd
+                .is_some_and(|(branch, _)| branch
+                    .ends_with("\nsystemctl daemon-reload\nsystemctl enable isoloom-routes.service\nsystemctl restart isoloom-routes.service")),
+            "enabled, so it runs at every boot: {sh}"
+        );
         let tc = at_boot("tc", "Link impairment", "tc qdisc\n", Trigger::Boot, &[]);
-        assert!(!tc.contains("if-up.d") && !tc.contains("Requires="), "{tc}");
-        assert!(tc.contains("tc qdisc\nexit 0\nTC\n"), "a kept script always succeeds: {tc}");
+        let (written, _) = tc.split_once("if command -v systemctl").expect("the systemd branch");
+        assert!(written.ends_with("chmod +x /etc/isoloom/tc.sh\n"), "at boot alone, no link hook: {tc}");
+        assert_eq!(
+            without_systemd(&tc),
+            "mkdir -p /etc/local.d && ln -sf /etc/isoloom/tc.sh /etc/local.d/isoloom-tc.start\nrc-update add local default >/dev/null 2>&1 || true\n/etc/isoloom/tc.sh || true\n"
+        );
     }
 
     #[test]

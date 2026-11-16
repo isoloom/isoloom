@@ -21,7 +21,7 @@ pub fn route_line(to: impl Display, via: impl Into<IpAddr>) -> String {
 }
 
 #[cfg(test)]
-mod route_tests {
+mod tests {
     use super::route_line;
 
     #[test]

@@ -87,11 +87,10 @@ mod tests {
             "api".parse().ok().as_ref(),
             "/srv".parse().ok().as_ref(),
         );
-        assert!(
-            unit.contains("ExecStart=\"/srv/api\" \"--name\" \"a \\\"b\\\" $$HOME 100%%\"\nUser=api\nWorkingDirectory=/srv\nRestart=on-failure\n"),
-            "{unit}"
+        assert_eq!(
+            unit,
+            "[Unit]\nDescription=api, defined by Isoloom\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nExecStart=\"/srv/api\" \"--name\" \"a \\\"b\\\" $$HOME 100%%\"\nUser=api\nWorkingDirectory=/srv\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target\n"
         );
-        assert!(unit.ends_with("[Install]\nWantedBy=multi-user.target\n"));
     }
 
     /// systemd takes `WorkingDirectory=` as a bare path (quoted, it isn't absolute: a real
@@ -105,16 +104,26 @@ mod tests {
             None,
             "/srv/my app/100%".parse().ok().as_ref(),
         );
-        assert!(unit.contains("\nWorkingDirectory=/srv/my app/100%%\n"), "{unit}");
+        let service: Vec<&str> = unit
+            .split_once("[Service]\n")
+            .map_or("", |(_, s)| s)
+            .lines()
+            .take_while(|l| !l.is_empty())
+            .collect();
+        assert_eq!(service, ["ExecStart=\"/srv/api\"", "WorkingDirectory=/srv/my app/100%%", "Restart=on-failure"]);
     }
 
     #[test]
     fn alpine_gets_an_openrc_script_its_shell_reads_back() {
         let unit = linux(Family::Alpine, &"api".parse().unwrap(), &argv(&["/srv/api", "it's"]), None, None);
         assert!(unit.starts_with("#!/sbin/openrc-run\n"), "{unit}");
-        assert!(
-            unit.contains("command='/srv/api'\ncommand_args=''\\''it'\\''\\'\\'''\\''s'\\'''\ncommand_background=true\n"),
-            "{unit}"
-        );
+        let value = |key: &str| {
+            let line = unit.lines().find_map(|l| l.strip_prefix(&format!("{key}=")));
+            line.and_then(isoloom_test_support::sh_decode).unwrap_or_else(|| panic!("no {key} in {unit}"))
+        };
+        assert_eq!(value("command"), "/srv/api");
+        // OpenRC reads `command_args` with sh: each word quoted for it, inside the quoted value.
+        assert_eq!(isoloom_test_support::sh_decode(&value("command_args")).as_deref(), Some("it's"));
+        assert!(unit.lines().any(|l| l == "command_background=true"), "OpenRC backgrounds it: {unit}");
     }
 }
