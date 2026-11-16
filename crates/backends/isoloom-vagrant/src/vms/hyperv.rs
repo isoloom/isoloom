@@ -275,8 +275,31 @@ pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
     let script = isoloom_spec::shell::heredoc(&format!("cat > {ENV_NET_SCRIPT}"), "NET", &format!("{ENV_NET}{lines}exit $rc\n"));
     format!(
-        "set -e\nmkdir -p {CONFIG_DIR}\n{script}chmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{ENV_NET_SCRIPT}\n",
+        "set -e\nmkdir -p {CONFIG_DIR}\n{script}chmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{}{ENV_NET_SCRIPT}\n",
+        networkd_addresses(nics, &macs),
         env_net_at_boot()
+    )
+}
+
+/// The addresses as systemd-networkd's own (`/etc/systemd/network/05-isoloom-env-net-<n>.network`,
+/// ahead of a box's catch-all such as netplan's `10-netplan-all.network`), where networkd manages
+/// the adapters: networkd drops an address it didn't set whenever it restarts, which Vagrant's
+/// hostname step does on a Debian or Ubuntu box right after the address was set, leaving the VM
+/// off its networks. Harmless where networkd doesn't run.
+fn networkd_addresses(nics: &[Nic], macs: &[String]) -> String {
+    let files: String = nics
+        .iter()
+        .zip(macs)
+        .enumerate()
+        .map(|(i, (n, m))| {
+            format!(
+                "  printf '[Match]\\nMACAddress={m}\\n\\n[Network]\\nAddress={}/{}\\nDHCP=no\\nLinkLocalAddressing=no\\nIPv6AcceptRA=no\\n' > /etc/systemd/network/05-isoloom-env-net-{i}.network\n",
+                n.ip, n.len
+            )
+        })
+        .collect();
+    format!(
+        "# systemd-networkd would drop the addresses on its next restart.\nif [ -d /etc/systemd/network ]; then\n{files}  networkctl reload 2>/dev/null || true\nfi\n"
     )
 }
 
