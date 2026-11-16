@@ -145,4 +145,13 @@ mod tests {
             ["tools: at most 3 tools (each takes one of the addresses Isoloom reserves on every network)"]
         );
     }
+
+    #[test]
+    fn a_tool_name_is_at_most_a_dns_labels_length() {
+        let long = "t".repeat(64);
+        assert_eq!(
+            with(&format!("{{ {long}: {{ image: x }} }}")),
+            [format!("tools.{long}: tool names are at most 63 characters: a DNS label")]
+        );
+    }
 }

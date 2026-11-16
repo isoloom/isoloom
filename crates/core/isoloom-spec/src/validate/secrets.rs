@@ -135,20 +135,28 @@ mod tests {
     fn a_windows_secret_takes_a_drive_path_and_no_owner() {
         let win = "    vm: { os: windows-server@2022, provision: [s.ps1] }\n";
         let ok = problems(&format!("{win}    secrets: [db, {{ source: db, target: 'C:\\app\\db' }}]\n"));
-        assert!(ok.is_empty(), "{ok:?}");
-        let owned = problems(&format!("{win}    secrets: [{{ source: db, mode: 0400 }}]\n"));
-        assert!(owned.iter().any(|p| p.contains("no `uid`, `gid` or `mode`")), "{owned:?}");
-        let up = problems(&format!("{win}    secrets: [{{ source: db, target: 'C:\\app\\..\\db' }}]\n"));
-        assert!(up.iter().any(|p| p.contains("isn't a file path")), "{up:?}");
+        assert_eq!(ok, Vec::<String>::new());
+        assert_eq!(
+            problems(&format!("{win}    secrets: [{{ source: db, mode: 0400 }}]\n")),
+            ["machines.m.secrets[0]: a Windows machine's secret has no `uid`, `gid` or `mode`: its file is readable by SYSTEM and Administrators only"]
+        );
+        assert_eq!(
+            problems(&format!("{win}    secrets: [{{ source: db, target: 'C:\\app\\..\\db' }}]\n")),
+            ["machines.m.secrets[0].target: `C:\\app\\..\\db` isn't a file path on the machine (no ':' past the drive, no '..'), like C:\\app\\db-password"]
+        );
     }
 
     #[test]
     fn a_linux_secret_keeps_the_mount_rules() {
         let linux = "    vm: { os: debian@12, provision: [s.sh] }\n";
-        let drive = problems(&format!("{linux}    secrets: [{{ source: db, target: 'C:\\app\\db' }}]\n"));
-        assert!(drive.iter().any(|p| p.contains("isn't a safe file path")), "{drive:?}");
-        let owned = problems(&format!("{linux}    secrets: [{{ source: db, mode: 0400, uid: 1000 }}]\n"));
-        assert!(owned.is_empty(), "{owned:?}");
+        assert_eq!(
+            problems(&format!("{linux}    secrets: [{{ source: db, target: 'C:\\app\\db' }}]\n")),
+            ["machines.m.secrets[0].target: `C:\\app\\db` isn't a safe file path inside the machine (no spaces, ':' or '..'), like /etc/app/db-password"]
+        );
+        assert_eq!(
+            problems(&format!("{linux}    secrets: [{{ source: db, mode: 0400, uid: 1000 }}]\n")),
+            Vec::<String>::new()
+        );
     }
 
     /// The problems of secret `s`, kept in `store`, placed on a container.
@@ -220,6 +228,23 @@ mod tests {
         assert_eq!(
             problems(&format!("{win}    secrets: [{{ source: db, uid: 1000 }}]\n")),
             ["machines.m.secrets[0]: a Windows machine's secret has no `uid`, `gid` or `mode`: its file is readable by SYSTEM and Administrators only"]
+        );
+    }
+
+    #[test]
+    fn a_secret_is_named_in_kebab_case_and_given_to_a_machine_at_a_path_of_its_own() {
+        let long = "s".repeat(64);
+        let found = crate::testing::problems(&crate::testing::lab(&format!(
+            "secrets: {{ {long}: {{ env: A }}, Db_pw: {{ env: B }}, spare: {{ env: C }}, x: {{ env: D }}, y: {{ env: E }} }}\nmachines:\n  web: {{ networks: {{ lan: 10 }}, docker: {{ image: nginx }}, secrets: [{long}, Db_pw, {{ source: x, target: /run/a }}, {{ source: y, target: /run/a }}] }}\n"
+        )));
+        assert_eq!(
+            found,
+            [
+                format!("secrets.{long}: secret names are at most 63 characters"),
+                "secrets.Db_pw: secret names are kebab-case: lowercase letters, digits and dashes (e.g. db-password)".to_owned(),
+                "secrets.spare: no machine gets it: place it as a file, `files: [{ path, secret: <name> }]`".to_owned(),
+                "machines.web.secrets[3]: `/run/a` already holds another secret of this machine".to_owned(),
+            ]
         );
     }
 }

@@ -155,4 +155,13 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn a_resolver_is_an_ip_address() {
+        assert_eq!(of("{ dns: [10.0.0.53, 'fd00::53'] }"), Vec::<String>::new());
+        assert_eq!(
+            of("{ dns: [ns.corp] }"),
+            ["constraints.dns[0]: `ns.corp`: a resolver's IP address, e.g. 10.0.0.53"]
+        );
+    }
 }

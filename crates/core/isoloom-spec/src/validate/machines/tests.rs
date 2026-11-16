@@ -266,3 +266,21 @@ fn a_name_or_alias_starting_with_isoloom_is_refused() {
     );
     assert_eq!(of("  isoloomweb: { networks: { lan: 10 }, docker: { image: nginx } }\n"), Vec::<String>::new());
 }
+
+#[test]
+fn a_machines_address_is_on_a_network_of_the_spec_and_its_own() {
+    assert_eq!(
+        problems(&lab("machines:\n  web: { networks: { lan: 10, wan: 10 }, docker: { image: nginx } }\n")),
+        ["machines.web.networks.wan: no network named `wan`"]
+    );
+    assert_eq!(
+        problems(&lab(
+            "machines:\n  a: { networks: { lan: 10 }, docker: { image: x } }\n  b: { networks: { lan: 10 }, docker: { image: x } }\n"
+        )),
+        ["machines.b.networks.lan: address .10 is already used by `a`"]
+    );
+    assert_eq!(
+        problems("version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.0.0.0/24, gateway: r }\nmachines:\n  r: { networks: { lan: 10 }, docker: { image: x } }\n"),
+        ["machines.r.networks.lan: `r` is this network's gateway, so it takes the gateway address: use 1"]
+    );
+}

@@ -173,3 +173,13 @@ fn only_a_shared_volume_has_folders_and_only_for_its_other_machines() {
         ["machines.c.volumes.share.subpath: `c` holds the whole volume `share`: give the subpath to another machine, or make another one the `owner`"]
     );
 }
+
+#[test]
+fn a_declared_volume_is_mounted_by_a_machine() {
+    assert_eq!(
+        problems(&lab(
+            "volumes: { orphan: {} }\nmachines:\n  web: { networks: { lan: 10 }, docker: { image: nginx } }\n"
+        )),
+        ["volumes.orphan: no machine mounts it: list it in a machine's `volumes`"]
+    );
+}

@@ -142,9 +142,18 @@ mod tests {
     }
 
     #[test]
-    fn sizes() {
-        assert!(size_ok("64m") && size_ok("1048576") && size_ok("2G"));
-        assert!(!size_ok("m") && !size_ok("0") && !size_ok("64mb") && !size_ok("-1"));
+    fn a_size_is_bytes_or_a_number_with_k_m_or_g() {
+        for (size, ok) in [
+            ("64m", true),
+            ("1048576", true),
+            ("2G", true),
+            ("m", false),
+            ("0", false),
+            ("64mb", false),
+            ("-1", false),
+        ] {
+            assert_eq!(size_ok(size), ok, "{size}");
+        }
     }
 
     #[test]
@@ -166,7 +175,7 @@ mod tests {
     fn a_tmpfs_mode_that_isnt_one_is_a_problem_at_its_path() {
         let spec = "version: 1\nname: t\nnetworks: { lan: { cidr: 10.0.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx }, tmpfs: [{ path: /cache, mode: '888' }] }\n";
         let Err(crate::Error::Invalid { problems, .. }) = crate::parse(spec) else {
-            panic!("the spec reads")
+            panic!("the spec is refused where it is read")
         };
         let problems: Vec<String> = problems.iter().map(crate::syntax::Problem::line).collect();
         assert_eq!(problems.len(), 1, "{problems:?}");
@@ -279,6 +288,18 @@ mod tests {
                 "volumes: { logs: /data }, disks: { b: { size_gb: 1, mount: /data } }"
             ),
             taken("/data")
+        );
+    }
+
+    #[test]
+    fn a_disk_isnt_named_like_a_volume_of_its_machine() {
+        assert_eq!(
+            named(
+                "web",
+                "vm: { os: debian@12 }",
+                "volumes: { data: /srv/data }, disks: { data: { size_gb: 1, fs: ext4, mount: /d } } }\nvolumes: { data: {}"
+            ),
+            ["machines.web.disks.data: `data` is a volume of this machine too: a disk is stored as `<machine>-<disk>`, as a volume"]
         );
     }
 }

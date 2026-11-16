@@ -69,10 +69,15 @@ mod tests {
     fn the_private_zone_takes_a_domain_of_two_labels_or_more() {
         assert_eq!(problems("dns: { private: true }"), Vec::<String>::new());
         assert_eq!(problems("dns: { private: true, domain: lab.internal }"), Vec::<String>::new());
-        let one = problems("dns: { private: true, domain: lab }");
-        assert!(one.iter().any(|p| p.starts_with("dns.domain: `lab` isn't a domain")), "{one:?}");
-        let upper = problems("dns: { private: true, domain: Lab.Internal }");
-        assert!(upper.iter().any(|p| p.contains("lowercase")), "{upper:?}");
+        for bad in ["lab", "Lab.Internal", "lab.internal."] {
+            assert_eq!(
+                problems(&format!("dns: {{ private: true, domain: {bad} }}")),
+                [format!(
+                    "dns.domain: `{bad}` isn't a domain of two labels or more like lab.internal (lowercase, no trailing dot)"
+                )],
+                "{bad}"
+            );
+        }
     }
 
     #[test]

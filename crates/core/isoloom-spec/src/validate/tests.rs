@@ -110,3 +110,11 @@ fn a_block_of_no_networks_size_is_reported_not_overflowed() {
         assert!(found.iter().any(|p| p.starts_with("networks.lan.cidr: ")), "{cidr}: {found:?}");
     }
 }
+
+#[test]
+fn a_reach_rule_opens_real_ports() {
+    let found = problems(&lab(
+        "  dmz: { cidr: 10.0.1.0/24 }\nmachines:\n  web: { networks: { lan: 10, dmz: 10 }, docker: { image: nginx } }\nreach: [{ from: lan, to: dmz, ports: [0, 80] }]\n",
+    ));
+    assert_eq!(found, ["reach[0].ports: port 0 isn't a port"]);
+}
