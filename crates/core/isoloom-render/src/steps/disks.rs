@@ -120,27 +120,28 @@ mod tests {
     #[test]
     fn a_disk_waits_for_a_blank_disk_then_mounts_it_by_its_label() {
         let sh = linux(&[disk("data", Filesystem::Ext4, Some("/data"))]).expect("a disk to mount");
-        assert!(sh.starts_with("set -e\npkg() {"), "{sh}");
-        assert!(sh.ends_with("}\ndisk 'data' ext4 '/data' 2147483648\n"), "{sh}");
-        assert!(sh.contains("blkid -L \"$label\"") && sh.contains("LABEL=%s %s %s defaults,nofail 0 2"), "{sh}");
+        // The package installer, the function with its tries filled in, then one call per disk.
+        let function = DISK_SH.replace("TRIES", "60");
+        assert!(function.contains("if [ \"$i\" -ge 60 ]; then"), "a minute of five-second tries: {function}");
+        assert_eq!(sh, format!("set -e\n{PKG}\n{function}disk 'data' ext4 '/data' 2147483648\n"));
     }
 
     #[test]
     fn each_formatted_disk_is_found_by_size_then_by_label() {
         let sh = linux(&[disk("data", Filesystem::Xfs, Some("/data")), disk("blk", Filesystem::Raw, None)]).unwrap();
-        assert!(sh.contains("disk 'data' xfs '/data' 2147483648\n"), "{sh}");
-        assert!(!sh.contains("disk blk"));
-        assert!(sh.contains("-ge 60 ]"));
+        let calls = sh.split_once(&DISK_SH.replace("TRIES", "60")).map(|(_, calls)| calls);
+        assert_eq!(calls, Some("disk 'data' xfs '/data' 2147483648\n"), "a raw disk is left alone");
         assert_eq!(linux(&[disk("blk", Filesystem::Raw, None)]), None);
     }
 
     #[test]
     fn a_windows_disk_gets_its_drive_letter() {
         let ps = windows(&[disk("logs", Filesystem::Ntfs, Some("E:")), disk("raw", Filesystem::Raw, None)]).unwrap();
-        assert_eq!(ps.lines().count(), 1, "a raw disk is left alone: {ps}");
-        assert!(ps.contains("-DriveLetter E ") && ps.contains("-NewFileSystemLabel 'logs'"), "{ps}");
-        assert!(ps.contains("$_.Size -ge 2147483648 -and $_.Size -lt 2147483648 + 1GB"), "{ps}");
-        assert!(ps.contains("throw 'disk logs: no blank disk of 2147483648 bytes is attached'"), "{ps}");
+        assert_eq!(
+            ps,
+            "if (-not (Get-Volume -FileSystemLabel 'logs' -ErrorAction SilentlyContinue)) { $i = 0; do { $d = Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' -and $_.Size -ge 2147483648 -and $_.Size -lt 2147483648 + 1GB } | Select-Object -First 1; if (-not $d) { if (++$i -ge 60) { throw 'disk logs: no blank disk of 2147483648 bytes is attached' }; Start-Sleep 5 } } until ($d); if ($d.IsOffline) { Set-Disk -Number $d.Number -IsOffline $false }; Initialize-Disk -Number $d.Number -PartitionStyle GPT -PassThru | New-Partition -UseMaximumSize -DriveLetter E | Format-Volume -FileSystem NTFS -NewFileSystemLabel 'logs' -Confirm:$false | Out-Null }",
+            "a raw disk is left alone"
+        );
         assert_eq!(windows(&[disk("raw", Filesystem::Raw, None)]), None);
     }
 }

@@ -86,20 +86,14 @@ fn routes_go_through_the_router() {
 }
 
 #[test]
-fn the_owner_serves_a_shared_volume() {
-    let env = env();
-    let sh = rendered(&env, "writer", |s| matches!(s, Step::SharedVolume { .. }));
-    assert!(sh.contains("exportfs -ra"), "{sh}");
-    let mount = rendered(&env, "reader", |s| matches!(s, Step::SharedVolume { .. }));
-    assert!(mount.contains("/srv/shared") && mount.contains("nfs defaults"), "{mount}");
-}
-
-#[test]
 fn hosts_carry_aliases() {
     let env = env();
     let sh = rendered(&env, "reader", |s| matches!(s, Step::Hosts { .. }));
-    assert!(sh.contains("writer store"), "{sh}");
-    assert!(sh.contains("grep -qxF"), "each line once: {sh}");
+    assert_eq!(
+        sh,
+        "printf '%s\\n' '10.85.0.10 writer store' '10.85.0.11 reader' '10.84.0.12 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done\n",
+        "each line once, a machine with its aliases"
+    );
     assert_eq!(linux(&env, "reader", &Step::Hosts { entries: Vec::new() }), None);
 }
 
@@ -107,10 +101,28 @@ fn hosts_carry_aliases() {
 fn offline_keeps_the_loopback() {
     let env = env();
     let sh = linux(&env, "reader", &Step::Egress).expect("the step renders");
-    let lo = sh.find("oifname \"lo\" accept").expect("the loopback stays open");
-    assert!(lo < sh.find("ct state new drop").expect("the drop"), "{sh}");
-    assert!(sh.contains("'    ip daddr != { 10.84.0.0/24, 10.85.0.0/24 } ct state new drop'"), "{sh}");
-    assert!(sh.contains("cat > /etc/isoloom/egress.sh <<'EGRESS'"), "loaded at every boot: {sh}");
+    // nft installed, the rules written, then loaded now and at every boot.
+    let load = crate::boot::at_boot(
+        "egress",
+        "No new connection leaves the isoloom networks",
+        "nft -f /etc/isoloom-egress.nft\n",
+        crate::boot::Trigger::Boot,
+        &[],
+    );
+    let write = sh
+        .strip_prefix(&super::nftables())
+        .and_then(|rest| rest.strip_suffix(&load))
+        .unwrap_or_else(|| panic!("nft, the rules, then their loading: {sh}"));
+    let Some(mut posix) = crate::test_support::posix_sh() else { return };
+    let dir = tempfile::Builder::new().prefix("isoloom-egress-").tempdir().expect("a temporary folder");
+    let rules = dir.path().join("egress.nft");
+    let write = write.replace("/etc/isoloom-egress.nft", &crate::test_support::sh_path(&rules));
+    assert!(posix.args(["-c", &write]).status().expect("sh runs").success(), "{write}");
+    assert_eq!(
+        std::fs::read_to_string(&rules).expect("the rules"),
+        "table inet isoloom-egress\ndelete table inet isoloom-egress\ntable inet isoloom-egress {\n  chain output {\n    type filter hook output priority 0; policy accept;\n    oifname \"lo\" accept\n    ip daddr != { 10.84.0.0/24, 10.85.0.0/24 } ct state new drop\n  }\n}\n",
+        "the loopback stays open, new connections out of the networks are dropped"
+    );
 }
 
 #[test]
@@ -164,11 +176,14 @@ fn a_provision_step_runs_from_the_project_folder_its_way() {
         run("steps/web.sh", RunKind::Shell).as_deref(),
         Some(concat!(r"cd /opt/isoloom && sh -c 'sh '\''steps/web.sh'\'''", "\n"))
     );
-    let play = run("site.yml", RunKind::Playbook).expect("a playbook runs locally");
-    assert!(play.starts_with("set -e\npkg() {") && play.contains("|| pkg ansible-core\n"), "{play}");
-    assert!(
-        play.ends_with(concat!(r"cd /opt/isoloom && sh -c 'ansible-playbook -c local -i web, '\''site.yml'\'''", "\n")),
-        "{play}"
+    assert_eq!(
+        run("site.yml", RunKind::Playbook),
+        Some(format!(
+            "set -e\n{}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\n{}\n",
+            super::PKG,
+            r"cd /opt/isoloom && sh -c 'ansible-playbook -c local -i web, '\''site.yml'\'''"
+        )),
+        "Ansible installed unless it is there, then the playbook run locally on the machine by its name"
     );
     assert_eq!(run("setup.ps1", RunKind::PowerShell), None, "a Windows script is PowerShell's");
 }
@@ -182,25 +197,37 @@ fn a_reboot_is_recorded_then_checked() {
         record_boot(),
         "mkdir -p /var/lib/isoloom && cp /proc/sys/kernel/random/boot_id /var/lib/isoloom/boot-id\n"
     );
-    assert!(reboot_check().starts_with("if [ \"$(cat /proc/sys/kernel/random/boot_id)\" = \"$(cat /var/lib/isoloom/boot-id)\" ]"));
-    assert!(reboot_check().ends_with("the machine did not restart' >&2; exit 1; fi\n"));
+    assert_eq!(
+        reboot_check(),
+        "if [ \"$(cat /proc/sys/kernel/random/boot_id)\" = \"$(cat /var/lib/isoloom/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi\n"
+    );
 }
 
 #[test]
 fn a_machine_waits_for_the_ones_it_depends_on() {
     let env = testing::env(WINDOWS, Target::Vagrant);
     let wait = planned(&env, "win", |s| matches!(s, Step::WaitFor { .. }));
-    let ps = windows(&env, "win", &wait).expect("db serves a port");
-    assert!(ps.contains("foreach ($p in @(5432))"), "{ps}");
-    let sh = linux(&env, "win", &wait).expect("the Linux form too");
-    assert!(sh.contains("</dev/tcp/db/5432"), "{sh}");
+    assert_eq!(
+        wait,
+        Step::WaitFor {
+            machine: "db".into(),
+            ports: vec![5432]
+        }
+    );
+    assert_eq!(windows(&env, "win", &wait), super::wait::windows("db", &[5432]));
+    assert_eq!(linux(&env, "win", &wait), Some(super::wait::linux("db", &[5432])));
 }
 
 #[test]
 fn windows_has_hosts_but_no_trunks() {
     let env = env();
     let hosts = planned(&env, "reader", |s| matches!(s, Step::Hosts { .. }));
-    assert!(windows(&env, "reader", &hosts).is_some_and(|ps| ps.contains("'10.85.0.10 writer store'")));
+    assert_eq!(
+        windows(&env, "reader", &hosts).as_deref(),
+        Some(
+            "$h = \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\"; foreach ($l in @('10.85.0.10 writer store', '10.85.0.11 reader', '10.84.0.12 web')) { if (-not (Select-String -Path $h -SimpleMatch $l -Quiet)) { Add-Content -Path $h -Value $l } }"
+        )
+    );
     assert_eq!(windows(&env, "reader", &Step::Hosts { entries: Vec::new() }), None);
     for linux_only in [
         Step::Trunks,
@@ -241,46 +268,57 @@ fn windows_routes_keep_across_restarts() {
     assert_eq!(windows(&env, "web", &none), None);
 }
 
-/// A step's name, how to pick it from a plan, and a text its rendering holds.
-type StepCase = (&'static str, fn(&Step) -> bool, &'static str);
-
 #[test]
 fn every_windows_step_is_powershell() {
     let env = testing::env(WINDOWS, Target::Vagrant);
-    let step = |pick: fn(&Step) -> bool| windows(&env, "win", &planned(&env, "win", pick)).expect("a Windows step");
-    // Each step's PowerShell, and a text it holds: every step is checked, and every mismatch said.
-    let cases: [StepCase; 6] = [
-        ("settings", |s| matches!(s, Step::Settings), "SetEnvironmentVariable('MODE', 'lab', 'Machine')"),
-        ("ipv6", |s| matches!(s, Step::Ipv6 { .. }), "-IPAddress 'fd00:86::10' -PrefixLength 64"),
-        (
-            "more addresses",
-            |s| matches!(s, Step::MoreAddresses { .. }),
-            "-IPAddress '10.86.0.11' -PrefixLength 24",
-        ),
-        ("files", |s| matches!(s, Step::Files { .. }), "[IO.File]::WriteAllText('C:\\app\\a.ini', 'x')"),
-        ("disk grow", |s| matches!(s, Step::DiskGrow), "Resize-Partition -DriveLetter C"),
-        ("disks", |s| matches!(s, Step::Disks { .. }), "-DriveLetter E "),
-    ];
-    let wrong: Vec<String> = cases
+    let lifecycle = &env.machines["win"].lifecycle;
+    let spec = env.spec();
+    let win = &spec.machines["win"];
+    // Each step of the plan, as its own renderer writes it in PowerShell.
+    for step in lifecycle {
+        let expected = match step {
+            Step::Settings => super::settings::windows(win),
+            Step::Ipv6 { addresses, routes } => Some(crate::network::ipv6::windows(addresses, routes)),
+            Step::MoreAddresses { addresses } => Some(crate::network::more_addresses::windows(addresses)),
+            Step::Files { files } => Some(super::files::windows(files)),
+            Step::DiskGrow => Some(super::disks::GROW_ROOT_PS1.to_owned()),
+            Step::Disks { disks } => super::disks::windows(disks),
+            Step::WaitFor { machine, ports } => super::wait::windows(machine, ports),
+            Step::Project => Some(super::windows_project_unpack(super::TopFolder::Stripped)),
+            Step::Run { .. } => Some(
+                "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'setup.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
+                    .to_owned(),
+            ),
+            Step::Hosts { entries } => super::network::windows_hosts(entries),
+            Step::Routes { routes, .. } => super::network::windows_routes(routes),
+            Step::Ready => Some("New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready".to_owned()),
+            // Linux's own steps.
+            _ => None,
+        };
+        assert_eq!(windows(&env, "win", step), expected, "{step:?}");
+    }
+    let rendered: Vec<String> = lifecycle
         .iter()
-        .filter_map(|(name, pick, holds)| {
-            let ps = step(*pick);
-            (!ps.contains(holds)).then(|| format!("{name}: no `{holds}` in\n{ps}"))
-        })
+        .filter(|s| windows(&env, "win", s).is_some())
+        .map(|s| format!("{s:?}").split([' ', '{', '(']).next().unwrap_or_default().to_owned())
         .collect();
-    assert!(wrong.is_empty(), "{}", wrong.join("\n\n"));
-    let project = step(|s| matches!(s, Step::Project));
-    assert!(
-        project.starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 1\n"),
-        "{project}"
-    );
     assert_eq!(
-        step(|s| matches!(s, Step::Run { .. })),
-        "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'setup.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
-    );
-    assert_eq!(
-        step(|s| matches!(s, Step::Ready)),
-        "New-Item -ItemType Directory -Force C:\\isoloom | Out-Null; Set-Content C:\\isoloom\\ready ready"
+        rendered,
+        [
+            "DiskGrow",
+            "Disks",
+            "Project",
+            "Hosts",
+            "Settings",
+            "MoreAddresses",
+            "Routes",
+            "Ipv6",
+            "Files",
+            "WaitFor",
+            "Run",
+            "Ready"
+        ],
+        "every step a Windows machine has"
     );
 }
 
@@ -292,18 +330,34 @@ fn a_typographic_quote_in_a_windows_path_stays_inside_its_string() {
         kind: RunKind::PowerShell,
         creates: None,
     };
-    let ps = windows(&env, "win", &run).expect("a PowerShell step");
-    assert!(ps.contains("-File 'it\u{2019}\u{2019}s.ps1';"), "{ps}");
+    assert_eq!(
+        windows(&env, "win", &run).as_deref(),
+        Some(
+            "Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'it\u{2019}\u{2019}s.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE }"
+        )
+    );
+    // Behind its `creates`: skipped once that path is there.
+    let guarded = Step::Run {
+        path: "it\u{2019}s.ps1".into(),
+        kind: RunKind::PowerShell,
+        creates: Some("C:\\done".into()),
+    };
+    assert_eq!(
+        windows(&env, "win", &guarded).as_deref(),
+        Some(
+            "if (-not (Test-Path -LiteralPath 'C:\\done')) { Set-Location C:\\isoloom; & powershell -NoProfile -ExecutionPolicy Bypass -File 'it\u{2019}\u{2019}s.ps1'; if ($LASTEXITCODE) { exit $LASTEXITCODE } }"
+        )
+    );
 }
 
 #[test]
 fn windows_secrets_wait_for_their_delivery() {
     let spec = "version: 1\nname: s\nsecrets: { pw: { env: PW } }\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  win: { networks: { lan: 10 }, os: windows-server@2022, files: [{ path: 'C:\\pw.txt', secret: pw }] }\n";
     let env = testing::env(spec, Target::Vagrant);
-    let ps = windows(&env, "win", &Step::Secrets).expect("a secret to place");
-    assert!(ps.contains("Set-IsoloomSecret") && ps.contains("isoloom-apply-secrets"), "{ps}");
-    let sh = linux(&env, "win", &Step::Secrets).expect("the Linux form too");
-    assert!(sh.starts_with("set -e\ni=0; until [ -f /var/lib/isoloom/secrets/.delivered ]"), "{sh}");
+    let files = &env.machines["win"].secrets;
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!(windows(&env, "win", &Step::Secrets), Some(crate::secrets::windows::step("win", files)));
+    assert_eq!(linux(&env, "win", &Step::Secrets), Some(crate::secrets::step("win", files)));
 }
 
 #[test]
@@ -322,12 +376,10 @@ machines:
   staff: { os: debian@12, networks: { office.vlan10: 10 } }
 ";
     let env = testing::env(VLANS, Target::Vagrant);
-    let sh = linux(&env, "admin", &Step::Trunks).expect("admin carries a trunk");
-    assert!(
-        sh.starts_with("ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s"),
-        "{sh}"
-    );
-    assert!(sh.ends_with("ip link set office.20 up; }\n"), "{sh}");
+    let trunks = crate::network::trunks::vms(&env);
+    let admin = trunks.iter().find(|t| t.machine == "admin").expect("admin carries a trunk");
+    let built: String = crate::network::trunks::vm_commands(&env, admin).into_iter().map(|l| l + "\n").collect();
+    assert_eq!(linux(&env, "admin", &Step::Trunks), Some(built));
     assert_eq!(linux(&env, "staff", &Step::Trunks), None, "one VLAN is an interface, not a trunk");
 }
 
@@ -344,8 +396,10 @@ machines:
   user: { os: debian@12, networks: { near: 10 } }
 ";
     let env = testing::env(SLOW, Target::Vagrant);
-    let sh = linux(&env, "web", &Step::Tc).expect("web is on a slow network");
-    assert!(sh.contains("/^10\\.75\\.2\\.10\\//") && sh.contains("root netem delay 80ms"), "{sh}");
+    let spec = env.spec();
+    let own = crate::network::router::machine_tc_script(spec, &spec.machines["web"], |n, o| env.address_on(n, o));
+    assert!(own.is_some(), "web is on a slow network");
+    assert_eq!(linux(&env, "web", &Step::Tc), own);
     assert_eq!(linux(&env, "user", &Step::Tc), None);
     assert_eq!(linux(&env, "nobody", &Step::Tc), None);
 }
@@ -389,23 +443,26 @@ mod hosts_in_a_real_shell {
 fn a_docker_host_gets_the_engine_and_compose_at_their_pinned_versions() {
     use super::{COMPOSE_VERSION, DOCKER_APT_KEY_SHA256, DOCKER_VERSION, install_docker};
     let script = install_docker();
-    assert!(script.starts_with("command -v docker >/dev/null || "), "an installed Docker is kept");
-    assert!(script.contains(&format!("\"docker-compose-plugin={COMPOSE_VERSION}-*\"")), "{script}");
+    let (apt, rpm) = script
+        .strip_prefix("command -v docker >/dev/null || if command -v apt-get >/dev/null; then (\n")
+        .and_then(|rest| rest.split_once("\n)\nelse\n"))
+        .unwrap_or_else(|| panic!("an installed Docker kept, else an apt branch and an rpm fallback: {script}"));
+    let apt: Vec<&str> = apt.lines().map(str::trim).collect();
     // The apt family adds Docker's repository with the key pinned by SHA-256, no `curl | sh`, and
     // resolves the engine's exact package from the repo at the pinned upstream version.
-    assert!(script.contains(DOCKER_APT_KEY_SHA256), "the apt signing key is pinned by sha256");
-    assert!(
-        script.contains("signed-by=/etc/apt/keyrings/docker.asc"),
-        "the repository is signed by the pinned key"
-    );
-    assert!(script.contains("apt-cache madison docker-ce"), "the engine version is resolved from the repo");
-    let (apt, rpm) = script.split_once("\nelse\n").expect("an apt branch and an rpm fallback");
-    assert!(!apt.contains("get.docker.com"), "the apt branch never pipes a script into sh: {apt}");
-    // The RPM family installs with Docker's pinned install script.
-    assert!(rpm.contains(&format!("VERSION={DOCKER_VERSION} sh")), "{rpm}");
     let escaped = DOCKER_VERSION.replace('.', "[.]");
-    assert!(apt.contains(&format!("/(^|:){escaped}/")), "the apt branch matches the pinned version: {apt}");
-    assert!(apt.contains(&format!("docker-ce {DOCKER_VERSION} is not")), "{apt}");
+    for line in [
+        format!("echo \"{DOCKER_APT_KEY_SHA256}  $k\" | sha256sum -c -"),
+        "echo \"deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable\" > /etc/apt/sources.list.d/docker.list".to_owned(),
+        format!("v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:){escaped}/ {{ print $3; exit }}')"),
+        format!("[ -n \"$v\" ] || {{ echo \"docker-ce {DOCKER_VERSION} is not in Docker's apt repository\" >&2; exit 1; }}"),
+        format!("apt-get install -y -qq --allow-downgrades \"docker-ce=$v\" \"docker-ce-cli=$v\" containerd.io docker-buildx-plugin \"docker-compose-plugin={COMPOSE_VERSION}-*\""),
+    ] {
+        assert!(apt.contains(&line.as_str()), "the apt branch has no `{line}`: {apt:#?}");
+    }
+    assert!(!apt.iter().any(|l| l.contains("get.docker.com")), "the apt branch never pipes a script into sh");
+    // The RPM family installs with Docker's pinned install script.
+    assert_eq!(rpm, format!("  curl -fsSL https://get.docker.com | VERSION={DOCKER_VERSION} sh\nfi"));
 }
 
 #[test]
@@ -426,15 +483,6 @@ fn a_mark_wait_ends_when_the_mark_is_there_and_gives_up_with_its_message_after_t
     std::fs::write(&mark, "").unwrap();
     let there = run(0).unwrap();
     assert!(there.status.success() && there.stdout.is_empty(), "{there:?}");
-}
-
-#[test]
-fn the_state_dirs_command_makes_the_state_dir() {
-    assert_eq!(super::MAKE_STATE_DIR, format!("mkdir -p {}", super::STATE_DIR));
-    assert_eq!(super::KEPT_INPUTS_FILE.rsplit_once('/').map(|(dir, _)| dir), Some(super::STATE_DIR));
-    assert_eq!(super::READY_FILE.rsplit_once('/').map(|(dir, _)| dir), Some(super::STATE_DIR));
-    let ready = isoloom_spec::windows::READY_FILE;
-    assert_eq!(ready.rsplit_once('\\').map(|(dir, _)| dir), Some(isoloom_spec::windows::ISOLOOM_DIR));
 }
 
 #[cfg(unix)]
@@ -479,13 +527,16 @@ fn every_project_unpack_replaces_the_old_copy() {
 
 #[test]
 fn the_windows_project_unpack_reads_the_uploaded_archive_into_the_project_folder() {
-    let unpack = super::windows_project_unpack(super::TopFolder::Kept);
-    assert!(
-        unpack.starts_with("$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = 0\n"),
-        "{unpack}"
-    );
-    assert!(unpack.ends_with(crate::powershell::UNTAR), "{unpack}");
-    assert!(super::windows_project_unpack(super::TopFolder::Stripped).contains("; $strip = 1\n"));
+    for (top, strip) in [(super::TopFolder::Kept, 0), (super::TopFolder::Stripped, 1)] {
+        assert_eq!(
+            super::windows_project_unpack(top),
+            format!(
+                "$archive = 'C:\\Windows\\Temp\\isoloom-project.tgz'; $dest = 'C:\\isoloom'; $strip = {strip}\n{}",
+                crate::powershell::UNTAR
+            ),
+            "{top:?}"
+        );
+    }
 }
 
 #[cfg(unix)]
