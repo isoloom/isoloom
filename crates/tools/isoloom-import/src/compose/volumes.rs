@@ -84,10 +84,10 @@ mod tests {
         assert_eq!(mount("$PWD/conf:/etc/x")?, bind("/etc/x"));
         assert_eq!(mount("'C:\\data:/data'")?, bind("/data"));
         assert_eq!(mount("D:/data:/data:ro")?, bind("/data"));
-        assert_eq!(mount("a:/x:ro")?, Some((VolumeMount::Named("a".to_owned()), "/x".to_owned())));
         assert_eq!(
-            mount("data:/var/lib/x:ro")?,
-            Some((VolumeMount::Named("data".to_owned()), "/var/lib/x".to_owned()))
+            mount("a:/x:ro")?,
+            Some((VolumeMount::Named("a".to_owned()), "/x".to_owned())),
+            "a one-letter volume isn't a drive"
         );
         Ok(())
     }

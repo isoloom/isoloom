@@ -433,9 +433,19 @@ mod tests {
             {"name":"network","args":["private_network",{"ip":"10.9.3.10","netmask":"255.255.0.0"}]}]}}}"#
             .parse()?;
         let d = draft(&recorded, "lab", "Vagrantfile")?;
-        let said: Vec<&str> = d.notes.iter().map(|n| n.text.as_str()).collect();
-        assert!(said.iter().any(|t| t.starts_with("`fd00::10` isn't an IPv4 address")), "{said:?}");
-        assert!(said.contains(&"10.9.3.10/16 isn't a /24 to /29; re-addressed to 10.9.3.0/24"), "{said:?}");
+        let said: Vec<&str> = d
+            .notes
+            .iter()
+            .filter(|n| n.at == "define default.vm.network")
+            .map(|n| n.text.as_str())
+            .collect();
+        assert_eq!(
+            said,
+            [
+                "`fd00::10` isn't an IPv4 address: the machine joins no network for it; give it an IPv4 one",
+                "10.9.3.10/16 isn't a /24 to /29; re-addressed to 10.9.3.0/24"
+            ]
+        );
         let y = isoloom_test_support::yaml(&d.yaml);
         let blocks: Vec<String> = isoloom_test_support::yaml_keys_at(&y, "networks")
             .iter()

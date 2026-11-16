@@ -225,6 +225,8 @@ mod tests {
             name: "lab",
         });
         let text = w.finish();
-        assert!(!text.lines().any(|l| l.starts_with("name: injected")), "{text}");
+        let header = isoloom_test_support::yaml(&text);
+        assert_eq!(isoloom_test_support::yaml_keys_at(&header, ""), ["version", "name", "networks"], "{text}");
+        assert_eq!(isoloom_test_support::yaml_str(&header, "name"), "lab");
     }
 }
