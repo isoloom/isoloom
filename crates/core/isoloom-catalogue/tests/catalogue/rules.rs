@@ -402,7 +402,7 @@ fn a_whole_placeholder_of_a_number_setting_keeps_its_type() {
 }
 
 #[test]
-fn an_entrys_own_fields_are_each_checked_where_they_are() {
+fn each_field_of_an_entry_is_checked_where_it_is() {
     let files = edited("demo/entry.yml", |t| {
         t.replace(
             "description: A made-up service for the catalogue's own tests.",
