@@ -6,6 +6,7 @@ use isoloom_plan::Environment;
 use isoloom_render::backend::Files;
 use isoloom_spec::model::Target;
 use isoloom_terraform::cloud_docker_modules;
+use isoloom_test_support::{hcl_resource, hcl_values};
 
 /// The cloud-docker modules of `e`, its host starting the Compose file.
 fn modules(e: &Environment) -> isoloom_terraform::Result<Files> {
@@ -23,39 +24,13 @@ fn cloud(cloud: &str) -> Outcome<String> {
     Ok(file(&files, &format!("cloud-docker/{cloud}/main.tf"))?.to_owned())
 }
 
+/// The module a reviewer reads as a file: hello-stack's host on each cloud, its Compose file
+/// started at boot.
 #[test]
-fn cloud_docker_aws_hello_stack() -> Outcome {
-    insta::assert_snapshot!(cloud("aws")?);
-    Ok(())
-}
-
-#[test]
-fn cloud_docker_azure_hello_stack() -> Outcome {
-    insta::assert_snapshot!(cloud("azure")?);
-    Ok(())
-}
-
-#[test]
-fn cloud_docker_gcp_hello_stack() -> Outcome {
-    insta::assert_snapshot!(cloud("gcp")?);
-    Ok(())
-}
-
-#[test]
-fn cloud_docker_digitalocean_hello_stack() -> Outcome {
-    insta::assert_snapshot!(cloud("digitalocean")?);
-    Ok(())
-}
-
-#[test]
-fn cloud_docker_linode_hello_stack() -> Outcome {
-    insta::assert_snapshot!(cloud("linode")?);
-    Ok(())
-}
-
-#[test]
-fn cloud_docker_oci_hello_stack() -> Outcome {
-    insta::assert_snapshot!(cloud("oci")?);
+fn hello_stacks_host_on_each_cloud() -> Outcome {
+    for id in ["aws", "azure", "gcp", "digitalocean", "linode", "oci"] {
+        insta::assert_snapshot!(format!("cloud_docker_{id}_hello_stack"), cloud(id)?);
+    }
     Ok(())
 }
 
@@ -71,8 +46,16 @@ fn rendering_twice_gives_the_same_files() -> Outcome {
 #[test]
 fn every_clouds_host_has_the_disk_its_containers_need() -> Outcome {
     let disk = isoloom_render::container::HostSize::of(&env("hello-stack", Target::CloudDocker)?).disk_gb;
-    assert!(cloud("aws")?.contains(&format!("volume_size = {disk}")));
-    // Oracle Cloud's boot volumes start at 50 GB.
-    assert!(cloud("oci")?.contains(&format!("boot_volume_size_in_gbs = {}", disk.max(50))));
+    // DigitalOcean's and Linode's disks come with the size the host's variable picks.
+    for (id, kind, key, size) in [
+        ("aws", "aws_instance", "volume_size", disk),
+        ("azure", "azurerm_linux_virtual_machine", "disk_size_gb", disk),
+        ("gcp", "google_compute_instance", "size", disk),
+        // Oracle Cloud's boot volumes start at 50 GB.
+        ("oci", "oci_core_instance", "boot_volume_size_in_gbs", disk.max(50)),
+    ] {
+        let host = hcl_resource(&cloud(id)?, kind, "env");
+        assert_eq!(hcl_values(&host, key), [size.to_string()], "{id}");
+    }
     Ok(())
 }

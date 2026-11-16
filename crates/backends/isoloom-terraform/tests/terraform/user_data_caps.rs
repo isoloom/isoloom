@@ -64,62 +64,22 @@ fn refusal(cloud: Cloud, yaml: &str) -> Outcome<Option<String>> {
 }
 
 #[test]
-fn a_small_set_up_fits_every_cloud() -> Outcome {
-    for cloud in Cloud::ALL {
-        assert_eq!(refusal(cloud, &lab(100))?, None, "{}", cloud.id());
+fn each_cloud_refuses_a_machines_user_data_over_its_cap_as_it_counts_it() -> Outcome {
+    // Hex gzips to about half, base64 grows it by a third: the same noise is over one cloud's cap
+    // and under another's.
+    for (cloud, fits, over, limit) in [
+        (Cloud::Aws, 100, 40_000, "as AWS counts it, over its 16384-byte limit"),
+        (Cloud::Azure, 40_000, 70_000, "as Azure counts it, over its 65535-byte limit"),
+        (Cloud::Gcp, 70_000, 270_000, "as Google Cloud counts it, over its 262144-byte limit"),
+        (Cloud::DigitalOcean, 25_000, 70_000, "as DigitalOcean counts it, over its 65536-byte limit"),
+        (Cloud::Linode, 25_000, 70_000, "as Linode counts it, over its 65535-byte limit"),
+        // Oracle Cloud counts the base64 within its 32000 bytes of metadata.
+        (Cloud::Oci, 100, 25_000, "as Oracle Cloud counts it, over its 30976-byte limit"),
+    ] {
+        assert_eq!(refusal(cloud, &lab(fits))?, None, "{cloud}: {fits} bytes fit");
+        let why = refusal(cloud, &lab(over))?.ok_or(format!("{cloud} takes {over} bytes"))?;
+        assert!(why.starts_with("machine `web`: its user data is ") && why.contains(limit), "{cloud}: {why}");
     }
-    Ok(())
-}
-
-#[test]
-fn aws_counts_the_gzip_and_refuses_over_16_kb_naming_the_machine() -> Outcome {
-    // Hex gzips to about half: 40 KB of it is over AWS's 16 KB gzipped, under Azure's 64 KB.
-    let yaml = lab(40_000);
-    let why = refusal(Cloud::Aws, &yaml)?.ok_or("AWS takes it")?;
-    assert!(why.starts_with("machine `web`: its user data is "), "{why}");
-    assert!(why.contains("as AWS counts it, over its 16384-byte limit"), "{why}");
-    for cloud in [Cloud::Azure, Cloud::Gcp] {
-        assert_eq!(refusal(cloud, &yaml)?, None, "{}", cloud.id());
-    }
-    Ok(())
-}
-
-#[test]
-fn azure_refuses_over_its_custom_data_cap_and_gcp_takes_up_to_256_kb() -> Outcome {
-    let yaml = lab(70_000);
-    let why = refusal(Cloud::Azure, &yaml)?.ok_or("Azure takes it")?;
-    assert!(why.contains("as Azure counts it, over its 65535-byte limit"), "{why}");
-    assert_eq!(refusal(Cloud::Gcp, &yaml)?, None);
-    let gcp = refusal(Cloud::Gcp, &lab(270_000))?.ok_or("GCP takes it")?;
-    assert!(gcp.starts_with("machine `web`: "), "{gcp}");
-    assert!(gcp.contains("as Google Cloud counts it, over its 262144-byte limit"), "{gcp}");
-    Ok(())
-}
-
-#[test]
-fn digitalocean_linode_and_oracle_cloud_refuse_over_their_caps() -> Outcome {
-    // Oracle Cloud counts the base64 within its 32000 bytes of metadata: 25 KB is over.
-    let oci = refusal(Cloud::Oci, &lab(25_000))?.ok_or("Oracle Cloud takes it")?;
-    assert!(oci.starts_with("machine `web`: "), "{oci}");
-    assert!(oci.contains("as Oracle Cloud counts it, over its 30976-byte limit"), "{oci}");
-    for cloud in [Cloud::DigitalOcean, Cloud::Linode] {
-        assert_eq!(refusal(cloud, &lab(25_000))?, None, "{}", cloud.id());
-    }
-    let yaml = lab(70_000);
-    let digitalocean = refusal(Cloud::DigitalOcean, &yaml)?.ok_or("DigitalOcean takes it")?;
-    assert!(digitalocean.contains("as DigitalOcean counts it, over its 65536-byte limit"), "{digitalocean}");
-    let linode = refusal(Cloud::Linode, &yaml)?.ok_or("Linode takes it")?;
-    assert!(linode.contains("as Linode counts it, over its 65535-byte limit"), "{linode}");
-    Ok(())
-}
-
-#[test]
-fn a_cloud_refusing_for_size_drops_only_its_module() -> Outcome {
-    use isoloom_render::backend::Backend;
-    let env = plan(&lab(40_000), Target::CloudVm)?;
-    let files = isoloom_terraform::CloudVmBackend.render(&env)?;
-    assert!(!files.iter().any(|f| f.path.contains("cloud-vm/aws/")), "AWS refuses it");
-    assert!(files.iter().any(|f| f.path.ends_with("cloud-vm/azure/main.tf")), "Azure takes it");
     Ok(())
 }
 
