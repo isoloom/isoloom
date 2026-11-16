@@ -73,9 +73,9 @@ fn environment_and_sets_reach_the_defaults() -> Outcome {
     };
     let set = with_sets(&["defaults.cloud.aws.region=x".into()])?;
     assert_eq!(set.defaults.cloud["aws"].region.as_deref(), Some("x"));
-    for (set, case) in [("nonsense", "a set without `=`"), ("a..b=1", "a key with an empty part")] {
-        let err = with_sets(&[set.into()]).err().ok_or(case)?.to_string();
-        assert!(err.contains(set), "{case}: {err}");
+    for (bad, case) in [("nonsense", "a set without `=`"), ("a..b=1", "a key with an empty part")] {
+        let err = with_sets(&[bad.into()]).err().ok_or(case)?.to_string();
+        assert!(err.contains(bad), "{case}: {err}");
     }
     Ok(())
 }
