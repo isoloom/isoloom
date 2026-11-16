@@ -342,6 +342,7 @@ mod tests {
         let texts: Vec<_> = v.values().collect();
         assert_eq!(texts[1], &EnvValue::Text("1024".into()));
         assert!(matches!(texts[3], EnvValue::Input(_)) && matches!(texts[4], EnvValue::Secret(_)));
-        assert!(serde_yaml_ng::from_str::<EnvValue>("{ file: x }").is_err());
+        let file = serde_yaml_ng::from_str::<EnvValue>("{ file: x }").unwrap_err().to_string();
+        assert!(file.contains("unknown field `file`, expected `input` or `secret`"), "{file}");
     }
 }

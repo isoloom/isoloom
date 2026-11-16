@@ -199,51 +199,36 @@ fn the_password_fix_names_settings_the_catalogue_has() {
 
 #[test]
 fn each_malformed_step_is_coded_at_its_field() {
-    for (yaml, code, path) in [
-        ("{ packages: [\"nginx=1.2\"] }", Code::InvalidValue, "machines.web.app.steps[1].packages[0]"),
-        ("{ packages: [] }", Code::InvalidValue, "machines.web.app.steps[1]"),
-        (
-            "{ copy: { from: /etc/passwd, to: /x } }",
-            Code::InvalidValue,
-            "machines.web.app.steps[1].copy.from",
-        ),
-        ("{ copy: { from: a, to: relative } }", Code::InvalidValue, "machines.web.app.steps[1].copy.to"),
-        (
-            "{ file: { path: /a, state: absent, mode: \"0600\" } }",
-            Code::Conflict,
-            "machines.web.app.steps[1].file",
-        ),
-        (
-            "{ file: { path: /a, state: directory, link: /b } }",
-            Code::Conflict,
-            "machines.web.app.steps[1].file",
-        ),
-        ("{ file: { path: /a } }", Code::MissingField, "machines.web.app.steps[1].file"),
-        (
-            "{ template: { from: conf/, to: /etc/x } }",
-            Code::InvalidValue,
-            "machines.web.app.steps[1].template.from",
-        ),
-        (
-            "{ service: { name: nginx, user: www-data } }",
-            Code::Conflict,
-            "machines.web.app.steps[1].service.user",
-        ),
+    // Each path below the step's own, `machines.web.app.steps[1]`.
+    for (yaml, code, below) in [
+        ("{ packages: [\"nginx=1.2\"] }", Code::InvalidValue, ".packages[0]"),
+        ("{ packages: [] }", Code::InvalidValue, ""),
+        ("{ packages: [{ name: nginx, version: \"1 2\" }] }", Code::InvalidValue, ".packages[0].version"),
+        ("{ copy: { from: /etc/passwd, to: /x } }", Code::InvalidValue, ".copy.from"),
+        ("{ copy: { from: a, to: relative } }", Code::InvalidValue, ".copy.to"),
+        ("{ file: { path: /a, state: absent, mode: \"0600\" } }", Code::Conflict, ".file"),
+        ("{ file: { path: /a, state: directory, link: /b } }", Code::Conflict, ".file"),
+        ("{ file: { path: /a, link: /b, mode: \"0600\" } }", Code::Conflict, ".file.mode"),
+        ("{ file: { path: /a, state: directory, sha256: x } }", Code::InvalidValue, ".file.sha256"),
+        ("{ file: { path: /a } }", Code::MissingField, ".file"),
+        ("{ template: { from: conf/, to: /etc/x } }", Code::InvalidValue, ".template.from"),
+        ("{ service: { name: nginx, user: www-data } }", Code::Conflict, ".service.user"),
+        ("{ service: { name: api, run: [] } }", Code::InvalidValue, ".service.run"),
         (
             "{ repository: { name: x, url: \"http://a\", key: { url: \"https://a/k\", sha256: x } } }",
             Code::InvalidValue,
-            "machines.web.app.steps[1].repository.url",
+            ".repository.url",
         ),
-        (
-            "{ firewall: { allow: [99999] } }",
-            Code::InvalidValue,
-            "machines.web.app.steps[1].firewall.allow[0]",
-        ),
-        ("{ unless: x, run: a.sh }", Code::InvalidValue, "machines.web.app.steps[1]"),
-        ("{ services: nginx }", Code::UnknownField, "machines.web.app.steps[1].services"),
+        ("{ firewall: { allow: [99999] } }", Code::InvalidValue, ".firewall.allow[0]"),
+        ("{ firewall: { allow: [53/sctp] } }", Code::InvalidValue, ".firewall.allow[0]"),
+        ("{ command: [], creates: /a }", Code::InvalidValue, ".command"),
+        ("{ user: { name: alice, password: '' } }", Code::InvalidValue, ".user.password"),
+        ("{ unless: x, run: a.sh }", Code::InvalidValue, ""),
+        ("{ services: nginx }", Code::UnknownField, ".services"),
     ] {
         let found = mistakes(yaml);
-        assert_eq!((found[0].0, found[0].1.as_str()), (code, path), "{yaml}: {found:?}");
+        let path = format!("machines.web.app.steps[1]{below}");
+        assert_eq!((found[0].0, found[0].1.as_str()), (code, path.as_str()), "{yaml}: {found:?}");
     }
 }
 
@@ -251,16 +236,6 @@ fn each_malformed_step_is_coded_at_its_field() {
 fn a_version_written_into_the_name_moves_to_version() {
     let found = mistakes("{ packages: [\"nginx=1.2\"] }");
     assert_eq!(found[0].2.as_deref(), Some("`{ name: nginx, version: \"1.2\" }`"));
-}
-
-#[test]
-fn a_step_does_one_thing() {
-    let e = serde_yaml_ng::from_str::<Step>("{ user: { name: a }, group: { name: b } }")
-        .unwrap_err()
-        .to_string();
-    assert!(e.contains("does one thing"), "{e}");
-    let alone = serde_yaml_ng::from_str::<Step>("{ creates: /a }").unwrap_err().to_string();
-    assert!(alone.contains("goes with `run` or `command`"), "{alone}");
 }
 
 #[test]
@@ -281,4 +256,16 @@ fn only_reboot_playbook_and_powershell_lack_a_container_form() {
 fn an_extension_matches_in_any_case_and_only_whole() {
     assert!(has_extension("setup.sh", "sh") && has_extension("setup.SH", "sh") && has_extension("a/b.Ps1", "ps1"));
     assert!(!has_extension("setup.shx", "sh") && !has_extension("sh", "sh") && !has_extension("setup.ps1", "sh"));
+}
+
+#[test]
+fn a_password_written_as_a_number_is_read_as_its_text() {
+    let Step::User(u) = step("{ user: { name: alice, password: 1234 } }") else {
+        panic!()
+    };
+    assert_eq!(u.password.as_ref().map(Password::as_str), Some("1234"));
+    let Step::User(negative) = step("{ user: { name: alice, password: -42 } }") else {
+        panic!()
+    };
+    assert_eq!(negative.password.as_ref().map(Password::as_str), Some("-42"));
 }

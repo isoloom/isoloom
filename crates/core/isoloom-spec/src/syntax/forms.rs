@@ -200,7 +200,15 @@ mod tests {
         assert_eq!(container(&rebooting).unwrap_err().path("web").as_str(), "machines.web.app.steps[1]");
         assert_eq!(vm(&rebooting), Ok(Form::Steps));
         let both = machine("{ os: debian@12, app: { image: redis:7, steps: [reboot] } }");
-        assert!(matches!(container(&both), Ok(Form::Recipe(_))) && vm(&both).is_ok());
+        assert!(matches!(container(&both), Ok(Form::Recipe(_))) && vm(&both) == Ok(Form::Steps));
+    }
+
+    #[test]
+    fn an_image_or_an_appliance_alone_has_no_vm_form() {
+        let image = machine("{ app: { image: redis:7 } }");
+        assert_eq!(vm(&image).unwrap_err().path("cache").as_str(), "machines.cache.app.image");
+        let appliance = machine("{ app: { appliance: cisco-iol, image: vrnetlab/cisco_iol:17 } }");
+        assert_eq!(vm(&appliance).unwrap_err().path("r1").as_str(), "machines.r1.app.appliance");
     }
 
     #[test]
@@ -214,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn windows_and_access_machines() {
+    fn windows_has_no_container_form_and_an_access_machine_is_supplied() {
         let windows = machine("{ os: windows-server@2019, app: { steps: [{ run: iis.ps1 }] } }");
         assert_eq!(container(&windows).unwrap_err().field, "os");
         let supplied = machine("{ access: true }");

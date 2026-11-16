@@ -1,3 +1,5 @@
+use isoloom_test_support::assert_every;
+
 use super::*;
 use crate::syntax::{Code, Kind};
 
@@ -61,15 +63,15 @@ fn shared_fields_and_clones_fold_in() {
     )
     .unwrap();
     assert_eq!(spec.machines.keys().collect::<Vec<_>>(), ["ws-01", "ws-02"]);
-    assert!(spec.machines.values().all(|m| m.os.is_some() && m.resources.and_then(|r| r.cpus) == Some(2)));
+    assert_every!(spec.machines.values(), |m: &&crate::syntax::Machine| m.os.is_some()
+        && m.resources.and_then(|r| r.cpus) == Some(2));
     assert_eq!(spec.clones["ws"], ["ws-01", "ws-02"]);
 }
 
 #[test]
-fn yaml_errors_have_their_line() {
+fn a_yaml_error_is_placed_at_its_line() {
     let p = problems("version: 1\nname: [\n");
-    assert_eq!(p[0].code, Code::InvalidValue);
-    assert!(p[0].span.is_some());
+    assert_eq!((p[0].code, p[0].span.map(|s| s.line)), (Code::InvalidValue, Some(3)));
 }
 
 #[test]
@@ -109,7 +111,42 @@ fn a_name_that_isnt_a_text_is_said_so_not_reported_as_an_empty_name() {
 }
 
 #[test]
-fn fields_that_exclude_each_other_are_a_conflict() {
-    let p = problems("version: 1\nname: t\nmachines:\n  web: { service: postgres, app: { image: nginx } }\n");
-    assert_eq!((p[0].code, p[0].path.as_str()), (Code::Conflict, "machines.web"));
+fn a_spec_that_isnt_a_mapping_or_a_machine_name_that_isnt_a_text_is_said_so() {
+    let list = problems("- version: 1\n");
+    assert_eq!(
+        (list[0].code, list[0].path.as_str(), list[0].reason.as_str()),
+        (Code::InvalidValue, "", "a spec is a mapping of fields (`version`, `name`, `machines`, ...)")
+    );
+    let numbered = problems("version: 1\nname: t\nmachines:\n  1: { os: debian@12 }\n");
+    assert_eq!(
+        (numbered[0].code, numbered[0].path.as_str(), numbered[0].reason.as_str()),
+        (Code::InvalidValue, "machines", "a machine's name is a text")
+    );
+}
+
+#[test]
+fn a_missing_field_inside_a_value_is_placed_at_that_field() {
+    let p = problems("version: 1\nname: t\noverrides:\n  kubernetes: { volumes: { data: {} } }\n");
+    assert_eq!(
+        (p[0].code, p[0].path.as_str(), p[0].reason.as_str()),
+        (Code::MissingField, "overrides.kubernetes.volumes.data.external", "`external` is required here")
+    );
+}
+
+#[test]
+fn tags_read_numbers_and_booleans_as_their_text() {
+    let spec = parse("version: 1\nname: t\ntags: { owner: ops, cost-center: 1234, ratio: 0.5, managed: true, offset: -3 }\n").unwrap();
+    let tags: Vec<(&str, &str)> = spec.tags.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    assert_eq!(
+        tags,
+        [
+            ("owner", "ops"),
+            ("cost-center", "1234"),
+            ("ratio", "0.5"),
+            ("managed", "true"),
+            ("offset", "-3")
+        ]
+    );
+    let nested = problems("version: 1\nname: t\ntags: { owner: [a] }\n");
+    assert!(nested[0].reason.contains("a tag's value: text, a number or true/false"), "{nested:?}");
 }

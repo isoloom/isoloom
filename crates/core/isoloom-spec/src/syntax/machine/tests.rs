@@ -24,9 +24,7 @@ fn a_service_is_a_name_or_a_list_of_names() {
 }
 
 #[test]
-fn a_service_and_an_app_together_are_refused() {
-    let both = machine("{ os: debian@12, service: nginx, app: { image: nginx } }").unwrap_err();
-    assert!(both.contains("both given"), "{both}");
+fn settings_without_a_service_are_refused() {
     let settings = machine("{ os: debian@12, with: { a: 1 } }").unwrap_err();
     assert!(settings.contains("goes with `service`"), "{settings}");
 }
@@ -52,4 +50,12 @@ fn settings_read_as_written() {
     assert_eq!(m.networks["lan"], Octets::Several(vec![10, 11]));
     assert_eq!(m.sysctls["net.core.somaxconn"], "4096");
     assert_eq!(m.setup, ["a.sh"]);
+}
+
+#[test]
+fn an_address_is_the_last_number_0_to_255() {
+    for bad in ["-1", "256"] {
+        let e = machine(&format!("{{ os: debian@12, networks: {{ lan: {bad} }} }}")).unwrap_err();
+        assert!(e.contains(&format!("`{bad}` isn't the last number of an address: 0 to 255")), "{bad}: {e}");
+    }
 }

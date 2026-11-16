@@ -1,3 +1,5 @@
+use isoloom_test_support::assert_every;
+
 use super::*;
 
 fn scanned(yaml: &str) -> Vec<Problem> {
@@ -54,7 +56,7 @@ fn moved_keys_name_their_new_place() {
     ] {
         assert!(paths.contains(&path), "{path} in {paths:?}");
     }
-    assert!(p.iter().all(|p| p.fix.is_some()));
+    assert_every!(&p, |problem: &&Problem| problem.fix.is_some());
 }
 
 #[test]

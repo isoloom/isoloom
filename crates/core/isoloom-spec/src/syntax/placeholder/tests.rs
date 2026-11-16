@@ -8,7 +8,7 @@ fn parsed(path: &str) -> Reference {
 }
 
 #[test]
-fn each_path_of_the_grammar_reads_into_its_reference() {
+fn each_path_of_the_grammar_reads_into_its_reference_and_writes_back_as_itself() {
     assert_eq!(parsed("machine.name"), Reference::MachineName);
     assert_eq!(parsed("machine.addresses.lab"), Reference::OwnAddress { network: "lab".into() });
     assert!(matches!(
@@ -26,6 +26,19 @@ fn each_path_of_the_grammar_reads_into_its_reference() {
     );
     assert_eq!(parsed("item.name"), Reference::Item("name".into()));
     assert_eq!(parsed("item.password.path"), Reference::ItemPath("password".into()));
+    for path in [
+        "machine.name",
+        "version",
+        "os.family",
+        "os.version",
+        "os.codename",
+        "with.password",
+        "item.name",
+        "item.password.path",
+        "machines.db.ports.postgres.port",
+    ] {
+        assert_eq!(parsed(path).to_string(), path);
+    }
 }
 
 #[test]
@@ -43,13 +56,26 @@ fn a_path_outside_the_grammar_says_the_paths_there() {
 
 #[test]
 fn each_place_names_only_its_own_paths() {
-    let template = |text: &str| read(text, Place::Template);
-    assert!(template("listen {{ machine.addresses.lab }}:{{ machines.db.ports.pg.port }}").is_ok());
-    let run_time = template("{{ machines.web.ports.site.published }}").unwrap_err();
+    let run_time = read("{{ machines.web.ports.site.published }}", Place::Template).unwrap_err();
     assert!(matches!(&run_time[0], Error::NotHere { why, .. } if why.contains("only once the environment runs")));
-    assert!(template("{{ with.port }}").is_err() && read("{{ with.port }}", Place::Entry).is_ok());
-    assert!(read("{{ item.name }}", Place::Entry).is_err() && read("{{ item.name }}", Place::EntryItem).is_ok());
-    assert!(read("{{ machine.name }}", Place::Message).is_err() && read("{{ cloud.outputs.x }}", Place::Template).is_err());
+    // `None`: read there; `Some(true)`: a path of the grammar not read there; `Some(false)`: no
+    // path of the grammar.
+    for (text, place, refused) in [
+        ("listen {{ machine.addresses.lab }}:{{ machines.db.ports.pg.port }}", Place::Template, None),
+        ("{{ with.port }}", Place::Template, Some(true)),
+        ("{{ with.port }}", Place::Entry, None),
+        ("{{ item.name }}", Place::Entry, Some(true)),
+        ("{{ item.name }}", Place::EntryItem, None),
+        ("{{ machine.name }}", Place::Message, Some(true)),
+        ("{{ cloud.outputs.x }}", Place::Template, Some(false)),
+    ] {
+        match (read(text, place), refused) {
+            (Ok(_), None) => {}
+            (Err(e), Some(true)) => assert!(matches!(e.as_slice(), [Error::NotHere { .. }]), "{text} in {place:?}: {e:?}"),
+            (Err(e), Some(false)) => assert!(matches!(e.as_slice(), [Error::Placeholder { .. }]), "{text} in {place:?}: {e:?}"),
+            (got, _) => panic!("{text} in {place:?}: {got:?}"),
+        }
+    }
 }
 
 #[test]
@@ -68,6 +94,16 @@ fn a_text_reads_into_its_pieces_in_order() {
     };
     assert!(matches!(unclosed.as_slice(), [Error::Unclosed]));
     assert_eq!(placeholders("{{ machine.name }} {{ nope }} {{", Place::Template).len(), 3);
+}
+
+#[test]
+fn join_writes_each_placeholders_value_in_its_place() {
+    let parts = read("server {{ machine.name }}:{{ machines.db.ports.pg.port }};", Place::Template).unwrap();
+    let filled = join(parts.clone(), |r| {
+        Ok::<_, ()>(if *r == Reference::MachineName { "web".to_owned() } else { "5432".to_owned() })
+    });
+    assert_eq!(filled, Ok("server web:5432;".to_owned()));
+    assert_eq!(join(parts, |_| Err("no value")), Err("no value"));
 }
 
 proptest! {

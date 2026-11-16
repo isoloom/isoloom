@@ -29,6 +29,7 @@ paas = []
 
 [dev-dependencies]
 insta.workspace = true
+isoloom-test-support.workspace = true
 proptest.workspace = true
 jsonschema = { version = "0.60", default-features = false }
 tempfile.workspace = true

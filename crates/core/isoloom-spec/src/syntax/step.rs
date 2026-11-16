@@ -133,11 +133,12 @@ mod kind_keys {
     /// The keys the input lists are the kinds the steps name, `reboot` aside: one list.
     #[test]
     fn every_kind_key_names_a_step_kind() {
-        let yaml = KIND_KEYS.iter().map(|k| format!("- {{ {k}: x }}")).collect::<Vec<_>>().join("\n");
-        let parsed: Result<Vec<super::Step>, _> = serde_yaml_ng::from_str(&yaml);
-        // Each key is known (a wrong value fails on the value, never as an unknown kind).
-        if let Err(e) = parsed {
-            assert!(!e.to_string().contains("needs one of"), "{e}");
+        for k in KIND_KEYS {
+            // Each key is known: a wrong value fails on the value, never as an unknown kind.
+            if let Err(e) = serde_yaml_ng::from_str::<super::Step>(&format!("{{ {k}: x }}")) {
+                let e = e.to_string();
+                assert!(!e.contains("needs one of") && !e.contains("unknown field"), "{k}: {e}");
+            }
         }
     }
 }
