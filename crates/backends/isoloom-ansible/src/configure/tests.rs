@@ -9,8 +9,10 @@ use isoloom_plan::{Environment, Lab};
 use isoloom_render::GeneratedFile;
 use isoloom_render::configure::Configured;
 use isoloom_spec::model::Target;
+use serde_yaml_ng::Value;
 
 use super::{project, role_files, role_name};
+use crate::testing::untagged;
 
 /// The environment `target` plans for a one-machine environment whose machine `m` has `body`
 /// (`os: …, app: …`), with `templates` as the project's template texts.
@@ -39,6 +41,35 @@ fn file(files: &[GeneratedFile], path: &str) -> String {
     )
 }
 
+/// Each task of `tasks` (a role's or the handlers' list) that runs `module`.
+fn using<'t>(tasks: &'t Value, module: &str) -> Vec<&'t Value> {
+    tasks.as_sequence().into_iter().flatten().filter(|t| t.get(module).is_some()).collect()
+}
+
+/// The one task of `tasks` that runs `module`.
+fn one<'t>(tasks: &'t Value, module: &str) -> &'t Value {
+    match using(tasks, module).as_slice() {
+        [task] => task,
+        found => panic!("{} tasks run {module}: {tasks:?}", found.len()),
+    }
+}
+
+/// The scalar text at `key` of `value`.
+fn text_at<'v>(value: &'v Value, key: &str) -> Option<&'v str> {
+    value.get(key).and_then(Value::as_str)
+}
+
+/// The texts of the list at `key` of `value`.
+fn texts_at<'v>(value: &'v Value, key: &str) -> Vec<&'v str> {
+    value
+        .get(key)
+        .and_then(Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect()
+}
+
 #[test]
 fn a_debian_recipe_uses_apt_and_deb822_native_modules() {
     let t = tasks(
@@ -46,9 +77,10 @@ fn a_debian_recipe_uses_apt_and_deb822_native_modules() {
         Target::Vagrant,
         &[],
     );
-    assert!(t.contains("ansible.builtin.apt:"), "{t}");
-    assert!(t.contains("nginx=1.30.6-1~bookworm"), "{t}");
-    assert!(t.contains("update_cache: true"), "{t}");
+    let tasks = untagged(&t);
+    let apt = &one(&tasks, "ansible.builtin.apt")["ansible.builtin.apt"];
+    assert_eq!(texts_at(apt, "name"), ["nginx=1.30.6-1~bookworm"], "{t}");
+    assert_eq!(apt["update_cache"].as_bool(), Some(true), "{t}");
 }
 
 #[test]
@@ -58,8 +90,12 @@ fn a_rocky_package_takes_dnf_and_the_rpm_version_join() {
         Target::Vagrant,
         &[],
     );
-    assert!(t.contains("ansible.builtin.dnf:"), "{t}");
-    assert!(t.contains("nginx-1.30.6"), "{t}");
+    let tasks = untagged(&t);
+    assert_eq!(
+        texts_at(&one(&tasks, "ansible.builtin.dnf")["ansible.builtin.dnf"], "name"),
+        ["nginx-1.30.6"],
+        "{t}"
+    );
 }
 
 #[test]
@@ -103,9 +139,15 @@ fn a_user_hashes_its_password_and_appends_its_groups() {
         Target::Vagrant,
         &[],
     );
-    assert!(t.contains("ansible.builtin.user:"), "{t}");
-    assert!(t.contains("append: true"), "{t}");
-    assert!(t.contains("$6$"), "the password is a crypt hash, not the literal: {t}");
+    let tasks = untagged(&t);
+    let user = &one(&tasks, "ansible.builtin.user")["ansible.builtin.user"];
+    assert_eq!(texts_at(user, "groups"), ["sudo"], "{t}");
+    assert_eq!(user["append"].as_bool(), Some(true), "{t}");
+    assert_eq!(user["uid"].as_u64(), Some(1500), "{t}");
+    assert!(
+        text_at(user, "password").is_some_and(|p| p.starts_with("$6$")),
+        "the password is a crypt hash, not the literal: {t}"
+    );
     assert!(!t.contains("winter"), "the literal password never reaches the output: {t}");
 }
 
@@ -116,21 +158,28 @@ fn a_command_guard_becomes_creates_or_a_registered_check() {
         Target::Vagrant,
         &[],
     );
-    assert!(
-        creates.contains("ansible.builtin.shell:") && creates.contains("creates: /etc/apache2/mods-enabled/rewrite.load"),
-        "{creates}"
-    );
+    let creating = untagged(&creates);
+    let shell = &one(&creating, "ansible.builtin.shell")["ansible.builtin.shell"];
+    assert_eq!(text_at(shell, "creates"), Some("/etc/apache2/mods-enabled/rewrite.load"), "{creates}");
     let unless = tasks(
         "os: debian@12, app: { steps: [{ command: [touch, /x], unless: [test, -e, /x] }] }",
         Target::Vagrant,
         &[],
     );
-    assert!(
-        unless.contains("register: isoloom_machine_m_guard_0"),
-        "the register is prefixed with the role name: {unless}"
-    );
-    assert!(unless.contains("isoloom_machine_m_guard_0.rc != 0"), "{unless}");
-    assert!(unless.contains("changed_when: false"), "the guard's check changes nothing: {unless}");
+    let tasks = untagged(&unless);
+    let tasks = tasks.as_sequence().expect("a task list");
+    // The guard's check, registered under the role's own prefix, changes nothing; the command runs
+    // when it failed.
+    let check = tasks
+        .iter()
+        .find(|t| text_at(t, "register") == Some("isoloom_machine_m_guard_0"))
+        .unwrap_or_else(|| panic!("the register is prefixed with the role name: {unless}"));
+    assert_eq!(check["changed_when"].as_bool(), Some(false), "{unless}");
+    let guarded: Vec<&Value> = tasks
+        .iter()
+        .filter(|t| text_at(t, "when") == Some("isoloom_machine_m_guard_0.rc != 0"))
+        .collect();
+    assert_eq!(guarded.len(), 1, "{unless}");
 }
 
 #[test]
@@ -140,9 +189,10 @@ fn a_firewall_uses_ansible_posix_guarded_by_whether_firewalld_runs() {
         Target::Vagrant,
         &[],
     );
-    assert!(t.contains("ansible.posix.firewalld:"), "{t}");
-    assert!(t.contains("port: \"80/tcp\""), "{t}");
-    assert!(t.contains("isoloom_machine_m_firewalld_0.rc == 0"), "{t}");
+    let tasks = untagged(&t);
+    let firewalld = one(&tasks, "ansible.posix.firewalld");
+    assert_eq!(text_at(&firewalld["ansible.posix.firewalld"], "port"), Some("80/tcp"), "{t}");
+    assert_eq!(text_at(firewalld, "when"), Some("isoloom_machine_m_firewalld_0.rc == 0"), "{t}");
     assert!(!t.contains("community"), "{t}");
 }
 
@@ -153,9 +203,11 @@ fn a_template_copies_the_rendered_file_not_jinja() {
         Target::Vagrant,
         &[("conf/app.conf", "name = {{ machine.name }}\n")],
     );
-    assert!(t.contains("src: rendered/conf/app.conf"), "{t}");
-    assert!(t.contains("ansible.builtin.copy:"), "{t}");
-    assert!(!t.contains("ansible.builtin.template"), "{t}");
+    let tasks = untagged(&t);
+    let copy = &one(&tasks, "ansible.builtin.copy")["ansible.builtin.copy"];
+    assert_eq!(text_at(copy, "src"), Some("rendered/conf/app.conf"), "{t}");
+    assert_eq!(text_at(copy, "mode"), Some("0640"), "{t}");
+    assert!(using(&tasks, "ansible.builtin.template").is_empty(), "{t}");
     // The rendered file is written beside the role, its placeholder filled in.
     let e = env(
         "os: debian@12, app: { steps: [{ template: { from: conf/app.conf, to: /etc/app.conf } }] }",
@@ -177,14 +229,30 @@ fn a_service_gets_a_restart_handler_notified_by_the_earlier_steps() {
     let c = Configured::of(&e, "m").unwrap();
     let files = role_files(&c, "r").unwrap();
     let main = file(&files, "r/tasks/main.yml");
-    assert!(
-        main.contains("notify:\n    - \"Isoloom restart nginx\""),
+    let tasks = untagged(&main);
+    assert_eq!(
+        texts_at(one(&tasks, "ansible.builtin.apt"), "notify"),
+        ["Isoloom restart nginx"],
         "the packages step notifies the restart: {main}"
     );
-    assert!(main.contains("ansible.builtin.meta: flush_handlers"), "{main}");
+    assert_eq!(
+        text_at(one(&tasks, "ansible.builtin.meta"), "ansible.builtin.meta"),
+        Some("flush_handlers"),
+        "{main}"
+    );
     let handlers = file(&files, "r/handlers/main.yml");
-    assert!(handlers.contains("name: \"Isoloom restart nginx\""), "{handlers}");
-    assert!(handlers.contains("state: restarted"), "{handlers}");
+    let handlers = untagged(&handlers);
+    let [restart] = handlers.as_sequence().map(Vec::as_slice).unwrap_or_default() else {
+        panic!("one handler: {handlers:?}")
+    };
+    assert_eq!(text_at(restart, "name"), Some("Isoloom restart nginx"), "{handlers:?}");
+    let restarted: Vec<&str> = restart
+        .as_mapping()
+        .into_iter()
+        .flatten()
+        .filter_map(|(_, args)| text_at(args, "state"))
+        .collect();
+    assert_eq!(restarted, ["restarted"], "{handlers:?}");
 }
 
 /// The Ansible project an environment of `machines` (and its `overrides.external`) renders on the external
@@ -215,10 +283,14 @@ overrides:
     );
     // `bare` has no recipe, so no role and no play; `web` does.
     assert!(!paths.iter().any(|p| p.contains("isoloom_machine_bare")), "{paths:?}");
-    let site = file(&files, ".isoloom/external/site.yml");
-    assert!(site.contains("hosts: web"), "{site}");
-    assert!(site.contains("- isoloom_machine_web"), "{site}");
-    assert_eq!(role_name("web"), "isoloom_machine_web");
+    let site = untagged(&file(&files, ".isoloom/external/site.yml"));
+    let plays: Vec<(&str, Vec<&str>)> = site
+        .as_sequence()
+        .into_iter()
+        .flatten()
+        .map(|p| (text_at(p, "hosts").unwrap_or_default(), texts_at(p, "roles")))
+        .collect();
+    assert_eq!(plays, [("web", vec![role_name("web").as_str()])]);
 }
 
 #[test]
@@ -230,14 +302,19 @@ overrides:
   external: { machines: { web-front: { ssh: { address: 10.0.0.5 } } } }
 ",
     );
-    let site = file(&files, ".isoloom/external/site.yml");
-    assert!(site.contains("hosts: web-front") && site.contains("- isoloom_machine_web_front"), "{site}");
-    let tasks = file(&files, ".isoloom/external/roles/isoloom_machine_web_front/tasks/main.yml");
+    let site = untagged(&file(&files, ".isoloom/external/site.yml"));
+    assert_eq!(text_at(&site[0], "hosts"), Some("web-front"), "{site:?}");
+    assert_eq!(texts_at(&site[0], "roles"), ["isoloom_machine_web_front"], "{site:?}");
+    let text = file(&files, ".isoloom/external/roles/isoloom_machine_web_front/tasks/main.yml");
     // `{{ isoloom_machine_web-front_file }}` would be a subtraction.
-    assert!(tasks.contains("{{ isoloom_machine_web_front_file }}"), "{tasks}");
-    assert!(tasks.contains("isoloom_machine_web_front_file: setup/web.sh"), "{tasks}");
-    assert!(!tasks.contains("web-front_"), "{tasks}");
-    assert_eq!(role_name("web-front"), "isoloom_machine_web_front");
+    let script = one(&untagged(&text), "ansible.builtin.script").clone();
+    assert_eq!(
+        text_at(&script["ansible.builtin.script"], "cmd"),
+        Some("{{ isoloom_project }}/{{ isoloom_machine_web_front_file }}"),
+        "{text}"
+    );
+    assert_eq!(text_at(&script["vars"], "isoloom_machine_web_front_file"), Some("setup/web.sh"), "{text}");
+    assert!(!text.contains("web-front_"), "{text}");
 }
 
 #[test]
@@ -269,7 +346,8 @@ overrides:
     // The pinned sha256, which galaxy doesn't check, is named for the user to check it.
     let sha = posix.sha256.to_string();
     assert_eq!(sha.len(), 64, "a sha256 is 64 hex chars: {sha}");
-    assert!(reqs.contains(&format!("# ansible.posix {}: sha256 {sha}\n", posix.version)), "{reqs}");
+    let named = format!("# ansible.posix {}: sha256 {sha}", posix.version);
+    assert!(reqs.lines().any(|l| l == named), "{reqs}");
 }
 
 #[test]
@@ -279,6 +357,7 @@ fn a_windows_packages_step_is_an_error_not_a_module_outside_the_builtin_ones() {
     let e = env("os: windows-server@2022, app: { steps: [{ packages: [Web-Server] }] }", Target::Vagrant, &[]);
     let c = Configured::of(&e, "m").unwrap();
     let err = role_files(&c, "r").unwrap_err();
+    assert!(matches!(&err, crate::Error::WindowsPackages { machine } if machine == "m"), "{err:?}");
     assert_eq!(err.to_string(), "external: machine `m`: a `packages` step on Windows has no Ansible task here");
 }
 
@@ -294,15 +373,45 @@ fn the_specs_text_reaches_ansible_unsafe_so_jinja_in_it_is_never_evaluated() {
         Target::Vagrant,
         &[],
     );
-    assert!(t.contains("cmd: !unsafe \"echo {{ lookup('pipe', 'id') }}\""), "{t}");
-    assert!(t.contains("dest: !unsafe \"/srv/{{ x }}.html\""), "{t}");
-    assert!(t.contains("path: !unsafe \"/srv/{% raw %}\""), "{t}");
-    assert!(t.contains("content: !unsafe |2"), "a unit holding Jinja is unsafe: {t}");
+    let tasks: Value = serde_yaml_ng::from_str(&t).expect("YAML");
+    let tasks = tasks.as_sequence().expect("a task list");
+    // A value as the file has it: `!unsafe` and its text, or plain.
+    let tagged = |v: &Value| match v {
+        Value::Tagged(tagged) if tagged.tag == "unsafe" => (true, tagged.value.as_str().unwrap_or_default().to_owned()),
+        other => (false, other.as_str().unwrap_or_default().to_owned()),
+    };
+    let unsafe_ = |s: &str| (true, s.to_owned());
+    let plain = |s: &str| (false, s.to_owned());
+    let task = |module: &str, key: &str, value: &str| {
+        tasks
+            .iter()
+            .find(|task| task.get(module).and_then(|m| m.get(key)).is_some_and(|v| tagged(v).1 == value))
+            .unwrap_or_else(|| panic!("no {module} task with {key} {value}: {t}"))
+    };
+    let shell = task("ansible.builtin.shell", "cmd", "echo {{ lookup('pipe', 'id') }}");
+    assert_eq!(tagged(&shell["ansible.builtin.shell"]["cmd"]), unsafe_("echo {{ lookup('pipe', 'id') }}"));
+    let copy = task("ansible.builtin.copy", "dest", "/srv/{{ x }}.html");
+    assert_eq!(tagged(&copy["ansible.builtin.copy"]["dest"]), unsafe_("/srv/{{ x }}.html"));
     // A project file is the play's folder joined to a task variable, which holds the spec's path.
-    assert!(t.contains("src: \"{{ isoloom_project }}/{{ isoloom_machine_m_file }}\""), "{t}");
-    assert!(t.contains("isoloom_machine_m_file: !unsafe \"site/{{ x }}.html\""), "{t}");
-    assert!(t.contains("cmd: \"{{ isoloom_project }}/{{ isoloom_machine_m_file }}\""), "{t}");
-    assert!(t.contains("isoloom_machine_m_file: !unsafe \"setup/{{ y }}.sh\""), "{t}");
+    assert_eq!(
+        tagged(&copy["ansible.builtin.copy"]["src"]),
+        plain("{{ isoloom_project }}/{{ isoloom_machine_m_file }}")
+    );
+    assert_eq!(tagged(&copy["vars"]["isoloom_machine_m_file"]), unsafe_("site/{{ x }}.html"));
+    let dir = task("ansible.builtin.file", "path", "/srv/{% raw %}");
+    assert_eq!(tagged(&dir["ansible.builtin.file"]["path"]), unsafe_("/srv/{% raw %}"));
+    let unit = tasks
+        .iter()
+        .filter_map(|each| each.get("ansible.builtin.copy")?.get("content"))
+        .find(|c| tagged(c).1.contains("--greet"))
+        .unwrap_or_else(|| panic!("no unit: {t}"));
+    assert!(tagged(unit).0, "a unit holding Jinja is unsafe: {t}");
+    let script = task("ansible.builtin.script", "cmd", "{{ isoloom_project }}/{{ isoloom_machine_m_file }}");
+    assert_eq!(
+        tagged(&script["ansible.builtin.script"]["cmd"]),
+        plain("{{ isoloom_project }}/{{ isoloom_machine_m_file }}")
+    );
+    assert_eq!(tagged(&script["vars"]["isoloom_machine_m_file"]), unsafe_("setup/{{ y }}.sh"));
 }
 
 #[test]
@@ -329,4 +438,106 @@ fn an_apt_pin_names_the_host_without_a_port_or_a_user() {
             .collect();
         assert_eq!(pins, ["Package: *\nPin: origin repo.example.com\nPin-Priority: 900\n"], "{url}");
     }
+}
+
+/// A repository of a Rocky machine is its key, checked, then a `.repo` file naming it; an
+/// Alpine machine's is its key under `/etc/apk/keys`, then a line of `/etc/apk/repositories`.
+#[test]
+fn a_repository_is_its_checked_key_then_the_package_managers_own_entry() {
+    let key = "key: { url: \"https://repo.example.com/vendor.rsa.pub\", sha256: 4c3f000000000000000000000000000000000000000000000000000000000000 }";
+    let sha = "sha256:4c3f000000000000000000000000000000000000000000000000000000000000";
+    let rocky = tasks(
+        &format!("os: rocky@9, app: {{ steps: [{{ repository: {{ name: vendor, url: \"https://repo.example.com/rpm\", priority: 10, {key} }} }}] }}"),
+        Target::Vagrant,
+        &[],
+    );
+    let rocky = untagged(&rocky);
+    let download = &one(&rocky, "ansible.builtin.get_url")["ansible.builtin.get_url"];
+    assert_eq!(text_at(download, "dest"), Some("/etc/pki/rpm-gpg/isoloom-vendor.asc"), "{rocky:?}");
+    assert_eq!(text_at(download, "checksum"), Some(sha), "{rocky:?}");
+    let repo = &one(&rocky, "ansible.builtin.yum_repository")["ansible.builtin.yum_repository"];
+    for (field, value) in [
+        ("name", "isoloom-vendor"),
+        ("baseurl", "https://repo.example.com/rpm"),
+        ("gpgkey", "file:///etc/pki/rpm-gpg/isoloom-vendor.asc"),
+        ("priority", "10"),
+    ] {
+        assert_eq!(text_at(repo, field), Some(value), "{field}: {repo:?}");
+    }
+    assert_eq!(repo["gpgcheck"].as_bool(), Some(true), "{repo:?}");
+
+    let alpine = tasks(
+        &format!("os: alpine@3.24, app: {{ steps: [{{ repository: {{ name: vendor, url: \"https://repo.example.com/apk\", {key} }} }}] }}"),
+        Target::Vagrant,
+        &[],
+    );
+    let alpine = untagged(&alpine);
+    let apk_key = &one(&alpine, "ansible.builtin.get_url")["ansible.builtin.get_url"];
+    assert_eq!(text_at(apk_key, "dest"), Some("/etc/apk/keys/vendor.rsa.pub"), "{alpine:?}");
+    let line = &one(&alpine, "ansible.builtin.lineinfile")["ansible.builtin.lineinfile"];
+    assert_eq!(text_at(line, "path"), Some("/etc/apk/repositories"), "{line:?}");
+    assert_eq!(text_at(line, "line"), Some("https://repo.example.com/apk"), "{line:?}");
+}
+
+/// Each state of a `file` step is the `file` module's (a folder, removed, a link) or a checked
+/// download, with its owner and mode where it has them.
+#[test]
+fn a_file_step_is_the_file_module_or_a_checked_download() {
+    let sha = "4c3f000000000000000000000000000000000000000000000000000000000000";
+    let t = tasks(
+        &format!(
+            "os: debian@12, app: {{ steps: [{{ file: {{ path: /srv/d, state: directory, owner: www-data, mode: '0750' }} }}, {{ file: {{ path: /srv/old, state: absent }} }}, {{ file: {{ path: /srv/current, link: /srv/d }} }}, {{ file: {{ path: /srv/tool, url: 'https://dl.example.com/tool', sha256: {sha} }} }}] }}"
+        ),
+        Target::Vagrant,
+        &[],
+    );
+    let tasks = untagged(&t);
+    let files: Vec<&Value> = using(&tasks, "ansible.builtin.file")
+        .into_iter()
+        .map(|task| &task["ansible.builtin.file"])
+        .collect();
+    let fields = |f: &Value| -> Vec<(String, String)> {
+        f.as_mapping()
+            .into_iter()
+            .flatten()
+            .map(|(k, v)| {
+                let v = v.as_str().map_or_else(|| v.as_bool().map(|b| b.to_string()).unwrap_or_default(), str::to_owned);
+                (k.as_str().unwrap_or_default().to_owned(), v)
+            })
+            .collect()
+    };
+    let pairs = |p: &[(&str, &str)]| p.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect::<Vec<_>>();
+    assert_eq!(
+        files.iter().map(|f| fields(f)).collect::<Vec<_>>(),
+        [
+            pairs(&[("path", "/srv/d"), ("state", "directory"), ("owner", "www-data"), ("mode", "0750")]),
+            pairs(&[("path", "/srv/old"), ("state", "absent")]),
+            pairs(&[("path", "/srv/current"), ("src", "/srv/d"), ("state", "link"), ("force", "true")]),
+        ],
+        "{t}"
+    );
+    let download = &one(&tasks, "ansible.builtin.get_url")["ansible.builtin.get_url"];
+    assert_eq!(
+        fields(download),
+        pairs(&[
+            ("url", "https://dl.example.com/tool"),
+            ("dest", "/srv/tool"),
+            ("checksum", &format!("sha256:{sha}"))
+        ]),
+        "{t}"
+    );
+}
+
+#[test]
+fn a_group_step_is_the_group_module_with_its_gid() {
+    let t = tasks(
+        "os: debian@12, app: { steps: [{ group: { name: ops, gid: 1600, system: true } }] }",
+        Target::Vagrant,
+        &[],
+    );
+    let tasks = untagged(&t);
+    let group = &one(&tasks, "ansible.builtin.group")["ansible.builtin.group"];
+    assert_eq!(text_at(group, "name"), Some("ops"), "{t}");
+    assert_eq!(group["gid"].as_u64(), Some(1600), "{t}");
+    assert_eq!(group["system"].as_bool(), Some(true), "{t}");
 }
