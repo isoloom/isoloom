@@ -143,12 +143,11 @@ fn container(image: &str, input: &Path, cpus: u16) -> Res<String> {
     Ok(String::from_utf8_lossy(&done.stdout).into_owned())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
     /// `run.sh` with its folders (`/work`, `/out`, `/cache`, `/tmp`) under `at`.
-    #[cfg(unix)]
     fn script_under(at: &std::path::Path) -> String {
         let marked = SCRIPT
             .replace("/tmp/", "\u{1}tmp/")
@@ -162,7 +161,6 @@ mod tests {
     /// module whose init fails offline and online, one whose provider starts too slowly once, one
     /// that isn't there. Every module is reported in the list's order, whatever order the jobs
     /// ended in, with its status and what Terraform said.
-    #[cfg(unix)]
     #[test]
     fn the_script_reports_every_module_in_the_list_s_order() {
         let bin = isoloom_test_support::FakeBin::named("tf-test").unwrap();

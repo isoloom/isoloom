@@ -114,28 +114,39 @@ fn a_windows_binary_importing_the_visual_cpp_runtime_is_named() {
     assert_eq!(super::vc_runtime_imports("  DLL Name: KERNEL32.dll\n"), Vec::<String>::new());
 }
 
-/// The `cargo xtask check --only` lists a workflow runs, as step names.
-fn workflow_steps(file: &str) -> std::collections::BTreeSet<String> {
+/// Each `run` of workflow `file`'s steps, across its jobs, parsed.
+fn workflow_runs(file: &str) -> (serde_yaml_ng::Value, Vec<String>) {
     let text = std::fs::read_to_string(crate::repo::root().join(".github/workflows").join(file)).unwrap();
-    text.lines()
-        .filter_map(|l| l.trim().strip_prefix("- run: cargo run -q -p xtask --locked -- check --only "))
-        .flat_map(|list| list.split(','))
-        .map(str::to_owned)
-        .collect()
+    let doc = isoloom_test_support::yaml(&text);
+    let runs = doc["jobs"]
+        .as_mapping()
+        .into_iter()
+        .flat_map(|jobs| jobs.values())
+        .flat_map(|job| job["steps"].as_sequence().into_iter().flatten())
+        .filter_map(|step| step["run"].as_str().map(str::to_owned))
+        .collect();
+    (doc, runs)
 }
 
 /// gate.yml runs every step `cargo xtask check` has (main and a release tag get the whole check),
 /// and ci.yml runs the short list on pull requests into dev: CI and the command can't drift.
 #[test]
 fn the_gate_runs_every_step_and_ci_the_short_list() {
-    let gate = workflow_steps("gate.yml");
-    let missing: Vec<&str> = STEPS.iter().map(|s| s.name).filter(|n| !gate.contains(*n)).collect();
+    let (_, gate) = workflow_runs("gate.yml");
+    let gate: std::collections::BTreeSet<&str> = gate
+        .iter()
+        .filter_map(|run| run.strip_prefix("cargo run -q -p xtask --locked -- check --only "))
+        .flat_map(|list| list.split(','))
+        .collect();
+    let missing: Vec<&str> = STEPS.iter().map(|s| s.name).filter(|n| !gate.contains(n)).collect();
     assert_eq!(missing, Vec::<&str>::new(), "steps gate.yml doesn't run");
-    let unknown: Vec<&String> = gate.iter().filter(|n| !STEPS.iter().any(|s| s.name == n.as_str())).collect();
-    assert_eq!(unknown, Vec::<&String>::new(), "gate.yml names steps cargo xtask check doesn't have");
-    let ci = std::fs::read_to_string(crate::repo::root().join(".github/workflows/ci.yml")).unwrap();
+    let unknown: Vec<&&str> = gate.iter().filter(|n| !STEPS.iter().any(|s| s.name == **n)).collect();
+    assert_eq!(unknown, Vec::<&&str>::new(), "gate.yml names steps cargo xtask check doesn't have");
+    let (ci, runs) = workflow_runs("ci.yml");
     assert!(
-        ci.contains("check ${{ matrix.check }}") && ci.contains("check: --fast"),
-        "ci.yml runs the short list"
+        runs.iter().any(|r| r == "cargo run -q -p xtask --locked -- check ${{ matrix.check }}"),
+        "{runs:?}"
     );
+    let checks = isoloom_test_support::yaml_values(&ci["jobs"]["fast"]["strategy"]["matrix"], "check");
+    isoloom_test_support::assert_every!(&checks, |c: &String| c == "--fast" || c.starts_with("--fast --skip "));
 }

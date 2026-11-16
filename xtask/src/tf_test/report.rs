@@ -239,6 +239,11 @@ mod tests {
         (s, "tests/terraform/cloud-vm/aws/segmented.tftest.hcl".into())
     }
 
+    /// The table's row for [`suite`]: its status, then what it counted.
+    fn row(status: &str, counted: &str) -> String {
+        format!("{status:<5} {:<20} {:<22} {counted}", "segmented", "cloud-vm/aws")
+    }
+
     #[test]
     fn a_failure_names_the_example_target_assertion_and_planned_value() {
         let mut failed = run("routing", "fail");
@@ -265,16 +270,20 @@ mod tests {
                 known: 1
             }
         );
-        assert!(text.contains("FAIL  segmented cloud-vm/aws run \"routing\""), "{text}");
-        assert!(
-            text.contains("back has no default route (tests/terraform/cloud-vm/aws/segmented.tftest.hcl:16)"),
-            "{text}"
+        assert_eq!(
+            text.lines().collect::<Vec<_>>(),
+            [
+                row("FAIL", "3 runs, 1 known bug").as_str(),
+                "",
+                "FAIL  segmented cloud-vm/aws run \"routing\" (fail)",
+                "      back has no default route (tests/terraform/cloud-vm/aws/segmented.tftest.hcl:16)",
+                "      planned: aws_route_table.back.route is [",
+                "                 \"0.0.0.0/0\"",
+                "               ]",
+                "",
+                "KNOWN segmented cloud-vm/aws run \"known_bug_x\" (fail)",
+            ]
         );
-        assert!(
-            text.contains("planned: aws_route_table.back.route is [\n                 \"0.0.0.0/0\""),
-            "{text}"
-        );
-        assert!(text.contains("KNOWN segmented cloud-vm/aws run \"known_bug_x\""), "{text}");
     }
 
     #[test]
@@ -288,7 +297,7 @@ mod tests {
     fn a_suite_without_results_fails() {
         let (text, tally) = report(&[suite()], &[]);
         assert_eq!(tally.failed, 1);
-        assert!(text.contains("no result"), "{text}");
+        assert_eq!(text, format!("{}\n", row("FAIL", "no result")));
     }
 
     #[test]
@@ -301,9 +310,14 @@ mod tests {
         };
         let (text, tally) = report(&[suite()], &[init]);
         assert_eq!(tally.failed, 1);
-        assert!(
-            text.contains("no run finished (status init-failed)") && text.contains("Error: provider missing"),
-            "{text}"
+        assert_eq!(
+            text.lines().collect::<Vec<_>>(),
+            [
+                row("FAIL", "0 runs").as_str(),
+                "",
+                "FAIL  segmented cloud-vm/aws: no run finished (status init-failed)",
+                "      Error: provider missing",
+            ]
         );
     }
 
@@ -324,9 +338,14 @@ mod tests {
     fn a_crash_fails_the_runs_that_never_finished() {
         let (text, tally) = report(&[suite()], &[crashed(&["routing", "outputs"])]);
         assert_eq!((tally.passed, tally.failed), (1, 1));
-        assert!(
-            text.contains("1 run(s) never finished: outputs (status 11)") && text.contains("panic: value has marks"),
-            "{text}"
+        assert_eq!(
+            text.lines().collect::<Vec<_>>(),
+            [
+                row("FAIL", "1 runs").as_str(),
+                "",
+                "FAIL  segmented cloud-vm/aws: 1 run(s) never finished: outputs (status 11)",
+                "      panic: value has marks",
+            ]
         );
     }
 
@@ -334,6 +353,10 @@ mod tests {
     fn a_crash_after_the_last_run_fails() {
         let (text, tally) = report(&[suite()], &[crashed(&["routing"])]);
         assert_eq!((tally.passed, tally.failed), (1, 1));
-        assert!(text.contains("Terraform crashed after its last run (status 11)"), "{text}");
+        assert_eq!(
+            text.lines().nth(2),
+            Some("FAIL  segmented cloud-vm/aws: Terraform crashed after its last run (status 11)"),
+            "{text}"
+        );
     }
 }

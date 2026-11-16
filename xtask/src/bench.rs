@@ -176,27 +176,61 @@ mod tests {
         entries.iter().map(|(id, ns)| ((*id).to_owned(), *ns)).collect()
     }
 
+    /// Each line's words: the columns without their padding.
+    fn words(lines: &[String]) -> Vec<Vec<&str>> {
+        lines.iter().map(|l| l.split_whitespace().collect()).collect()
+    }
+
     #[test]
     fn only_a_benchmark_slower_than_the_threshold_counts() {
         let baseline = medians(&[("parse/a", 100.0), ("lower/a", 100.0), ("render/a", 100.0)]);
         let now = medians(&[("parse/a", 130.0), ("lower/a", 120.0), ("render/b", 5.0)]);
         let report = compare(&baseline, &now, 25.0);
         assert_eq!(report.slower, 1);
-        let text = report.lines.concat();
-        assert!(text.contains("parse/a") && text.contains("+30.0%  SLOWER"), "{text}");
-        assert!(text.contains("render/b") && text.contains("not in the baseline"), "{text}");
-        assert!(text.contains("render/a                     gone"), "{text}");
+        assert_eq!(
+            words(&report.lines),
+            [
+                vec!["lower/a", "120", "ns", "baseline", "100", "ns", "+20.0%"],
+                vec!["parse/a", "130", "ns", "baseline", "100", "ns", "+30.0%", "SLOWER"],
+                vec!["render/b", "5", "ns", "(not", "in", "the", "baseline)"],
+                vec!["render/a", "gone", "(in", "the", "baseline", "only)"],
+            ]
+        );
     }
 
     #[test]
     fn a_benchmark_over_its_budget_is_named() {
         assert_eq!(over_budget(&medians(&[("generate/every-example", 7.9e9)])), Vec::<String>::new());
         let over = over_budget(&medians(&[("generate/every-example", 8.1e9), ("parse/a", 9e9)]));
-        assert_eq!(over.len(), 1);
-        assert!(
-            over[0].contains("generate/every-example") && over[0].contains("over its budget of 8.00 s"),
-            "{over:?}"
+        assert_eq!(
+            words(&over),
+            [vec!["generate/every-example", "8.10", "s", "over", "its", "budget", "of", "8.00", "s"]]
         );
+    }
+
+    /// A criterion report folder: `<id>/new/{benchmark,estimates}.json`.
+    fn criterion(at: &std::path::Path, folder: &str, id: &str, median: f64) {
+        let new = at.join(folder).join("new");
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::write(new.join("benchmark.json"), json!({ "full_id": id }).to_string()).unwrap();
+        std::fs::write(new.join("estimates.json"), json!({ "median": { "point_estimate": median } }).to_string()).unwrap();
+    }
+
+    #[test]
+    fn the_medians_are_read_from_criterions_reports_rounded() {
+        let dir = tempfile::Builder::new().prefix("isoloom-xtask-bench-").tempdir().unwrap();
+        criterion(dir.path(), "parse_a", "parse/a", 1234.6);
+        criterion(dir.path(), "lower_a", "lower/a", 99.2);
+        // A folder without a finished report (criterion's own `report/`) is left out.
+        std::fs::create_dir_all(dir.path().join("report")).unwrap();
+        assert_eq!(super::medians(dir.path()).unwrap(), medians(&[("lower/a", 99.0), ("parse/a", 1235.0)]));
+    }
+
+    #[test]
+    fn no_report_at_all_is_an_error_naming_the_folder() {
+        let dir = tempfile::Builder::new().prefix("isoloom-xtask-bench-").tempdir().unwrap();
+        let e = super::medians(dir.path()).unwrap_err().to_string();
+        assert_eq!(e, format!("no benchmark results under {}", dir.path().display()));
     }
 
     #[test]

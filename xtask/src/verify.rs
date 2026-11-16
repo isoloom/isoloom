@@ -311,7 +311,7 @@ mod tests {
         assert_eq!(cpus(Some("8")).unwrap(), 8);
         for wrong in ["0", "1.5", "-2", "all"] {
             let e = cpus(Some(wrong)).unwrap_err().to_string();
-            assert!(e.contains(&format!("`{wrong}`")), "{e}");
+            assert_eq!(e, format!("ISOLOOM_VERIFY_CPUS is `{wrong}`: give a whole number of CPUs, from 1"));
         }
     }
 
@@ -350,7 +350,8 @@ mod tests {
         let whole = results(&[b'x'; 2048]);
         std::fs::write(dir.join("out.tar"), &whole[..1024]).unwrap();
         let e = unpack(&dir.join("out.tar"), &dir.join("out"), 3).unwrap_err().to_string();
-        assert!(e.starts_with("the results didn't unpack into ") && e.contains("(runner exit status 3)"), "{e}");
+        let said = format!("the results didn't unpack into {} (runner exit status 3): ", dir.join("out").display());
+        assert!(e.starts_with(&said), "{e}");
     }
 
     #[test]
