@@ -106,6 +106,32 @@ pub(crate) fn join(topo: &mut Topology, node: &str, lan: &str, octet: Option<u8>
     Ok(())
 }
 
+/// The spec's text, parsed as YAML: what a reader of `isoloom.yml` finds at each path.
+pub(crate) fn parsed(c: &Compiled) -> serde_yaml_ng::Value {
+    isoloom_test_support::yaml(&yaml(c))
+}
+
+/// The scalar at `path` of the spec's text (`machines.web.app.firmware`).
+pub(crate) fn at(c: &Compiled, path: &str) -> String {
+    isoloom_test_support::yaml_str(&parsed(c), path)
+}
+
+/// Every key of `value`, at any depth, and `<empty>` for each null, empty list or empty map.
+pub(crate) fn keys_and_empties(value: &serde_yaml_ng::Value) -> Vec<String> {
+    use serde_yaml_ng::Value;
+    match value {
+        Value::Null => vec!["<empty>".to_owned()],
+        Value::Sequence(items) if items.is_empty() => vec!["<empty>".to_owned()],
+        Value::Mapping(map) if map.is_empty() => vec!["<empty>".to_owned()],
+        Value::Sequence(items) => items.iter().flat_map(keys_and_empties).collect(),
+        Value::Mapping(map) => map
+            .iter()
+            .flat_map(|(k, v)| std::iter::once(k.as_str().unwrap_or_default().to_owned()).chain(keys_and_empties(v)))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// The spec's text, as `isoloom.yml` gets it.
 pub(crate) fn yaml(c: &Compiled) -> String {
     c.clone().into_parts().0
@@ -119,6 +145,13 @@ pub(crate) fn spec(c: &Compiled) -> isoloom_spec::Spec {
 /// The project's own files.
 pub(crate) fn files(c: &Compiled) -> Vec<isoloom_topology::ProjectFile> {
     c.clone().into_parts().2
+}
+
+/// What Isoloom finds wrong with the compiled spec (`isoloom validate`): each problem's code,
+/// field and reason.
+pub(crate) fn problems(c: &Compiled) -> Outcome<Vec<(isoloom_spec::syntax::Code, String, String)>> {
+    let project = isoloom_targets::Lab::parse(&yaml(c)).map_err(|p| format!("Isoloom doesn't read it: {p:?}"))?;
+    Ok(project.problems().iter().map(|p| (p.code, p.path.to_string(), p.reason.clone())).collect())
 }
 
 /// The compiled spec, which Isoloom reads and finds nothing wrong with (`isoloom validate`).

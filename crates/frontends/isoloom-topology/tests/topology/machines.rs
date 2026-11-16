@@ -1,9 +1,9 @@
 //! Machines: what each kind of node becomes, its steps and its ports.
 
-use isoloom_spec::syntax::Recipe;
+use isoloom_spec::syntax::{Code, Recipe};
 use isoloom_topology::{Error, compile};
 
-use crate::testing::{Outcome, accepted, container, files, spec, three_node, vm, yaml};
+use crate::testing::{Outcome, accepted, at, container, files, keys_and_empties, parsed, problems, spec, three_node, vm, yaml};
 
 #[test]
 fn a_container_is_an_app_from_its_image_and_a_vm_its_os_and_steps() -> Outcome {
@@ -21,13 +21,15 @@ fn a_container_is_an_app_from_its_image_and_a_vm_its_os_and_steps() -> Outcome {
 
 #[test]
 fn the_yaml_is_the_new_format_with_defaults_left_out() -> Outcome {
-    let yaml = accepted(&three_node()?)?.into_parts().0;
-    for old in ["docker:", "vm:", "services:", "idle", "provision:", "null", "[]", "{}", "privileged", "arch"] {
-        assert!(!yaml.contains(old), "`{old}` in:\n{yaml}");
+    let c = accepted(&three_node()?)?;
+    let written = keys_and_empties(&parsed(&c));
+    for old in ["docker", "vm", "services", "idle", "provision", "<empty>", "privileged", "arch"] {
+        assert!(!written.iter().any(|k| k == old), "`{old}` in:\n{}", yaml(&c));
     }
-    assert!(yaml.contains("internet: false"), "{yaml}");
-    assert!(yaml.contains("access: true"), "{yaml}");
-    assert!(yaml.contains("steps:\n      - run: provision/x.sh"), "{yaml}");
+    assert_eq!(
+        ["networks.link-0.internet", "machines.client.access", "machines.client.app.steps.0.run"].map(|path| at(&c, path)),
+        ["false", "true", "provision/x.sh"]
+    );
     Ok(())
 }
 
@@ -36,8 +38,7 @@ fn an_idle_container_is_kept_running_by_its_own_command() -> Outcome {
     let mut topo = three_node()?;
     topo.nodes["router"].kind = container("alpine:3.20", true);
     let c = accepted(&topo)?;
-    assert!(yaml(&c).contains("command:\n    - sleep\n    - infinity"), "{}", yaml(&c));
-    assert!(spec(&c).machines["router"].command.is_some());
+    assert_eq!(isoloom_test_support::yaml_strs(&parsed(&c), "machines.router.command"), ["sleep", "infinity"]);
     Ok(())
 }
 
@@ -50,10 +51,9 @@ fn a_vm_without_steps_is_its_os_alone_and_a_playbook_is_a_playbook_step() -> Out
     topo.nodes["server"].kind = vm("ubuntu@24.04", &["provision/web.sh", "provision/site.yml"])?;
     let c = accepted(&topo)?;
     assert!(spec(&c).machines["client"].app().is_none());
-    assert!(
-        yaml(&c).contains("- run: provision/web.sh\n      - playbook: provision/site.yml"),
-        "{}",
-        yaml(&c)
+    assert_eq!(
+        ["machines.server.app.steps.0.run", "machines.server.app.steps.1.playbook"].map(|path| at(&c, path)),
+        ["provision/web.sh", "provision/site.yml"]
     );
     Ok(())
 }
@@ -65,12 +65,12 @@ fn ports_are_named_with_their_protocol() -> Outcome {
     topo.nodes["router"].kind = vm("debian@12", &[])?;
     topo.nodes["server"].services = serde_json::from_str(r#"[{ "port": 22 }, { "port": 443, "protocol": "https" }, { "port": 53, "protocol": "udp" }]"#)?;
     let c = accepted(&topo)?;
-    assert!(
-        yaml(&c).contains(
-            "ports:\n      ssh: 22\n      https:\n        port: 443\n        protocol: https\n      dns-udp:\n        port: 53\n        protocol: udp\n"
-        ),
-        "{}",
-        yaml(&c)
+    let ports = "machines.server.ports";
+    assert_eq!(isoloom_test_support::yaml_keys_at(&parsed(&c), ports), ["ssh", "https", "dns-udp"]);
+    assert_eq!(
+        ["ssh", "https.port", "https.protocol", "dns-udp.port", "dns-udp.protocol"].map(|p| at(&c, &format!("{ports}.{p}"))),
+        ["22", "443", "https", "53", "udp"],
+        "plain TCP as its number"
     );
     Ok(())
 }
@@ -82,17 +82,25 @@ fn a_windows_vm_runs_its_powershell_steps_and_the_controller_its_playbooks() -> 
     topo.nodes["router"].kind = vm("debian@12", &[])?;
     topo.nodes["server"].kind = vm("windows-server@2022", &["provision/iis.ps1", "provision/domain.yml"])?;
     let c = accepted(&topo)?;
-    assert!(
-        yaml(&c).contains("os: windows-server@2022\n    app:\n      steps:\n      - run: provision/iis.ps1\n    networks:"),
-        "{}",
-        yaml(&c)
+    assert_eq!(
+        ["machines.server.os", "machines.server.app.steps.0.run", "provision.0.ansible"].map(|path| at(&c, path)),
+        ["windows-server@2022", "provision/iis.ps1", "provision/domain.yml"]
     );
-    assert!(yaml(&c).ends_with("provision:\n- ansible: provision/domain.yml\n"), "{}", yaml(&c));
+    assert_eq!(
+        isoloom_test_support::yaml_strs(&parsed(&c), "machines.server.app.steps").len(),
+        1,
+        "the playbook isn't the VM's step"
+    );
     let starter = files(&c)
         .into_iter()
         .find(|f| f.path == "provision/domain.yml")
         .ok_or("the playbook's starter")?;
-    assert!(starter.contents.contains("- hosts: server\n"), "{}", starter.contents);
+    let play = isoloom_test_support::yaml(&starter.contents);
+    assert_eq!(
+        isoloom_test_support::yaml_str(&play, "0.hosts"),
+        "server",
+        "it runs from the controller, on its machine"
+    );
     Ok(())
 }
 
@@ -104,10 +112,9 @@ fn a_windows_vm_with_only_playbooks_is_its_os_alone() -> Outcome {
     topo.nodes["server"].kind = vm("windows@11", &["provision/a.yml", "provision/b.yaml"])?;
     let c = accepted(&topo)?;
     assert!(spec(&c).machines["server"].app().is_none(), "{}", yaml(&c));
-    assert!(
-        yaml(&c).ends_with("provision:\n- ansible: provision/a.yml\n- ansible: provision/b.yaml\n"),
-        "{}",
-        yaml(&c)
+    assert_eq!(
+        ["provision.0.ansible", "provision.1.ansible"].map(|path| at(&c, path)),
+        ["provision/a.yml", "provision/b.yaml"]
     );
     Ok(())
 }
@@ -147,7 +154,10 @@ fn a_container_takes_the_forms_isoloom_has_of_its_image() -> Outcome {
     let s = spec(&c);
     assert_eq!(s.machines["router"].os.map(|os| os.to_string()).as_deref(), Some("alpine@3.24"));
     assert!(s.machines["router"].app().is_none() && s.machines["router"].command.is_none(), "{}", yaml(&c));
-    assert!(yaml(&c).contains("server:\n    os: debian@12\n    service: nginx@1.30\n"), "{}", yaml(&c));
+    assert_eq!(
+        ["machines.server.os", "machines.server.service"].map(|path| at(&c, path)),
+        ["debian@12", "nginx@1.30"]
+    );
     Ok(())
 }
 
@@ -155,9 +165,14 @@ fn a_container_takes_the_forms_isoloom_has_of_its_image() -> Outcome {
 fn a_drawing_no_target_runs_whole_is_refused_naming_each_machine_and_why() -> Outcome {
     let mut topo = three_node()?;
     topo.nodes["server"].kind = vm("windows-server@2022", &["provision/iis.ps1"])?;
-    let refused = accepted(&topo).err().ok_or("a drawing no one target runs")?.to_string();
-    assert!(refused.contains("no target is possible"), "{refused}");
-    assert!(refused.contains("machines.router.app.image"), "the image with no VM form: {refused}");
-    assert!(refused.contains("machines.server.os"), "the Windows VM with no container form: {refused}");
+    // The Windows VM has no container form, the router's image no VM form.
+    assert_eq!(
+        problems(&compile(&topo)?)?,
+        [(
+            Code::InvalidValue,
+            "machines".to_owned(),
+            "no target is possible: machines.server.os: Windows has no container form; machines.router.app.image: an image's filesystem can't be reproduced on a fresh VM".to_owned()
+        )]
+    );
     Ok(())
 }

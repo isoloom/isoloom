@@ -2,7 +2,7 @@
 
 use isoloom_topology::{Compiled, Error, Lan, ProjectFile, Result, Topology, compile};
 
-use crate::testing::{Outcome, accepted, cable, ep, files, join, lan, octet, spec, two_lans, yaml};
+use crate::testing::{Outcome, accepted, at, cable, ep, files, join, lan, octet, parsed, spec, two_lans};
 
 /// A switch running a Cisco OS, as the editor sends it: a node of its own with no networks,
 /// named as the `device` of its VLANs; machines on its ports join the VLANs.
@@ -26,7 +26,10 @@ fn a_cisco_switch_switches_its_vlans() -> Outcome {
     assert_eq!(spec(&c).networks["sw1"].switch.as_deref(), Some("sw1"));
     assert!(spec(&c).machines["sw1"].networks.is_empty());
     assert_eq!(spec(&c).machines["pc1"].networks.keys().collect::<Vec<_>>(), ["sw1.vlan10"]);
-    assert!(yaml(&c).contains("appliance: cisco-iol-l2\n      config: configs/sw1.cfg"), "{}", yaml(&c));
+    assert_eq!(
+        ["machines.sw1.app.appliance", "machines.sw1.app.config"].map(|path| at(&c, path)),
+        ["cisco-iol-l2", "configs/sw1.cfg"]
+    );
     assert_eq!(
         files(&c),
         [ProjectFile {
@@ -134,8 +137,8 @@ fn a_starter_names_its_machines_address_on_a_vlan_and_a_cable() -> Outcome {
     )?;
     let c = accepted(&topo)?;
     let starter = files(&c).into_iter().find(|f| f.path == "provision/pc.sh").ok_or("no starter")?;
-    assert!(starter.contents.contains("# Address: 10.10.10.10 (sw1.vlan10)\n"), "{}", starter.contents);
-    assert!(starter.contents.contains("# Address: 10.200.0.2 (link-0)\n"), "{}", starter.contents);
+    let addresses: Vec<&str> = starter.contents.lines().filter(|l| l.starts_with("# Address: ")).collect();
+    assert_eq!(addresses, ["# Address: 10.10.10.10 (sw1.vlan10)", "# Address: 10.200.0.2 (link-0)"]);
     Ok(())
 }
 
@@ -153,10 +156,14 @@ fn a_dynamips_router_boots_its_firmware() -> Outcome {
         }"#,
     )?;
     let c = accepted(&topo)?;
-    assert!(
-        yaml(&c).contains("app:\n      appliance: cisco-dynamips\n      firmware: images/r1.bin"),
-        "{}",
-        yaml(&c)
+    assert_eq!(
+        isoloom_test_support::yaml_keys_at(&parsed(&c), "machines.r1.app"),
+        ["appliance", "firmware"],
+        "no image of its own"
+    );
+    assert_eq!(
+        ["machines.r1.app.appliance", "machines.r1.app.firmware"].map(|path| at(&c, path)),
+        ["cisco-dynamips", "images/r1.bin"]
     );
     Ok(())
 }

@@ -2,7 +2,7 @@
 
 use isoloom_topology::{Error, compile};
 
-use crate::testing::{Outcome, accepted, cable, ep, octet, spec, three_node, yaml};
+use crate::testing::{Outcome, accepted, at, cable, ep, octet, parsed, spec, three_node, yaml};
 
 #[test]
 fn each_cable_is_a_point_to_point_network() -> Outcome {
@@ -100,6 +100,14 @@ fn a_cable_keeps_its_conditions() -> Outcome {
     let mut topo = three_node()?;
     topo.links[0].tc = serde_json::from_str(r#"{ "delay": "40ms", "loss": 0.5 }"#)?;
     let c = accepted(&topo)?;
-    assert!(yaml(&c).contains("tc:\n      delay: 40ms\n      loss: 0.5"), "{}", yaml(&c));
+    assert_eq!(
+        (at(&c, "networks.link-0.tc.delay"), at(&c, "networks.link-0.tc.loss")),
+        ("40ms".to_owned(), "0.5".to_owned())
+    );
+    assert_eq!(
+        isoloom_test_support::yaml_at(&parsed(&c), "networks.link-1.tc"),
+        None,
+        "the other cable has none"
+    );
     Ok(())
 }

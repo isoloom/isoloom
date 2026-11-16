@@ -1,5 +1,5 @@
 ---
-source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
+source: crates/frontends/isoloom-topology/tests/topology/fixtures.rs
 expression: "compiled(\"cisco-ospf\", &[\"docker\"])"
 ---
 version: 1

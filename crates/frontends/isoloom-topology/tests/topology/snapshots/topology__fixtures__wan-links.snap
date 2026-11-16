@@ -1,5 +1,5 @@
 ---
-source: crates/frontends/isoloom-topology/tests/compile/fixtures.rs
+source: crates/frontends/isoloom-topology/tests/topology/fixtures.rs
 expression: yaml(&compiled)
 ---
 version: 1

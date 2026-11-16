@@ -18,22 +18,3 @@ impl From<&ControllerPlaybook> for ProvisionDoc {
         ProvisionDoc { ansible: p.path.clone() }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_controller_playbook_is_a_provision_step() {
-        let p = ControllerPlaybook {
-            path: "provision/dc01.yml".into(),
-            machine: "dc01".into(),
-        };
-        assert_eq!(
-            ProvisionDoc::from(&p),
-            ProvisionDoc {
-                ansible: "provision/dc01.yml".into()
-            }
-        );
-    }
-}

@@ -1,4 +1,4 @@
-//! The compiler, through its API: drawings compiled into specs Isoloom accepts, one module per
+//! isoloom-topology's one test binary. The compiler, through its API: drawings compiled into specs Isoloom accepts, one module per
 //! concept (machines, LANs, cables, switches), the fixture drawings as written, and properties
 //! over generated drawings. `testing` holds what they share.
 

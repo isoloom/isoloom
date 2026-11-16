@@ -4,9 +4,10 @@
 
 use std::path::Path;
 
+use isoloom_spec::syntax::Code;
 use isoloom_topology::{Topology, compile};
 
-use crate::testing::{Outcome, accepted, yaml};
+use crate::testing::{Outcome, accepted, problems, yaml};
 
 /// The drawing in `tests/fixtures/<name>.json`.
 fn fixture(name: &str) -> Outcome<Topology> {
@@ -54,12 +55,15 @@ fn the_cisco_drawing_compiles_to_a_spec_isoloom_runs() -> Outcome {
 #[test]
 fn the_wan_drawing_is_refused_naming_the_machines_no_target_takes() -> Outcome {
     let compiled = compile(&fixture("wan-links")?)?;
-    let project = isoloom_targets::Lab::parse(&yaml(&compiled)).map_err(|p| format!("{p:?}"))?;
-    let problems: Vec<String> = project.problems().iter().map(ToString::to_string).collect();
-    let why = problems.join("\n");
-    assert!(why.contains("no target is possible"), "{why}");
-    assert!(why.contains("machines.edge.app.image"), "the image with no VM form: {why}");
-    assert!(why.contains("machines.files.command"), "the VM with no container form: {why}");
+    // The VM with no container form, the image with no VM form.
+    assert_eq!(
+        problems(&compiled)?,
+        [(
+            Code::InvalidValue,
+            "machines".to_owned(),
+            "no target is possible: machines.files.command: its steps install services, but no `service` step or `command` runs one in a container; machines.edge.app.image: an image's filesystem can't be reproduced on a fresh VM".to_owned()
+        )]
+    );
     insta::assert_snapshot!("wan-links", yaml(&compiled));
     Ok(())
 }
