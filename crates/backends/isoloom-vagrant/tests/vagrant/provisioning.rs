@@ -21,28 +21,27 @@ fn every_vagrantfile() -> Outcome<Vec<(String, String)>> {
 }
 
 /// Each `config.vm.define` of `file`: its name, and each of its provisioners as its name and its
-/// text (the `vm.provision` line up to the next one, or the define's end).
+/// statement, its script included: its own, in order, then its providers' (which Vagrant runs
+/// after its own).
 fn defines(file: &str) -> Vec<(String, Vec<(String, String)>)> {
-    let mut out: Vec<(String, Vec<(String, String)>)> = Vec::new();
-    for line in file.lines() {
-        if let Some(rest) = line.trim_start().strip_prefix("config.vm.define \"") {
-            out.push((rest.split('"').next().unwrap_or_default().to_owned(), Vec::new()));
-        } else if let Some((_, provisioners)) = out.last_mut() {
-            if line.contains(".vm.provision ") {
-                let name = line
-                    .split("name: \"")
-                    .nth(1)
-                    .or_else(|| line.split(".vm.provision \"").nth(1))
-                    .unwrap_or_default();
-                provisioners.push((name.split('"').next().unwrap_or_default().to_owned(), String::new()));
-            }
-            if let Some((_, text)) = provisioners.last_mut() {
-                text.push_str(line);
-                text.push('\n');
-            }
-        }
-    }
-    out
+    let r = isoloom_test_support::ruby_blocks(file);
+    r.find("config.vm.define \"")
+        .into_iter()
+        .map(|define| {
+            let name = define.head.split('"').nth(1).unwrap_or_default().to_owned();
+            let provisioners = define
+                .every_statement()
+                .into_iter()
+                .filter(|s| s.starts_with("m.vm.provision ") || s.starts_with("o.vm.provision "))
+                .map(|s| {
+                    let head = s.lines().next().unwrap_or_default();
+                    let named = head.split("name: \"").nth(1).or_else(|| head.split(".vm.provision \"").nth(1));
+                    (named.unwrap_or_default().split('"').next().unwrap_or_default().to_owned(), s.to_owned())
+                })
+                .collect();
+            (name, provisioners)
+        })
+        .collect()
 }
 
 /// The provisioners that converge, run again by `vagrant provision`: each writes the same state
@@ -109,6 +108,9 @@ fn vagrant_provision_runs_again_safely() -> Outcome {
     Ok(())
 }
 
+/// The readiness check is the last of each machine's own provisioners (`m.vm.provision`), and an
+/// unhealthy machine fails it. A provider's own provisioner (`o.vm.provision`, QEMU's Windows
+/// address) is not among them: Vagrant runs it after every one of the machine's own.
 #[test]
 fn the_readiness_check_is_each_machines_last_provisioner_and_its_failure_fails_vagrant_up() -> Outcome {
     for (example, file) in every_vagrantfile()? {
@@ -117,7 +119,8 @@ fn the_readiness_check_is_each_machines_last_provisioner_and_its_failure_fails_v
             if !env.machines.contains_key(&define) {
                 continue;
             }
-            let (last, text) = provisioners.last().ok_or(format!("{example}/{define}: no provisioner"))?;
+            let own: Vec<&(String, String)> = provisioners.iter().filter(|(_, s)| s.starts_with("m.vm.provision ")).collect();
+            let (last, text) = own.last().ok_or(format!("{example}/{define}: no provisioner"))?;
             assert_eq!(last, "ready", "{example}/{define}");
             let healthcheck = env.machines.get(&define).is_some_and(|m| m.process.health.is_some());
             if healthcheck {

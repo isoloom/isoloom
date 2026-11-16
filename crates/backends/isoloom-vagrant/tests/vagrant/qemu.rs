@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use isoloom_test_support::needs;
+use isoloom_test_support::{assert_every, needs};
 
 use crate::testing::{Outcome, loadable, printed};
 
@@ -125,7 +125,11 @@ fn a_hub_left_running_is_stopped_and_fails_its_test() -> Outcome {
     // A stand-in hub, as the Ruby tests start one: a daemon whose command names its pid file.
     let mut hub = Command::new("sh").arg("-c").arg("while :; do sleep 0.1; done").arg(&pid_file).spawn()?;
     std::fs::write(&pid_file, format!("{}\n", hub.id()))?;
-    assert!(scratch.no_hub_left().is_err(), "a running hub is a failure");
+    let left = scratch.no_hub_left().err().ok_or("a running hub is a failure")?.to_string();
+    assert!(
+        left.starts_with("QEMU hubs outlived the test: ") && left.contains(&*pid_file.to_string_lossy()),
+        "{left}"
+    );
     let status = hub.wait()?;
     assert!(!status.success(), "the hub was stopped: {status}");
     scratch.no_hub_left()
@@ -147,7 +151,7 @@ fn two_copies_of_one_environment_get_disjoint_qemu_hub_ports() -> Outcome {
             let dir = scratch.path().join(example).join(copy);
             let (ports, _) = qemu_hub_ports(example, &dir, false)?;
             assert!(ports.len() >= 2, "{example}: {ports:?}");
-            assert!(ports.iter().all(|(_, p)| (20000..40000).contains(p)), "{example}: {ports:?}");
+            assert_every!(&ports, |(_, p): &&(String, u16)| (20000..40000).contains(p));
             let distinct: std::collections::BTreeSet<u16> = ports.iter().map(|(_, p)| *p).collect();
             assert_eq!(distinct.len(), ports.len(), "{example} {copy}: two VMs share a port: {ports:?}");
             assert_eq!(qemu_hub_ports(example, &dir, false)?.0, ports, "{example} {copy}: read again");
@@ -285,9 +289,19 @@ fn a_vm_joining_a_running_qemu_network_takes_a_spare_port_and_the_hub_runs_on() 
         !joining.contains("\nstop ") && !joining.contains("\nstart "),
         "the hub was restarted under the running VMs: {joining}"
     );
-    let kept = std::fs::read_to_string(&record)?;
-    assert!(kept.contains(&format!("\"{}\":{}", joined.0, spare[0])), "{kept}");
-    assert!(kept.contains(&format!("\"spare\":[{}]", spares[1..].join(","))), "{kept}");
+    // The record (JSON, which YAML reads): every VM's port, the joining one's included, and the
+    // spares it didn't take.
+    let kept = isoloom_test_support::yaml(&std::fs::read_to_string(&record)?);
+    let recorded: Vec<(String, String)> = isoloom_test_support::yaml_keys_at(&kept, "vms")
+        .into_iter()
+        .map(|vm| {
+            let port = isoloom_test_support::yaml_str(&kept, &format!("vms.{vm}"));
+            (vm, port)
+        })
+        .collect();
+    let wanted: Vec<(String, String)> = now.iter().map(|(vm, p)| (vm.clone(), p.to_string())).collect();
+    assert_eq!(recorded, wanted, "{kept:?}");
+    assert_eq!(isoloom_test_support::yaml_strs(&kept, "spare"), spares[1..], "{kept:?}");
     scratch.no_hub_left()
 }
 

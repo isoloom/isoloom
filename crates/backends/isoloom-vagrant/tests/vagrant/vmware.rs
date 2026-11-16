@@ -1,5 +1,7 @@
 //! VMware Desktop's part of a Vagrantfile.
 
+use isoloom_test_support::assert_every;
+
 use crate::testing::{Outcome, vagrantfile};
 
 /// On VMware Desktop each adapter on the environment's networks is pinned to a PCI slot of its
@@ -27,10 +29,7 @@ fn every_vmware_adapter_on_a_network_has_a_pci_slot_of_its_own() -> Outcome {
             assert_eq!(adapters, wanted, "{example}: {name}'s adapters");
             let distinct: std::collections::BTreeSet<&str> = slots.iter().map(|(_, s)| s.as_str()).collect();
             assert_eq!(distinct.len(), slots.len(), "{example}: {name}: {slots:?}");
-            assert!(
-                slots.iter().all(|(_, s)| s.parse::<u32>().is_ok_and(|n| n >= 160)),
-                "{example}: {name}: {slots:?}"
-            );
+            assert_every!(&slots, |(_, s): &&(String, String)| s.parse::<u32>().is_ok_and(|n| n >= 160));
         }
     }
     Ok(())
