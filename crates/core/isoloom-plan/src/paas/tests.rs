@@ -106,14 +106,13 @@ fn a_spec_of_services_alone_runs_and_publishes_them() {
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "the test checks the start scripts with sh -n: test code, not an adapter")]
 fn the_start_scripts_are_shell_sh_reads() {
     let spec = isoloom_spec::syntax::parse(SPEC).unwrap();
     let isoloom_spec::paas::Service::Kafka(k) = &spec.services["bus"] else {
         panic!()
     };
     for script in [super::seaweedfs_start("files"), super::kafka_start("bus", "bus.shop.internal", k)] {
-        let out = std::process::Command::new("sh").args(["-n", "-c", &script]).output().unwrap();
+        let out = isoloom_test_support::tool("sh").args(["-n", "-c", &script]).output().unwrap();
         assert!(out.status.success(), "{}\n{script}", String::from_utf8_lossy(&out.stderr));
     }
 }
