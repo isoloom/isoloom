@@ -33,6 +33,13 @@ Two exceptions are by design, and worth knowing:
   A secret or input is refused there. For a real credential, use a catalogue entry's password
   setting with `{ secret: <name> }` (`openssh`'s `password`, `mysql`'s `user_password`), or a
   secret delivered as a file.
+- **An input's `default` is a literal** too, written as it is in the generated files so a lab
+  starts without a launch: a public development value (`dev-launch-token`), never a real secret.
+  A sensitive input's default that doesn't read as one (no `dev`, `test`, `example`, `demo`,
+  `local`… in it, or a real credential's shape, such as `AKIA…`, `ghp_…` or a private key) gets a
+  warning. On Compose, an input's file with a default is a config whose content is
+  `${NAME:-default}` rather than a secret (a secret can't name a fallback), so `docker compose
+  config` shows the value it was given.
 - **Terraform state holds what Terraform makes**: a generated Windows administrator password, the
   controller's SSH private key. Keep state where only the people who run the environment can read
   it ([remote state](../guide/remote-terraform-state.md)).

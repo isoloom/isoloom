@@ -271,6 +271,48 @@ mod tests {
     }
 
     #[test]
+    fn a_step_and_a_file_get_an_inputs_default_when_none_is_given() {
+        let env = environment(
+            "  a: { networks: { lab: 5 }, os: debian@12, environment: { MODE: { input: MODE } }, files: [{ path: /run/lab/token, input: TOKEN }], app: { steps: [{ run: setup.sh }] } }\ninputs: { MODE: { sensitive: false, default: \"{{ lab }}\" }, TOKEN: { default: dev-token } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",
+        );
+        let files = render(&env).expect("renders");
+        let file = |end: &str| files.iter().find(|f| f.path.ends_with(end)).expect("the file");
+        let role = file("roles/isoloom_machine_a/tasks/main.yml");
+        let tasks = crate::testing::untagged(&role.contents);
+        let step = tasks
+            .as_sequence()
+            .expect("a list of tasks")
+            .iter()
+            .find(|t| t.get("ansible.builtin.script").is_some())
+            .expect("the run step");
+        assert_eq!(
+            step["environment"]["MODE"].as_str(),
+            Some("{{ lookup('ansible.builtin.env', 'MODE') | default(isoloom_input_defaults['MODE'], true) }}")
+        );
+        assert_eq!(step["vars"]["isoloom_input_defaults"]["MODE"].as_str(), Some("{{ lab }}"));
+        assert!(
+            role.contents.contains("MODE: !unsafe \"{{ lab }}\""),
+            "the spec's Jinja is never evaluated: {}",
+            role.contents
+        );
+        let plays = crate::testing::untagged(&file("external/site.yml").contents);
+        let copy = plays[0]["tasks"]
+            .as_sequence()
+            .expect("tasks")
+            .iter()
+            .find(|t| t.get("ansible.builtin.copy").is_some())
+            .expect("the token's file");
+        assert_eq!(
+            copy["ansible.builtin.copy"]["content"].as_str(),
+            Some("{{ lookup('ansible.builtin.env', isoloom_secret_env) | default(isoloom_secret_default, true) }}")
+        );
+        assert_eq!(
+            (copy["vars"]["isoloom_secret_env"].as_str(), copy["vars"]["isoloom_secret_default"].as_str()),
+            (Some("TOKEN"), Some("dev-token"))
+        );
+    }
+
+    #[test]
     fn a_step_gets_the_machines_inputs_from_where_ansible_runs() {
         let env = environment(
             "  a: { networks: { lab: 5 }, os: debian@12, environment: { MODE: { input: MODE } }, app: { steps: [{ run: setup.sh }, { playbook: site.yml }] } }\ninputs: { MODE: { sensitive: false } }\noverrides: { external: { machines: { a: { ssh: { address: 10.0.0.5 } } } } }\n",

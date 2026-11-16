@@ -157,7 +157,7 @@ fn detect(cmd: &str, register: &str) -> Value {
 }
 
 /// The `run` step: a project script run behind its `creates`.
-pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str, inputs: &[String]) -> Value {
+pub(super) fn run(r: &RunPlan, notify: &[String], vars: &str, inputs: &[(String, Option<String>)]) -> Value {
     let mut args = serde_json::Map::new();
     args.insert("cmd".to_owned(), project_file(vars));
     if let Some(path) = &r.creates {
@@ -184,7 +184,7 @@ pub(super) fn reboot() -> Value {
 
 /// The `playbook` step: the project's playbook run on the host itself (`-c local`), as the shell
 /// carrier runs it.
-pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String], vars: &str, inputs: &[String]) -> Value {
+pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String], vars: &str, inputs: &[(String, Option<String>)]) -> Value {
     let task = Task::new(format!("playbook {p}"))
         .module(
             "ansible.builtin.command",
@@ -197,9 +197,11 @@ pub(super) fn playbook(p: &isoloom_spec::syntax::ProjectPath, notify: &[String],
 
 /// `task` with the machine's `inputs` in its environment, as a VM's `run` and `playbook` steps
 /// read them: each from the environment `ansible-playbook` runs in, where the runner (or the user)
-/// puts the launch values. A lookup's result is data, which Ansible never evaluates as a template.
-/// Unchanged when the machine reads none.
-fn with_inputs(task: Task, inputs: &[String]) -> Task {
+/// puts the launch values, else (unset or empty) its default when it has one. A lookup's result
+/// is data, which Ansible never evaluates as a template; a default is a task variable
+/// (`isoloom_input_defaults`), written `!unsafe` when it holds Jinja. Unchanged when the machine
+/// reads none.
+fn with_inputs(task: Task, inputs: &[(String, Option<String>)]) -> Task {
     if inputs.is_empty() {
         return task;
     }
@@ -207,7 +209,23 @@ fn with_inputs(task: Task, inputs: &[String]) -> Task {
     // lookup's quotes as is.
     let env: serde_json::Map<String, Value> = inputs
         .iter()
-        .map(|n| (n.clone(), jinja(format!("{{{{ lookup('ansible.builtin.env', '{n}') }}}}"))))
+        .map(|(n, default)| {
+            let fallback = if default.is_some() {
+                format!(" | default(isoloom_input_defaults['{n}'], true)")
+            } else {
+                String::new()
+            };
+            (n.clone(), jinja(format!("{{{{ lookup('ansible.builtin.env', '{n}'){fallback} }}}}")))
+        })
         .collect();
+    let defaults: serde_json::Map<String, Value> = inputs
+        .iter()
+        .filter_map(|(n, d)| d.as_ref().map(|d| (n.clone(), Value::String(d.clone()))))
+        .collect();
+    let task = if defaults.is_empty() {
+        task
+    } else {
+        task.var("isoloom_input_defaults", Value::Object(defaults))
+    };
     task.set("environment", Value::Object(env))
 }

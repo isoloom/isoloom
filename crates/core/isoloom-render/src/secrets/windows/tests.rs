@@ -108,9 +108,27 @@ fn the_input_is_the_script_then_the_values() {
 }
 
 #[test]
+fn an_inputs_default_is_written_when_no_value_is_given_and_none_is_kept() {
+    let ps = from_environment(
+        &[("TOKEN".to_owned(), "T_B64".to_owned())],
+        &[("TOKEN".to_owned(), "dev-token".to_owned())],
+        &[],
+    );
+    let lines: Vec<&str> = ps.lines().collect();
+    // The default in base64, as a given value travels; used after a kept value would have won.
+    assert_eq!(lines[5], "$d = @{ 'TOKEN' = 'ZGV2LXRva2Vu' }");
+    assert!(
+        lines[6].contains("{ continue }; if (-not $v) { $v = $d[$e.Key] }; $b = [byte[]]::new(0);"),
+        "{}",
+        lines[6]
+    );
+}
+
+#[test]
 fn values_from_the_environment_are_kept_then_placed_without_waiting() {
     let ps = from_environment(
         &[("db".to_owned(), "PW_B64".to_owned()), ("it's".to_owned(), "X".to_owned())],
+        &[],
         &[file("db", "C:\\db.txt")],
     );
     // An empty value keeps the kept one; else an empty value writes an empty file: `$b` is

@@ -149,8 +149,8 @@ fn inputs_come_from_the_hosts_environment_into_the_file_the_steps_read() {
 /// The inputs step's own lines (before the persisting step), as a script run in a test's folder
 /// writing the inputs file at `$OUT` and keeping the values in `./kept`, then reading `TOKEN`
 /// back from the file into `$OUT.read`.
-fn inputs_script() -> String {
-    let s = text(|r| provisioners(r, &env(), "app", Os::Linux, |_| {}));
+fn inputs_script(env: &Environment) -> String {
+    let s = text(|r| provisioners(r, env, "app", Os::Linux, |_| {}));
     let (_, from_umask) = s.split_once("umask 077").expect("the inputs script");
     let lines: Vec<String> = format!("umask 077{from_umask}")
         .lines()
@@ -169,8 +169,8 @@ fn inputs_script() -> String {
 
 /// [`inputs_script`] run in `dir` with `TOKEN` set to `value` in base64 (unset: `None`): whether
 /// it succeeded, and the value the steps read.
-fn provision_inputs(dir: &std::path::Path, value: Option<&str>) -> (bool, String) {
-    std::fs::write(dir.join("inputs.sh"), inputs_script()).expect("the script written");
+fn provision_inputs(env: &Environment, dir: &std::path::Path, value: Option<&str>) -> (bool, String) {
+    std::fs::write(dir.join("inputs.sh"), inputs_script(env)).expect("the script written");
     let mut posix = isoloom_render::test_support::posix_sh().expect("a POSIX shell, checked by the caller");
     posix.arg("inputs.sh").current_dir(dir).env("OUT", "./inputs.env").env_remove("TOKEN");
     if let Some(v) = value {
@@ -187,7 +187,7 @@ fn the_inputs_file_quotes_every_value() {
     }
     let dir = tempfile::Builder::new().prefix("isoloom-inputs-").tempdir().expect("a temporary folder");
     let tricky = "it's $(not run) \"quoted\" `nor this`";
-    assert_eq!(provision_inputs(dir.path(), Some(tricky)), (true, tricky.to_owned()));
+    assert_eq!(provision_inputs(&env(), dir.path(), Some(tricky)), (true, tricky.to_owned()));
 }
 
 #[test]
@@ -197,10 +197,54 @@ fn a_provisioning_given_no_input_keeps_the_one_given_before() {
     }
     let dir = tempfile::Builder::new().prefix("isoloom-inputs-kept-").tempdir().expect("a temporary folder");
     let dir = dir.path();
-    assert_eq!(provision_inputs(dir, None), (true, String::new()), "unset the first time: empty");
-    assert_eq!(provision_inputs(dir, Some("first")), (true, "first".to_owned()));
-    assert_eq!(provision_inputs(dir, None), (true, "first".to_owned()), "given none: kept");
-    assert_eq!(provision_inputs(dir, Some("second")), (true, "second".to_owned()));
+    let env = env();
+    assert_eq!(provision_inputs(&env, dir, None), (true, String::new()), "unset the first time: empty");
+    assert_eq!(provision_inputs(&env, dir, Some("first")), (true, "first".to_owned()));
+    assert_eq!(provision_inputs(&env, dir, None), (true, "first".to_owned()), "given none: kept");
+    assert_eq!(provision_inputs(&env, dir, Some("second")), (true, "second".to_owned()));
+}
+
+#[test]
+fn an_input_given_no_value_the_first_time_is_its_default_and_a_given_one_is_kept_over_it() {
+    if isoloom_render::test_support::posix_sh().is_none() {
+        return;
+    }
+    let env = environment(&SPEC.replace("TOKEN: { sensitive: false }", "TOKEN: { sensitive: false, default: \"dev 'x' $HOME\" }"));
+    let dir = tempfile::Builder::new()
+        .prefix("isoloom-inputs-default-")
+        .tempdir()
+        .expect("a temporary folder");
+    let dir = dir.path();
+    assert_eq!(
+        provision_inputs(&env, dir, None),
+        (true, "dev 'x' $HOME".to_owned()),
+        "unset the first time: the default"
+    );
+    assert_eq!(provision_inputs(&env, dir, Some("launched")), (true, "launched".to_owned()));
+    assert_eq!(
+        provision_inputs(&env, dir, None),
+        (true, "launched".to_owned()),
+        "given none: kept, not the default"
+    );
+    let fresh = tempfile::Builder::new()
+        .prefix("isoloom-inputs-default-")
+        .tempdir()
+        .expect("a temporary folder");
+    assert_eq!(
+        provision_inputs(&env, fresh.path(), Some("")),
+        (true, "dev 'x' $HOME".to_owned()),
+        "empty: the default"
+    );
+    // A Windows machine sets the default machine-wide, and in a step's process, when it holds none.
+    let w = text(|r| provisioners(r, &env, "dc", Os::Windows, |_| {}));
+    assert!(
+        w.contains("if (-not [Environment]::GetEnvironmentVariable('TOKEN', 'Machine')) { [Environment]::SetEnvironmentVariable('TOKEN', 'dev ''x'' $HOME', 'Machine') }"),
+        "{w}"
+    );
+    assert!(
+        w.contains("if (-not [Environment]::GetEnvironmentVariable('TOKEN')) { [Environment]::SetEnvironmentVariable('TOKEN', 'dev ''x'' $HOME') }"),
+        "{w}"
+    );
 }
 
 #[test]

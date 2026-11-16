@@ -49,8 +49,13 @@ fn usage(env: &Environment, file: &ComposeFile) -> String {
     }
     if !inputs.is_empty() {
         lines.push(format!(
-            "Inputs: set {} in Compose's environment (the shell's, else .env) for `up` and `start` (unset: empty).",
-            inputs.join(", ")
+            "Inputs: set {} in Compose's environment (the shell's, else .env) for `up` and `start` ({}).",
+            inputs.join(", "),
+            if inputs.iter().any(|i| env.input_default(i).is_some()) {
+                "unset or empty: the spec's default, else empty"
+            } else {
+                "unset: empty"
+            }
         ));
     }
     let access = isoloom_spec::contract::ACCESS_PROFILE;
@@ -107,10 +112,11 @@ pub(crate) fn render(target: ComposeTarget, env: &Environment) -> Result<Files> 
     let mut files = vec![GeneratedFile {
         path: format!("{OUTPUT_DIR}/{DIR}/compose.yml"),
         contents: format!(
-            "{}{}{}{}{}\n{yaml}",
+            "{}{}{}{}{}{}\n{yaml}",
             header("#"),
             usage(env, &file),
             secrets::usage(env, &file),
+            secrets::defaults_usage(env),
             configs::usage(env),
             Moved(env)
         ),
@@ -158,7 +164,7 @@ pub(crate) fn compose_file(target: ComposeTarget, env: &Environment) -> Result<R
         networks: networks::declared(env, &ts),
         volumes: volumes(env, &out.probes),
         secrets: secrets::of_file(env),
-        configs: configs::declared(env),
+        configs: configs::declared(env).into_iter().chain(secrets::configs(env)).collect(),
         ..ComposeFile::default()
     };
     probes(env, &out.probes, &mut out.services);

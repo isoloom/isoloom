@@ -126,18 +126,28 @@ fn placed(files: &[SecretFile]) -> String {
 /// variable holding its value in base64 (PowerShell never expands anything in it), kept in the
 /// SYSTEM- and Administrators-only folder and the delivery marked; then the placing script
 /// written, registered and run, as `step` does. Nothing waits. An empty or unset variable
-/// writes an empty value the first time, and keeps the value already kept after.
+/// writes the value's default the first time (an input's, from `defaults`: a kept name and its
+/// default), else an empty value, and keeps the value already kept after.
 #[must_use]
-pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> String {
-    let pairs = values
-        .iter()
-        .map(|(name, var)| format!("{} = {}", powershell::quote(name), powershell::quote(var)))
-        .collect::<Vec<_>>()
-        .join("; ");
+pub fn from_environment(values: &[(String, String)], defaults: &[(String, String)], files: &[SecretFile]) -> String {
+    let table = |pairs: &mut dyn Iterator<Item = (&String, String)>| {
+        pairs
+            .map(|(name, value)| format!("{} = {}", powershell::quote(name), powershell::quote(&value)))
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    let pairs = table(&mut values.iter().map(|(name, var)| (name, var.clone())));
+    // The defaults, each in base64 as a given value is: only when there are some.
+    let (with_defaults, fallback) = if defaults.is_empty() {
+        (String::new(), "")
+    } else {
+        let d = table(&mut defaults.iter().map(|(name, d)| (name, isoloom_spec::shell::base64(d.as_bytes()))));
+        (format!("$d = @{{ {d} }}\n"), "if (-not $v) { $v = $d[$e.Key] }; ")
+    };
     format!(
-        "$ErrorActionPreference = 'Stop'\n{PROTECT}\n$k = {k}\nNew-Item -ItemType Directory -Force $k | Out-Null\nProtect-IsoloomPath $k\n\
+        "$ErrorActionPreference = 'Stop'\n{PROTECT}\n$k = {k}\nNew-Item -ItemType Directory -Force $k | Out-Null\nProtect-IsoloomPath $k\n{with_defaults}\
          foreach ($e in @{{ {pairs} }}.GetEnumerator()) {{ $v = [Environment]::GetEnvironmentVariable($e.Value); \
-         if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) {{ continue }}; \
+         if (-not $v -and (Test-Path \"$k\\$($e.Key)\")) {{ continue }}; {fallback}\
          $b = [byte[]]::new(0); if ($v) {{ $b = [Convert]::FromBase64String($v) }}; \
          [IO.File]::WriteAllBytes(\"$k\\$($e.Key).new\", $b); Move-Item -Force \"$k\\$($e.Key).new\" \"$k\\$($e.Key)\" }}\n\
          Set-Content -Path {} -Value ''\n{}",

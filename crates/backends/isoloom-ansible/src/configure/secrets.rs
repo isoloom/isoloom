@@ -63,8 +63,18 @@ fn tasks(env: &Environment, f: &SecretFile) -> Vec<Value> {
     out
 }
 
-/// The lookup reading `f`'s value where `ansible-playbook` runs, and the task variables it reads.
+/// The lookup reading `f`'s value where `ansible-playbook` runs, and the task variables it reads:
+/// an input's file, its default too when the input declares one (unset or empty, the value is
+/// the default).
 fn lookup(env: &Environment, f: &SecretFile) -> (String, Value) {
+    if let ValueSource::Input(input) = &f.source
+        && let Some(default) = env.input_default(input)
+    {
+        return (
+            "{{ lookup('ansible.builtin.env', isoloom_secret_env) | default(isoloom_secret_default, true) }}".to_owned(),
+            json!({ "isoloom_secret_env": input, "isoloom_secret_default": default }),
+        );
+    }
     let source = match &f.source {
         ValueSource::Input(input) => SecretSource::Env { env: input.clone() },
         ValueSource::Secret(name) => env.spec().secrets.get(name).cloned().unwrap_or(SecretSource::Env { env: name.clone() }),

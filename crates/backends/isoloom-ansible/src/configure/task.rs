@@ -58,6 +58,16 @@ impl Task {
         self
     }
 
+    /// The task with `key` set to `value` among its `vars` (kept beside those it has).
+    #[must_use]
+    pub(super) fn var(mut self, key: &str, value: Value) -> Task {
+        let vars = self.0.entry("vars").or_insert_with(|| Value::Object(Map::new()));
+        if let Value::Object(map) = vars {
+            map.insert(key.to_owned(), value);
+        }
+        self
+    }
+
     /// A task directive (`when`, `register`, `changed_when`, `failed_when`).
     #[must_use]
     pub(super) fn set(mut self, key: &str, value: Value) -> Task {

@@ -8,6 +8,10 @@
 //! backquote in a value would run in the guest, as root. So every value travels in base64
 //! (`isoloom_b64`, defined with the inputs), which no shell reads anything into, and the script
 //! decodes it.
+//!
+//! An input the runner gives no value (unset or empty) is its spec's default, when it declares
+//! one, the first time: the guest's script holds the default and keeps it as it keeps a given
+//! value, so a re-provision given no value keeps the launch's value rather than the default.
 
 use isoloom_plan::{Environment, SecretFile, ValueSource};
 use isoloom_render::{secrets, steps};
@@ -41,15 +45,29 @@ pub(crate) fn inputs_env(env: &Environment, machine: &str) -> Option<Value> {
 const DECODED: &str = "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v))";
 
 /// PowerShell decoding the machine's inputs in its own environment before a step runs: what the
-/// step's script reads is the value itself. Empty when it reads none.
+/// step's script reads is the value itself, or the input's default when it is given none. Empty
+/// when it reads none.
 pub(crate) fn windows_decode(env: &Environment, machine: &str) -> String {
     let Some(mp) = env.machines.get(machine).filter(|mp| !mp.inputs.is_empty()) else {
         return String::new();
     };
     format!(
-        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}) }} }}; ",
-        list(&mp.inputs)
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}) }} }}; {}",
+        list(&mp.inputs),
+        windows_defaults(env, &mp.inputs, "")
     )
+}
+
+/// PowerShell setting each of `inputs` that has a default to it when it holds no value (in
+/// `scope`: `""` for the process, `, 'Machine'` machine-wide). Empty when none has a default.
+fn windows_defaults(env: &Environment, inputs: &[String], scope: &str) -> String {
+    let q = isoloom_render::powershell::quote;
+    let lines: Vec<String> = inputs
+        .iter()
+        .filter_map(|k| env.input_default(k).map(|d| (q(k), q(d))))
+        .map(|(k, d)| format!("if (-not [Environment]::GetEnvironmentVariable({k}{scope})) {{ [Environment]::SetEnvironmentVariable({k}, {d}{scope}) }}; "))
+        .collect();
+    lines.concat()
 }
 
 /// `names` as a PowerShell list's items.
@@ -64,8 +82,8 @@ pub(crate) const KEPT_INPUTS_DIR: &str = isoloom_spec::linux_state_path!("/input
 
 /// A Linux machine's inputs, decoded into the file its steps read (`KEY='value'` lines, readable
 /// by root alone); then the step itself (kept on disk when a reboot comes). Each value is kept
-/// first ([`KEPT_INPUTS_DIR`]): an unset or empty variable writes an empty value the first time,
-/// and keeps the value kept after.
+/// first ([`KEPT_INPUTS_DIR`]): an unset or empty variable writes the input's default the first
+/// time (else an empty value), and keeps the value kept after.
 pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step: &isoloom_plan::lifecycle::Step) {
     let Some(mp) = env.machines.get(machine) else { return };
     let file = steps::INPUTS_FILE;
@@ -75,9 +93,15 @@ pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step:
         .iter()
         .map(|k| {
             let kept = quote(&format!("{KEPT_INPUTS_DIR}/{k}"));
+            let fallback = env.input_default(k).map_or(String::new(), |d| {
+                format!(
+                    "if [ -z \"$v\" ] && [ ! -e {kept} ]; then v={}; fi; ",
+                    quote(&isoloom_spec::shell::base64(d.as_bytes()))
+                )
+            });
             let k = quote(k);
             format!(
-                "v=\"$(printenv {k} || true)\"; if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}; fi\n\
+                "v=\"$(printenv {k} || true)\"; {fallback}if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}; fi\n\
                  printf \"%s='%s'\\n\" {k} \"$(sed \"s/'/'\\\\\\\\''/g\" {kept})\" >> {file}\n"
             )
         })
@@ -93,14 +117,17 @@ pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step:
 /// and command scripts (the last two startup tasks, run at every boot) read them as a Linux
 /// machine's read its inputs file. Only inputs the spec lets show (`sensitive: false`) reach an
 /// environment; a sensitive one is a file. A provisioning given no value keeps the one set
-/// before (unset, a variable is empty).
+/// before (unset, a variable is empty), else sets the input's default when it has one.
 pub(crate) fn windows_inputs(r: &mut Ruby, env: &Environment, machine: &str) {
     let Some(mp) = env.machines.get(machine).filter(|mp| !mp.inputs.is_empty()) else {
         return;
     };
+    let defaults = windows_defaults(env, &mp.inputs, ", 'Machine'");
+    let defaults = defaults.trim_end_matches("; ");
     let script = format!(
-        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}, 'Machine') }} }}",
-        list(&mp.inputs)
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}, 'Machine') }} }}{}{defaults}",
+        list(&mp.inputs),
+        if defaults.is_empty() { "" } else { "; " }
     );
     let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
     r.provision(call.script("inline", &script));
@@ -127,9 +154,17 @@ pub(crate) fn secret_files(r: &mut Ruby, env: &Environment, machine: &str, os: O
     let unique: Vec<&SecretFile> = mp.secrets.iter().filter(|f| seen.insert(f.kept())).collect();
     let read: Vec<(String, Value)> = unique.iter().map(|f| secret_value(f)).collect();
     let values: Vec<(String, String)> = unique.iter().zip(&read).map(|(f, (var, _))| (f.kept().to_owned(), var.clone())).collect();
+    // An input's file falls back to the input's default, kept under the input's name.
+    let defaults: Vec<(String, String)> = unique
+        .iter()
+        .filter_map(|f| match &f.source {
+            ValueSource::Input(name) => env.input_default(name).map(|d| (f.kept().to_owned(), d.to_owned())),
+            ValueSource::Secret(_) => None,
+        })
+        .collect();
     let script = match os {
-        Os::Linux => secrets::from_environment(&values, &mp.secrets),
-        Os::Windows => secrets::windows::from_environment(&values, &mp.secrets),
+        Os::Linux => secrets::from_environment(&values, &defaults, &mp.secrets),
+        Os::Windows => secrets::windows::from_environment(&values, &defaults, &mp.secrets),
     };
     let hash = Value::hash(read.into_iter().map(|(var, value)| (Value::str(&var), value)));
     r.provision(vagrantfile::shell("m", "secrets").kw("env", hash).script("inline", &script));
@@ -215,10 +250,29 @@ machines:
     }
 
     #[test]
+    fn an_inputs_file_falls_back_to_the_inputs_default_and_a_secret_to_nothing() {
+        let env = environment(&SPEC.replace("DEMO_SECRET: {}", "DEMO_SECRET: { default: dev-secret }"));
+        let s = text(|r| secret_files(r, &env, "web", Os::Linux));
+        let default = isoloom_spec::shell::base64(b"dev-secret");
+        assert!(
+            s.contains(&format!(
+                "v=\"$(printenv ISOLOOM_SECRET_INPUT_DEMO_SECRET || true)\"; if [ -z \"$v\" ] && [ ! -e /var/lib/isoloom/secrets/DEMO_SECRET ]; then v='{default}'; fi; "
+            )),
+            "{s}"
+        );
+        assert!(
+            s.contains("v=\"$(printenv ISOLOOM_SECRET_DB_PASSWORD || true)\"; if [ -n \"$v\" ]"),
+            "a secret has no default: {s}"
+        );
+        let w = text(|r| secret_files(r, &env, "dc", Os::Windows));
+        assert!(w.contains(&format!("$d = @{{ 'DEMO_SECRET' = '{default}' }}")), "{w}");
+    }
+
+    #[test]
     fn a_secret_value_reaches_its_file_as_given_whatever_it_holds() {
         // Vagrant writes `NAME="value"` into the shell that runs the script: only base64 keeps a
         // `$(...)` in a secret from running as root in the guest.
-        let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[]);
+        let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[], &[]);
         let dir = tempfile::Builder::new().prefix("isoloom-values-").tempdir().expect("a temporary folder");
         let dir = dir.path();
         // The kept folder as a relative path, the shell in the test's folder: a Windows path in a

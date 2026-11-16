@@ -47,8 +47,8 @@ pub(super) fn add(env: &Environment, m: Machine<'_>, services: &mut IndexMap<Str
             entrypoint: vec!["/bin/sh".into(), mounted.clone()],
             network_mode: Some(NetworkMode::Service(m.name.to_owned())),
             environment: environment(env, plan),
-            secrets: secrets::of_machine(plan),
-            configs: configs::mounts(m.name, plan),
+            secrets: secrets::of_machine(env, plan),
+            configs: [configs::mounts(m.name, plan), secrets::as_configs(env, plan)].concat(),
             restart: Some(Restart::No),
             ..Service::default()
         };
