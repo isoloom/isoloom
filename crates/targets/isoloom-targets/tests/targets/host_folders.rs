@@ -90,11 +90,10 @@ machines:
 
 #[test]
 fn vagrants_vagrantfile_stops_up_on_a_provider_it_does_not_know() -> Outcome {
-    let vagrantfile = generate(&desk()?, Target::Vagrant)?;
-    let vagrantfile = file(&vagrantfile, "vagrant/Vagrantfile")?;
-    assert!(
-        vagrantfile.contains("Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless ["),
-        "{vagrantfile}"
-    );
+    let files = generate(&desk()?, Target::Vagrant)?;
+    let vf = isoloom_test_support::ruby_blocks(file(&files, "vagrant/Vagrantfile")?);
+    let stop = "Isoloom knows no two-way shared folder of the `#{machine.provider_name}` provider\" unless [";
+    let statements = crate::testing::define(&vf, "desk").every_statement();
+    assert!(statements.iter().any(|s| s.contains(stop)), "{statements:?}");
     Ok(())
 }

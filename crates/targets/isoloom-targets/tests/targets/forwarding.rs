@@ -4,7 +4,9 @@
 use isoloom_spec::Target;
 use isoloom_targets::generate;
 
-use crate::testing::{Outcome, example, file};
+use isoloom_test_support::{yaml, yaml_str};
+
+use crate::testing::{Outcome, cloud_config, define, example, file, set_up, vagrantfile, written};
 
 /// A gateway between two networks (IPv4 only: a gateway's network carries no IPv6), and the
 /// environment's router routing IPv6 between two others (`v6`) or not.
@@ -38,26 +40,34 @@ fn a_gateway_forwards_by_the_plans_step_on_every_vm_target() -> Outcome {
             .ok_or("no forwarding step")?;
         assert_eq!(sysctls.len(), if v6 { 2 } else { 1 }, "{sysctls:?}");
         let line = if v6 { "'net.ipv6.conf.all.forwarding=1'" } else { "'net.ipv4.ip_forward=1'" };
-        let vagrant = file(&generate(&lab, Target::Vagrant)?, "vagrant/Vagrantfile")?.to_owned();
-        let fw = vagrant.split("config.vm.define \"fw\"").nth(1).ok_or("no fw")?;
-        assert!(fw.contains("name: \"forwarding\"") && fw.contains(line), "{fw}");
+        let vf = vagrantfile(&lab)?;
+        let steps = define(&vf, "fw").statements("m.vm.provision \"shell\", name: \"forwarding\"");
+        assert!(matches!(steps.as_slice(), [one] if one.contains(line)), "{steps:?}");
         let azure = file(&generate(&lab, Target::CloudVm)?, "cloud-vm/azure/main.tf")?.to_owned();
-        assert!(azure.contains("90-isoloom-forwarding.conf"), "the cloud's set-up runs it too");
+        assert!(set_up(&azure, "fw")?.contains("90-isoloom-forwarding.conf"), "the cloud's set-up runs it too");
     }
     Ok(())
 }
 
+/// The sysctl file the router's cloud-config writes on Proxmox.
+fn router_sysctls(lab: &str) -> Outcome<String> {
+    let tf = file(&generate(&example(lab)?, Target::Proxmox)?, "proxmox/main.tf")?.to_owned();
+    written(&cloud_config(&tf, "isoloom_router")?)
+        .into_iter()
+        .find(|(path, _)| path == "/etc/sysctl.d/90-isoloom.conf")
+        .map(|(_, content)| content)
+        .ok_or_else(|| "no sysctl file for the router".into())
+}
+
 #[test]
 fn routers_forward_ipv6_when_the_lab_routes_it() -> Outcome {
-    let compose = file(&generate(&example("dual-stack")?, Target::Docker)?, "docker/compose.yml")?.to_owned();
-    let service = compose.split("\n  isoloom-router:\n").nth(1).ok_or("no router")?;
-    assert!(service.contains("net.ipv6.conf.all.forwarding: '1'"), "{service}");
-    let pve = file(&generate(&example("dual-stack")?, Target::Proxmox)?, "proxmox/main.tf")?.to_owned();
-    assert!(
-        pve.contains("net.ipv4.ip_forward=1\\nnet.ipv6.conf.all.forwarding=1\\n"),
-        "the router's sysctl file"
+    let compose = yaml(file(&generate(&example("dual-stack")?, Target::Docker)?, "docker/compose.yml")?);
+    assert_eq!(yaml_str(&compose, "services.isoloom-router.sysctls.`net.ipv6.conf.all.forwarding`"), "1");
+    assert_eq!(router_sysctls("dual-stack")?, "net.ipv4.ip_forward=1\nnet.ipv6.conf.all.forwarding=1\n");
+    assert_eq!(
+        router_sysctls("segmented")?,
+        "net.ipv4.ip_forward=1\n",
+        "an IPv4 lab's router forwards IPv4 alone"
     );
-    let v4 = file(&generate(&example("segmented")?, Target::Proxmox)?, "proxmox/main.tf")?.to_owned();
-    assert!(!v4.contains("net.ipv6.conf.all.forwarding"), "an IPv4 lab's router forwards IPv4 alone");
     Ok(())
 }

@@ -8,6 +8,7 @@ use isoloom_spec::Spec;
 use isoloom_spec::host_access::{Grants, HostAccess};
 use isoloom_spec::model::Target;
 use isoloom_targets::{GeneratedFile, Lab, generate};
+use isoloom_test_support::hcl;
 
 /// A test's outcome: a failure is the report.
 pub(crate) type Outcome<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -211,4 +212,76 @@ pub(crate) fn check_line<'a>(runner: &'a str, name: &str) -> Outcome<&'a str> {
         .lines()
         .find(|l| l.starts_with("if ") && l.contains(&pass))
         .ok_or_else(|| format!("no check `{name}` in:\n{runner}").into())
+}
+
+/// A key of an HCL object as text.
+fn key_text(key: &hcl::ObjectKey) -> String {
+    match key {
+        hcl::ObjectKey::Identifier(id) => id.to_string(),
+        hcl::ObjectKey::Expression(hcl::Expression::String(s)) => s.clone(),
+        other => format!("{other:?}"),
+    }
+}
+
+/// The first object written in `expr`, a call's arguments searched (`format("…", yamlencode({…}))`).
+pub(crate) fn object_in(expr: &hcl::Expression) -> Option<&hcl::Object<hcl::ObjectKey, hcl::Expression>> {
+    match expr {
+        hcl::Expression::Object(o) => Some(o),
+        hcl::Expression::FuncCall(call) => call.args.iter().find_map(object_in),
+        _ => None,
+    }
+}
+
+/// Field `key` of `object`.
+pub(crate) fn field<'o>(object: &'o hcl::Object<hcl::ObjectKey, hcl::Expression>, key: &str) -> Option<&'o hcl::Expression> {
+    object.iter().find(|(k, _)| key_text(k) == key).map(|(_, v)| v)
+}
+
+/// VM `vm`'s cloud-config on Proxmox: the object its snippet file's `source_raw.data`
+/// YAML-encodes.
+pub(crate) fn cloud_config(tf: &str, vm: &str) -> Outcome<hcl::Object<hcl::ObjectKey, hcl::Expression>> {
+    let body = isoloom_test_support::hcl_body(tf);
+    let file = isoloom_test_support::hcl_one(&body, "proxmox_virtual_environment_file", vm);
+    let raw = isoloom_test_support::hcl_nested(file, "source_raw");
+    let data = raw
+        .first()
+        .and_then(|r| isoloom_test_support::hcl_attribute(r.body(), "data"))
+        .ok_or("no source_raw.data")?;
+    Ok(object_in(data).ok_or("no object in the cloud-config")?.clone())
+}
+
+/// The strings of the list `key` of `object`.
+pub(crate) fn strings(object: &hcl::Object<hcl::ObjectKey, hcl::Expression>, key: &str) -> Vec<String> {
+    match field(object, key) {
+        Some(hcl::Expression::Array(items)) => items
+            .iter()
+            .filter_map(|i| match i {
+                hcl::Expression::String(s) => Some(s.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// The content of each file the cloud-config writes (`write_files`, Isoloom's own after the
+/// project's), by path.
+pub(crate) fn written(object: &hcl::Object<hcl::ObjectKey, hcl::Expression>) -> Vec<(String, String)> {
+    fn objects(e: &hcl::Expression, out: &mut Vec<hcl::Object<hcl::ObjectKey, hcl::Expression>>) {
+        match e {
+            hcl::Expression::Object(o) => out.push(o.clone()),
+            hcl::Expression::Array(items) => items.iter().for_each(|i| objects(i, out)),
+            hcl::Expression::FuncCall(call) => call.args.iter().for_each(|a| objects(a, out)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    if let Some(files) = field(object, "write_files") {
+        objects(files, &mut found);
+    }
+    let text = |o: &hcl::Object<hcl::ObjectKey, hcl::Expression>, k: &str| match field(o, k) {
+        Some(hcl::Expression::String(s)) => Some(s.clone()),
+        _ => None,
+    };
+    found.iter().filter_map(|o| Some((text(o, "path")?, text(o, "content")?))).collect()
 }
