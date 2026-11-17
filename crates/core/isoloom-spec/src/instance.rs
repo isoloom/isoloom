@@ -236,15 +236,15 @@ fn shift_ipv6(copy: &mut Spec, n: u8) -> Result<(), InstanceError> {
     Ok(())
 }
 
-/// A generated file's path and contents, moved from `.isoloom/` to the instance's folder.
+/// A generated file's path and contents, moved from `.isoloom/` to the instance's folder. Both
+/// move by one rule, every `.isoloom/` in them, so a path one file names is still where the
+/// file it names is written, even nested (a catalogue template the image's build copies from
+/// `.isoloom/configure/<machine>/rendered/.isoloom/catalogue/…`).
 #[must_use]
 pub fn relocate(path: &str, contents: &str, n: u8) -> (String, String) {
     let (from, to) = (format!("{OUTPUT_DIR}/"), format!("{}/", output_dir(Some(n))));
-    let path = match path.strip_prefix(&from) {
-        Some(rest) => format!("{to}{rest}"),
-        None => path.to_owned(),
-    };
-    (path, contents.replace(&from, &to))
+    let moved = |text: &str| text.replace(&from, &to);
+    (moved(path), moved(contents))
 }
 
 #[cfg(test)]
@@ -397,6 +397,17 @@ mod tests {
             (".isoloom-2/compose.yml".to_owned(), "env_file: .isoloom-2/web.env".to_owned())
         );
         assert_eq!(relocate("README.md", "plain", 2), ("README.md".to_owned(), "plain".to_owned()));
+    }
+
+    #[test]
+    fn a_nested_folder_moves_in_the_path_as_in_the_files_that_name_it() {
+        // Regression: the path moved only its leading folder, the Dockerfile naming it every one,
+        // so the image's build copied a template from where none was written.
+        let template = ".isoloom/configure/db/rendered/.isoloom/catalogue/mysql/files/port.cnf";
+        let (path, _) = relocate(template, "", 1);
+        let (_, dockerfile) = relocate(".isoloom/docker/build/db/Dockerfile", &format!("COPY [\"{template}\", \"/etc/port.cnf\"]"), 1);
+        assert_eq!(path, ".isoloom-1/configure/db/rendered/.isoloom-1/catalogue/mysql/files/port.cnf");
+        assert_eq!(dockerfile, format!("COPY [\"{path}\", \"/etc/port.cnf\"]"));
     }
 
     #[test]

@@ -185,3 +185,113 @@ fn an_instances_vagrantfile_stops_where_its_networks_would_be_the_environments()
     );
     Ok(())
 }
+
+/// The paths under `folder` (`.isoloom/`, `.isoloom-<n>/`) that `files` name in their texts, each
+/// with the file that names it, which none of `files` is (nor holds, for a folder).
+fn missing(files: &[isoloom_targets::GeneratedFile], folder: &str) -> Vec<String> {
+    let written = |p: &str| {
+        files
+            .iter()
+            .any(|f| f.path == p || f.path.starts_with(&format!("{}/", p.trim_end_matches('/'))))
+    };
+    let mut out = Vec::new();
+    for f in files {
+        for (at, _) in f.contents.match_indices(folder) {
+            let (before, rest) = f.contents.split_at(at);
+            // A path in the text's own boundary: the folder starts it (not `x.isoloom/`, nor a
+            // folder nested in a longer path, checked whole from its own start), and it ends
+            // where a quote, a space, a separator or an interpolation does. A placeholder in a
+            // comment (`checks/isoloom-exec-<machine>.sh`) names no one file.
+            if before.chars().next_back().is_some_and(|c| c.is_alphanumeric() || "./-_".contains(c)) {
+                continue;
+            }
+            let end = rest.find(|c: char| c.is_whitespace() || "\"'`,;:)]}{$\\|".contains(c)).unwrap_or(rest.len());
+            let path = rest.split_at(end).0.trim_end_matches('.');
+            if !path.contains('<') && !written(path) {
+                out.push(format!("{} names {path}", f.path));
+            }
+        }
+    }
+    out
+}
+
+/// Every path one of an instance's files names in its folder is one of its files, as it is
+/// without an instance: what a Dockerfile copies, a Compose file builds or mounts, a check runs.
+fn paths_hold(lab: &isoloom_targets::Lab, targets: &[Target], what: &str) -> Outcome<Vec<String>> {
+    let mut broken = Vec::new();
+    for target in lab.possible().into_iter().filter(|t| targets.contains(t)) {
+        if isoloom_targets::refusal(lab, target)?.is_some() {
+            continue;
+        }
+        for (files, folder) in [(generate(lab, target)?, ".isoloom/"), (generate_instance(lab, target, 7)?, ".isoloom-7/")] {
+            broken.extend(
+                files
+                    .iter()
+                    .filter(|f| !f.path.starts_with(folder))
+                    .map(|f| format!("{what}: {}: {} is outside {folder}", target.id(), f.path)),
+            );
+            broken.extend(missing(&files, folder).into_iter().map(|m| format!("{what}: {}: {m}", target.id())));
+        }
+    }
+    Ok(broken)
+}
+
+#[test]
+fn every_path_an_examples_instance_names_is_one_it_writes() -> Outcome {
+    let mut broken = Vec::new();
+    for dir in crate::every_example::example_dirs()? {
+        let lab = isoloom_targets::Lab::new(isoloom_spec::load(&dir)?);
+        broken.extend(paths_hold(&lab, &Target::ALL, &dir.file_name().unwrap_or_default().to_string_lossy())?);
+    }
+    assert!(broken.is_empty(), "{broken:#?}");
+    Ok(())
+}
+
+#[test]
+fn every_path_an_instance_of_a_catalogue_service_names_is_one_it_writes() -> Outcome {
+    // Regression: a catalogue template, rendered for the image's build under a nested `.isoloom/`,
+    // was written there while the Dockerfile copied it from `.isoloom-<n>/`: the build failed.
+    use isoloom_catalogue::conformance::PROBE;
+    let catalogue = isoloom_catalogue::Catalogue::embedded().map_err(ToString::to_string)?;
+    let (mut broken, mut checked) = (Vec::new(), Vec::new());
+    for entry in catalogue.entries() {
+        // On each OS, the newest release of each source: the container form differs by both
+        // (mysql@8.4 is its official image on Debian 12, 8.4.7 Oracle's build, on Ubuntu 22.04 too).
+        let mut shapes = Vec::new();
+        for (release, os) in entry.definition().releases.iter().rev().flat_map(|r| r.os.iter().map(move |os| (r, os))) {
+            if shapes.contains(&(os, &release.source)) {
+                continue;
+            }
+            shapes.push((os, &release.source));
+            for case in entry.contract().cases.keys() {
+                let written = entry.conformance_lab(catalogue, case, release, *os)?;
+                // The access machine is the runner's to supply: here, the service machine's OS.
+                let mut spec: serde_yaml_ng::Value = serde_yaml_ng::from_str(&written.spec)?;
+                spec["machines"][PROBE]["os"] = os.to_string().into();
+                let dir = tempfile::tempdir()?;
+                for (path, text) in [("isoloom.yml".to_owned(), serde_yaml_ng::to_string(&spec)?)]
+                    .into_iter()
+                    .chain(written.project.clone())
+                {
+                    let at = dir.path().join(path);
+                    std::fs::create_dir_all(at.parent().ok_or("a project file in no folder")?)?;
+                    std::fs::write(at, text)?;
+                }
+                let lab = isoloom_targets::Lab::new(isoloom_spec::load(dir.path())?);
+                // A case whose helpers don't run on this OS (php-fpm 8.2 on Debian 13) isn't a lab.
+                if !crate::testing::problems(&lab).is_empty() {
+                    continue;
+                }
+                let what = format!("{}@{} {case} on {os}", entry.name(), release.version);
+                // The image's build is where the files are named (Kubernetes builds the same
+                // Dockerfiles; a VM's set-up carries them inline).
+                broken.extend(paths_hold(&lab, &[Target::Docker], &what)?);
+                checked.push(what);
+            }
+        }
+    }
+    assert!(checked.iter().any(|c| c == "mysql@8.4.7 readonly on debian@12"), "{checked:?}");
+    assert!(checked.iter().any(|c| c == "mysql@8.4 readonly on debian@12"), "{checked:?}");
+    assert!(broken.is_empty(), "{broken:#?}");
+    Ok(())
+}

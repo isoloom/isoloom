@@ -45,7 +45,7 @@ fn generations() -> Outcome<Vec<Generation>> {
 }
 
 /// Every example's folder, in order.
-fn example_dirs() -> Outcome<Vec<std::path::PathBuf>> {
+pub(crate) fn example_dirs() -> Outcome<Vec<std::path::PathBuf>> {
     let mut dirs: Vec<_> = std::fs::read_dir(examples())?.map(|entry| entry.map(|e| e.path())).collect::<Result<_, _>>()?;
     dirs.retain(|d| d.join("isoloom.yml").is_file());
     dirs.sort();
