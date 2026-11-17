@@ -263,7 +263,7 @@ impl Profile {
                 }
             }
         }
-        // `inputs` is a list of names or a map of name to `{ sensitive, description }`.
+        // `inputs` is a list of names or a map of name to `{ sensitive, description, default }`.
         let declared: Vec<String> = match spec.get("inputs") {
             Some(Value::Sequence(list)) => list.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect(),
             Some(Value::Mapping(inputs)) => inputs.keys().filter_map(|k| k.as_str().map(str::to_owned)).collect(),

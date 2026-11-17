@@ -10,14 +10,15 @@ fn controller(extra: &str) -> Option<Controller> {
 }
 
 #[test]
-fn each_input_carries_the_sensitivity_the_spec_gives_it() {
+fn each_input_carries_the_sensitivity_and_the_default_the_spec_gives_it() {
     let env = testing::environment(
-        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\ninputs: { URL: { sensitive: false }, TOKEN: {} }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\ninputs: { URL: { sensitive: false }, TOKEN: { default: dev-token } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
         Target::Vagrant,
     );
     let inputs: Vec<(&str, bool)> = env.inputs.iter().map(|i| (i.name.as_str(), i.sensitive)).collect();
     assert_eq!(inputs, [("URL", false), ("TOKEN", true)]);
     assert_eq!(env.input_names(), ["URL", "TOKEN"]);
+    assert_eq!((env.input_default("URL"), env.input_default("TOKEN")), (None, Some("dev-token")));
 }
 
 #[test]

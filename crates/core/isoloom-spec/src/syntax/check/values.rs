@@ -12,6 +12,26 @@ use super::super::problem::{Code, FieldPath, Problem, Problems, closest};
 use super::super::process::EnvValue;
 use crate::validate::is_variable;
 
+/// Each input's `default`: text every target can write as the value it falls back to, without a
+/// NUL (no environment variable holds one) or a `}` (Compose's `${NAME:-default}` ends at the
+/// first one).
+pub(super) fn input_defaults(spec: &Spec, out: &mut Problems) {
+    for (name, input) in &spec.inputs.0 {
+        let Some(default) = &input.default else { continue };
+        let reason = if default.contains('\0') {
+            "a default can't hold a NUL: no environment variable carries one"
+        } else if default.contains('}') {
+            "a default can't hold a `}`: Compose's `${NAME:-default}` ends at the first one"
+        } else {
+            continue;
+        };
+        out.push(
+            Problem::new(Code::InvalidValue, FieldPath::new("inputs").key(name.as_str()).key("default"), reason)
+                .fix("leave `default` out, or give text without them"),
+        );
+    }
+}
+
 /// A machine's environment, files and DNS servers.
 pub(super) fn machine(spec: &Spec, at: &FieldPath, m: &Machine, out: &mut Problems) {
     environment(spec, at, m, out);

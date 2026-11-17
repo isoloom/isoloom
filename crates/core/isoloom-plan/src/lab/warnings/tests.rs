@@ -51,3 +51,22 @@ fn a_best_effort_seal_of_a_machine_with_copies_is_one_warning_at_its_line() {
     assert_eq!(warnings.iter().map(|w| w.path.as_str()).collect::<Vec<_>>(), ["machines.ws.seal"]);
     assert_eq!(warnings[0].span.map(|s| s.line), Some(9), "the spec's own line");
 }
+
+#[test]
+fn a_sensitive_inputs_default_that_reads_like_a_real_secret_is_a_warning() {
+    let yaml = "version: 1\nname: t\ninputs:\n  TOKEN: { default: dev-launch-token }\n  EMPTY: { default: '' }\n  KEY: { default: Xk29fQp7Lr0aZt }\n  AWS: { default: AKIAEXAMPLETEST1 }\n  URL: { sensitive: false, default: https://api.internal/v1 }\nnetworks: { lab: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { os: debian@12, networks: { lab: 10 }, command: x }\n";
+    let lab = testing::lab(yaml);
+    assert_eq!(lab.problems(), []);
+    let warnings = lab.warnings();
+    // A development value says so; empty, or a non-sensitive input's default, is no secret at all.
+    assert_eq!(
+        warnings.iter().map(|w| w.path.as_str()).collect::<Vec<_>>(),
+        ["inputs.KEY.default", "inputs.AWS.default"]
+    );
+    assert!(
+        warnings[0].reason.contains("`Xk29fQp7Lr0a…` doesn't read as a development value"),
+        "{}",
+        warnings[0].reason
+    );
+    assert_eq!(warnings[0].span.map(|s| s.line), Some(6));
+}

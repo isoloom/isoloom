@@ -1,6 +1,8 @@
 //! The spec's `inputs`: values the runner, CI or the command line provides at each start.
 //! `inputs: [TOKEN]` is short for `inputs: { TOKEN: {} }`. An input is sensitive unless it says
 //! otherwise, and a sensitive one can only reach a machine as a file (or a catalogue setting).
+//! An input may declare a `default`: the value the generated files use when the runner gives
+//! none (unset or empty), so the environment also starts without a launch.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -23,6 +25,12 @@ pub struct Input {
     /// What the value is, shown when a runner asks for it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// The value used when the runner gives none (unset or empty): a local run, CI, an import
+    /// without a launch. Text without a NUL or a `}`; `""` starts it empty. It is written in the generated
+    /// files as it is, so anyone reading them reads it: a sensitive input's default is a public
+    /// development value (`dev-launch-token`), never a real secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
 }
 
 impl Default for Input {
@@ -30,6 +38,7 @@ impl Default for Input {
         Input {
             sensitive: true,
             description: None,
+            default: None,
         }
     }
 }
@@ -58,7 +67,7 @@ impl Inputs {
 enum InputsInput {
     /// Input names, each sensitive.
     Names(Vec<InputName>),
-    /// Inputs by name, each with whether it is sensitive and what it is.
+    /// Inputs by name, each with whether it is sensitive, what it is and its default.
     Full(IndexMap<InputName, Input>),
 }
 
@@ -68,7 +77,7 @@ impl<'de> Deserialize<'de> for InputsInput {
         impl<'de> Visitor<'de> for V {
             type Value = InputsInput;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a list of input names, or a map of name to `{ sensitive, description }`")
+                f.write_str("a list of input names, or a map of name to `{ sensitive, description, default }`")
             }
             fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<InputsInput, A::Error> {
                 Vec::<InputName>::deserialize(de::value::SeqAccessDeserializer::new(seq)).map(InputsInput::Names)
@@ -130,12 +139,24 @@ mod tests {
         assert_eq!(none, Inputs::default());
         let wrong = serde_yaml_ng::from_str::<Inputs>("5").unwrap_err().to_string();
         assert!(
-            wrong.contains("a list of input names, or a map of name to `{ sensitive, description }`"),
+            wrong.contains("a list of input names, or a map of name to `{ sensitive, description, default }`"),
             "{wrong}"
         );
         let twice = serde_yaml_ng::from_str::<Inputs>("[DEMO_SECRET, DEMO_SECRET]").unwrap_err().to_string();
         assert!(twice.contains("twice"), "{twice}");
         let e = serde_yaml_ng::from_str::<Inputs>("[1SECRET]").unwrap_err().to_string();
         assert!(e.contains("named like an environment variable"), "{e}");
+    }
+
+    #[test]
+    fn an_input_may_declare_its_default_as_text() {
+        let map: Inputs = serde_yaml_ng::from_str("{ TOKEN: { default: dev-token }, URL: { sensitive: false }, MODE: }").unwrap();
+        let defaults: Vec<Option<&str>> = map.0.values().map(|i| i.default.as_deref()).collect();
+        assert_eq!(defaults, [Some("dev-token"), None, None]);
+        // A value is text, as an environment variable's: a number reads as its digits.
+        let number: Inputs = serde_yaml_ng::from_str("{ PORT: { default: 8080 } }").unwrap();
+        assert_eq!(number.0.values().next().and_then(|i| i.default.as_deref()), Some("8080"));
+        let list = serde_yaml_ng::from_str::<Inputs>("{ PORT: { default: [a] } }").unwrap_err().to_string();
+        assert!(list.contains("expected a string"), "{list}");
     }
 }
