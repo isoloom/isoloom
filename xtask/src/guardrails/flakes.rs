@@ -12,8 +12,7 @@
 //! `tests/` folder, `tests.rs`, `testing.rs`, `test_support.rs`, the test-support crate), and the
 //! rest of a file from its inline `#[cfg(test)] mod tests {` on.
 
-use std::path::{Path, PathBuf};
-
+use super::walk;
 use crate::repo;
 
 /// The `sleep`s each file's tests have, and why none of them waits for something to happen.
@@ -50,6 +49,7 @@ fn test_sources() -> Vec<TestSource> {
     }
     let mut out: Vec<TestSource> = files
         .into_iter()
+        .filter(|f| f.extension().is_some_and(|e| e == "rs"))
         .filter_map(|f| {
             let path = f.strip_prefix(&root).ok()?.to_string_lossy().replace('\\', "/");
             let name = f.file_name()?.to_string_lossy().into_owned();
@@ -78,20 +78,6 @@ fn test_module(text: &str) -> Option<usize> {
             .and_then(|rest| rest.lines().nth(1))
             .is_some_and(|next| next.trim_start().starts_with("mod ") && next.trim_end().ends_with('{'))
     })
-}
-
-/// Every `.rs` file under `dir`, `target` folders left out.
-fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            if !path.ends_with("target") {
-                walk(&path, out);
-            }
-        } else if path.extension().is_some_and(|e| e == "rs") {
-            out.push(path);
-        }
-    }
 }
 
 /// The lines (from 1) of `text` calling a `sleep`: `thread::sleep`, `tokio::time::sleep`, or one
