@@ -22,6 +22,10 @@ use crate::{labels, networks, outside, sidecars, storage};
 /// A machine's service, then its sidecar and its `init:` jobs.
 pub(super) fn machine(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk], out: &mut Out) {
     let mut svc = base(env, m, ts);
+    secrets::mount_defaulted(env, m.name, m.plan, &mut svc);
+    if let Some(job) = secrets::inputs_job(env, m.name, m.plan) {
+        out.services.insert(crate::names::inputs_service(m.name), job);
+    }
     appliance::wire(env, m, &mut svc, &mut out.files);
     waits(env, m, &mut svc, &mut out.probes);
     svc.deploy = limits(m.plan);
@@ -69,7 +73,7 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         ports: plan.ports.iter().map(port).collect(),
         volumes: [storage::volume_mounts(plan), long_tmpfs, storage::host_folders(m.name, plan)].concat(),
         secrets: secrets::of_machine(env, plan),
-        configs: [configs::mounts(m.name, plan), secrets::as_configs(env, plan)].concat(),
+        configs: configs::mounts(m.name, plan),
         restart: Some(Restart::UnlessStopped),
         ..Service::default()
     };

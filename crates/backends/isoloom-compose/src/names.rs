@@ -19,6 +19,14 @@ pub(crate) fn routes_service(machine: &str) -> String {
     format!("isoloom-routes-{machine}")
 }
 
+/// The one-shot service that writes machine `machine`'s input files that have a default, and the
+/// volume it writes them to: `isoloom-inputs-<machine>`, under the prefix an environment's
+/// machines can't take.
+#[must_use]
+pub(crate) fn inputs_service(machine: &str) -> String {
+    format!("isoloom-inputs-{machine}")
+}
+
 /// The one-shot service that copies the probe for the machines pinned to `platform`, or for those
 /// that run on the host's own architecture (`None`): `isoloom-probe-<arch>`, `isoloom-probe`.
 pub(crate) fn probe_service(platform: Option<Arch>) -> String {

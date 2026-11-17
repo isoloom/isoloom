@@ -310,6 +310,7 @@ fn unrunnable(arch: Arch, machines: &[String]) -> String {
 /// pinned one: its job runs the host's busybox).
 fn volumes(env: &Environment, probes: &Probes) -> IndexMap<String, Volume> {
     let mut out = storage::declared(env);
+    out.extend(secrets::inputs_volumes(env));
     if !probes.is_empty() {
         out.insert(probe_service(None), Volume::default());
     }

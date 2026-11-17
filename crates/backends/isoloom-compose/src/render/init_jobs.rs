@@ -48,13 +48,14 @@ pub(super) fn add(env: &Environment, m: Machine<'_>, services: &mut IndexMap<Str
             network_mode: Some(NetworkMode::Service(m.name.to_owned())),
             environment: environment(env, plan),
             secrets: secrets::of_machine(env, plan),
-            configs: [configs::mounts(m.name, plan), secrets::as_configs(env, plan)].concat(),
+            configs: configs::mounts(m.name, plan),
             restart: Some(Restart::No),
             ..Service::default()
         };
         j.volumes.push(format!("{ROOT}/{script}:{mounted}:{RO_BIND}").into());
         j.volumes.push(format!("{ROOT}:{PROJECT_DIR}:{RO_BIND}").into());
         j.volumes.extend(storage::volume_mounts(plan));
+        secrets::mount_defaulted(env, m.name, plan, &mut j);
         j.after(m.name, readiness(m.spec));
         if sidecars::needed(env, m) {
             j.after(routes_service(m.name), Condition::Healthy);
