@@ -124,7 +124,10 @@ fn a_published_database_is_allow_listed_by_its_input() {
     assert!(group.contains("var.PLAYER_IP"), "{group}");
     assert!(variables(&aws).contains(&"PLAYER_IP".to_owned()));
     let azure = hcl_body(&file(&published, Cloud::Azure, "services.tf"));
-    assert!(!hcl_names(&azure, "resource", "azurerm_postgresql_flexible_server_firewall_rule").is_empty());
+    assert_ne!(
+        hcl_names(&azure, "resource", "azurerm_postgresql_flexible_server_firewall_rule"),
+        Vec::<String>::new()
+    );
     let gcp = hcl_body(&file(&published, Cloud::Gcp, "services.tf"));
     let sql: Vec<&hcl::Block> = hcl_blocks(&gcp, "resource", &["google_sql_database_instance"]);
     let networks = sql

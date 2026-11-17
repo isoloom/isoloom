@@ -14,6 +14,7 @@
 //! Windows only and says `n/a` elsewhere).
 
 mod outputs;
+mod paas;
 #[cfg(test)]
 mod tests;
 
@@ -90,6 +91,12 @@ pub(crate) const STEPS: &[Step] = &[
         false,
         "the tests' line coverage, at least COVERAGE_FLOOR (cargo-llvm-cov)",
         coverage,
+    ),
+    step(
+        "paas",
+        false,
+        "the paas feature (off in the binary): clippy, then the tests of the crates it changes",
+        paas::run,
     ),
     step("doc", false, "the API docs build without a warning", |root| {
         process::passed(

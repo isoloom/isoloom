@@ -187,10 +187,11 @@ fn give(m: &mut syntax::Machine, (name, host): (&str, &str), service: &Service, 
             env("WAIT", WAIT_HELPER.to_owned());
         }
     }
-    if matches!(service, Service::ObjectStorage(_) | Service::Kafka(_)) && !m.files.iter().any(|f| f.path == WAIT_HELPER) {
-        if let Some(file) = read(json!({ "path": WAIT_HELPER, "content": wait_helper(), "mode": "0755" })) {
-            m.files.push(file);
-        }
+    if matches!(service, Service::ObjectStorage(_) | Service::Kafka(_))
+        && !m.files.iter().any(|f| f.path == WAIT_HELPER)
+        && let Some(file) = read(json!({ "path": WAIT_HELPER, "content": wait_helper(), "mode": "0755" }))
+    {
+        m.files.push(file);
     }
     let facts = file_facts(service, how.access);
     for f in &facts {

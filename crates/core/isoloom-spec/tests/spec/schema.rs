@@ -6,17 +6,15 @@ use isoloom_spec::schema::{MODELINE, schema};
 
 use crate::testing::{Outcome, workspace};
 
-/// The committed schema is written by the catalogue, which adds each entry's `with:` rule.
-const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
-
-/// The committed copy of the schema.
-fn committed() -> std::path::PathBuf {
-    workspace().join("schemas/spec-v1.schema.json")
-}
-
+// The committed file is the spec as the binary reads it, the paas feature off: with it on, the
+// services make it another.
+#[cfg(not(feature = "paas"))]
 #[test]
 fn the_committed_schema_is_current() {
-    let on_disk: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(committed()).unwrap_or_default()).unwrap_or_default();
+    // The committed schema is written by the catalogue, which adds each entry's `with:` rule.
+    const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
+    let committed = workspace().join("schemas/spec-v1.schema.json");
+    let on_disk: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(committed).unwrap_or_default()).unwrap_or_default();
     // The catalogue adds one rule per entry (`with:` follows its settings); the rest is the
     // spec's own.
     let mut own = on_disk;

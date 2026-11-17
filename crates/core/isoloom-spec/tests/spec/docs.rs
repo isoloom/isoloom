@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use isoloom_spec::reference::{markdown, slug};
+use isoloom_spec::reference::slug;
 
 use crate::testing::{Outcome, workspace as root};
 
@@ -47,10 +47,16 @@ fn shown(path: &Path) -> String {
     path.strip_prefix(root()).unwrap_or(path).display().to_string()
 }
 
+// The committed file is the spec as the binary reads it, the paas feature off: with it on, the
+// services make it another.
+#[cfg(not(feature = "paas"))]
 #[test]
 fn docs_spec_is_up_to_date() -> Outcome {
     let on_disk = std::fs::read_to_string(root().join("docs/spec.md"))?;
-    assert!(on_disk == markdown(), "docs/spec.md is stale; run `cargo run -q -- docs --spec > docs/spec.md`");
+    assert!(
+        on_disk == isoloom_spec::reference::markdown(),
+        "docs/spec.md is stale; run `cargo run -q -- docs --spec > docs/spec.md`"
+    );
     Ok(())
 }
 
