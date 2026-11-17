@@ -979,6 +979,13 @@ Vagrant.configure("2") do |config|
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:73:b1:19:c0;mac:02:15:05:b8:bb:5b;mac:02:15:5d:44:e9:2b\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:73:b1:19:c0\n\n[Network]\nAddress=10.70.10.254/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            printf '[Match]\nMACAddress=02:15:05:b8:bb:5b\n\n[Network]\nAddress=10.70.20.254/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-1.network
+            printf '[Match]\nMACAddress=02:15:5d:44:e9:2b\n\n[Network]\nAddress=10.70.99.254/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-2.network
+            networkctl reload 2>/dev/null || true
+          fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
@@ -1049,6 +1056,13 @@ Vagrant.configure("2") do |config|
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:73:b1:19:c0;mac:02:15:05:b8:bb:5b;mac:02:15:5d:44:e9:2b\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:73:b1:19:c0\n\n[Network]\nAddress=10.70.10.254/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            printf '[Match]\nMACAddress=02:15:05:b8:bb:5b\n\n[Network]\nAddress=10.70.20.254/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-1.network
+            printf '[Match]\nMACAddress=02:15:5d:44:e9:2b\n\n[Network]\nAddress=10.70.99.254/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-2.network
+            networkctl reload 2>/dev/null || true
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
@@ -1219,6 +1233,11 @@ Vagrant.configure("2") do |config|
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:a0:bd:8f:2e\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:a0:bd:8f:2e\n\n[Network]\nAddress=10.70.99.10/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            networkctl reload 2>/dev/null || true
+          fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
@@ -1287,6 +1306,11 @@ Vagrant.configure("2") do |config|
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:a0:bd:8f:2e\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:a0:bd:8f:2e\n\n[Network]\nAddress=10.70.99.10/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            networkctl reload 2>/dev/null || true
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
@@ -1547,6 +1571,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:53:77:6e:dc\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:53:77:6e:dc\n\n[Network]\nAddress=10.70.10.10/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            networkctl reload 2>/dev/null || true
+          fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
@@ -1615,6 +1644,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:53:77:6e:dc\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:53:77:6e:dc\n\n[Network]\nAddress=10.70.10.10/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            networkctl reload 2>/dev/null || true
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
@@ -1865,6 +1899,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:9c:b5:47:f5\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:9c:b5:47:f5\n\n[Network]\nAddress=10.70.20.10/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            networkctl reload 2>/dev/null || true
+          fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
@@ -1933,6 +1972,11 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:9c:b5:47:f5\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:9c:b5:47:f5\n\n[Network]\nAddress=10.70.20.10/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            networkctl reload 2>/dev/null || true
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
@@ -2141,6 +2185,12 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:dd:ce:59:29;mac:02:15:e3:d0:a1:32\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
           fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:dd:ce:59:29\n\n[Network]\nAddress=10.70.10.50/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            printf '[Match]\nMACAddress=02:15:e3:d0:a1:32\n\n[Network]\nAddress=10.70.20.50/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-1.network
+            networkctl reload 2>/dev/null || true
+          fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'
           [Unit]
@@ -2210,6 +2260,12 @@ printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/con
           # NetworkManager would try DHCP there.
           if [ -d /etc/NetworkManager/conf.d ]; then
             printf '[keyfile]\nunmanaged-devices=mac:02:15:dd:ce:59:29;mac:02:15:e3:d0:a1:32\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf
+          fi
+          # systemd-networkd would drop the addresses on its next restart.
+          if [ -d /etc/systemd/network ]; then
+            printf '[Match]\nMACAddress=02:15:dd:ce:59:29\n\n[Network]\nAddress=10.70.10.50/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-0.network
+            printf '[Match]\nMACAddress=02:15:e3:d0:a1:32\n\n[Network]\nAddress=10.70.20.50/24\nDHCP=no\nLinkLocalAddressing=no\nIPv6AcceptRA=no\n' > /etc/systemd/network/05-isoloom-env-net-1.network
+            networkctl reload 2>/dev/null || true
           fi
           if [ -d /run/systemd/system ]; then
             cat > /etc/systemd/system/isoloom-env-net.service <<'UNIT'

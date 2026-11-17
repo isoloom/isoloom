@@ -157,6 +157,13 @@ stable spec format.
   VM's read-write host folders are now made group-writable at each `vagrant up` (the
   `host_folders` provisioner), as VirtualBox's are; the folder's mode on the computer is untouched.
 
+- **A Linux VM keeps its addresses on the environment's networks when systemd-networkd restarts**
+  (Vagrant on UTM and Hyper-V). The addresses were set with `ip` only, and networkd drops an
+  address it didn't set when it restarts. Vagrant's hostname step restarts it on Debian and Ubuntu
+  boxes right after the addresses are set, so a VM came up off its networks: machines couldn't
+  reach each other and the checks failed. The addresses are now networkd's own too
+  (`/etc/systemd/network/05-isoloom-env-net-<n>.network`, matched by MAC).
+
 - **On VMware Desktop, each adapter on the environment's networks has a fixed PCI slot (#284).**
   Without `ethernet<n>.pcislotnumber`, VMware picked a slot as Vagrant added an adapter: the
   guest's interfaces took other names when the second network's was attached, or at a boot after
