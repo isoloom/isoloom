@@ -334,6 +334,12 @@ jobs:
           set -eu
           isoloom --version | tr -d '\r' | grep -qx "isoloom ${TAG#v}"
           isoloom validate examples/hello-stack
+      - name: Validate and generate with it
+        uses: ./
+        with:
+          version: ${{ github.ref_name }}
+          project: examples/hello-stack
+          targets: docker, vagrant
 
   # The website (its own repository) serves the docs generated from this repository's docs/ and
   # the committed schema at its `$id`, deployed for the release (.github/CONTRIBUTING.md, "Publish

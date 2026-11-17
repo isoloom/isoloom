@@ -1,5 +1,5 @@
 name: Set up Isoloom
-description: Installs the isoloom CLI (a release binary, checked against the release's SHA256SUMS) and puts it on the PATH.
+description: Installs the isoloom CLI (a release binary, checked against the release's SHA256SUMS) and puts it on the PATH; with targets, validates the spec and generates each of them.
 branding:
   icon: layers
   color: orange
@@ -7,6 +7,15 @@ inputs:
   version:
     description: A release tag (e.g. v2.1.9), or latest.
     default: latest
+  targets:
+    description: >-
+      The targets a lab must generate (`docker vagrant`, space- or comma-separated). Each is
+      generated after `isoloom validate`; a problem, a target that refuses the spec or a backend
+      failure fails the step. Empty (the default) only installs.
+    default: ''
+  project:
+    description: The project folder holding isoloom.yml, for targets.
+    default: .
 runs:
   using: composite
   steps:
@@ -54,3 +63,16 @@ runs:
         $bin = Join-Path $dir $name
         & (Join-Path $bin "isoloom.exe") --version
         $bin | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+    - name: Validate, then generate each target
+      if: inputs.targets != ''
+      shell: bash
+      env:
+        ISOLOOM_TARGETS: ${{ inputs.targets }}
+        ISOLOOM_PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+        isoloom validate "$ISOLOOM_PROJECT"
+        for target in ${ISOLOOM_TARGETS//,/ }; do
+          echo "isoloom generate --target $target"
+          isoloom generate "$ISOLOOM_PROJECT" --target "$target"
+        done

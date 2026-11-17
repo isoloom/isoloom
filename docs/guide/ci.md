@@ -20,6 +20,8 @@ steps:
 | Input | Default | Meaning |
 |---|---|---|
 | `version` | `latest` | The release to install (`v2.1.8`), or `latest` |
+| `targets` | none | The targets to generate after installing (`docker vagrant`); see below |
+| `project` | `.` | The project folder holding `isoloom.yml`, for `targets` |
 
 ### Pinning
 
@@ -33,6 +35,24 @@ steps:
 
 Without the Action: `curl -fsSL https://raw.githubusercontent.com/isoloom/isoloom/<ref>/packaging/install.sh | ISOLOOM_VERSION=v2.1.8 sh`,
 or `cargo install --locked isoloom`.
+
+## Generate every target a lab runs on
+
+`isoloom generate` with no `--target` writes the targets the spec allows and passes over the
+others, so a target that stops working goes unnoticed. Name the targets the lab must run on, and
+the Action validates the spec (warnings don't fail it) and generates each of them, failing on a
+problem, on a target that refuses the spec (a Dockerfile with no VM form, say) or on a backend
+failure:
+
+```yaml
+  - uses: isoloom/isoloom@<commit sha>   # v2.1.8
+    with:
+      version: v2.1.8
+      targets: docker vagrant
+```
+
+Without the Action, the same steps: `isoloom validate`, then `isoloom generate --target <target>`
+for each target; each exits 1 on a problem or a refusal.
 
 ## Check the generated files
 
