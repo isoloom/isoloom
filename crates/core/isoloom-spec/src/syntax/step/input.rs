@@ -65,7 +65,8 @@ pub(super) struct StepInput {
     #[serde(default)]
     repository: Option<Repository>,
     /// A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or
-    /// a download pinned by its SHA-256 (`url` and `sha256`).
+    /// a download pinned by its SHA-256 (`url` and `sha256`), one for every machine or one per
+    /// CPU architecture.
     #[serde(default)]
     file: Option<FileStep>,
     /// A project file with its `{{ path }}` placeholders filled in, placed in the machine.

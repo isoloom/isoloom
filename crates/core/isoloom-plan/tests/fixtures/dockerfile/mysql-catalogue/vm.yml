@@ -63,6 +63,7 @@ app:
     - xz-utils
   - packages:
     - libncurses5
+    - libncurses6
   - file:
       path: /var/cache/isoloom/mysql.tar
       url: https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz

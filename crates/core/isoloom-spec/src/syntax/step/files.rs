@@ -1,14 +1,19 @@
 //! The steps that place files: `copy` (a project file or folder as it is), `template` (a project
 //! file with its `{{ path }}` placeholders filled in at generation) and `file` (a folder, a
-//! removal, a link or a pinned download).
+//! removal, a link or a pinned download, one for every machine or one per CPU architecture).
+
+use std::fmt;
+use std::marker::PhantomData;
 
 use schemars::JsonSchema;
 use serde::Deserialize;
+use serde::de::{self, MapAccess, Visitor};
 
 use super::super::files::Mode;
 use super::super::mistake::Mistake;
 use super::super::problem::Code;
 use super::words::{AbsPath, GroupName, HttpsUrl, ProjectPath, Sha256, UserName};
+use crate::model::Arch;
 
 /// A `copy` step: a project file or folder copied into the machine as it is.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, JsonSchema)]
@@ -120,6 +125,22 @@ pub enum FileState {
         /// What it must hash to.
         sha256: Sha256,
     },
+    /// One file per CPU architecture (a vendor's build for each), in `amd64`, `arm64` order: the
+    /// machine's own architecture's, picked where the step runs. A machine of an architecture
+    /// none is for fails the step.
+    Downloads(Vec<ArchDownload>),
+}
+
+/// One architecture's file of a `file` step's download.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct ArchDownload {
+    /// The architecture it is for.
+    pub arch: Arch,
+    /// Where it comes from.
+    pub url: HttpsUrl,
+    /// What it must hash to.
+    pub sha256: Sha256,
 }
 
 /// `state:` as written.
@@ -145,12 +166,15 @@ struct FileInput {
     /// A symbolic link to this target (absolute). Not on Windows.
     #[serde(default)]
     link: Option<AbsPath>,
-    /// A file to download (`https`), with its `sha256`: every fetch is pinned.
+    /// A file to download (`https`), with its `sha256`: every fetch is pinned. One URL, or one per
+    /// CPU architecture (`{ amd64: <url>, arm64: <url> }`), the machine's own picked where the
+    /// step runs.
     #[serde(default)]
-    url: Option<HttpsUrl>,
-    /// The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it).
+    url: Option<ByArch<HttpsUrl>>,
+    /// The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it): one, or one
+    /// per architecture `url` names.
     #[serde(default)]
-    sha256: Option<Sha256>,
+    sha256: Option<ByArch<Sha256>>,
     /// Its owner, a user name (default root). Not on Windows.
     #[serde(default)]
     owner: Option<UserName>,
@@ -190,8 +214,86 @@ impl TryFrom<FileInput> for FileStep {
     }
 }
 
+/// A download's `url` or `sha256` as written: one value, or one per CPU architecture.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+#[schemars(rename = "{T}ByArch")]
+enum ByArch<T> {
+    /// The same for every machine.
+    One(T),
+    /// One per architecture.
+    PerArch(PerArch<T>),
+}
+
+/// A value per CPU architecture: each one the download has a build for.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "{T}PerArch")]
+struct PerArch<T> {
+    /// For an x86-64 machine.
+    amd64: Option<T>,
+    /// For a 64-bit ARM machine.
+    arm64: Option<T>,
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for ByArch<T> {
+    /// A string is read as `T` itself, so its own rule's mistake reaches the author; a mapping as
+    /// one value per architecture.
+    fn deserialize<D: de::Deserializer<'de>>(d: D) -> Result<ByArch<T>, D::Error> {
+        struct V<T>(PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for V<T> {
+            type Value = ByArch<T>;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("one value, or one per architecture (`{ amd64: ..., arm64: ... }`)")
+            }
+            fn visit_str<E: de::Error>(self, s: &str) -> Result<ByArch<T>, E> {
+                T::deserialize(de::value::StrDeserializer::new(s)).map(ByArch::One)
+            }
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<ByArch<T>, A::Error> {
+                PerArch::deserialize(de::value::MapAccessDeserializer::new(map)).map(ByArch::PerArch)
+            }
+        }
+        d.deserialize_any(V(PhantomData))
+    }
+}
+
+/// A download: one file for every machine, or one per architecture, each with its SHA-256.
+fn download(urls: ByArch<HttpsUrl>, sums: ByArch<Sha256>) -> Result<FileState, Mistake> {
+    let (urls, sums) = match (urls, sums) {
+        (ByArch::One(url), ByArch::One(sha256)) => return Ok(FileState::Download { url, sha256 }),
+        (ByArch::PerArch(urls), ByArch::PerArch(sums)) => (urls, sums),
+        _ => {
+            return Err(
+                Mistake::new(Code::Conflict, "`url` and `sha256` are both one value, or both one per architecture")
+                    .at("sha256")
+                    .fix("`sha256: { amd64: <hex>, arm64: <hex> }` beside `url: { amd64: <url>, arm64: <url> }`"),
+            );
+        }
+    };
+    let mut all = Vec::new();
+    for (arch, url, sha256) in [(Arch::Amd64, urls.amd64, sums.amd64), (Arch::Arm64, urls.arm64, sums.arm64)] {
+        match (url, sha256) {
+            (Some(url), Some(sha256)) => all.push(ArchDownload { arch, url, sha256 }),
+            (None, None) => {}
+            _ => {
+                return Err(Mistake::new(
+                    Code::Conflict,
+                    format!("`url` and `sha256` name the same architectures: `{}` is in one only", arch.id()),
+                )
+                .at("sha256"));
+            }
+        }
+    }
+    if all.is_empty() {
+        return Err(Mistake::new(Code::MissingField, "a download per architecture names at least one")
+            .at("url")
+            .fix("`url: { amd64: <url>, arm64: <url> }`"));
+    }
+    Ok(FileState::Downloads(all))
+}
+
 /// What the step makes of its path: exactly one of `state`, `link` and `url` (with `sha256`).
-fn state(word: Option<StateWord>, link: Option<AbsPath>, url: Option<HttpsUrl>, sha256: Option<Sha256>) -> Result<FileState, Mistake> {
+fn state(word: Option<StateWord>, link: Option<AbsPath>, url: Option<ByArch<HttpsUrl>>, sha256: Option<ByArch<Sha256>>) -> Result<FileState, Mistake> {
     let given = usize::from(word.is_some()) + usize::from(link.is_some()) + usize::from(url.is_some());
     if given > 1 {
         return Err(Mistake::new(Code::Conflict, "a file step does one thing: one of `state`, `link` and `url`"));
@@ -203,7 +305,7 @@ fn state(word: Option<StateWord>, link: Option<AbsPath>, url: Option<HttpsUrl>, 
                 .fix("`sha256: <hex>` (`sha256sum <file>` prints it)"),
         ),
         (_, _, None, Some(_)) => Err(Mistake::new(Code::InvalidValue, "`sha256` checks a download: it goes with `url`").at("sha256")),
-        (_, _, Some(url), Some(sha256)) => Ok(FileState::Download { url, sha256 }),
+        (_, _, Some(url), Some(sha256)) => download(url, sha256),
         (Some(StateWord::Directory), ..) => Ok(FileState::Directory),
         (Some(StateWord::Absent), ..) => Ok(FileState::Absent),
         (None, Some(target), ..) => Ok(FileState::Link(target)),

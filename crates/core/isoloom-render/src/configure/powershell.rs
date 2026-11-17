@@ -90,6 +90,13 @@ fn file(f: &FilePlan) -> Option<String> {
             "Install-IsoloomFile -Path {path} -State download -Url {} -Sha256 '{sha256}'",
             quote(url.as_str())
         ),
+        FileState::Downloads(all) => {
+            let table: Vec<String> = all
+                .iter()
+                .map(|d| format!("{} = @({}, '{}')", quote(d.arch.id()), quote(d.url.as_str()), d.sha256))
+                .collect();
+            format!("Install-IsoloomDownload -Path {path} -ByArch @{{ {} }}", table.join("; "))
+        }
         _ => return None,
     })
 }

@@ -10,7 +10,7 @@ use super::{CommandLine, Disk, Dns, DockerImpl, External, Healthcheck, HostFolde
 /// A machine's CPU architecture: a box architecture, a cloud instance family, a container
 /// platform. Defaults to x86-64 where a target has to pick one (a VM, a cloud instance); a
 /// container is pinned to one only when its spec asks for one, or its image has one only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Arch {
     /// x86-64 (amd64), the default.

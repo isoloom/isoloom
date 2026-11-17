@@ -129,6 +129,23 @@ function Install-IsoloomFile {
     Write-IsoloomChange -What $Path
 }
 
+# The download of Path for this machine's CPU architecture, from ByArch: each architecture's URL
+# and SHA-256 (@{ 'amd64' = @(Url, Sha256); 'arm64' = @(Url, Sha256) }).
+function Install-IsoloomDownload {
+    param(
+        [Parameter(Mandatory)][string] $Path,
+        [Parameter(Mandatory)][hashtable] $ByArch
+    )
+    $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
+        'AMD64' { 'amd64' }
+        'ARM64' { 'arm64' }
+        default { $env:PROCESSOR_ARCHITECTURE }
+    }
+    $one = $ByArch[$arch]
+    if (-not $one) { throw "isoloom: $Path has no download for this machine's architecture ($arch)" }
+    Install-IsoloomFile -Path $Path -State download -Url $one[0] -Sha256 $one[1]
+}
+
 # A password as a SecureString, built a character at a time.
 function ConvertTo-IsoloomSecure {
     param([Parameter(Mandatory)][string] $Phrase)

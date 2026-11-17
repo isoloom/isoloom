@@ -233,6 +233,10 @@ fn file(f: &FilePlan) -> String {
         FileState::Absent => args.push("absent".into()),
         FileState::Link(target) => args.extend(["link".into(), target.to_string()]),
         FileState::Download { url, sha256 } => args.extend(["download".into(), url.to_string(), sha256.to_string()]),
+        FileState::Downloads(all) => {
+            args.push("download-arch".into());
+            args.extend(all.iter().flat_map(|d| [d.arch.id().to_owned(), d.url.to_string(), d.sha256.to_string()]));
+        }
         _ => return words("isoloom_fail", ["this Isoloom can't render that file state"]),
     }
     words("isoloom_file", args)

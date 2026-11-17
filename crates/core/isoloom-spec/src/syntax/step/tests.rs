@@ -1,5 +1,5 @@
 use super::*;
-use crate::model::Protocol;
+use crate::model::{Arch, Protocol};
 use crate::syntax::{Code, Problem, parse};
 
 fn step(yaml: &str) -> Step {
@@ -151,6 +151,71 @@ fn a_command_without_its_guard_says_how_to_tell_it_ran() {
     );
     let both = mistakes("{ command: x, creates: /a, unless: y }");
     assert_eq!((both[0].0, both[0].1.as_str()), (Code::Conflict, "machines.web.app.steps[1]"));
+}
+
+#[test]
+fn a_download_per_architecture_keeps_each_ones_url_and_checksum() {
+    let (a, b) = ("a".repeat(64), "b".repeat(64));
+    let Step::File(f) = step(&format!(
+        "{{ file: {{ path: /opt/db.tar, url: {{ arm64: \"https://example.org/db-aarch64.tar\", amd64: \"https://example.org/db-x86_64.tar\" }}, sha256: {{ amd64: {a}, arm64: {b} }} }} }}"
+    )) else {
+        panic!()
+    };
+    let FileState::Downloads(all) = f.state else { panic!("{:?}", f.state) };
+    let got: Vec<_> = all.iter().map(|d| (d.arch, d.url.as_str(), d.sha256.as_str())).collect();
+    assert_eq!(
+        got,
+        [
+            (Arch::Amd64, "https://example.org/db-x86_64.tar", a.as_str()),
+            (Arch::Arm64, "https://example.org/db-aarch64.tar", b.as_str())
+        ],
+        "amd64 first, whatever order the spec writes"
+    );
+    let Step::File(one) = step(&format!(
+        "{{ file: {{ path: /opt/db.tar, url: {{ amd64: \"https://example.org/db.tar\" }}, sha256: {{ amd64: {a} }} }} }}"
+    )) else {
+        panic!()
+    };
+    assert!(matches!(&one.state, FileState::Downloads(amd64) if amd64.len() == 1), "{:?}", one.state);
+}
+
+#[test]
+fn a_download_per_architecture_pins_each_one_it_names() {
+    let sha = "a".repeat(64);
+    let at = |yaml: &str| mistakes(yaml).into_iter().map(|(code, path, _)| (code, path)).collect::<Vec<_>>();
+    let sha256 = "machines.web.app.steps[1].file.sha256".to_owned();
+    assert_eq!(
+        at(&format!(
+            "{{ file: {{ path: /opt/db.tar, url: {{ amd64: \"https://example.org/a\", arm64: \"https://example.org/b\" }}, sha256: {{ amd64: {sha} }} }} }}"
+        )),
+        [(Code::Conflict, sha256.clone())],
+        "arm64 has a URL but no SHA-256"
+    );
+    assert_eq!(
+        at(&format!(
+            "{{ file: {{ path: /opt/db.tar, url: {{ amd64: \"https://example.org/a\" }}, sha256: {sha} }} }}"
+        )),
+        [(Code::Conflict, sha256)],
+        "one SHA-256 for URLs per architecture"
+    );
+    assert_eq!(
+        at("{ file: { path: /opt/db.tar, url: {}, sha256: {} } }"),
+        [(Code::MissingField, "machines.web.app.steps[1].file.url".to_owned())]
+    );
+    let found = mistakes(&format!(
+        "{{ file: {{ path: /opt/db.tar, url: {{ amd64: \"http://example.org/a\" }}, sha256: {{ amd64: {sha} }} }} }}"
+    ));
+    assert!(
+        found.iter().any(|(_, path, _)| path.starts_with("machines.web.app.steps[1].file")),
+        "a plain-HTTP URL is refused per architecture too: {found:?}"
+    );
+    assert!(
+        !mistakes(&format!(
+            "{{ file: {{ path: /opt/db.tar, url: {{ riscv64: \"https://example.org/a\" }}, sha256: {{ riscv64: {sha} }} }} }}"
+        ))
+        .is_empty(),
+        "an architecture Isoloom doesn't know"
+    );
 }
 
 #[test]

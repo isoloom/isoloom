@@ -2,6 +2,7 @@
 //! OS its default release claims, with the official image only where its OS is the machine's.
 
 use isoloom_catalogue::Catalogue;
+use isoloom_spec::model::Arch;
 use isoloom_spec::syntax::{FileState, Step};
 
 use crate::testing::resolve;
@@ -90,4 +91,60 @@ fn php_installs_the_server_its_setting_is() {
     assert_eq!(run("{ server: apache }"), ["apache2"]);
     assert_eq!(run("{ server: fpm }"), ["php-fpm"]);
     assert_eq!(run("{}"), Vec::<String>::new(), "the CLI alone");
+}
+
+/// The download steps of `steps`: each one's architectures and the archive each fetches.
+fn downloads(steps: &[Step]) -> Vec<Vec<(Arch, String)>> {
+    steps
+        .iter()
+        .filter_map(|s| match s {
+            Step::File(f) => match &f.state {
+                FileState::Downloads(all) => Some(
+                    all.iter()
+                        .map(|d| (d.arch, d.url.as_str().rsplit('/').next().unwrap_or_default().to_owned()))
+                        .collect(),
+                ),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// MySQL 8.4.7 installs Oracle's build of the machine's architecture on a VM (x86-64 or arm64,
+/// on Ubuntu 22.04 and Debian 12 alike), and runs its official image, published for both, in a
+/// container on Debian 12; the older releases have an x86-64 build only.
+#[test]
+fn mysql_8_4_7_installs_the_build_of_the_machines_architecture() {
+    let with = "{ password: root-secret, user_password: app-secret, port: 3207, privileges: SELECT }";
+    for os in ["ubuntu@22.04", "debian@12"] {
+        let r = resolve(embedded().unwrap(), os, "mysql@8.4.7", with).unwrap_or_else(|p| panic!("{os}: {p:?}"));
+        assert_eq!(
+            downloads(&r.install),
+            [vec![
+                (Arch::Amd64, "mysql-8.4.7-linux-glibc2.17-x86_64.tar.xz".to_owned()),
+                (Arch::Arm64, "mysql-8.4.7-linux-glibc2.28-aarch64.tar.xz".to_owned())
+            ]],
+            "{os}"
+        );
+        let packages: Vec<String> = r
+            .install
+            .iter()
+            .filter_map(|s| if let Step::Packages(p) = s { Some(p) } else { None })
+            .flatten()
+            .map(|p| p.name.to_string())
+            .collect();
+        assert!(packages.iter().any(|p| p == "libncurses6"), "{os}: the arm64 client's ncurses: {packages:?}");
+        assert!(matches!(r.configure.last(), Some(Step::Service(s)) if s.name().as_str() == "mysql"), "{os}");
+        match (os, &r.image) {
+            ("debian@12", Some(image)) => {
+                assert!(image.reference.starts_with("docker.io/library/mysql:8.4.7@sha256:"), "{}", image.reference);
+                assert_eq!(image.platforms, [Arch::Amd64, Arch::Arm64]);
+            }
+            ("ubuntu@22.04", None) => {}
+            (_, image) => panic!("{os}: {image:?}"),
+        }
+    }
+    let older = resolve(embedded().unwrap(), "ubuntu@22.04", "mysql@8.0.44", with).unwrap();
+    assert!(downloads(&older.install).is_empty(), "8.0.44: Oracle's x86-64 build alone, one URL");
 }
