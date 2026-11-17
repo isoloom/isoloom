@@ -236,9 +236,21 @@ isoloom_template() {
   return "$_status"
 }
 
-# The `file` step: PATH made a directory, absent, a link to TARGET, or a download of URL pinned
-# by SHA256, then given OWNER, GROUP and MODE (`isoloom_file PATH OWNER GROUP MODE
-# directory|absent|link TARGET|download URL SHA256`; an empty one is left as it is).
+# This machine's CPU architecture, as a spec names it (`amd64`, `arm64`; another as `uname -m`
+# prints it).
+isoloom_arch() {
+  case $(uname -m) in
+    x86_64 | amd64) echo amd64 ;;
+    aarch64 | arm64) echo arm64 ;;
+    *) uname -m ;;
+  esac
+}
+
+# The `file` step: PATH made a directory, absent, a link to TARGET, a download of URL pinned by
+# SHA256, or the download of this machine's architecture among several (ARCH URL SHA256, again
+# for each), then given OWNER, GROUP and MODE (`isoloom_file PATH OWNER GROUP MODE
+# directory|absent|link TARGET|download URL SHA256|download-arch ARCH URL SHA256...`; an empty
+# one is left as it is).
 isoloom_file() {
   _path=$1 _file_owner=$2 _file_group=$3 _file_mode=$4 _state=$5
   shift 5
@@ -263,6 +275,17 @@ isoloom_file() {
       fi
       ;;
     download) isoloom_download "$1" "$_path" "$2" || return 1 ;;
+    download-arch)
+      _arch=$(isoloom_arch)
+      while [ $# -ge 3 ] && [ "$1" != "$_arch" ]; do
+        shift 3
+      done
+      if [ $# -lt 3 ]; then
+        isoloom_fail "$_path has no download for this machine's architecture ($_arch)"
+        return 1
+      fi
+      isoloom_download "$2" "$_path" "$3" || return 1
+      ;;
     *) isoloom_fail "no file state $_state" || return 1 ;;
   esac
   isoloom_attrs "$_path" "$_file_owner" "$_file_group" "$_file_mode"

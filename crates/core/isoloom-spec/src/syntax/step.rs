@@ -18,7 +18,7 @@ mod software;
 mod words;
 
 pub use accounts::{GroupStep, Password, UserStep};
-pub use files::{Copy, FileState, FileStep, Template};
+pub use files::{ArchDownload, Copy, FileState, FileStep, Template};
 pub use services::{Argv, CommandStep, Firewall, FirewallPort, Guard, Invocation, Service};
 pub use software::{Package, Repository, RepositoryKey};
 pub use words::{AbsPath, AptWord, GroupName, HttpsUrl, PackageName, PackageVersion, ProjectPath, RepositoryName, Sha256, UnitName, UserName};

@@ -10,6 +10,7 @@
 
 use isoloom_plan::configure::{CopyPlan, Family, FilePlan, GroupPlan, PinnedPackage, RepositoryKind, RepositoryPlan, Resource, TemplatePlan, UserPlan};
 use isoloom_render::configure::Configured;
+use isoloom_spec::model::Arch;
 use isoloom_spec::syntax::{FileState, Mode};
 use serde_json::{Value, json};
 
@@ -282,9 +283,11 @@ fn template(c: &Configured<'_>, t: &TemplatePlan, notify: &[String]) -> Value {
         .into_value()
 }
 
-/// The `file` step: a directory, a removal, a link or a pinned download, with owner, group, mode.
+/// The `file` step: a directory, a removal, a link or a pinned download (one per architecture
+/// picked by the host's `architecture` fact), with owner, group, mode.
 fn file(f: &FilePlan, notify: &[String]) -> Value {
     let mut args = serde_json::Map::new();
+    let mut by_arch = None;
     let (module, name) = match &f.state {
         FileState::Directory => {
             args.insert("path".to_owned(), Value::String(f.path.to_string()));
@@ -309,6 +312,19 @@ fn file(f: &FilePlan, notify: &[String]) -> Value {
             args.insert("checksum".to_owned(), Value::String(format!("sha256:{sha256}")));
             ("ansible.builtin.get_url", format!("the download {}", f.path))
         }
+        FileState::Downloads(all) => {
+            // Each architecture's URL and SHA-256 by the name Ansible's fact gives it.
+            let table: serde_json::Map<String, Value> = all
+                .iter()
+                .map(|d| (fact_arch(d.arch).to_owned(), json!({ "url": d.url.as_str(), "sha256": d.sha256.as_str() })))
+                .collect();
+            by_arch = Some(Value::Object(table));
+            let picked = "isoloom_download[ansible_facts['architecture']]";
+            args.insert("url".to_owned(), jinja(format!("{{{{ {picked}.url }}}}")));
+            args.insert("dest".to_owned(), Value::String(f.path.to_string()));
+            args.insert("checksum".to_owned(), jinja(format!("sha256:{{{{ {picked}.sha256 }}}}")));
+            ("ansible.builtin.get_url", format!("the download {}", f.path))
+        }
         _ => {
             return Task::new(format!("the file {}", f.path))
                 .module("ansible.builtin.fail", json!({ "msg": "this Isoloom can't render that file state" }))
@@ -320,7 +336,19 @@ fn file(f: &FilePlan, notify: &[String]) -> Value {
     if let Some(m) = mode(f.mode) {
         args.insert("mode".to_owned(), m);
     }
-    Task::new(name).module(module, Value::Object(args)).notify(notify).into_value()
+    let task = Task::new(name).module(module, Value::Object(args)).notify(notify);
+    match by_arch {
+        Some(table) => task.var("isoloom_download", table).into_value(),
+        None => task.into_value(),
+    }
+}
+
+/// An architecture as Ansible's `architecture` fact names it (`uname -m`'s word).
+fn fact_arch(arch: Arch) -> &'static str {
+    match arch {
+        Arch::Amd64 => "x86_64",
+        Arch::Arm64 => "aarch64",
+    }
 }
 
 /// The `user` step: a local user, its supplementary groups added (never removed), its literal
