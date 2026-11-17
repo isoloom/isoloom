@@ -23,7 +23,7 @@ releases:
     source: distro
     os: [debian@12]
 # Oracle's generic builds: 5.x links ncurses 5, which Debian 11 is the last to ship; 8.x links
-# libaio 1 by its old name, which Ubuntu 22.04 still has.
+# libaio 1 by its old name, which Ubuntu 22.04 still has, and its `mysql` client ncurses 5 too.
   - version: 5.5.62
     source: download
     os: [debian@11]
@@ -108,8 +108,9 @@ recipe:
   install:
     - packages: [ca-certificates, libaio1, libnuma1, procps, xz-utils]
       when: { os: [debian@11, ubuntu@22.04] }
+    # The `mysql` client, which the entrypoint's first start runs, links ncurses 5 in every release.
     - packages: [libncurses5]
-      when: { os: [debian@11] }
+      when: { os: [debian@11, ubuntu@22.04] }
     - file: { path: /var/cache/isoloom/mysql.tar, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
       when: { os: [debian@11, ubuntu@22.04] }
     - command: "sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
