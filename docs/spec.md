@@ -365,7 +365,7 @@ A published image, by tag or digest (`example/clamd:1.4`): the container form. W
 
 ### `machines.*.app.build`
 
-The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form, and on a VM target the VM form it translates to (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as that published name.
+The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile, target, args }`. The container form, and on a VM target the VM form it translates to (`os` and `steps` beside it are the VM form instead, with a warning: two recipes drift apart). With `image`, the build is tagged as that published name.
 
 - **Type:** string or mapping
 
@@ -395,7 +395,7 @@ Build arguments (the Dockerfile's `ARG`s), fixed values.
 
 ### `machines.*.app.steps`
 
-Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official image on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe.
+Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official image on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe; beside `build`, validation warns that the machine has two recipes, which drift apart (it says whether the Dockerfile translates to a VM form on its own): describe the machine once, as a catalogue `service` or as `os` and `steps` alone, so every target comes from one description.
 
 - **Type:** list of strings or mappings
 

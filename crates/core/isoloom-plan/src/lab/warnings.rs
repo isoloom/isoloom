@@ -1,7 +1,8 @@
 //! What a spec says that is likely not what its author means: a daemon a recipe installs that no
-//! step says where to run, a best-effort seal, an access machine left to the runner that the image
-//! table gives no form, a sensitive input's default that reads like a real secret. Warnings,
-//! never problems: validation passes with them.
+//! step says where to run, a machine with two recipes (`app.build` and `app.steps`), a best-effort
+//! seal, an access machine left to the runner that the image table gives no form, a sensitive
+//! input's default that reads like a real secret. Warnings, never problems: validation passes
+//! with them.
 
 use std::collections::HashSet;
 
@@ -9,17 +10,20 @@ use isoloom_spec::model::Seal;
 use isoloom_spec::syntax::{FieldPath, PackageName, Warning};
 
 use super::Lab;
+use super::dockerfiles::{self, TwoRecipes};
 use crate::configure::unstarted;
 
 impl Lab {
     /// What the spec says that is likely not what its author means, in file order: a daemon a
     /// recipe installs with no `service` step for it (it would start on Debian VMs only), a
+    /// machine with both `app.build` and `app.steps` (two recipes that drift apart), a
     /// best-effort seal, an access machine left to the runner that the image table gives no
     /// form, a sensitive input's default that reads like a real secret. Never a problem:
     /// validation passes with warnings.
     #[must_use]
     pub fn warnings(&self) -> Vec<Warning> {
         let mut out = self.unstarted_warnings();
+        out.extend(self.two_recipe_warnings());
         out.extend(self.seal_warnings());
         out.extend(self.unsupplied_warning());
         out.extend(self.secret_default_warnings());
@@ -52,6 +56,39 @@ impl Lab {
                 w.span = self.source.spans.find(&w.path);
                 out.push(w);
             }
+        }
+        out
+    }
+
+    /// A machine written with both `app.build` and `app.steps`, once per machine of the spec's own
+    /// lines: containers run the Dockerfile and VMs the steps, two descriptions of one machine
+    /// that drift apart. When its Dockerfile was read, the warning says whether it translates to
+    /// a VM form on its own (the steps aren't needed) or has none (they are, until it does).
+    fn two_recipe_warnings(&self) -> Vec<Warning> {
+        const TWICE: &str =
+            "`app.build` and `app.steps` are two recipes for one machine: containers run the Dockerfile, VMs the steps, and the two drift apart";
+        const ONCE: &str = "describe the machine once, so every target comes from one description: a catalogue `service`, or `os` and portable `steps` alone";
+        let mut said: HashSet<FieldPath> = HashSet::new();
+        let mut out = Vec::new();
+        for (name, found) in dockerfiles::two_recipes(&self.source, &self.dockerfiles, &self.bases) {
+            let path = FieldPath::new("machines").key(self.written_as(&name)).key("app").key("steps");
+            if !said.insert(path.clone()) {
+                continue;
+            }
+            let (reason, fix) = match found {
+                TwoRecipes::Unread => (TWICE.to_owned(), format!("{ONCE} (keep both only while the Dockerfile has no VM form)")),
+                TwoRecipes::Translates => (
+                    format!("{TWICE}. Its Dockerfile translates to a VM form on its own, so the steps aren't needed"),
+                    "describe the machine once: `build` alone (VMs run its translation), a catalogue `service`, or `os` and portable `steps` alone".to_owned(),
+                ),
+                TwoRecipes::NoVmForm(u) => (
+                    format!("{TWICE}. Both are needed here while its Dockerfile has no VM form: {u}"),
+                    format!("{ONCE}; else keep the two in step"),
+                ),
+            };
+            let mut w = Warning::new(path, reason).fix(fix);
+            w.span = self.source.spans.find(&w.path);
+            out.push(w);
         }
         out
     }

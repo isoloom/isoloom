@@ -81,13 +81,17 @@ struct AppInput {
     image: Option<String>,
     /// The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,
     /// target, args }`. The container form, and on a VM target the VM form it translates to
-    /// (`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as
-    /// that published name.
+    /// (`os` and `steps` beside it are the VM form instead, with a warning: two recipes drift
+    /// apart). With `image`, the build is tagged as that published name.
     #[serde(default, deserialize_with = "build")]
     #[schemars(with = "Option<BuildInput>")]
     build: Option<Build>,
     /// Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official
-    /// image on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe.
+    /// image on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe;
+    /// beside `build`, validation warns that the machine has two recipes, which drift apart (it
+    /// says whether the Dockerfile translates to a VM form on its own): describe the machine once,
+    /// as a catalogue `service` or as `os` and `steps` alone, so every target comes from one
+    /// description.
     #[serde(default)]
     steps: Vec<Step>,
     /// A network appliance Isoloom wires (a router or switch OS in a container): with `image`, or

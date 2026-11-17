@@ -2,14 +2,16 @@
 //! `app.build` with no `app.steps` of its own takes the explicit VM form its Dockerfile
 //! translates to ([`crate::dockerfile`]), so the target runs it as a true VM; one whose
 //! Dockerfile doesn't translate is refused at its `app.build`, naming the line and the
-//! instruction. The container targets read the spec as written.
+//! instruction. The container targets read the spec as written. A machine written with both
+//! `app.build` and `app.steps` has two recipes: its Dockerfile is read too, to say whether it
+//! would translate on its own ([`two_recipes`]).
 
 use std::collections::BTreeMap;
 
 use isoloom_spec::model::{Shape, Target};
 use isoloom_spec::syntax::{self, Code, FieldPath, Kind, Problem, ProjectPath, Recipe};
 
-use crate::dockerfile::{self, Build, Sources};
+use crate::dockerfile::{self, Build, Sources, Translation, Untranslatable};
 
 /// The spec with the VM forms its Dockerfiles give, and each machine whose Dockerfile gave none,
 /// with why.
@@ -24,30 +26,86 @@ pub(super) struct Translated {
     pub files: BTreeMap<ProjectPath, String>,
 }
 
-/// The Dockerfile a machine's VM form is translated from: its build's, when it has no steps of
-/// its own.
-fn dockerfile(m: &syntax::Machine) -> Option<(&syntax::Build, String)> {
+/// A machine's build and its Dockerfile's path, and whether the machine has `app.steps` of its
+/// own beside it.
+fn build(m: &syntax::Machine) -> Option<(&syntax::Build, String, bool)> {
     let Kind::App(app) = &m.kind else { return None };
     let Some(Recipe::Build(b)) = &app.container else { return None };
-    if !app.steps.is_empty() {
-        return None;
-    }
     let path = b
         .dockerfile
         .clone()
         .unwrap_or_else(|| format!("{}/Dockerfile", b.context.trim_end_matches('/')));
-    Some((b, path.trim_start_matches("./").to_owned()))
+    Some((b, path.trim_start_matches("./").to_owned(), !app.steps.is_empty()))
+}
+
+/// The Dockerfile a machine's VM form is translated from: its build's, when it has no steps of
+/// its own.
+fn dockerfile(m: &syntax::Machine) -> Option<(&syntax::Build, String)> {
+    build(m).filter(|(_, _, steps)| !steps).map(|(b, p, _)| (b, p))
 }
 
 /// The Dockerfiles the environment's VM forms are translated from, each once.
 pub(super) fn paths(source: &syntax::Spec) -> Vec<ProjectPath> {
+    each_once(source.machines.values().filter_map(dockerfile).map(|(_, p)| p))
+}
+
+/// Every build's Dockerfile, each once: those [`paths`] has, and those `app.steps` stand beside.
+pub(super) fn all_paths(source: &syntax::Spec) -> Vec<ProjectPath> {
+    each_once(source.machines.values().filter_map(build).map(|(_, p, _)| p))
+}
+
+/// The project paths among `paths`, each once, in order.
+fn each_once(paths: impl Iterator<Item = String>) -> Vec<ProjectPath> {
     let mut out: Vec<ProjectPath> = Vec::new();
-    for m in source.machines.values() {
-        if let Some(p) = dockerfile(m).and_then(|(_, p)| p.parse().ok())
-            && !out.contains(&p)
-        {
+    for p in paths.filter_map(|p| p.parse().ok()) {
+        if !out.contains(&p) {
             out.push(p);
         }
+    }
+    out
+}
+
+/// `m`'s build, translated from its Dockerfile `text` at `path`, its bases from the matrix or
+/// `bases`.
+fn translation(m: &syntax::Machine, build: &syntax::Build, path: &str, text: &str, bases: &Sources) -> Result<Translation, Untranslatable> {
+    let args: Vec<(String, String)> = build.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let os = m.os.map(|o| o.to_string());
+    let b = Build {
+        path,
+        text,
+        context: build.context.trim_start_matches("./").trim_end_matches('/'),
+        args: &args,
+        os: os.as_deref(),
+    };
+    dockerfile::translate(&b, bases)
+}
+
+/// Whether a machine with two recipes needs both: its Dockerfile's text wasn't given, or it
+/// translates to a VM form on its own, or it has none, and why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum TwoRecipes {
+    /// The Dockerfile wasn't read: Isoloom can't tell.
+    Unread,
+    /// The Dockerfile translates to a VM form: the steps aren't needed.
+    Translates,
+    /// The Dockerfile has no VM form: the steps are needed.
+    NoVmForm(Untranslatable),
+}
+
+/// Each machine written with both `app.build` and `app.steps`, in the spec's order, and whether
+/// its Dockerfile (`texts`, by project path) would give its VM form on its own.
+pub(super) fn two_recipes(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, String>, bases: &Sources) -> Vec<(String, TwoRecipes)> {
+    let mut out = Vec::new();
+    for (name, m) in &source.machines {
+        let Some((b, path, true)) = build(m) else { continue };
+        let found = match path.parse::<ProjectPath>().ok().and_then(|p| texts.get(&p)) {
+            None => TwoRecipes::Unread,
+            Some(text) => match translation(m, b, &path, text, bases) {
+                Ok(_) => TwoRecipes::Translates,
+                Err(u) => TwoRecipes::NoVmForm(u),
+            },
+        };
+        out.push((name.clone(), found));
     }
     out
 }
@@ -68,16 +126,7 @@ pub(super) fn translate(source: &syntax::Spec, texts: &BTreeMap<ProjectPath, Str
         let Some(text) = path.parse::<ProjectPath>().ok().and_then(|p| texts.get(&p)) else {
             continue;
         };
-        let args: Vec<(String, String)> = build.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        let os = m.os.map(|o| o.to_string());
-        let b = Build {
-            path: &path,
-            text,
-            context: build.context.trim_start_matches("./").trim_end_matches('/'),
-            args: &args,
-            os: os.as_deref(),
-        };
-        match dockerfile::translate(&b, bases) {
+        match translation(m, build, &path, text, bases) {
             Ok(t) => {
                 files.extend(t.files);
                 m.os = Some(t.os);
@@ -121,10 +170,25 @@ mod tests {
     }
 
     #[test]
-    fn the_dockerfiles_read_are_the_builds_without_steps() {
+    fn the_dockerfiles_translated_are_the_builds_without_steps() {
         let lab = Lab::parse(LAB).unwrap();
         let found: Vec<String> = paths(lab.source()).iter().map(ToString::to_string).collect();
         assert_eq!(found, ["build/web/Dockerfile", "build/db/Dockerfile.lab"]);
+        let read: Vec<String> = lab.all_dockerfile_paths().iter().map(ToString::to_string).collect();
+        assert_eq!(read, ["build/web/Dockerfile", "build/db/Dockerfile.lab", "build/own/Dockerfile"]);
+    }
+
+    #[test]
+    fn a_build_beside_steps_is_never_translated() {
+        let lab = Lab::parse(LAB).unwrap().with_dockerfiles(texts(&[(
+            "build/own/Dockerfile",
+            "FROM debian:12
+",
+        )]));
+        let vm = lab.for_target(Target::Vagrant);
+        assert_eq!(vm.machines["own"].vm.as_ref().map(|v| v.os.as_str()), Some("debian-12"));
+        let steps = vm.machines["own"].configuration.as_ref().map(|c| c.steps().count());
+        assert_eq!(steps, Some(1), "its own step, not the Dockerfile's");
     }
 
     #[test]
