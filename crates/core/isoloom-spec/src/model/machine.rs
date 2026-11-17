@@ -288,8 +288,9 @@ pub struct Port {
     #[serde(default)]
     pub publish: Option<u16>,
     /// Keep `publish` as the host port on local Docker too (normally a free one is picked, so
-    /// environments never collide): for apps whose pages call `localhost:<that port>` themselves. The
-    /// environment can't start while another holds that port.
+    /// environments never collide), and in every instance (which moves the others): for apps whose
+    /// pages call `localhost:<that port>` themselves. The environment can't start while another holds
+    /// that port.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fixed: bool,
     /// `publish: true`: a free host port, which the format picks itself where it can (Compose, Vagrant);

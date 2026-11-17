@@ -2,8 +2,9 @@
 //! gives a copy its own names and its own room on the host, so two instances of a spec never
 //! collide: the name gets a suffix (so Compose project, container, network, VM and namespace
 //! names differ), the Docker networks move to other blocks (Docker refuses two networks on one
-//! subnet), published host ports shift, and the files go to `.isoloom-<n>/` next to the
-//! committed `.isoloom/`. A VM network keeps the block the spec writes, so machines keep their
+//! subnet), published host ports shift (a `fixed` one keeps its number: that port or nothing, so
+//! two copies of an environment that fixes one can't run at once), and the files go to
+//! `.isoloom-<n>/` next to the committed `.isoloom/`. A VM network keeps the block the spec writes, so machines keep their
 //! addresses: the providers that give each copy networks of its own (VirtualBox's internal
 //! networks, Hyper-V's private switches, QEMU's hubs, UTM's vmnet networks) run an instance
 //! beside the environment as written, and those whose networks are the computer's, one per block
@@ -27,7 +28,7 @@ pub enum InstanceError {
     #[error("`{0}` is too long for an instance name (at most {max} characters with the suffix)", max = crate::validate::NAME_MAX)]
     Name(String),
     /// A published port too high to shift for the instance.
-    #[error("machines.{machine}.ports: published port {port} leaves no room for instance {instance} (ports shift by 100 per instance)")]
+    #[error("machines.{machine}.ports: published port {port} leaves no room for instance {instance} (ports not fixed shift by 100 per instance)")]
     Port {
         /// The machine.
         machine: String,
@@ -125,9 +126,10 @@ fn shifted(spec: &Spec, n: u8) -> Result<Spec, InstanceError> {
         }
     }
     shift_ipv6(&mut copy, n)?;
-    // Published host ports: 100 apart per instance (8080 -> 8180 for instance 1).
+    // Published host ports: 100 apart per instance (8080 -> 8180 for instance 1). A fixed one
+    // keeps its number, the one the app's own pages call: that port or nothing.
     for (machine, m) in &mut copy.machines {
-        for port in &mut m.ports {
+        for port in m.ports.iter_mut().filter(|p| !p.fixed) {
             if let Some(published) = port.publish {
                 let shifted = u32::from(published) + 100 * u32::from(n);
                 let moved = u16::try_from(shifted).map_err(|_| InstanceError::Port {
@@ -170,7 +172,10 @@ fn collision(copy: &Spec, n: u8, other: &Spec, m: u8) -> Option<Problem> {
             .fix(format!("an instance moves every IPv6 block by its number in the third group: give the networks one third group and different second ones, or third groups more than {n} apart")),
         );
     }
-    let (machine, mine, taker, _) = first_shared(published(copy), &published(other), |a, b| a == b)?;
+    // A fixed port is the same in every copy: two copies holding it collide when they run, not
+    // here (that port or nothing); a moved port that lands on one is refused.
+    let same = |(a, a_fixed): (u16, bool), (b, b_fixed): (u16, bool)| a == b && !(a_fixed && b_fixed);
+    let (machine, (mine, _), taker, _) = first_shared(published(copy), &published(other), same)?;
     Some(
         Problem::new(
             Code::Conflict,
@@ -178,7 +183,7 @@ fn collision(copy: &Spec, n: u8, other: &Spec, m: u8) -> Option<Problem> {
             format!("instance {n} publishes port {mine} on the host, which machine `{taker}` publishes in {theirs}: two can't listen on one host port"),
         )
         .fix(format!(
-            "an instance moves every published port by 100 times its number: publish ports that are not a multiple of 100 apart, or more than {} apart",
+            "an instance moves every published port not fixed by 100 times its number: publish ports that are not a multiple of 100 apart, or more than {} apart",
             100 * u32::from(n)
         )),
     )
@@ -212,11 +217,11 @@ fn ipv6_blocks(spec: &Spec) -> Vec<(String, Cidr6)> {
         .collect()
 }
 
-/// Every port published on the host, with its machine.
-fn published(spec: &Spec) -> Vec<(String, u16)> {
+/// Every port published on the host, with its machine and whether it is fixed.
+fn published(spec: &Spec) -> Vec<(String, (u16, bool))> {
     spec.machines
         .iter()
-        .flat_map(|(machine, m)| m.ports.iter().filter_map(move |p| Some((machine.clone(), p.publish?))))
+        .flat_map(|(machine, m)| m.ports.iter().filter_map(move |p| Some((machine.clone(), (p.publish?, p.fixed)))))
         .collect()
 }
 
@@ -319,6 +324,43 @@ mod tests {
             apply(&web(65_500)?, 1),
             Err(InstanceError::Port { machine, port: 65_500, instance: 1 }) if machine == "web"
         ));
+        Ok(())
+    }
+
+    /// A web machine publishing port 80 on the host's 8080, fixed, and an API's 9090 that isn't.
+    fn fixed_web(api: u16) -> Result<Spec, String> {
+        model(&lab(&format!(
+            "machines:\n  web:\n    docker: {{ image: nginx }}\n    networks: {{ lan: 10 }}\n    ports: [{{ port: 80, publish: 8080, fixed: true }}]\n  api:\n    docker: {{ image: nginx }}\n    networks: {{ lan: 11 }}\n    ports: [{{ port: 80, publish: {api} }}]\n"
+        )))
+    }
+
+    #[test]
+    fn a_fixed_port_keeps_its_number_in_every_instance() -> Result<(), String> {
+        let spec = fixed_web(9090)?;
+        for n in [1, 2, MAX] {
+            let copy = apply(&spec, n).map_err(|e| e.to_string())?;
+            let web = &copy.machines["web"].ports[0];
+            assert_eq!((web.publish, web.fixed), (Some(8080), true), "instance {n}: that port or nothing");
+            assert_eq!(copy.machines["api"].ports[0].publish, Some(9090 + 100 * u16::from(n)), "instance {n}");
+        }
+        // Regression: instance 1 published the fixed 8080 on 8180, where the app's own pages
+        // don't call it.
+        let mut high = fixed_web(9090)?;
+        high.machines.get_mut("web").ok_or("web")?.ports[0].publish = Some(65_500);
+        assert_eq!(
+            apply(&high, 1).map(|c| c.machines["web"].ports[0].publish).ok(),
+            Some(Some(65_500)),
+            "never too high to shift"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_moved_port_never_lands_on_a_fixed_one() -> Result<(), String> {
+        // The API's 7980 moves to 8080 in instance 1: the web's fixed port, in every copy.
+        let p = conflict(&fixed_web(7980)?, 1).ok_or("instance 1 is refused")?;
+        assert_eq!((p.code, p.path.as_str()), (Code::Conflict, "machines.api.ports"));
+        assert!(p.reason.contains("port 8080") && p.reason.contains("`web`"), "{}", p.reason);
         Ok(())
     }
 

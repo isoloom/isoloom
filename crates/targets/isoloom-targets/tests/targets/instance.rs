@@ -295,3 +295,46 @@ fn every_path_an_instance_of_a_catalogue_service_names_is_one_it_writes() -> Out
     assert!(broken.is_empty(), "{broken:#?}");
     Ok(())
 }
+
+/// Instance 1 of `invoice-portal-api`, whose web machine publishes its portal on 8080, fixed (its
+/// pages call that URL), on `target`: the file at `path` under `.isoloom-1/`, the snapshot giving
+/// the portal's URL on 8080 too.
+fn fixed_port_instance(target: Target, path: &str) -> Outcome<String> {
+    let lab = example("invoice-portal-api")?;
+    let files = generate_instance(&lab, target, 1)?;
+    let snap: serde_json::Value = serde_json::from_str(file(&files, ".isoloom-1/resolved.json")?)?;
+    assert_eq!(
+        snap.pointer("/machines/web/ports/portal/url").and_then(serde_json::Value::as_str),
+        Some("http://127.0.0.1:8080/"),
+        "{target:?}"
+    );
+    Ok(file(&files, &format!(".isoloom-1/{path}"))?.to_owned())
+}
+
+#[test]
+fn an_instance_publishes_a_fixed_port_on_its_own_number_on_compose() -> Outcome {
+    // Regression: instance 1 published it on 8180, where the portal's own pages don't call it.
+    let compose = yaml(&fixed_port_instance(Target::Docker, "docker/compose.yml")?);
+    assert_eq!(yaml_str(&compose, "services.web.ports.0"), "${ISOLOOM_PUBLISH_ADDRESS:-127.0.0.1}:8080:80");
+    Ok(())
+}
+
+#[test]
+fn an_instance_forwards_a_fixed_port_from_its_own_number_on_vagrant() -> Outcome {
+    let vf = ruby_blocks(&fixed_port_instance(Target::Vagrant, "vagrant/Vagrantfile")?);
+    let forwards = define(&vf, "web").statements("m.vm.network \"forwarded_port\", guest: 80,");
+    assert!(
+        matches!(forwards.as_slice(), [one] if one.contains("host: ISOLOOM_HOSTPORTS.fetch(\"web/portal\", 8080)")),
+        "{forwards:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_instance_publishes_a_fixed_port_on_its_own_number_on_terraform() -> Outcome {
+    let proxmox = fixed_port_instance(Target::Proxmox, "proxmox/main.tf")?;
+    assert!(proxmox.contains("value = { \"web/portal\" = \"${local.router_address}:8080\" }"), "{proxmox}");
+    let aws = fixed_port_instance(Target::CloudVm, "cloud-vm/aws/main.tf")?;
+    assert!(aws.contains("value = { \"web/portal\" = \"${aws_instance.web.public_ip}:8080\" }"), "{aws}");
+    Ok(())
+}
