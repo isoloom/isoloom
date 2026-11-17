@@ -23,14 +23,11 @@ fi
 
 pushing=0
 touched=
-while read -r _ local_sha _ remote_sha; do
+while read -r _ local_sha _ _; do
   [ "$local_sha" != "$zero" ] || continue # a branch being deleted
-  if [ "$remote_sha" = "$zero" ]; then
-    # A new branch: its commits no remote has yet.
-    range="$local_sha --not --remotes"
-  else
-    range="$remote_sha..$local_sha"
-  fi
+  # The commits no remote branch has yet: a new branch's, a later push's, and a rebased branch's
+  # own (force-pushed), never the ones it was rebased onto, which are on the remote already.
+  range="$local_sha --not --remotes"
   # shellcheck disable=SC2086 # the range is git's own words
   if found=$(git log --format=%B $range | attribution_lines); then
     refuse "a commit being pushed carries an attribution line (git rebase -i and reword it):" "$found"
