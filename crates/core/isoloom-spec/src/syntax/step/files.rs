@@ -217,6 +217,7 @@ impl TryFrom<FileInput> for FileStep {
 /// A download's `url` or `sha256` as written: one value, or one per CPU architecture.
 #[derive(JsonSchema)]
 #[serde(untagged)]
+#[schemars(rename = "{T}ByArch")]
 enum ByArch<T> {
     /// The same for every machine.
     One(T),
@@ -227,6 +228,7 @@ enum ByArch<T> {
 /// A value per CPU architecture: each one the download has a build for.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[schemars(rename = "{T}PerArch")]
 struct PerArch<T> {
     /// For an x86-64 machine.
     amd64: Option<T>,
