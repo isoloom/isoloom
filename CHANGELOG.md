@@ -180,6 +180,15 @@ stable spec format.
 
 ### Fixed
 
+- **An instance keeps a fixed port's number, on every target.** `isoloom_spec::instance::apply`
+  moved every published port by 100 per instance, `publish: { host: 8080, fixed: true }`
+  included: instance 1 published it on 8180 (Compose, Vagrant's forward, a Terraform module's
+  firewall and `published` output, the snapshot's URL and the message), where the app's own
+  pages, which call 8080, don't reach it. A fixed port now keeps its number in every instance:
+  that port or nothing, as the spec says, so two copies of the environment collide when they run
+  (the second can't start while the first holds it), never when they are made. An instance
+  whose moved port lands on a fixed one is still refused.
+
 - **On Compose, an input's file with a default keeps its value when a start gives none.** The
   inputs job wrote each file at every `up`, an unset variable falling back to the spec's
   default: a start given no value again (a resume once the values given at the first start are

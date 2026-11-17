@@ -906,7 +906,7 @@ The host port.
 
 ### `machines.*.ports.*.publish.fixed`
 
-`true`: that port or nothing; `false` (the default): preferred.
+`true`: that port or nothing, in every instance too; `false` (the default): preferred.
 
 - **Type:** boolean
 - **Default:** `false`

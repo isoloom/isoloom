@@ -57,7 +57,8 @@ pub enum Publish {
     /// A number: that host port when it is free, else a free one (environments never collide).
     Preferred(NonZeroU16),
     /// `{ host, fixed: true }`: that host port or nothing (an app that calls
-    /// `localhost:<port>` itself); the environment can't start while another holds it.
+    /// `localhost:<port>` itself), in every instance too; the environment can't start while
+    /// another holds it.
     Fixed(NonZeroU16),
 }
 
@@ -74,7 +75,7 @@ enum PublishInput {
     Host {
         /// The host port.
         host: NonZeroU16,
-        /// `true`: that port or nothing; `false` (the default): preferred.
+        /// `true`: that port or nothing, in every instance too; `false` (the default): preferred.
         #[serde(default)]
         fixed: bool,
     },
