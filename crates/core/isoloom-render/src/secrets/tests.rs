@@ -182,7 +182,7 @@ fn a_docker_host_gets_the_secrets_of_its_containers_in_the_spec_s_order() {
 #[cfg(unix)]
 #[test]
 fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() {
-    let script = from_environment(&[("db".to_owned(), "PW_B64".to_owned()), ("api".to_owned(), "API_B64".to_owned())], &[]);
+    let script = from_environment(&[("db".to_owned(), "PW_B64".to_owned()), ("api".to_owned(), "API_B64".to_owned())], &[], &[]);
     // Only what keeps the values: the placing service needs a real machine's `/etc`.
     let (keeping, placing) = script.split_once(&format!("touch {DELIVERED}\n")).expect("the mark");
     assert_eq!(
@@ -202,6 +202,30 @@ fn values_from_the_environment_are_kept_and_an_empty_one_keeps_the_kept_value() 
     let (kept, kept_dir, _kept) = run(&again, "", "env-again");
     assert!(kept.status.success(), "{}", String::from_utf8_lossy(&kept.stderr));
     assert_eq!(std::fs::read_to_string(kept_dir.join("db")).unwrap(), "kept");
+}
+
+// The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
+#[cfg(unix)]
+#[test]
+fn an_inputs_default_is_kept_when_no_value_is_given_the_first_time_only() {
+    let values = [("TOKEN".to_owned(), "TOKEN_B64".to_owned()), ("db".to_owned(), "PW_B64".to_owned())];
+    let script = from_environment(&values, &[("TOKEN".to_owned(), "dev 'token' $HOME".to_owned())], &[]);
+    let (keeping, _) = script.split_once(&format!("touch {DELIVERED}\n")).expect("the mark");
+    // No value, nothing kept: the default, written as it is; the value without one stays empty.
+    let (first, first_dir, _first) = run(keeping, "", "default-first");
+    assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
+    assert_eq!(std::fs::read_to_string(first_dir.join("TOKEN")).unwrap(), "dev 'token' $HOME");
+    assert_eq!(std::fs::read_to_string(first_dir.join("db")).unwrap(), "");
+    // A value given wins over the default.
+    let given = format!("export TOKEN_B64={}; {keeping}", b64("launched"));
+    let (g, g_dir, _g) = run(&given, "", "default-given");
+    assert!(g.status.success(), "{}", String::from_utf8_lossy(&g.stderr));
+    assert_eq!(std::fs::read_to_string(g_dir.join("TOKEN")).unwrap(), "launched");
+    // No value again: the kept value stays, the default doesn't replace it.
+    let again = format!("mkdir -p {KEPT_DIR} && printf launched > {KEPT_DIR}/TOKEN && {keeping}");
+    let (k, k_dir, _k) = run(&again, "", "default-again");
+    assert!(k.status.success(), "{}", String::from_utf8_lossy(&k.stderr));
+    assert_eq!(std::fs::read_to_string(k_dir.join("TOKEN")).unwrap(), "launched");
 }
 
 #[test]

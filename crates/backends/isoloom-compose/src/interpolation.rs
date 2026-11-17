@@ -8,15 +8,28 @@ pub(crate) fn literal(text: &str) -> String {
     text.replace('$', "$$")
 }
 
+/// Input `name`'s value as Compose fills it from its environment: `${NAME:-default}`, the
+/// default (literal) when the variable is unset or empty, else empty. A spec's default holds no
+/// `}`, which would end the reference.
+pub(crate) fn input(name: &str, default: Option<&str>) -> String {
+    format!("${{{name}:-{}}}", literal(default.unwrap_or_default()))
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
 
-    use super::literal;
+    use super::{input, literal};
 
     #[test]
     fn a_reference_is_kept_from_compose() {
         assert_eq!(literal("echo ${HOME} $PATH"), "echo $${HOME} $$PATH");
+    }
+
+    #[test]
+    fn an_input_falls_back_to_its_default_written_literal() {
+        assert_eq!(input("MODE", None), "${MODE:-}");
+        assert_eq!(input("TOKEN", Some("dev-$HOME")), "${TOKEN:-dev-$$HOME}");
     }
 
     proptest! {

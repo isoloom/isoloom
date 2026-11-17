@@ -74,6 +74,12 @@ impl Variable {
         self.sensitive
     }
 
+    /// Its default, as HCL.
+    #[cfg(test)]
+    pub(crate) fn default_hcl(&self) -> Option<String> {
+        self.default.as_ref().map(ToString::to_string)
+    }
+
     /// Whether it has a default.
     #[cfg(test)]
     pub(crate) fn has_default(&self) -> bool {

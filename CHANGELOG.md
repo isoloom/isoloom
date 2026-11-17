@@ -12,6 +12,16 @@ stable spec format.
 
 ### Added
 
+- **An input may declare a `default`, so a lab starts without a launch.** `inputs: { TOKEN:
+  { default: dev-launch-token } }`: given no value (unset or empty), the input is its default
+  on every target, else empty as before. Compose writes `${TOKEN:-dev-launch-token}` (an input's
+  file with a default is a config, not a secret, which Compose refused to create while its
+  variable was unset); Terraform gives the variable that default; a Vagrant VM keeps the default
+  the first time and a given value over it; Ansible's lookups and Helm's `values.yaml` fall back
+  to it. A default is text without a NUL or a `}` (`""` starts it empty); it is written in the generated
+  files, so a sensitive input's default that reads like a real secret gets a warning
+  ([spec](docs/spec.md#inputs), [security](docs/explanation/security.md)).
+
 - **A Proxmox server whose lab bridge only its node reaches.** The `proxmox` module takes a
   SOCKS5 proxy, `ssh_proxy_host` and `ssh_proxy_port` (unset by default): Terraform's SSH
   connections to the router and the machines (the waits for their set-up, the seal) go to it

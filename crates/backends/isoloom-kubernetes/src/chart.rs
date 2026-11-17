@@ -86,13 +86,20 @@ fn chart_file(env: &Environment) -> Result<String> {
 }
 
 /// Each machine's image, as its manifests pull it (through the mirrors; a built one is local),
-/// and the inputs, empty.
+/// and the inputs, each its spec's default, else empty.
 fn values(env: &Environment, inputs: bool) -> Result<String> {
     let values = Values {
         images: Machine::all(env).iter().map(|m| (m.name.to_owned(), m.reference.to_owned())).collect(),
-        inputs: inputs.then(|| env.inputs.iter().map(|i| (i.name.clone(), String::new())).collect()),
+        inputs: inputs.then(|| env.inputs.iter().map(|i| (i.name.clone(), i.default.clone().unwrap_or_default())).collect()),
     };
-    let usage = "# images: each machine's image (images built from the project must be pushed where the\n# cluster pulls from, and named here). inputs: the launch-time inputs (unset ones are empty).\n";
+    let unset = if env.inputs.iter().any(|i| i.default.is_some()) {
+        "unset ones are the spec's default, else empty"
+    } else {
+        "unset ones are empty"
+    };
+    let usage = format!(
+        "# images: each machine's image (images built from the project must be pushed where the\n# cluster pulls from, and named here). inputs: the launch-time inputs ({unset}).\n"
+    );
     Ok(format!("{}{usage}{}", generated(), document(&values)?))
 }
 

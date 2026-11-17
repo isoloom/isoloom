@@ -58,16 +58,18 @@ pub(super) fn step_tasks(c: &Configured<'_>, r: &Resource, notify: &[String], se
         Resource::Service(s) => services::service(c, s),
         Resource::Command(cmd) => services::command(cmd, notify, &vars, seq),
         Resource::Firewall(ports) => services::firewall(ports, notify, &vars, seq),
-        Resource::Run(run) => vec![services::run(run, notify, &vars, inputs(c))],
+        Resource::Run(run) => vec![services::run(run, notify, &vars, &inputs(c))],
         Resource::Reboot => vec![services::reboot()],
-        Resource::Playbook(p) => vec![services::playbook(p, notify, &vars, inputs(c))],
+        Resource::Playbook(p) => vec![services::playbook(p, notify, &vars, &inputs(c))],
     })
 }
 
-/// The inputs machine `c` reads (an environment variable from an input), which its `run` and
-/// `playbook` steps get in their environment.
-fn inputs<'a>(c: &Configured<'a>) -> &'a [String] {
-    c.env().machines.get(c.machine()).map_or(&[], |m| m.inputs.as_slice())
+/// The inputs machine `c` reads (an environment variable from an input), each with its default
+/// when the spec declares one, which its `run` and `playbook` steps get in their environment.
+fn inputs(c: &Configured<'_>) -> Vec<(String, Option<String>)> {
+    let env = c.env();
+    let names = env.machines.get(c.machine()).map_or(&[][..], |m| m.inputs.as_slice());
+    names.iter().map(|n| (n.clone(), env.input_default(n).map(str::to_owned))).collect()
 }
 
 /// A mode as Ansible wants it: the octal text (`"0644"`), never a bare number.

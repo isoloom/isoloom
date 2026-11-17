@@ -2,8 +2,8 @@
 //! Vagrantfile read it from their environment, so one set of values starts every format (with
 //! Terraform, as `TF_VAR_<name>`):
 //!
-//! - an input (`inputs:`) under its own name, sensitive unless the spec says it isn't, empty when
-//!   not given;
+//! - an input (`inputs:`) under its own name, sensitive unless the spec says it isn't, its spec's
+//!   default when not given (else empty);
 //! - a secret a machine gets as a file (`secrets:`) as `ISOLOOM_SECRET_<NAME>`, sensitive, with no
 //!   default: Terraform refuses to apply without it.
 //!
@@ -27,9 +27,13 @@ pub(crate) fn variables_of(env: &Environment) -> Vec<Variable> {
         .iter()
         .filter(|i| vms().any(|mp| mp.reads_input(&i.name)))
         .map(|i| {
+            let (default, when) = match &i.default {
+                Some(d) => (d.as_str(), "the spec's default when not given"),
+                None => ("", "empty when not given"),
+            };
             let v = Variable::new(&i.name, "string")
-                .default(string(""))
-                .describe("A value given at launch (the spec's `inputs`): empty when not given");
+                .default(string(default))
+                .describe(&format!("A value given at launch (the spec's `inputs`): {when}"));
             if i.sensitive { v.sensitive() } else { v }
         })
         .collect();
@@ -99,7 +103,7 @@ fn value_of(f: &SecretFile) -> Expression {
 /// Nothing waits: the values are there. `None` when the machine gets no secret.
 pub(crate) fn secrets_step(mp: &MachinePlan) -> Option<Template> {
     let (unique, values) = kept_values(mp)?;
-    let script = isoloom_render::secrets::from_environment(&values, &mp.secrets);
+    let script = isoloom_render::secrets::from_environment(&values, &[], &mp.secrets);
     let mut t = Template::text("env");
     for (f, (_, var)) in unique.iter().zip(&values) {
         t.push_text(format!(" {var}="));
@@ -128,7 +132,7 @@ pub(crate) fn secrets_file(mp: &MachinePlan) -> Option<Expression> {
 /// (`isoloom_render::secrets::from_environment`). `None` when the machine gets no secret.
 pub(crate) fn secrets_from_file(mp: &MachinePlan, path: &str) -> Option<String> {
     let (_, values) = kept_values(mp)?;
-    let script = isoloom_render::secrets::from_environment(&values, &mp.secrets);
+    let script = isoloom_render::secrets::from_environment(&values, &[], &mp.secrets);
     Some(format!(
         "set -a && . {path} && set +a && rm -f {path} && sh -c {}",
         isoloom_spec::shell::quote(script.trim_end_matches('\n'))
@@ -158,7 +162,7 @@ mod tests {
     use super::*;
     use crate::hcl_builder::Piece;
 
-    const SPEC: &str = "version: 1\nname: s\ninputs:\n  TOKEN: {}\n  MODE: { sensitive: false }\n  UNREAD: {}\nsecrets:\n  db-password: { env: DB_PASSWORD }\nnetworks:\n  lan: { cidr: 10.61.10.0/24 }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    environment: { MODE: { input: MODE } }\n    files:\n      - { path: /etc/token, input: TOKEN }\n      - { path: /etc/db, secret: db-password }\n";
+    const SPEC: &str = "version: 1\nname: s\ninputs:\n  TOKEN: { default: dev-token }\n  MODE: { sensitive: false }\n  UNREAD: {}\nsecrets:\n  db-password: { env: DB_PASSWORD }\nnetworks:\n  lan: { cidr: 10.61.10.0/24 }\nmachines:\n  web:\n    os: debian@12\n    networks: { lan: 10 }\n    environment: { MODE: { input: MODE } }\n    files:\n      - { path: /etc/token, input: TOKEN }\n      - { path: /etc/db, secret: db-password }\n";
 
     #[test]
     fn each_value_a_vm_reads_is_a_variable_of_its_own_name() {
@@ -171,6 +175,9 @@ mod tests {
             vars[0].has_default() && !vars[2].has_default(),
             "a secret has no default: Terraform asks for it"
         );
+        // An input falls back to the spec's default, else to empty.
+        assert_eq!(vars[0].default_hcl().as_deref(), Some("\"dev-token\""));
+        assert_eq!(vars[1].default_hcl().as_deref(), Some("\"\""));
     }
 
     #[test]

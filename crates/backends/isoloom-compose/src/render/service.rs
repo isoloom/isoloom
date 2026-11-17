@@ -68,8 +68,8 @@ fn base(env: &Environment, m: Machine<'_>, ts: &[trunks::Trunk]) -> Service {
         environment: environment(env, plan),
         ports: plan.ports.iter().map(port).collect(),
         volumes: [storage::volume_mounts(plan), long_tmpfs, storage::host_folders(m.name, plan)].concat(),
-        secrets: secrets::of_machine(plan),
-        configs: configs::mounts(m.name, plan),
+        secrets: secrets::of_machine(env, plan),
+        configs: [configs::mounts(m.name, plan), secrets::as_configs(env, plan)].concat(),
         restart: Some(Restart::UnlessStopped),
         ..Service::default()
     };
@@ -202,7 +202,8 @@ pub(super) fn build_of(env: &Environment, machine: &str, b: &isoloom_plan::Build
 }
 
 /// A machine's environment: the spec's constraints (proxy, package mirrors), its own fixed
-/// values (`$$`: literal, not Compose's interpolation), then its inputs, read from the shell.
+/// values (`$$`: literal, not Compose's interpolation), then its inputs, read from the shell
+/// (each its default when unset or empty, when the spec declares one).
 pub(super) fn environment(env: &Environment, plan: &isoloom_plan::MachinePlan) -> Option<IndexMap<String, String>> {
     let constraints = constraints::machine_env(env.constraints.as_ref());
     if plan.inputs.is_empty() && constraints.is_empty() && plan.settings.environment.is_empty() {
@@ -210,7 +211,7 @@ pub(super) fn environment(env: &Environment, plan: &isoloom_plan::MachinePlan) -
     }
     let fixed = plan.settings.environment.iter().map(|(k, v)| (k.clone(), v.clone()));
     let mut out: IndexMap<String, String> = constraints.into_iter().chain(fixed).map(|(k, v)| (k, literal(&v))).collect();
-    out.extend(plan.inputs.iter().map(|i| (i.clone(), format!("${{{i}:-}}"))));
+    out.extend(plan.inputs.iter().map(|i| (i.clone(), crate::interpolation::input(i, env.input_default(i)))));
     Some(out)
 }
 

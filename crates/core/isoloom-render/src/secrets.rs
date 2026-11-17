@@ -103,15 +103,22 @@ fn placed(files: &[SecretFile]) -> String {
 /// secret's name and the variable holding its value in base64 (so a `$`, a quote or a line break
 /// in it is never read by the shell that sets the variable), kept as delivery keeps it and the
 /// delivery marked; then the files put in place now and at every boot. Nothing waits: the
-/// values are there. An empty or unset variable writes an empty value the first time, and keeps
-/// the value already kept after (a re-provision given no value again).
+/// values are there. An empty or unset variable writes the value's default the first time (an
+/// input's, from `defaults`: a kept name and its default), else an empty value, and keeps the
+/// value already kept after (a re-provision given no value again).
 #[must_use]
-pub fn from_environment(values: &[(String, String)], files: &[SecretFile]) -> String {
+pub fn from_environment(values: &[(String, String)], defaults: &[(String, String)], files: &[SecretFile]) -> String {
     let kept = values
         .iter()
         .map(|(name, var)| {
             let kept = format!("{KEPT_DIR}/{name}");
-            format!("v=\"$(printenv {var} || true)\"; if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}.new; mv -f {kept}.new {kept}; fi\n")
+            let fallback = defaults.iter().find(|(n, _)| n == name).map_or(String::new(), |(_, d)| {
+                format!(
+                    "if [ -z \"$v\" ] && [ ! -e {kept} ]; then v={}; fi; ",
+                    quote(&isoloom_spec::shell::base64(d.as_bytes()))
+                )
+            });
+            format!("v=\"$(printenv {var} || true)\"; {fallback}if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}.new; mv -f {kept}.new {kept}; fi\n")
         })
         .collect::<Vec<_>>()
         .concat();
