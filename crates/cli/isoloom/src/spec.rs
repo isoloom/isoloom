@@ -141,10 +141,10 @@ pub(crate) fn settled(profile: Option<&isoloom_spec::profile::Profile>, dir: &Pa
 }
 
 /// The texts of the Dockerfiles `lab`'s builds name, read from `dir`, for their machines' VM
-/// form. One that can't be read is left out: its machine's VM form is refused saying so, and
-/// its container form reads it as the build does.
+/// form (and the warning about a build beside `app.steps`). One that can't be read is left out:
+/// its machine's VM form is refused saying so, and its container form reads it as the build does.
 fn dockerfiles(lab: &Lab, dir: &Path) -> std::collections::BTreeMap<isoloom_spec::syntax::ProjectPath, String> {
-    lab.dockerfile_paths()
+    lab.all_dockerfile_paths()
         .into_iter()
         .filter_map(|p| read_inside(dir, p.as_str()).ok().map(|text| (p, text)))
         .collect()

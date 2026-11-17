@@ -211,8 +211,9 @@ impl Lab {
     }
 
     /// The lab with the texts of its builds' Dockerfiles (read by the caller that generates,
-    /// from [`Lab::dockerfile_paths`]): on a target that runs VMs, each such machine takes the
-    /// VM form its Dockerfile translates to, or is refused at the line that has none.
+    /// from [`Lab::all_dockerfile_paths`]): on a target that runs VMs, each machine with no
+    /// `app.steps` takes the VM form its Dockerfile translates to, or is refused at the line that
+    /// has none.
     #[must_use]
     pub fn with_dockerfiles(mut self, texts: BTreeMap<ProjectPath, String>) -> Lab {
         self.dockerfiles = texts;
@@ -234,6 +235,14 @@ impl Lab {
     #[must_use]
     pub fn dockerfile_paths(&self) -> Vec<ProjectPath> {
         dockerfiles::paths(&self.source)
+    }
+
+    /// Every build's Dockerfile, each once: those of [`Lab::dockerfile_paths`], and those a
+    /// machine's `app.steps` stand beside, which [`Lab::warnings`] reads to say whether the steps
+    /// are needed. The caller that reads the Dockerfiles for [`Lab::with_dockerfiles`] reads these.
+    #[must_use]
+    pub fn all_dockerfile_paths(&self) -> Vec<ProjectPath> {
+        dockerfiles::all_paths(&self.source)
     }
 
     /// The spec `scope` lowers: the translated one for a target that runs VMs.

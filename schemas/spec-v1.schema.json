@@ -1403,7 +1403,7 @@
           "description": "A published image, by tag or digest (`example/clamd:1.4`): the container form. With\n`build`, the name that build is tagged with: development builds and tags it, production\npulls it."
         },
         "build": {
-          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form, and on a VM target the VM form it translates to\n(`os` and `steps` beside it are the VM form instead). With `image`, the build is tagged as\nthat published name.",
+          "description": "The project's own Dockerfile: a folder holding a `Dockerfile`, or `{ context, dockerfile,\ntarget, args }`. The container form, and on a VM target the VM form it translates to\n(`os` and `steps` beside it are the VM form instead, with a warning: two recipes drift\napart). With `image`, the build is tagged as that published name.",
           "$ref": "#/$defs/BuildInput"
         },
         "steps": {
@@ -1411,7 +1411,7 @@
           "items": {
             "$ref": "#/$defs/Step"
           },
-          "description": "Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official\nimage on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe."
+          "description": "Portable steps (they need `os`): a Dockerfile Isoloom generates from the OS's official\nimage on containers, set-up steps on VMs. With `image` or `build`, the VM form's recipe;\nbeside `build`, validation warns that the machine has two recipes, which drift apart (it\nsays whether the Dockerfile translates to a VM form on its own): describe the machine once,\nas a catalogue `service` or as `os` and `steps` alone, so every target comes from one\ndescription."
         },
         "appliance": {
           "$ref": "#/$defs/Appliance",
