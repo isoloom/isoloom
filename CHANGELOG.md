@@ -12,6 +12,14 @@ stable spec format.
 
 ### Added
 
+- **The catalogue's `mysql` takes a port, first-start scripts and the application user's
+  privileges.** `with: { port: 3207, init: db/, privileges: SELECT }`: the server and its
+  clients use the port (the machine's `mysql` port follows it); the folder's `*.sql`, `*.sql.gz`
+  and `*.sh` run once at the first start on the application database, as the image's
+  /docker-entrypoint-initdb.d; the user gets only the privileges given on that database instead
+  of all of them. The same in every form: the official image, the container built from the OS,
+  and a VM.
+
 - **An input may declare a `default`, so a lab starts without a launch.** `inputs: { TOKEN:
   { default: dev-launch-token } }`: given no value (unset or empty), the input is its default
   on every target, else empty as before. Compose writes `${TOKEN:-dev-launch-token}` (an input's

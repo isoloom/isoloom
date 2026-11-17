@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's mysql entry: the port of its `port` setting, for the
+# server and for the clients run beside it.
+[mysqld]
+port = {{ with.port }}
+
+[client]
+port = {{ with.port }}

@@ -110,6 +110,10 @@ app:
       from: catalogue/mysql/.isoloom/catalogue/mysql/files/docker-entrypoint.sh
       to: /usr/local/bin/docker-entrypoint.sh
       mode: '0755'
+  - template:
+      from: catalogue/mysql/.isoloom/catalogue/mysql/files/port.cnf
+      to: /etc/mysql/conf.d/isoloom-port.cnf
+      mode: '0644'
   - service:
       name: mysql
       run:

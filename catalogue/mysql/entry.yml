@@ -23,7 +23,7 @@ releases:
     source: distro
     os: [debian@12]
 # Oracle's generic builds: 5.x links ncurses 5, which Debian 11 is the last to ship; 8.x links
-# libaio 1 by its old name, which Ubuntu 22.04 still has.
+# libaio 1 by its old name, which Ubuntu 22.04 still has, and its `mysql` client ncurses 5 too.
   - version: 5.5.62
     source: download
     os: [debian@11]
@@ -72,6 +72,22 @@ settings:
     type: password
     required: true
     description: The application user's password (a literal, or a secret or input reference).
+  privileges:
+    type: string
+    pattern: "[A-Z][A-Z ,]{0,127}"
+    description: >-
+      The application user's privileges on the application database, as GRANT writes them
+      (`SELECT`, `SELECT, INSERT, UPDATE, DELETE`). Without it, all of them, as the image grants.
+  port:
+    type: port
+    default: 3306
+    description: The port MySQL listens on, and the number of the machine's `mysql` port.
+  init:
+    type: folder
+    description: >-
+      A folder of the project (`db/`) whose scripts run once, at the first start, in name order,
+      on the application database: `*.sql`, `*.sql.gz` and `*.sh`, as the image's
+      /docker-entrypoint-initdb.d.
 
 image:
   environment:
@@ -81,7 +97,7 @@ image:
     MYSQL_PASSWORD_FILE: "{{ with.user_password.path }}"
 
 ports:
-  mysql: { port: 3306, protocol: tcp }
+  mysql: { setting: port, protocol: tcp }
 
 data:
   data: /var/lib/mysql
@@ -92,8 +108,9 @@ recipe:
   install:
     - packages: [ca-certificates, libaio1, libnuma1, procps, xz-utils]
       when: { os: [debian@11, ubuntu@22.04] }
+    # The `mysql` client, which the entrypoint's first start runs, links ncurses 5 in every release.
     - packages: [libncurses5]
-      when: { os: [debian@11] }
+      when: { os: [debian@11, ubuntu@22.04] }
     - file: { path: /var/cache/isoloom/mysql.tar, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
       when: { os: [debian@11, ubuntu@22.04] }
     - command: "sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
@@ -121,6 +138,13 @@ recipe:
     - template: { from: files/docker-entrypoint.sh, to: /usr/local/bin/docker-entrypoint.sh, mode: "0755" }
       when: { os: [debian@11, ubuntu@22.04] }
     # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    # Every form, the official image's included: the port, the first start's scripts, and the
+    # application user's privileges (a script of the first start, after the user is made).
+    - template: { from: files/port.cnf, to: /etc/mysql/conf.d/isoloom-port.cnf, mode: "0644" }
+    - copy: { from: "{{ with.init }}/", to: /docker-entrypoint-initdb.d/ }
+      when: { set: init }
+    - template: { from: files/privileges.sql, to: /docker-entrypoint-initdb.d/zz-isoloom-privileges.sql, mode: "0644" }
+      when: { set: privileges }
     - service: { name: mysql, run: [/usr/local/bin/docker-entrypoint.sh, mysqld] }
       when: { os: [debian@11, ubuntu@22.04] }
 

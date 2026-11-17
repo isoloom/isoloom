@@ -6,10 +6,15 @@
 cases:
   default:
     with: { password: "root-secret", user_password: "app-secret" }
+  # A read-only application on its own port, its table made by a first-start script.
+  readonly:
+    with: { password: "root-secret", user_password: "app-secret", port: 3307, privileges: SELECT, init: db/ }
+    project:
+      db/01-rows.sql: "CREATE TABLE rows_made (v INT); INSERT INTO rows_made VALUES (42);\n"
 
 checks:
   - name: the port answers
-    tcp: "{{ machine }}:3306"
+    tcp: "{{ machine }}:{{ with.port }}"
     wait: 2m
   - name: mysql reports the release asked for
     exec: mysqld --version
@@ -17,6 +22,14 @@ checks:
   - name: the server answers a ping
     exec: mysqladmin -uroot -p"{{ with.password }}" ping 2>&1
     expect: "mysqld is alive"
+  - name: the first start's scripts ran on the application database
+    case: readonly
+    exec: mysql -h127.0.0.1 -uapp -p"{{ with.user_password }}" -N -B app -e "select v from rows_made" 2>&1
+    expect: "42"
+  - name: the application user has only the privileges given
+    case: readonly
+    exec: mysql -h127.0.0.1 -uapp -p"{{ with.user_password }}" -N -B app -e "insert into rows_made values (1)" 2>&1
+    expect: "INSERT command denied"
 
 facts:
   - name: the server version
