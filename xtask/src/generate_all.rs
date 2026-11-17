@@ -53,12 +53,13 @@ pub(crate) fn binary(root: &Path) -> Res<PathBuf> {
         .ok_or_else(|| "cargo built no isoloom binary".into())
 }
 
-/// Every example folder, sorted.
+/// Every example, sorted: the folders with their isoloom.yml. examples/paas groups its own, out
+/// of this list as out of the tests' (they need the paas feature, which the binary leaves off).
 pub(crate) fn examples(root: &Path) -> Res<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = std::fs::read_dir(root.join("examples"))?
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.is_dir())
+        .filter(|p| p.join("isoloom.yml").is_file())
         .collect();
     out.sort();
     Ok(out)
@@ -247,11 +248,14 @@ esac"#,
     }
 
     #[test]
-    fn the_examples_are_the_folders_of_examples_sorted() {
+    fn the_examples_are_the_folders_with_their_isoloom_yml_sorted() {
         let root = tempfile::Builder::new().prefix("isoloom-xtask-examples-").tempdir().unwrap();
-        for dir in ["examples/web", "examples/db"] {
+        for dir in ["examples/web", "examples/db", "examples/group/inner"] {
             std::fs::create_dir_all(root.path().join(dir)).unwrap();
+            std::fs::write(root.path().join(dir).join("isoloom.yml"), "").unwrap();
         }
+        // A folder that groups its own (examples/paas) is none, nor is one without a spec.
+        std::fs::create_dir_all(root.path().join("examples/empty")).unwrap();
         std::fs::write(root.path().join("examples/README.md"), "").unwrap();
         let found = examples(root.path()).unwrap();
         assert_eq!(found, [root.path().join("examples/db"), root.path().join("examples/web")]);
