@@ -1,25 +1,27 @@
 //! The placeholders of the message and of an app's templates, read with the spec's one grammar
-//! ([`placeholder`]) and resolved against the spec at validation: a
-//! typo or an index (`ports.0`) fails here, not at run time. The message may use
-//! `machines.<m>.ports.<name>.port`, and a published port's `.published` and `.url` (an `http`
-//! or `https` one's),
-//! `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`; a template the machine's own
-//! `machine.name` and `machine.addresses.<network>`, and no run-time value.
+//! ([`placeholder`]) and resolved against the spec at validation: a typo or an index (`ports.0`)
+//! fails here, not at run time, naming the nearest placeholder the spec has when there is one
+//! (`machines.wbe.ports.site.url`: `machines.web.ports.site.url`). The message may use
+//! `machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or
+//! `https` one's) and `machines.<m>.addresses.<network>`; a template those but the run-time
+//! values, and the machine's own `machine.name` and `machine.addresses.<network>`.
 
 use super::super::Spec;
+use super::super::names::PortName;
 use super::super::placeholder::{self, Place, PortField, Reference};
-use super::super::problem::{Code, FieldPath, Problem, Problems};
+use super::super::problem::{Code, FieldPath, Problem, Problems, closest};
 use crate::Error;
 
 /// Every placeholder of the message.
 pub(super) fn check(spec: &Spec, out: &mut Problems) {
     let Some(message) = &spec.message else { return };
     let at = FieldPath::new("message");
-    for found in placeholder_problems(spec, None, message, Place::Message) {
+    for (found, nearest) in unresolved(spec, None, message, Place::Message) {
         let p = Problem::new(found.code(), at.clone(), found.reason().to_owned());
-        out.push(match found {
-            Unresolved::Unclosed(_) => p,
-            Unresolved::Unknown(_) => p.fix(example(spec)),
+        out.push(match (found, nearest) {
+            (Unresolved::Unclosed(_), _) => p,
+            (Unresolved::Unknown(_), Some(near)) => p.fix(format!("`{{{{ {near} }}}}`")),
+            (Unresolved::Unknown(_), None) => p.fix(example(spec)),
         });
     }
 }
@@ -55,19 +57,93 @@ impl Unresolved {
 }
 
 /// The placeholders of `text`, written at `place`, that name nothing the spec has, in order:
-/// `machine` is the machine a template is for. Empty when each resolves.
+/// `machine` is the machine a template is for. Each names the nearest placeholder the spec has,
+/// when one is near (`(did you mean `{{ machines.web.ports.site.port }}`?)`). Empty when each
+/// resolves.
 #[must_use]
 pub fn placeholder_problems(spec: &Spec, machine: Option<&str>, text: &str, place: Place) -> Vec<Unresolved> {
-    placeholder::placeholders(text, place)
+    unresolved(spec, machine, text, place)
         .into_iter()
-        .filter_map(|found| match found {
-            Ok(r) => resolve(spec, machine, &r)
-                .err()
-                .map(|why| Unresolved::Unknown(format!("`{{{{ {r} }}}}`: {why}"))),
-            Err(Error::Unclosed) => Some(Unresolved::Unclosed(Error::Unclosed.to_string())),
-            Err(e) => Some(Unresolved::Unknown(e.to_string())),
+        .map(|(found, nearest)| match (found, nearest) {
+            (Unresolved::Unknown(why), Some(near)) => Unresolved::Unknown(format!("{why} (did you mean `{{{{ {near} }}}}`?)")),
+            (found, _) => found,
         })
         .collect()
+}
+
+/// The placeholders of `text`, written at `place`, that name nothing the spec has, in order, each
+/// with the nearest path the spec has ([`nearest`]).
+fn unresolved(spec: &Spec, machine: Option<&str>, text: &str, place: Place) -> Vec<(Unresolved, Option<String>)> {
+    placeholder::placeholders(text, place)
+        .into_iter()
+        .filter_map(|found| {
+            let (why, written) = match found {
+                Ok(r) => {
+                    let why = resolve(spec, machine, &r).err()?;
+                    (format!("`{{{{ {r} }}}}`: {why}"), r.to_string())
+                }
+                Err(Error::Unclosed) => return Some((Unresolved::Unclosed(Error::Unclosed.to_string()), None)),
+                Err(Error::Placeholder { path, why }) => (Error::Placeholder { path: path.clone(), why }.to_string(), path),
+                Err(Error::NotHere { reference, why }) => {
+                    let written = reference.to_string();
+                    (Error::NotHere { reference, why }.to_string(), written)
+                }
+                Err(e) => return Some((Unresolved::Unknown(e.to_string()), None)),
+            };
+            Some((Unresolved::Unknown(why), nearest(spec, machine, &written, place)))
+        })
+        .collect()
+}
+
+/// The path nearest to `written` that `place` may name and the spec has, one segment at a time: a
+/// typo in a machine's, a port's or a network's name, or in a field (`.uri`: `.url`). None when a
+/// segment is near nothing there, or when the nearest doesn't resolve either (`.published` of a
+/// port that isn't published).
+fn nearest(spec: &Spec, template_of: Option<&str>, written: &str, place: Place) -> Option<String> {
+    let roots: &[&str] = match place {
+        Place::Message => &["machines"],
+        Place::Template => &["machine", "machines"],
+        Place::Entry | Place::EntryItem => return None,
+    };
+    let fields: &[&str] = if place == Place::Message { &["port", "published", "url"] } else { &["port"] };
+    let parts: Vec<&str> = written.split('.').collect();
+    let (root, rest) = parts.split_first()?;
+    let root = closest(root, roots)?;
+    let mut near = vec![root];
+    match (root, rest) {
+        ("machine", [field, rest @ ..]) => {
+            let own = spec.machines.get(template_of?)?;
+            let field = closest(field, &["name", "addresses"])?;
+            near.push(field);
+            match (field, rest) {
+                ("name", []) => {}
+                ("addresses", [n]) => near.push(closest(n, &own.networks.keys().map(String::as_str).collect::<Vec<_>>())?),
+                _ => return None,
+            }
+        }
+        ("machines", [m, kind, rest @ ..]) => {
+            let m = closest(m, &spec.machines.keys().map(String::as_str).collect::<Vec<_>>())?;
+            let machine = spec.machines.get(m)?;
+            let kind = closest(kind, &["ports", "addresses"])?;
+            near.extend([m, kind]);
+            match (kind, rest) {
+                ("addresses", [n]) => near.push(closest(n, &machine.networks.keys().map(String::as_str).collect::<Vec<_>>())?),
+                ("ports", [port, field]) => {
+                    near.push(closest(port, &machine.ports.keys().map(PortName::as_str).collect::<Vec<_>>())?);
+                    near.push(closest(field, fields)?);
+                }
+                _ => return None,
+            }
+        }
+        _ => return None,
+    }
+    let near = near.join(".");
+    let resolves = || {
+        placeholder::placeholders(&format!("{{{{ {near} }}}}"), place)
+            .iter()
+            .all(|r| r.as_ref().is_ok_and(|r| resolve(spec, template_of, r).is_ok()))
+    };
+    (near != written && resolves()).then_some(near)
 }
 
 /// Whether `r` names something of the spec (`template_of`: the machine a template is for),

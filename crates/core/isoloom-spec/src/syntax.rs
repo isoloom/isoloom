@@ -132,8 +132,9 @@ pub struct Spec {
     pub checks: Vec<Check>,
     /// Shown once the environment is up, in Markdown, with `{{ path }}` placeholders:
     /// `machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or
-    /// `https` one's), `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked
-    /// at validation.
+    /// `https` one's) and `machines.<m>.addresses.<network>`, each checked at validation: a
+    /// machine, port, network or field the spec doesn't have is a problem naming the nearest it
+    /// has.
     pub message: Option<String>,
     /// Tags every cloud resource and Kubernetes object carries, beside Isoloom's own
     /// (`cost-center: 1234`, `team: platform`): AWS's default tags, Azure's tags, Oracle

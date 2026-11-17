@@ -60,7 +60,7 @@ Named sets of machines sharing fields, also Ansible inventory groups and `overri
 
 ### `message`
 
-Shown once the environment is up, in Markdown, with `{{ path }}` placeholders: `machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or `https` one's), `machines.<m>.addresses.<network>` and `cloud.outputs.<name>`, each checked at validation.
+Shown once the environment is up, in Markdown, with `{{ path }}` placeholders: `machines.<m>.ports.<name>.port`, a published port's `.published` and `.url` (an `http` or `https` one's) and `machines.<m>.addresses.<network>`, each checked at validation: a machine, port, network or field the spec doesn't have is a problem naming the nearest it has.
 
 - **Type:** string
 
