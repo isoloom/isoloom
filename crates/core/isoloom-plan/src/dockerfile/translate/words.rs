@@ -117,15 +117,13 @@ pub(in crate::dockerfile) fn argv(a: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use isoloom_test_support::owned_pairs;
 
-    fn vars(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
-        pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
-    }
+    use super::*;
 
     #[test]
     fn substitution_follows_dockers_forms() {
-        let v = vars(&[("A", "1"), ("EMPTY", "")]);
+        let v = owned_pairs(&[("A", "1"), ("EMPTY", "")]);
         assert_eq!(substitute("$A-${A}-${B:-d}-${A:+x}-${B:+x}-\\$A", &v), "1-1-d-x--$A");
         assert_eq!(substitute("${EMPTY:-d}", &v), "d");
     }

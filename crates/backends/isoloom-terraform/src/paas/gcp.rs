@@ -14,15 +14,18 @@ use crate::hcl_builder::{
 };
 use crate::module::{ResourceRef, ident, output};
 
-/// Service `at` on Google Cloud.
+/// Service `at` on Google Cloud; a bucket or a cluster with its key clients' service account.
 pub(super) fn write(at: &Each<'_>, m: &mut Module) {
     match at.service {
         Service::Postgres(p) => postgres(at, p, m),
-        Service::ObjectStorage(o) => object_storage(at, o, m),
-        Service::Kafka(k) => kafka(at, k, m),
-    }
-    if matches!(at.service, Service::ObjectStorage(_) | Service::Kafka(_)) && at.service.clients().values().any(|c| c.access == Access::Keys) {
-        keys(at, m);
+        Service::ObjectStorage(o) => {
+            object_storage(at, o, m);
+            keys(at, m);
+        }
+        Service::Kafka(k) => {
+            kafka(at, k, m);
+            keys(at, m);
+        }
     }
 }
 
@@ -219,8 +222,12 @@ fn kafka(at: &Each<'_>, k: &Kafka, m: &mut Module) {
     }
 }
 
-/// The service account whose keys a service's key clients get, and what it may do.
+/// The service account whose keys a service's key clients get, and what it may do: none when
+/// no client takes keys.
 fn keys(at: &Each<'_>, m: &mut Module) {
+    if !at.service.clients().values().any(|c| c.access == Access::Keys) {
+        return;
+    }
     let id = format!("isoloom_service_{}", ident(at.name));
     let account = ResourceRef::new("google_service_account", &id);
     let short = Template::text("svc-")
