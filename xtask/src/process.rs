@@ -64,7 +64,7 @@ pub(crate) fn first_line(cmd: &mut Command) -> Option<String> {
 }
 
 /// `program`, started by its name on the `PATH`: the tools the tasks drive (`docker`, `curl`). In
-/// this crate's tests, the stand-in a test put in its place ([`testing::with_stand_ins`]).
+/// this crate's tests, the stand-in a test put in its place (`testing::with_stand_ins`, test code).
 pub(crate) fn tool(program: &str) -> Command {
     #[cfg(test)]
     if let Some(stand_in) = testing::stand_in(program) {
