@@ -41,6 +41,15 @@ fn a_feature_a_file_and_a_copy_are_each_a_call_with_its_arguments_quoted() {
         )),
         format!("Install-IsoloomFile -Path 'C:\\tool.zip' -State download -Url 'https://example.org/tool.zip' -Sha256 '{sha}'\n")
     );
+    let arm = "b".repeat(64);
+    assert_eq!(
+        one(&format!(
+            "{{ file: {{ path: 'C:\\tool.zip', url: {{ amd64: \"https://example.org/x64.zip\", arm64: \"https://example.org/arm64.zip\" }}, sha256: {{ amd64: {sha}, arm64: {arm} }} }} }}"
+        )),
+        format!(
+            "Install-IsoloomDownload -Path 'C:\\tool.zip' -ByArch @{{ 'amd64' = @('https://example.org/x64.zip', '{sha}'); 'arm64' = @('https://example.org/arm64.zip', '{arm}') }}\n"
+        )
+    );
 }
 
 #[test]

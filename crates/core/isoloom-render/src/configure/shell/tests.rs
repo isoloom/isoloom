@@ -93,6 +93,53 @@ fn copies_and_files_carry_their_owner_group_and_mode() {
 }
 
 #[test]
+fn a_download_per_architecture_passes_each_ones_url_and_checksum() {
+    let (a, b) = ("a".repeat(64), "b".repeat(64));
+    assert_eq!(
+        one(
+            "debian@12",
+            &format!(
+                "{{ file: {{ path: /opt/db.tar, url: {{ amd64: \"https://example.org/x86_64.tar\", arm64: \"https://example.org/aarch64.tar\" }}, sha256: {{ amd64: {a}, arm64: {b} }} }} }}"
+            )
+        ),
+        format!(
+            "isoloom_file '/opt/db.tar' '' '' '' 'download-arch' 'amd64' 'https://example.org/x86_64.tar' '{a}' 'arm64' 'https://example.org/aarch64.tar' '{b}'\n"
+        )
+    );
+}
+
+/// The library downloads the file of the machine's architecture (`uname -m`'s, by a spec's
+/// name), and fails a machine none is for.
+#[cfg(unix)]
+#[test]
+fn the_library_downloads_the_file_of_the_machines_architecture() {
+    let run = |machine: &str| {
+        // `uname` and the download stand in for the machine's: the choice is what is checked.
+        let stubs = format!("uname() {{ echo {machine}; }}\nisoloom_download() {{ echo \"$1 $2 $3\"; }}\n");
+        let call = "isoloom_file /opt/db.tar '' '' '' download-arch amd64 https://x/x86_64 aaa arm64 https://x/aarch64 bbb";
+        std::process::Command::new("sh")
+            .args(["-c", &format!("{LIBRARY}\n{stubs}{call}")])
+            .output()
+            .expect("sh runs")
+    };
+    for (machine, fetched) in [
+        ("x86_64", "https://x/x86_64 /opt/db.tar aaa\n"),
+        ("aarch64", "https://x/aarch64 /opt/db.tar bbb\n"),
+    ] {
+        let out = run(machine);
+        assert!(out.status.success(), "{machine}: {}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(String::from_utf8_lossy(&out.stdout), fetched, "{machine}");
+    }
+    let other = run("riscv64");
+    assert!(!other.status.success());
+    assert!(
+        String::from_utf8_lossy(&other.stderr).contains("no download for this machine's architecture (riscv64)"),
+        "{}",
+        String::from_utf8_lossy(&other.stderr)
+    );
+}
+
+#[test]
 fn a_template_goes_in_filled_and_encoded() {
     let found = calls_with(
         "debian@12",

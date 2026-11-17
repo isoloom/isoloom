@@ -528,6 +528,37 @@ fn a_file_step_is_the_file_module_or_a_checked_download() {
     );
 }
 
+/// A download per architecture is one `get_url` of the file the host's `architecture` fact
+/// names, from the task's table of each one's URL and SHA-256.
+#[test]
+fn a_download_per_architecture_is_the_one_of_the_hosts_architecture() {
+    let (a, b) = ("a".repeat(64), "b".repeat(64));
+    let t = tasks(
+        &format!(
+            "os: debian@12, app: {{ steps: [{{ file: {{ path: /opt/db.tar, url: {{ amd64: 'https://dl.example.com/x86_64', arm64: 'https://dl.example.com/aarch64' }}, sha256: {{ amd64: {a}, arm64: {b} }} }} }}] }}"
+        ),
+        Target::Vagrant,
+        &[],
+    );
+    let tasks = untagged(&t);
+    let task = one(&tasks, "ansible.builtin.get_url");
+    let download = &task["ansible.builtin.get_url"];
+    assert_eq!(
+        text_at(download, "url"),
+        Some("{{ isoloom_download[ansible_facts['architecture']].url }}"),
+        "{t}"
+    );
+    assert_eq!(
+        text_at(download, "checksum"),
+        Some("sha256:{{ isoloom_download[ansible_facts['architecture']].sha256 }}"),
+        "{t}"
+    );
+    let table = &task["vars"]["isoloom_download"];
+    assert_eq!(text_at(&table["x86_64"], "url"), Some("https://dl.example.com/x86_64"), "{t}");
+    assert_eq!(text_at(&table["aarch64"], "sha256"), Some(b.as_str()), "{t}");
+    assert!(t.contains(&a), "{t}");
+}
+
 #[test]
 fn a_group_step_is_the_group_module_with_its_gid() {
     let t = tasks(
