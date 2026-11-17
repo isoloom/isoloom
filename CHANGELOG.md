@@ -151,6 +151,12 @@ stable spec format.
 
 ### Fixed
 
+- **Another account of a UTM VM writes in a read-write host folder.** UTM's 9p share is mounted
+  with the folder's mode on the computer (0755) and handed to the VM's SSH user, so another account
+  in its group was refused (`Permission denied`). A Linux
+  VM's read-write host folders are now made group-writable at each `vagrant up` (the
+  `host_folders` provisioner), as VirtualBox's are; the folder's mode on the computer is untouched.
+
 - **On VMware Desktop, each adapter on the environment's networks has a fixed PCI slot (#284).**
   Without `ethernet<n>.pcislotnumber`, VMware picked a slot as Vagrant added an adapter: the
   guest's interfaces took other names when the second network's was attached, or at a boot after

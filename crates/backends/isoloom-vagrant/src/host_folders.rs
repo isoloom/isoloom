@@ -9,7 +9,11 @@
 //!   another account of the VM writes there once in that group, as on the other providers.
 //! - VMware Workstation and Fusion: `vmware` (HGFS, the box's VMware Tools).
 //! - Parallels: `parallels` (the box's Parallels Tools).
-//! - UTM (`vagrant_utm` 0.1.3 or later): `utm` (QEMU's 9p shares).
+//! - UTM (`vagrant_utm` 0.1.3 or later): `utm` (QEMU's 9p shares, `mapped-xattr`). Vagrant mounts
+//!   it as the VM's SSH user and group with the folder's own mode on the computer (0755: only that
+//!   user writes), and 9p takes no mode at its mount, so a Linux VM's read-write one is made
+//!   group-writable at each `vagrant up` ([`group_writes`]), as VirtualBox's is. The mode is the
+//!   VM's own, kept in the folder's extended attributes: the folder's on the computer is untouched.
 //! - QEMU (vagrant-qemu 0.7.0 or later): `qemu_virtiofs`, from `virtiofsd` on the host; it mounts
 //!   every share read-write, so a read-only folder is refused there. virtiofsd works as the
 //!   computer's user for the guest's user 1000 and, where it translates ids, for every other
@@ -23,7 +27,7 @@
 use isoloom_plan::{Environment, MachineShape};
 use isoloom_spec::model::HostFolder;
 
-use crate::ruby::{Call, Ruby, Value};
+use crate::ruby::{Call, Provision, Ruby, Value};
 use crate::vms::provider::{self, Provider};
 
 /// How `provider` shares a folder of the kind asked (`read_only`: one is read-only): its synced
@@ -116,6 +120,36 @@ fn virtiofs_every_account(r: &mut Ruby) {
     r.assign("v.virtiofs_guest_uid", Value::raw("IsoloomQemu::GUEST_ID"));
     r.assign("v.virtiofs_guest_gid", Value::raw("IsoloomQemu::GUEST_ID"));
     r.assign("v.extra_virtiofsd_args", Value::raw("IsoloomQemu.virtiofs_squash"));
+}
+
+/// The provisioner's name: what `vagrant up --provision-with` takes.
+pub(crate) const GROUP_WRITES: &str = "host_folders";
+
+/// The script, given each read-write folder's mount point: each one that is a 9p mount (UTM's)
+/// made group-writable. Any other mount (VirtualBox's, already group-writable; virtiofs, which
+/// maps ids instead) is left alone.
+const GROUP_WRITES_SCRIPT: &str = r#"set -eu
+for folder in "$@"; do
+  if awk -v f="$folder" '$2 == f && $3 == "9p" { found = 1 } END { exit !found }' /proc/mounts; then
+    chmod g+w "$folder"
+  fi
+done
+"#;
+
+/// `m.vm.provision "host_folders"`, run at every `vagrant up`, for a Linux VM's read-write
+/// `shares`: each that UTM mounts (9p) made group-writable, so another account of the VM writes
+/// there once in its group, as on the other providers. Nothing without a read-write share.
+pub(crate) fn group_writes(r: &mut Ruby, shares: &[Share]) {
+    let folders: Vec<Value> = shares.iter().filter(|s| !s.read_only).map(|s| Value::str(&s.guest)).collect();
+    if folders.is_empty() {
+        return;
+    }
+    r.provision(
+        Provision::named("m", GROUP_WRITES, "shell")
+            .kw("run", Value::str("always"))
+            .kw("inline", Value::str(GROUP_WRITES_SCRIPT))
+            .kw("args", Value::array(folders)),
+    );
 }
 
 /// VirtualBox's mount of a read-write folder: its group writes too ([`synced_folder`]).
@@ -240,6 +274,47 @@ mod tests {
         // Only QEMU's block takes its config: VirtualBox's has the folder alone.
         let vbox = provider(&r, "virtualbox").expect("VirtualBox's block");
         assert!(vbox.statements.iter().all(|s| !s.contains("virtiofs")), "{:?}", vbox.statements);
+    }
+
+    /// UTM's 9p share is the folder's mode on the computer (0755), handed to the VM's SSH user:
+    /// another account of the VM in its group couldn't write. A Linux VM's read-write folders are
+    /// made group-writable where 9p mounts them, at every `vagrant up`; a read-only one isn't.
+    #[test]
+    fn a_read_write_folder_utm_mounts_is_group_writable_at_every_up() {
+        let mut r = Ruby::new();
+        group_writes(
+            &mut r,
+            &[
+                share("shared", "/shared", false),
+                share("~/notes", "/notes", true),
+                share("/srv/drop", "/srv/drop", false),
+            ],
+        );
+        let out = r.finish();
+        assert!(out.contains("m.vm.provision \"host_folders\", type: \"shell\""), "{out}");
+        assert!(out.contains("run: \"always\""), "{out}");
+        assert!(out.contains("args: [\"/shared\", \"/srv/drop\"]"), "{out}");
+        let mut none = Ruby::new();
+        group_writes(&mut none, &[share("~/notes", "/notes", true)]);
+        assert!(none.finish().trim().is_empty(), "no read-write folder, no provisioner");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_script_makes_a_9p_mount_group_writable_and_leaves_any_other_alone() {
+        let parsed = std::process::Command::new("sh").args(["-n", "-c", GROUP_WRITES_SCRIPT]).status().unwrap();
+        assert!(parsed.success(), "not valid sh");
+        // A folder that isn't a mount point at all: nothing changes, and it succeeds.
+        let dir = tempfile::Builder::new().prefix("isoloom-not-9p-").tempdir().unwrap();
+        let folder = dir.path().to_str().unwrap();
+        let mode = || std::fs::metadata(folder).unwrap().permissions();
+        let before = mode();
+        let out = std::process::Command::new("/bin/sh")
+            .args(["-c", GROUP_WRITES_SCRIPT, "host_folders", folder])
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(mode(), before, "not a 9p mount: left alone");
     }
 
     #[test]

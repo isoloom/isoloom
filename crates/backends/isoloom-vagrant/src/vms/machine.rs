@@ -65,6 +65,9 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         }
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
         crate::host_folders::render(r, "m", &shares);
+        if os == Os::Linux {
+            crate::host_folders::group_writes(r, &shares);
+        }
         // Its checks installed (and their on-demand provisioner) before the readiness check,
         // the last provisioner.
         transport::provisioners(r, env, name, os, |r| {
