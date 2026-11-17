@@ -2,10 +2,9 @@
 //! reader reads it: JSON by a JSON parser, `.properties` as `java.util.Properties` loads it, the
 //! JAAS line as Kafka's `JaasConfig` tokenizes it, `--add-scram` as Kafka's `ScramParser` splits it.
 
-#![expect(clippy::disallowed_methods, reason = "the tests run the scripts they check with sh: test code, not an adapter")]
-
 use std::path::Path;
-use std::process::Command;
+
+use isoloom_test_support::tool;
 
 use super::*;
 
@@ -14,7 +13,7 @@ const NASTY: [&str; 4] = ["pa\"ss", "back\\slash", "both\\\"mix\\\\ed\"", "tab\t
 
 /// Runs `script` with `sh -eu` in `dir`; its status, and what it said on stderr.
 fn run(script: &str, dir: &Path) -> (bool, String) {
-    let out = Command::new("sh").arg("-euc").arg(script).current_dir(dir).output().unwrap();
+    let out = tool("sh").arg("-euc").arg(script).current_dir(dir).output().unwrap();
     (out.status.success(), String::from_utf8_lossy(&out.stderr).into_owned())
 }
 
@@ -137,7 +136,7 @@ fn the_salted_password_is_pbkdf2_hmac_sha512_of_the_password() {
     let check = format!(
         "import base64,hashlib,sys; print(base64.b64encode(hashlib.pbkdf2_hmac('sha512', sys.argv[1].encode(), base64.b64decode(sys.argv[2]), {SCRAM_ITERATIONS})).decode())"
     );
-    let out = Command::new("python3").args(["-c", &check, secret, &field("salt")]).output().unwrap();
+    let out = tool("python3").args(["-c", &check, secret, &field("salt")]).output().unwrap();
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), field("saltedpassword"));
 }
 

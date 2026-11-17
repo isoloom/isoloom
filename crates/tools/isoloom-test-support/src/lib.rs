@@ -9,7 +9,8 @@
 //!   executes a file its own process wrote: that file is open for writing in every process
 //!   another test thread forks meanwhile, and executing it then fails with "Text file busy".
 //! - [`assert_every!`]: fails on an empty collection, where `iter().all(..)` passes.
-//! - [`needs`]: a test of a real tool fails naming the tool when it isn't there.
+//! - [`needs`]: a test of a real tool fails naming the tool when it isn't there; [`tool`] starts
+//!   it.
 //! - [`hcl_body`], [`yaml`], [`ruby_blocks`]: a rendered file parsed, so a test asserts on its values rather than on
 //!   substrings of its text.
 //! - [`sh_decode`], [`hcl_decode`] and the other decoders: a literal the builders write read back
@@ -248,6 +249,14 @@ pub fn needs(tools: &[&str]) -> Outcome<()> {
         }
     }
     Ok(())
+}
+
+/// A real tool a test runs on what the crate writes (`sh` on a generated script, `python3` as
+/// a second implementation), to set up and start: this crate is the tests' adapter, so their
+/// own code starts no process.
+#[must_use]
+pub fn tool(program: &str) -> Command {
+    Command::new(program)
 }
 
 /// Asserts that `$pred` holds for every item of `$items`, naming the first that doesn't, and that
