@@ -127,7 +127,7 @@ recipe:
         url: { amd64: "{{ vars.url }}", arm64: "{{ vars.arm64_url }}" }
         sha256: { amd64: "{{ vars.sha256 }}", arm64: "{{ vars.arm64_sha256 }}" }
       when: { release: ["8.4.7"] }
-    - file: { path: /var/cache/isoloom/mysql.tar, url: { amd64: "{{ vars.url }}" }, sha256: { amd64: "{{ vars.sha256 }}" } }
+    - file: { path: /var/cache/isoloom/mysql.tar, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
       when: { release: ["5", "8.0"] }
     - command: "sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
       creates: /usr/local/mysql/bin/mysqld

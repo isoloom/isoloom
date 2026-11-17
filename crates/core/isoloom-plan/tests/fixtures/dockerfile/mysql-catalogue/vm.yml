@@ -63,10 +63,13 @@ app:
     - xz-utils
   - packages:
     - libncurses5
+    - libncurses6
   - file:
       path: /var/cache/isoloom/mysql.tar
-      url: https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz
-      sha256: 798ff0a14cdc1ab259f8a3b6a7f683403e9bbaa85957d82e5370f82b27ba6805
+      url:
+        amd64: https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz
+      sha256:
+        amd64: 798ff0a14cdc1ab259f8a3b6a7f683403e9bbaa85957d82e5370f82b27ba6805
   - command: sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf "$b" /usr/local/bin/; done'
     creates: /usr/local/mysql/bin/mysqld
   - group:

@@ -21,7 +21,7 @@ stable spec format.
   container built from the OS) and its x86-64 build elsewhere, on Ubuntu 22.04 and now Debian
   12, where a container runs MySQL's official 8.4.7 image (published for both architectures).
   So a lab no longer pins `hardware: { arch: amd64 }` for MySQL, which an Apple silicon computer
-  emulated. The older releases stay x86-64 only, and say so on an arm64 machine.
+  emulated. The older releases stay x86-64 only.
 
 - **The catalogue's `mysql` takes a port, first-start scripts and the application user's
   privileges.** `with: { port: 3207, init: db/, privileges: SELECT }`: the server and its

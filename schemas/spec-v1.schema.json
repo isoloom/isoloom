@@ -1562,7 +1562,7 @@
           "$ref": "#/$defs/Repository"
         },
         "file": {
-          "description": "A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or\na download pinned by its SHA-256 (`url` and `sha256`).",
+          "description": "A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or\na download pinned by its SHA-256 (`url` and `sha256`), one for every machine or one per\nCPU architecture.",
           "$ref": "#/$defs/FileStep"
         },
         "template": {
@@ -1761,14 +1761,12 @@
           "description": "A symbolic link to this target (absolute). Not on Windows."
         },
         "url": {
-          "type": "string",
-          "pattern": "^https://[^\\s/]+\\S*$",
-          "description": "A file to download (`https`), with its `sha256`: every fetch is pinned."
+          "description": "A file to download (`https`), with its `sha256`: every fetch is pinned. One URL, or one per\nCPU architecture (`{ amd64: <url>, arm64: <url> }`), the machine's own picked where the\nstep runs.",
+          "$ref": "#/$defs/HttpsUrlByArch"
         },
         "sha256": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$",
-          "description": "The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it)."
+          "description": "The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it): one, or one\nper architecture `url` names.",
+          "$ref": "#/$defs/Sha256ByArch"
         },
         "owner": {
           "type": "string",
@@ -1809,6 +1807,68 @@
         }
       ],
       "description": "`state:` as written."
+    },
+    "HttpsUrlByArch": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^https://[^\\s/]+\\S*$",
+          "description": "The same for every machine."
+        },
+        {
+          "$ref": "#/$defs/HttpsUrlPerArch",
+          "description": "One per architecture."
+        }
+      ],
+      "description": "A download's `url` or `sha256` as written: one value, or one per CPU architecture."
+    },
+    "HttpsUrlPerArch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "amd64": {
+          "type": "string",
+          "pattern": "^https://[^\\s/]+\\S*$",
+          "description": "For an x86-64 machine."
+        },
+        "arm64": {
+          "type": "string",
+          "pattern": "^https://[^\\s/]+\\S*$",
+          "description": "For a 64-bit ARM machine."
+        }
+      },
+      "description": "A value per CPU architecture: each one the download has a build for."
+    },
+    "Sha256ByArch": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The same for every machine."
+        },
+        {
+          "$ref": "#/$defs/Sha256PerArch",
+          "description": "One per architecture."
+        }
+      ],
+      "description": "A download's `url` or `sha256` as written: one value, or one per CPU architecture."
+    },
+    "Sha256PerArch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "amd64": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "For an x86-64 machine."
+        },
+        "arm64": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "For a 64-bit ARM machine."
+        }
+      },
+      "description": "A value per CPU architecture: each one the download has a build for."
     },
     "Template": {
       "type": "object",

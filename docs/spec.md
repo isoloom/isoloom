@@ -542,7 +542,7 @@ Its priority over the OS's own packages: apt's pin priority, dnf's `priority`.
 
 ### `machines.*.app.steps[].file`
 
-A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or a download pinned by its SHA-256 (`url` and `sha256`).
+A path made a folder (`state: directory`), removed (`state: absent`), a link (`link`), or a download pinned by its SHA-256 (`url` and `sha256`), one for every machine or one per CPU architecture.
 
 - **Type:** mapping
 
@@ -571,14 +571,40 @@ A symbolic link to this target (absolute). Not on Windows.
 
 ### `machines.*.app.steps[].file.url`
 
-A file to download (`https`), with its `sha256`: every fetch is pinned.
+A file to download (`https`), with its `sha256`: every fetch is pinned. One URL, or one per CPU architecture (`{ amd64: <url>, arm64: <url> }`), the machine's own picked where the step runs.
+
+- **Type:** string or mapping
+
+### `machines.*.app.steps[].file.url.amd64`
+
+For an x86-64 machine.
+
+- **Type:** string
+- **Limits:** matches `^https://[^\s/]+\S*$`
+
+### `machines.*.app.steps[].file.url.arm64`
+
+For a 64-bit ARM machine.
 
 - **Type:** string
 - **Limits:** matches `^https://[^\s/]+\S*$`
 
 ### `machines.*.app.steps[].file.sha256`
 
-The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it).
+The SHA-256 of what `url` fetches (64 hex digits, as `sha256sum` prints it): one, or one per architecture `url` names.
+
+- **Type:** string or mapping
+
+### `machines.*.app.steps[].file.sha256.amd64`
+
+For an x86-64 machine.
+
+- **Type:** string
+- **Limits:** matches `^[0-9a-f]{64}$`
+
+### `machines.*.app.steps[].file.sha256.arm64`
+
+For a 64-bit ARM machine.
 
 - **Type:** string
 - **Limits:** matches `^[0-9a-f]{64}$`
