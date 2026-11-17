@@ -232,9 +232,9 @@ pub(crate) struct MachineInput {
     /// provider's own shared folder: VirtualBox, VMware, Parallels, UTM's `VirtFS`, QEMU with
     /// `virtiofsd`, libvirt's virtiofs). Hyper-V (SMB asks for a password) and ESXi refuse it, and
     /// QEMU a read-only one.
-    /// VirtualBox mounts it as the VM's SSH user and group, a read-write folder group-writable
-    /// whatever its mode on the computer, so another account of the VM writes there once in that
-    /// group.
+    /// VirtualBox and UTM mount it as the VM's SSH user and group, a read-write folder
+    /// group-writable whatever its mode on the computer (UTM's made so at each `vagrant up`, by the
+    /// `host_folders` provisioner), so another account of the VM writes there once in that group.
     #[serde(default)]
     host_folders: Vec<HostFolder>,
     /// Memory-backed mounts: a path, or `{ path, size, mode }`.
