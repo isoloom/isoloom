@@ -385,3 +385,51 @@ fn a_port_that_doesnt_speak_http_has_no_url() {
     assert_eq!(reasons.len(), 1, "{reasons:?}");
     assert!(reasons[0].contains("`ssh` isn't an `http` or `https` port, so it has no URL"), "{reasons:?}");
 }
+
+#[test]
+fn a_typo_in_a_placeholder_names_the_nearest_the_spec_has() {
+    let found = |message: &str| {
+        check(&with_message("site", message))
+            .into_iter()
+            .map(|p| (p.reason, p.fix.unwrap_or_default()))
+            .collect::<Vec<_>>()
+    };
+    let fix = |message: &str| found(message).into_iter().map(|(_, f)| f).collect::<Vec<_>>();
+    assert_eq!(
+        found("{{ machines.wbe.ports.site.url }}"),
+        [(
+            "`{{ machines.wbe.ports.site.url }}`: no machine named `wbe`".to_owned(),
+            "`{{ machines.web.ports.site.url }}`".to_owned()
+        )]
+    );
+    assert_eq!(fix("{{ machines.web.ports.stie.published }}"), ["`{{ machines.web.ports.site.published }}`"]);
+    assert_eq!(fix("{{ machines.web.ports.site.uri }}"), ["`{{ machines.web.ports.site.url }}`"]);
+    assert_eq!(fix("{{ machines.web.port.site.url }}"), ["`{{ machines.web.ports.site.url }}`"]);
+    assert_eq!(fix("{{ machines.web.addresses.lba }}"), ["`{{ machines.web.addresses.lab }}`"]);
+    assert_eq!(fix("{{ machine.web.addresses.lab }}"), ["`{{ machines.web.addresses.lab }}`"]);
+    // Nothing near: the fix is a placeholder the spec has.
+    assert_eq!(fix("{{ machines.database.ports.site.url }}"), ["`{{ machines.web.ports.site.published }}`"]);
+}
+
+#[test]
+fn a_templates_typo_names_the_nearest_in_its_reason() {
+    let spec = with_message("site", "");
+    let reasons = |text: &str| {
+        placeholder_problems(&spec, Some("web"), text, crate::syntax::placeholder::Place::Template)
+            .iter()
+            .map(|u| u.reason().to_owned())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        reasons("{{ machine.addresses.lb }} {{ machines.web.ports.stie.port }}"),
+        [
+            "`{{ machine.addresses.lb }}`: `web` isn't on a network named `lb` (did you mean `{{ machine.addresses.lab }}`?)",
+            "`{{ machines.web.ports.stie.port }}`: `web` has no port named `stie` (ports are named, never numbered) (did you mean `{{ machines.web.ports.site.port }}`?)",
+        ]
+    );
+    // A run-time value in a file has no nearest a file may name.
+    assert_eq!(
+        reasons("{{ machines.web.ports.site.url }}"),
+        ["`{{ machines.web.ports.site.url }}`: a published port and a URL are known only once the environment runs; a file gets `port`"]
+    );
+}
