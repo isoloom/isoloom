@@ -50,6 +50,7 @@ fn defines(file: &str) -> Vec<(String, Vec<(String, String)>)> {
 /// run once, behind a mark ([`once`](isoloom_vagrant) guards) or its `creates`.
 const CONVERGE: &[&str] = &[
     "addresses",
+    "resolver",
     "constraints",
     "disk",
     "data disks",

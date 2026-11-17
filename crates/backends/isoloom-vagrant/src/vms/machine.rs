@@ -62,6 +62,7 @@ pub(crate) fn vm(r: &mut Ruby, ctx: &Ctx, name: &str) -> Option<GeneratedFile> {
         if os == Os::Linux {
             let addresses: Vec<(std::net::Ipv4Addr, u8)> = mp.addresses.iter().map(|(net, ip)| (*ip, env.block(net).prefix())).collect();
             super::addresses::provisioner(r, &addresses);
+            super::resolver::provisioner(r);
         }
         let shares: Vec<Share> = mp.host_folders.iter().map(Share::of).collect();
         crate::host_folders::render(r, "m", &shares);

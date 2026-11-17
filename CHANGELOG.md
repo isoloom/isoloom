@@ -169,6 +169,13 @@ stable spec format.
 
 ### Fixed
 
+- **A Vagrant VM resolves names on a network whose resolvers don't serve DNSSEC keys.** The
+  roboxes `generic/*` boxes (libvirt's and Hyper-V's Ubuntu) ship systemd-resolved validating
+  DNSSEC (`DNSSEC=yes`) against public servers of their choice; where one of them answers without
+  the keys, every name failed (`DNSSEC validation failed: missing-key`), and with it the VM's
+  packages and downloads. Each Linux VM gets a `resolver` provisioner that, when its resolved.conf
+  enforces DNSSEC, sets it back to its distribution's default (`DNSSEC=no`) in a drop-in.
+
 - **Another account of a UTM VM writes in a read-write host folder.** UTM's 9p share is mounted
   with the folder's mode on the computer (0755) and handed to the VM's SSH user, so another account
   in its group was refused (`Permission denied`). A Linux

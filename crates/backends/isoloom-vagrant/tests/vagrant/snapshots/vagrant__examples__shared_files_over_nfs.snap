@@ -1103,6 +1103,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.84.0.10/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "shell", name: "data disks", inline: <<~'SH'
       set -e
       pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$@"; elif command -v dnf >/dev/null; then dnf install -y -q "$@"; elif command -v apk >/dev/null; then apk add -q --no-cache "$@"; else yum install -y -q "$@"; fi; }
@@ -1407,6 +1413,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.84.0.11/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.84.0.10 writer' '10.84.0.11 reader' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "volume shared", inline: <<~'SH'

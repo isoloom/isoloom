@@ -1140,6 +1140,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.20.0.32/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "volumes", inline: "mkdir -p '/var/lib/ctf'"
@@ -1467,6 +1473,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.20.0.31/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.20.0.32 database' '10.20.0.31 web' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "wait for database", inline: "i=0; until (bash -c '</dev/tcp/database/3207' 2>/dev/null || nc -z -w 2 database 3207 2>/dev/null); do i=$((i+2)); if [ $i -ge 900 ]; then echo \"database didn't answer within 900s\" >&2; exit 1; fi; sleep 2; done; echo \"database answers\""

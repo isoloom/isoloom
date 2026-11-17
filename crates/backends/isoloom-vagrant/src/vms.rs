@@ -42,6 +42,7 @@ mod own;
 pub(crate) mod provider;
 pub(crate) mod providers;
 pub(crate) mod qemu;
+mod resolver;
 mod transport;
 mod utm;
 pub(crate) mod values;
