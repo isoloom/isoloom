@@ -12,12 +12,16 @@
 //! values, into a volume of its own, and the machine (and its `setup` jobs) mount each file from
 //! there, read-only, once the job is done:
 //!
-//! - the job reads each value from a config whose `content` is never empty, a `-` then
-//!   `${NAME:-default}`, and writes it without that first byte (`tail -c +2`): an empty value is
-//!   an empty file, a value its exact bytes, as a VM's file holds them;
+//! - the job reads each value from a config whose `content` is never empty: [`GIVEN`] when the
+//!   input's variable is set and not empty (`${NAME:+g}`), a `-`, then `${NAME:-default}`; it
+//!   writes the value without what comes before it: an empty value is an empty file, a value its
+//!   exact bytes, as a VM's file holds them;
 //! - the value stays where a config's does: in no generated file (the default only), in no image
 //!   layer, in no container's environment; Compose hands it to the job as a file;
-//! - the job runs at every `up`, so a value given at the next start replaces the file in place.
+//! - the job runs at every `up`: a value given replaces the file in place, and none given keeps
+//!   the file the volume holds. A start that gives no value again (a resume: the values given at
+//!   the first start aren't kept, nor handed again) keeps the one it was started with; only a
+//!   volume with no file yet (the first start, or one after `down --volumes`) gets the default.
 
 use indexmap::IndexMap;
 use isoloom_plan::secrets::DEFAULT_MODE;
@@ -85,10 +89,15 @@ pub(super) fn mount_defaulted(env: &Environment, machine: &str, mp: &MachinePlan
     }
 }
 
+/// What a config of an input's file with a default starts with when the input is given.
+const GIVEN: &str = "g";
+
 /// Machine `machine`'s inputs job ([`inputs_service`]), when it has inputs' files with a default:
-/// each value read from its config at `/in/<i>`, written without the config's first byte to
-/// `/out/<i>` (truncated in place, so a running container's mount sees the new value), owned and
-/// moded as the spec says (root, [`DEFAULT_MODE`] by default, as a config would be).
+/// each value read from its config at `/in/<i>` ([`configs`]) and written, without what comes
+/// before it, to `/out/<i>` (truncated in place, so a running container's mount sees the new
+/// value) when the input was given ([`GIVEN`]) or `/out/<i>` doesn't exist yet (its default);
+/// else the file is kept. Owned and moded as the spec says (root, [`DEFAULT_MODE`] by default, as
+/// a config would be).
 pub(super) fn inputs_job(env: &Environment, machine: &str, mp: &MachinePlan) -> Option<Service> {
     let files: Vec<(usize, &SecretFile)> = defaulted_files(env, mp).collect();
     if files.is_empty() {
@@ -99,7 +108,12 @@ pub(super) fn inputs_job(env: &Environment, machine: &str, mp: &MachinePlan) -> 
         .map(|(i, s)| {
             let owner = format!("{}:{}", s.uid.unwrap_or(0), s.gid.unwrap_or(0));
             let mode = s.mode.unwrap_or(DEFAULT_MODE);
-            format!("tail -c +2 /in/{i} > /out/{i}\nchown {owner} /out/{i}\nchmod {mode:04o} /out/{i}\n")
+            format!(
+                "if [ \"$(head -c 1 /in/{i})\" = {GIVEN} ]; then tail -c +3 /in/{i} > /out/{i}\n\
+                 elif [ ! -e /out/{i} ]; then tail -c +2 /in/{i} > /out/{i}\n\
+                 fi\n\
+                 chown {owner} /out/{i}\nchmod {mode:04o} /out/{i}\n"
+            )
         })
         .collect();
     let script = format!("set -e\n{}", writes.concat());
@@ -152,9 +166,9 @@ pub(super) fn of_file(env: &Environment) -> IndexMap<String, Secret> {
         .collect()
 }
 
-/// The file's configs of the inputs' files with a default: each `-${NAME:-default}`, filled from
-/// the input's variable when it is set and not empty, and never empty itself (the inputs job
-/// drops the `-`).
+/// The file's configs of the inputs' files with a default: each `${NAME:+g}-${NAME:-default}`,
+/// filled from the input's variable when it is set and not empty, then marked [`GIVEN`], and
+/// never empty itself (the inputs job drops what comes before the value).
 pub(super) fn configs(env: &Environment) -> IndexMap<String, Config> {
     of_containers(env)
         .filter_map(|name| match env.secrets.get(name) {
@@ -163,7 +177,7 @@ pub(super) fn configs(env: &Environment) -> IndexMap<String, Config> {
         })
         .map(|(name, input, default)| {
             let config = Config {
-                content: Some(format!("-{}", interpolation::input(input, Some(default)))),
+                content: Some(format!("{}-{}", interpolation::given(input, GIVEN), interpolation::input(input, Some(default)))),
                 ..Config::default()
             };
             (name.clone(), config)
@@ -202,7 +216,7 @@ pub(super) fn defaults_usage(env: &Environment) -> String {
         return String::new();
     }
     format!(
-        "# Inputs delivered as files, each its spec's default when unset or empty: set {} in Compose's environment for `up` and `start` to give another value.\n",
+        "# Inputs delivered as files, each its spec's default at the first `up` when unset or empty, and kept at a later one: set {} in Compose's environment for `up` and `start` to give another value.\n",
         inputs.join(", ")
     )
 }
@@ -239,8 +253,8 @@ machines:
         let file = compose_file(ComposeTarget::Docker, &environment(SPEC)).expect("renders").file;
         let yaml: serde_yaml_ng::Value = serde_yaml_ng::to_value(&file).expect("YAML");
         // The token's value: a config filled from its variable, else its default (`$` literal),
-        // behind a first byte that keeps it from ever being empty.
-        assert_eq!(yaml["configs"]["input-token"]["content"].as_str(), Some("-${TOKEN:-dev-$$token}"));
+        // behind a mark of whether it was given and a byte that keeps it from ever being empty.
+        assert_eq!(yaml["configs"]["input-token"]["content"].as_str(), Some("${TOKEN:+g}-${TOKEN:-dev-$$token}"));
         assert!(yaml["secrets"].get("input-token").is_none(), "not a secret: Compose would refuse it unset");
         let web = &yaml["services"]["web"];
         // The key has no default: a secret, as before, whose variable Compose needs.
@@ -277,8 +291,13 @@ machines:
         let carrier = &job["configs"][0];
         assert_eq!((carrier["source"].as_str(), carrier["target"].as_str()), (Some("input-token"), Some("/in/0")));
         assert_eq!((job["network_mode"].as_str(), job["restart"].as_str()), (Some("none"), Some("no")));
+        // A value given replaces the file; none given keeps it, but for a volume with none yet.
         let script = job["entrypoint"][2].as_str().expect("a script");
-        let writes = ["tail -c +2 /in/0 > /out/0", "chown 0:0 /out/0", "chmod 0400 /out/0"];
+        let writes = [
+            "if [ \"$$(head -c 1 /in/0)\" = g ]; then tail -c +3 /in/0 > /out/0\nelif [ ! -e /out/0 ]; then tail -c +2 /in/0 > /out/0\nfi\n",
+            "chown 0:0 /out/0",
+            "chmod 0400 /out/0",
+        ];
         assert!(writes.iter().all(|w| script.contains(w)), "{script}");
     }
 }

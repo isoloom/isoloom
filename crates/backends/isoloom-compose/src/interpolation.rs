@@ -15,6 +15,12 @@ pub(crate) fn input(name: &str, default: Option<&str>) -> String {
     format!("${{{name}:-{}}}", literal(default.unwrap_or_default()))
 }
 
+/// `mark` when input `name` is given (its variable set and not empty), else nothing:
+/// `${NAME:+mark}`. `mark` holds no `}` nor `$`.
+pub(crate) fn given(name: &str, mark: &str) -> String {
+    format!("${{{name}:+{mark}}}")
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;

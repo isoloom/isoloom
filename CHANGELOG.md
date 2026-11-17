@@ -169,6 +169,14 @@ stable spec format.
 
 ### Fixed
 
+- **On Compose, an input's file with a default keeps its value when a start gives none.** The
+  inputs job wrote each file at every `up`, an unset variable falling back to the spec's
+  default: a start given no value again (a resume once the values given at the first start are
+  gone, as after the runner restarted) put the default in place of the value the environment
+  was started with. The config now marks a value given (`${NAME:+g}-${NAME:-default}`), and the
+  job writes the file when one is, or when its volume holds none yet (the first start: the
+  default); otherwise it keeps the file. An empty value counts as none given, as before.
+
 - **On Compose, an input's file with a default holds exactly its value, an empty one
   included.** It was a config whose `content` is `${NAME:-default}`: with an empty value (a
   default of `""`, or an empty variable) Compose mounted the Compose file's own folder at the
