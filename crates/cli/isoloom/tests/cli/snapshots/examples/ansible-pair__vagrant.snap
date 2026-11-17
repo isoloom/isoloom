@@ -1365,6 +1365,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.63.0.10/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/web.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"
@@ -1620,6 +1626,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.63.0.20/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.63.0.10 web' '10.63.0.20 cache' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "checks script", inline: "umask 077\nmkdir -p /var/lib/isoloom\ncat > /var/lib/isoloom/checks.sh.new <<'ISOLOOM_CHECKS'\n" + File.read(File.join(__dir__, "checks/cache.sh")) + "\nISOLOOM_CHECKS\nmv -f /var/lib/isoloom/checks.sh.new /var/lib/isoloom/checks.sh\n"

@@ -1132,6 +1132,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.70.0.5/24", "10.70.10.1/24", "10.70.20.1/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.70.0.5 fw' '10.70.10.10 web www.edge.test' '10.70.20.20 cache' '10.70.0.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "forwarding", inline: "printf '%s\\n' 'net.ipv4.ip_forward=1' > /etc/sysctl.d/90-isoloom-forwarding.conf && sysctl -q -p /etc/sysctl.d/90-isoloom-forwarding.conf"
@@ -1398,6 +1404,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.70.10.10/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.70.10.1 fw' '10.70.10.10 web www.edge.test' '10.70.20.20 cache' '10.70.0.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -1736,6 +1748,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.70.20.20/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.70.20.1 fw' '10.70.10.10 web www.edge.test' '10.70.20.20 cache' '10.70.0.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
@@ -2074,6 +2092,12 @@ done
 mkdir -p /etc/NetworkManager/conf.d
 printf '[keyfile]\\nunmanaged-devices=%s\\n' \"$cards\" >/etc/NetworkManager/conf.d/90-isoloom-addresses.conf
 ", args: ["10.70.0.10/24"]
+    m.vm.provision "resolver", type: "shell", inline: "set -eu
+grep -Eqs '^[[:space:]]*DNSSEC[[:space:]]*=[[:space:]]*(yes|true|1)[[:space:]]*$' /etc/systemd/resolved.conf || exit 0
+mkdir -p /etc/systemd/resolved.conf.d
+printf '[Resolve]\\nDNSSEC=no\\n' >/etc/systemd/resolved.conf.d/90-isoloom-dnssec.conf
+systemctl restart systemd-resolved
+"
     m.vm.provision "isoloom_project", name: "project"
     m.vm.provision "shell", name: "hosts", inline: "printf '%s\\n' '10.70.0.5 fw' '10.70.10.10 web www.edge.test' '10.70.20.20 cache' '10.70.0.10 user' | while IFS= read -r l; do grep -qxF \"$l\" /etc/hosts || printf '%s\\n' \"$l\" >> /etc/hosts; done"
     m.vm.provision "shell", name: "routes", inline: <<~'SH'
