@@ -169,6 +169,16 @@ stable spec format.
 
 ### Fixed
 
+- **On Compose, an input's file with a default holds exactly its value, an empty one
+  included.** It was a config whose `content` is `${NAME:-default}`: with an empty value (a
+  default of `""`, or an empty variable) Compose mounted the Compose file's own folder at the
+  file's path instead of an empty file, and a machine reading it failed (`Is a directory`). Each
+  machine with such files now has a one-shot job, `isoloom-inputs-<machine>`, that writes them
+  into a volume of its own (the value from a config that is never empty, its first byte
+  dropped), and the machine and its `setup` jobs mount each file read-only from there once the
+  job is done: an empty value is an empty file and a value its exact bytes, as on a VM. The value
+  stays out of the generated files, the images and every container's environment.
+
 - **A Vagrant VM resolves names on a network whose resolvers don't serve DNSSEC keys.** The
   roboxes `generic/*` boxes (libvirt's and Hyper-V's Ubuntu) ship systemd-resolved validating
   DNSSEC (`DNSSEC=yes`) against public servers of their choice; where one of them answers without

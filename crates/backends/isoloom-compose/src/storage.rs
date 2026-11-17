@@ -22,6 +22,7 @@ pub(crate) fn volume_mounts(plan: &MachinePlan) -> Vec<Mount> {
         Some(sub) => Mount::Long(LongMount::Volume {
             source: v.key.clone(),
             target: v.path.clone(),
+            read_only: false,
             volume: VolumeOptions { subpath: sub.clone() },
         }),
         None => Mount::Short(format!("{}:{}", v.key, v.path)),

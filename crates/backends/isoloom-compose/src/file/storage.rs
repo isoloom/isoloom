@@ -47,7 +47,10 @@ pub(crate) enum LongMount {
         source: String,
         /// The path in the container.
         target: String,
-        /// The folder mounted.
+        /// The container only reads it.
+        #[serde(skip_serializing_if = "Not::not")]
+        read_only: bool,
+        /// The folder (or file) mounted.
         volume: VolumeOptions,
     },
     /// A folder of the host (a host folder).
@@ -74,7 +77,7 @@ pub(crate) enum LongMount {
 /// `volumes[].volume`.
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct VolumeOptions {
-    /// The folder of the volume mounted instead of all of it.
+    /// The folder (or file) of the volume mounted instead of all of it.
     pub(crate) subpath: String,
 }
 
@@ -115,6 +118,7 @@ mod tests {
         let folder = LongMount::Volume {
             source: "data".into(),
             target: "/srv".into(),
+            read_only: false,
             volume: VolumeOptions { subpath: "web".into() },
         };
         let tmpfs = LongMount::Tmpfs {
