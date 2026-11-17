@@ -2,8 +2,9 @@
 # The hooks' test: a throwaway repository with these hooks on (core.hooksPath) and a bare remote.
 # A clean commit and push go through; an attribution line is refused at commit time and, when
 # the commit skipped its hooks, at push time; a staged file over 5 MB is refused unless Git LFS
-# holds it; a fake private key is refused at push time; a missing gitleaks refuses the push. The
-# repository's own checks (repo.sh) are stubbed to a log: they are CI's gates, run as CI runs them.
+# holds it; a fake private key is refused at push time; a missing gitleaks refuses the push; a
+# rebased branch is force-pushed with only its own commits scanned. The repository's own checks
+# (repo.sh) are stubbed to a log: they are CI's gates, run as CI runs them.
 #
 #   .githooks/test.sh          needs git and gitleaks
 set -euo pipefail
@@ -128,6 +129,27 @@ fi
 if in_repo push -q origin main && grep -q '^gate: a.txt $' "$log"; then ok "a later clean push, the gate run over its files"; else
   cat "$tmp/out" "$log"
   fail "a later clean push"
+fi
+
+# A branch rebased onto commits already on the remote, one of them with an attribution line (it
+# skipped the hooks), is force-pushed: only its own commits are scanned, and it goes through.
+in_repo checkout -q -b feature
+echo five >"$tmp/repo/b.txt"
+in_repo add b.txt
+in_repo commit -q -m "A feature"
+in_repo push -q origin feature
+in_repo checkout -q main
+echo six >>"$tmp/repo/a.txt"
+in_repo add a.txt
+in_repo commit -q --no-verify -m "Someone else's" -m "Co-Authored-By: Someone <s@example.com>"
+in_repo push -q --no-verify origin main
+in_repo checkout -q feature
+in_repo rebase -q main
+: >"$log"
+what="a rebased branch force-pushed over a commit already on the remote"
+if in_repo push -q --force origin feature && grep -q '^gate: b.txt $' "$log"; then ok "$what, only its own commit scanned"; else
+  cat "$tmp/out" "$log"
+  fail "$what refused"
 fi
 
 exit "$failed"
