@@ -12,6 +12,17 @@ stable spec format.
 
 ### Added
 
+- **A download per CPU architecture, and the catalogue's MySQL 8.4.7 native on arm64.** A `file`
+  step's `url` and `sha256` may each be one per architecture (`url: { amd64: <url>, arm64: <url>
+  }`, `sha256` likewise): the machine downloads its own architecture's file where the step runs
+  (the shell library by `uname -m`, Ansible by the host's `architecture` fact, PowerShell by
+  `PROCESSOR_ARCHITECTURE`), and a machine of an architecture none is for fails the step. The
+  `mysql` entry uses it: `mysql@8.4.7` installs Oracle's arm64 build on an arm64 VM (or a
+  container built from the OS) and its x86-64 build elsewhere, on Ubuntu 22.04 and now Debian
+  12, where a container runs MySQL's official 8.4.7 image (published for both architectures).
+  So a lab no longer pins `hardware: { arch: amd64 }` for MySQL, which an Apple silicon computer
+  emulated. The older releases stay x86-64 only, and say so on an arm64 machine.
+
 - **The catalogue's `mysql` takes a port, first-start scripts and the application user's
   privileges.** `with: { port: 3207, init: db/, privileges: SELECT }`: the server and its
   clients use the port (the machine's `mysql` port follows it); the folder's `*.sql`, `*.sql.gz`
