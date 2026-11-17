@@ -831,6 +831,7 @@ dependencies = [
  "criterion",
  "insta",
  "isoloom-ansible",
+ "isoloom-catalogue",
  "isoloom-compose",
  "isoloom-kubernetes",
  "isoloom-plan",

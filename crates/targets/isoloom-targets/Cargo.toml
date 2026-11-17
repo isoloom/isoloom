@@ -39,6 +39,8 @@ proptest.workspace = true
 jsonschema.workspace = true
 criterion.workspace = true
 tempfile.workspace = true
+# Every catalogue entry's contract cases, as labs (the conformance harness's).
+isoloom-catalogue = { workspace = true, features = ["maintenance"] }
 
 # The hot paths of generation, measured by `cargo xtask bench` (criterion, its own main).
 [[bench]]
