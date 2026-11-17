@@ -1023,6 +1023,23 @@
                       }
                     ],
                     "description": "The application user's password (a literal, or a secret or input reference)."
+                  },
+                  "privileges": {
+                    "type": "string",
+                    "pattern": "^(?:[A-Z][A-Z ,]{0,127})$",
+                    "description": "The application user's privileges on the application database, as GRANT writes them (`SELECT`, `SELECT, INSERT, UPDATE, DELETE`). Without it, all of them, as the image grants."
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "The port MySQL listens on, and the number of the machine's `mysql` port.",
+                    "default": 3306
+                  },
+                  "init": {
+                    "type": "string",
+                    "pattern": "^[^/\\\\]",
+                    "description": "A folder of the project (`db/`) whose scripts run once, at the first start, in name order, on the application database: `*.sql`, `*.sql.gz` and `*.sh`, as the image's /docker-entrypoint-initdb.d."
                   }
                 },
                 "required": [
