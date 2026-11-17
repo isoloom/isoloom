@@ -86,13 +86,16 @@ pub(super) fn terraform(root: &Path) -> Res<bool> {
         if !process::passed(Command::new(&isoloom).arg("generate").arg(&e).stdout(Stdio::null()))? {
             return Err(format!("{} failed to generate", e.display()).into());
         }
-        modules.extend(modules_of(&e.join(".isoloom"))?);
+        for m in modules_of(&e.join(".isoloom"))? {
+            let providers = providers_of(&m)?;
+            modules.push((m, providers));
+        }
     }
     let cache = std::env::var_os("TF_PLUGIN_CACHE_DIR").map_or_else(|| repo::target_dir(root).join("terraform-plugin-cache"), PathBuf::from);
     std::fs::create_dir_all(&cache)?;
     let (first, rest) = phases(&modules);
-    // The cache isn't safe for concurrent writes: one module of each target fills it in turn,
-    // then the others read it, a few at a time.
+    // The cache isn't safe for concurrent writes: the modules that bring a provider it lacks fill
+    // it in turn, then the others read it, a few at a time.
     let mut valid = true;
     for m in first {
         valid &= validate(m, &cache);
@@ -132,27 +135,51 @@ fn modules_of(out: &Path) -> Res<Vec<PathBuf>> {
     Ok(found)
 }
 
-/// The modules split in two: the first of each target (its path from `.isoloom/` on), then
-/// every other one.
-pub(super) fn phases(modules: &[PathBuf]) -> (Vec<&Path>, Vec<&Path>) {
-    let mut seen = Vec::new();
+/// The modules split in two: each that requires a provider no module before it does (a provider
+/// is its source and version constraint), then every other one, whose providers are all cached
+/// by then. One target's modules don't all require the same providers (`tls`, `random` and
+/// `time` only where a spec needs them), so the first of each target isn't enough: four
+/// `terraform init`s fetching the same provider into the cache at once corrupt it.
+pub(super) fn phases(modules: &[(PathBuf, Vec<String>)]) -> (Vec<&Path>, Vec<&Path>) {
+    let mut seen: Vec<&str> = Vec::new();
     let (mut first, mut rest) = (Vec::new(), Vec::new());
-    for m in modules {
-        let kind = target_of(m);
-        if seen.contains(&kind) {
+    for (m, providers) in modules {
+        let new: Vec<&str> = providers.iter().map(String::as_str).filter(|p| !seen.contains(p)).collect();
+        if new.is_empty() {
             rest.push(m.as_path());
         } else {
-            seen.push(kind);
+            seen.extend(new);
             first.push(m.as_path());
         }
     }
     (first, rest)
 }
 
-/// A module's target: its path after `.isoloom/` (`cloud-vm/aws`).
-pub(super) fn target_of(module: &Path) -> String {
-    let text = repo::slashed(module);
-    text.rsplit_once(".isoloom/").map_or(text.clone(), |(_, kind)| kind.to_owned())
+/// The providers `module` requires, each its source and version constraint
+/// (`hashicorp/aws ~> 6.67.0`), from its `required_providers` entries: one line each, as the
+/// generator writes them.
+fn providers_of(module: &Path) -> Res<Vec<String>> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(module)?.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|x| x == "tf") {
+            out.extend(std::fs::read_to_string(&path)?.lines().filter_map(provider_entry));
+        }
+    }
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
+/// A `required_providers` entry's source and version (`aws = { source = "hashicorp/aws",
+/// version = "~> 6.67.0" }` gives `hashicorp/aws ~> 6.67.0`); `None` for any other line.
+pub(super) fn provider_entry(line: &str) -> Option<String> {
+    let quoted = |key: &str| {
+        let (_, after) = line.split_once(key)?;
+        let after = after.trim_start().strip_prefix('=')?.trim_start().strip_prefix('"')?;
+        after.split_once('"').map(|(value, _)| value.to_owned())
+    };
+    Some(format!("{} {}", quoted("source")?, quoted("version")?))
 }
 
 /// `terraform init`, retried, then `terraform validate` in one module; whether it's valid. What
@@ -163,6 +190,11 @@ fn validate(module: &Path, cache: &Path) -> bool {
             .arg(format!("-chdir={}", module.display()))
             .args(args)
             .env("TF_PLUGIN_CACHE_DIR", cache)
+            // A generated module has no lock file, and without one terraform (1.4 on) fetches a
+            // cached provider again to learn its checksums, rewriting the cache while the other
+            // validators read it. This lets it link the cached provider instead: only the first
+            // phase writes the cache. The lock files it writes are the throwaway tree's.
+            .env("TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE", "true")
             .output()
     };
     let mut said = String::new();

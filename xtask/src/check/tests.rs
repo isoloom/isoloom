@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use super::outputs::{differences, phases, target_of};
+use super::outputs::{differences, phases, provider_entry};
 use super::{Args, SEMVER_CRATES, STEPS, chosen, latest_release, release_type, rust_version};
 
 #[derive(Parser)]
@@ -65,21 +65,31 @@ fn a_1x_release_checks_the_changes_as_a_major_and_a_later_one_as_the_version_say
 }
 
 #[test]
-fn the_first_module_of_each_target_fills_the_cache_and_the_others_follow() {
-    let modules: Vec<PathBuf> = [
-        "a/.isoloom/cloud-vm/aws",
-        "a/.isoloom/proxmox",
-        "b/.isoloom/cloud-vm/aws",
-        "b/.isoloom/cloud-vm/gcp",
-        "c/.isoloom/proxmox",
-    ]
-    .iter()
-    .map(PathBuf::from)
-    .collect();
+fn the_modules_that_bring_a_provider_fill_the_cache_and_the_others_follow() {
+    let module = |path: &str, providers: &[&str]| (PathBuf::from(path), providers.iter().map(|p| (*p).to_owned()).collect());
+    let modules: Vec<(PathBuf, Vec<String>)> = vec![
+        module("a/aws", &["hashicorp/aws ~> 6", "hashicorp/local ~> 2"]),
+        module("a/proxmox", &["bpg/proxmox ~> 0.1"]),
+        module("b/aws", &["hashicorp/aws ~> 6", "hashicorp/local ~> 2"]),
+        // The same target, one provider more: it fills the cache with it before the others run.
+        module("c/aws", &["hashicorp/aws ~> 6", "hashicorp/local ~> 2", "hashicorp/tls ~> 4"]),
+        module("d/aws", &["hashicorp/aws ~> 6", "hashicorp/tls ~> 4"]),
+        module("d/proxmox", &["bpg/proxmox ~> 0.1"]),
+    ];
     let (first, rest) = phases(&modules);
-    let text = |v: Vec<&std::path::Path>| v.iter().map(|p| target_of(p)).collect::<Vec<_>>();
-    assert_eq!(text(first), ["cloud-vm/aws", "proxmox", "cloud-vm/gcp"]);
-    assert_eq!(text(rest), ["cloud-vm/aws", "proxmox"]);
+    let text = |v: Vec<&std::path::Path>| v.iter().map(|p| p.display().to_string()).collect::<Vec<_>>();
+    assert_eq!(text(first), ["a/aws", "a/proxmox", "c/aws"]);
+    assert_eq!(text(rest), ["b/aws", "d/aws", "d/proxmox"]);
+}
+
+#[test]
+fn a_provider_entry_is_its_source_and_version_and_nothing_else_is_one() {
+    assert_eq!(
+        provider_entry(r#"    aws   = { source = "hashicorp/aws", version = "~> 6.67.0" }"#).as_deref(),
+        Some("hashicorp/aws ~> 6.67.0")
+    );
+    assert_eq!(provider_entry(r#"    source      = "${path.module}/.isoloom-outputs-web.tgz""#), None);
+    assert_eq!(provider_entry(r#"  required_version = ">= 1.6""#), None);
 }
 
 #[test]
