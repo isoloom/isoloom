@@ -176,7 +176,7 @@ fn a_download_per_architecture_keeps_each_ones_url_and_checksum() {
     )) else {
         panic!()
     };
-    assert!(matches!(&one.state, FileState::Downloads(all) if all.len() == 1), "{:?}", one.state);
+    assert!(matches!(&one.state, FileState::Downloads(amd64) if amd64.len() == 1), "{:?}", one.state);
 }
 
 #[test]

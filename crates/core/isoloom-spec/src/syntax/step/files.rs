@@ -258,8 +258,8 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for ByArch<T> {
 }
 
 /// A download: one file for every machine, or one per architecture, each with its SHA-256.
-fn download(url: ByArch<HttpsUrl>, sha256: ByArch<Sha256>) -> Result<FileState, Mistake> {
-    let (urls, sums) = match (url, sha256) {
+fn download(urls: ByArch<HttpsUrl>, sums: ByArch<Sha256>) -> Result<FileState, Mistake> {
+    let (urls, sums) = match (urls, sums) {
         (ByArch::One(url), ByArch::One(sha256)) => return Ok(FileState::Download { url, sha256 }),
         (ByArch::PerArch(urls), ByArch::PerArch(sums)) => (urls, sums),
         _ => {
