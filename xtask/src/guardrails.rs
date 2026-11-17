@@ -117,7 +117,7 @@ fn sources(extensions: &[&str]) -> Vec<Source> {
 }
 
 /// Every file under `dir`, `target` folders left out.
-fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+pub(super) fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let path = entry.path();
         if path.is_dir() {
