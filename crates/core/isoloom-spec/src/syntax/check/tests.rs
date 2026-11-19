@@ -54,13 +54,15 @@ fn sensitive_values_stay_out_of_the_environment() {
 
 #[test]
 fn an_inputs_default_is_text_every_target_writes() {
-    let found =
-        problems("inputs:\n  OK: { default: dev-token }\n  EMPTY: { default: '' }\n  BRACE: { default: 'a}b' }\n  NUL: { default: \"a\\0b\" }\nmachines: {}\n");
-    // Empty is a default too: a sensitive input's file then starts empty rather than unset.
+    let found = problems(
+        "inputs:\n  OK: { default: dev-token }\n  EMPTY: { default: '' }\n  BRACE: { default: 'INV-{2024}' }\n  MODE: { sensitive: false, default: 'a}b' }\n  NUL: { default: \"a\\0b\" }\nmachines:\n  web: { networks: { lab: 10 }, app: { image: nginx }, environment: { MODE: { input: MODE } } }\n",
+    );
+    // Empty is a default too: a sensitive input's file then starts empty rather than unset. A `}`
+    // is refused only where Compose interpolates the default: a machine's environment.
     assert_eq!(
         found,
         [
-            (Code::InvalidValue, "inputs.BRACE.default".to_owned()),
+            (Code::InvalidValue, "inputs.MODE.default".to_owned()),
             (Code::InvalidValue, "inputs.NUL.default".to_owned()),
         ]
     );

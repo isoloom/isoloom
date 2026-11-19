@@ -98,7 +98,7 @@ pub struct Spec {
     /// Given no value (unset or empty), an input is its `default` when it declares one, else
     /// empty; but on Compose an input's file with no default can't be left unset (Compose won't
     /// start). So an environment that must start without a launch (a local run, CI) gives its inputs a
-    /// default (`""`: empty). A default is text without a NUL or a `}`, written as it is in the
+    /// default (`""`: empty). A default is text without a NUL (nor a `}` when a machine's `environment` reads it), written as it is in the
     /// generated files: a sensitive input's default is a public development value
     /// (`dev-launch-token`), and a warning says so when it reads like a real secret.
     #[schemars(default)]

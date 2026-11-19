@@ -13,15 +13,19 @@ use super::super::process::EnvValue;
 use crate::validate::is_variable;
 
 /// Each input's `default`: text every target can write as the value it falls back to, without a
-/// NUL (no environment variable holds one) or a `}` (Compose's `${NAME:-default}` ends at the
-/// first one).
+/// NUL (no environment variable holds one), nor a `}` when a machine's `environment` reads the
+/// input (Compose's `${NAME:-default}` ends at the first one; a file's default has no such limit).
 pub(super) fn input_defaults(spec: &Spec, out: &mut Problems) {
     for (name, input) in &spec.inputs.0 {
         let Some(default) = &input.default else { continue };
+        let in_environment = spec
+            .machines
+            .values()
+            .any(|m| m.environment.values().any(|v| matches!(v, EnvValue::Input(i) if i == name)));
         let reason = if default.contains('\0') {
             "a default can't hold a NUL: no environment variable carries one"
-        } else if default.contains('}') {
-            "a default can't hold a `}`: Compose's `${NAME:-default}` ends at the first one"
+        } else if in_environment && default.contains('}') {
+            "a default read in a machine's `environment` can't hold a `}`: Compose's `${NAME:-default}` ends at the first one"
         } else {
             continue;
         };
