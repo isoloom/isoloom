@@ -9,8 +9,8 @@ pub(crate) fn literal(text: &str) -> String {
 }
 
 /// Input `name`'s value as Compose fills it from its environment: `${NAME:-default}`, the
-/// default (literal) when the variable is unset or empty, else empty. A spec's default holds no
-/// `}`, which would end the reference.
+/// default (literal) when the variable is unset or empty, else empty. Only an environment value's
+/// default is written here: a spec refuses a `}` in it, which would end the reference.
 pub(crate) fn input(name: &str, default: Option<&str>) -> String {
     format!("${{{name}:-{}}}", literal(default.unwrap_or_default()))
 }

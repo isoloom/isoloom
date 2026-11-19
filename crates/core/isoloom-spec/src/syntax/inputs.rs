@@ -26,7 +26,7 @@ pub struct Input {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// The value used when the runner gives none (unset or empty): a local run, CI, an import
-    /// without a launch. Text without a NUL or a `}`; `""` starts it empty. It is written in the generated
+    /// without a launch. Text without a NUL (nor a `}` when a machine's `environment` reads it); `""` starts it empty. It is written in the generated
     /// files as it is, so anyone reading them reads it: a sensitive input's default is a public
     /// development value (`dev-launch-token`), never a real secret.
     #[serde(default, skip_serializing_if = "Option::is_none")]
