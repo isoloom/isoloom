@@ -31,10 +31,20 @@ fn provider<'v>(vm: &'v RubyBlock, provider: &str) -> Vec<&'v str> {
 fn each_provider_sizes_the_disk_and_the_root_grows_before_the_steps() -> Outcome {
     let vf = disks(", disk_gb: 80")?;
     let vm = define(&vf, "box");
-    assert_eq!(
-        vm.statements("m.vm.disk"),
-        ["m.vm.disk :disk, size: \"80GB\", primary: true"],
-        "VirtualBox, VMware, Hyper-V"
+    // VirtualBox and VMware grow the box's disk with Vagrant's own setting, in their blocks;
+    // Hyper-V, where that setting would shrink a bigger VHDX, with Isoloom's step before the VM
+    // starts, which grows it only when smaller.
+    assert!(vm.statements("m.vm.disk").is_empty(), "no disk setting every provider reads");
+    for p in ["virtualbox", "vmware_desktop"] {
+        assert!(provider(vm, p).contains(&"o.vm.disk :disk, size: \"80GB\", primary: true"), "{p}");
+    }
+    assert!(!provider(vm, "hyperv").iter().any(|s| s.contains("vm.disk")), "Hyper-V reads no disk setting");
+    assert!(
+        vm.block("m.trigger.before :\"VagrantPlugins::HyperV::Action::StartInstance\"")
+            .every_statement()
+            .iter()
+            .any(|s| s.contains("IsoloomHyperV.grow(machine, 80)")),
+        "Hyper-V grows it before the VM starts"
     );
     assert!(provider(vm, "libvirt").contains(&"v.machine_virtual_size = 80"), "libvirt");
     assert!(provider(vm, "vmware_esxi").contains(&"v.guest_boot_disk_size = 80"), "ESXi");
@@ -60,8 +70,9 @@ fn without_a_disk_the_box_keeps_its_own() -> Outcome {
     let vm = define(&vf, "box");
     assert!(!provisioners(vm).contains(&"disk".to_owned()), "no grow step");
     let statements = vm.every_statement();
-    for absent in ["m.vm.disk", "v.machine_virtual_size", "v.guest_boot_disk_size", "v.disk_resize"] {
+    for absent in ["m.vm.disk", "o.vm.disk", "v.machine_virtual_size", "v.guest_boot_disk_size", "v.disk_resize"] {
         assert!(!statements.iter().any(|s| s.starts_with(absent)), "{absent}");
     }
+    assert!(!statements.iter().any(|s| s.contains("IsoloomHyperV.grow")), "no Hyper-V grow");
     Ok(())
 }

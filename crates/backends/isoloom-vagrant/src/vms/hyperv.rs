@@ -6,7 +6,9 @@
 //!
 //! - before `Configure`: the first adapter's switch (`ISOLOOM_HYPERV_SWITCH`, else the Default
 //!   Switch) must exist, and each network is a private switch `isoloom-<env>-<network>`;
-//! - before `StartInstance`: an adapter per network with a fixed MAC ([`mac`]), connected there,
+//! - before `StartInstance`: its disk grown to its size when smaller, never shrunk (Vagrant's own
+//!   disk setting would shrink a VHDX, which Hyper-V refuses); an adapter per network with a
+//!   fixed MAC ([`mac`]), connected there,
 //!   and the virtual TPM (`vm.tpm`, or Windows 11's own) enabled with a key protector of the host;
 //! - after `WaitForIPAddress`: the machine's addresses set in the guest, found by MAC (a
 //!   boot-time script on Linux, a static address through WMI on Windows), and its published
@@ -170,7 +172,7 @@ pub(crate) fn block(r: &mut Ruby, vm: &isoloom_plan::HostName, size: Size, hv: &
         let first = Call::new("o.vm.network").arg(Value::str("private_network"));
         r.call(first.kw("bridge", Value::raw("HYPERV_SWITCH")));
     });
-    triggers(r, vm_name, hv);
+    triggers(r, vm_name, size.disk, hv);
 }
 
 /// `m.trigger.<when> :"VagrantPlugins::HyperV::Action::<action>", type: :action do |t|`: only
@@ -182,10 +184,11 @@ fn trigger(r: &mut Ruby, when: &str, action: &str, body: impl FnOnce(&mut Ruby))
     r.block(head, "t", body);
 }
 
-/// The switches before Vagrant picks the first adapter's, the adapters before the VM starts,
+/// The switches before Vagrant picks the first adapter's, its disk grown (never shrunk) and the
+/// adapters before the VM starts,
 /// its addresses and its ports' relays once it answers, the relays gone with the VM and the
 /// switches with the last one.
-fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
+fn triggers(r: &mut Ruby, vm_name: &str, disk: Option<u32>, hv: &HyperV) {
     let switches = hv.switches();
     trigger(r, "before", "Configure", |r| {
         r.line(format_args!("t.ruby {{ |_, _| IsoloomHyperV.switches({switches}) }}"));
@@ -196,6 +199,9 @@ fn triggers(r: &mut Ruby, vm_name: &str, hv: &HyperV) {
             .map(|n| Value::array([hv.switch(n.net), Value::str(&hyperv_mac_text(mac(vm_name, n.net), ""))])),
     );
     let mut before_start = Vec::new();
+    if let Some(gb) = disk {
+        before_start.push(format!("IsoloomHyperV.grow(machine, {gb})"));
+    }
     if !hv.nics.is_empty() {
         before_start.push(format!("IsoloomHyperV.attach(machine, {nics})"));
     }

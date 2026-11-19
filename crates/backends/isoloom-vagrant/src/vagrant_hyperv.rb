@@ -56,6 +56,16 @@ module IsoloomHyperV
        "elseif (-not (Hyper-V\\Get-VMSecurity -VM $vm).TpmEnabled) { Hyper-V\\Set-VMKeyProtector -VM $vm -NewLocalKeyProtector; Hyper-V\\Enable-VMTPM -VM $vm }")
   end
 
+  # Before the VM starts (a Hyper-V step, so this runs on Hyper-V only): its first disk grown to
+  # `gb` GB when it is smaller, never shrunk. Vagrant's own disk setting resizes a VHDX down too
+  # ("VHDX formats can be shrunk"), which Hyper-V refuses when the box's disk is the bigger: a
+  # disk size grows the box's disk, never below its own, as on the other providers.
+  def self.grow(machine, gb)
+    ps("$d = Hyper-V\\Get-VMHardDiskDrive -VM (Hyper-V\\Get-VM -Id #{q(machine.id)}) | " \
+       "Sort-Object ControllerType, ControllerNumber, ControllerLocation | Select-Object -First 1; " \
+       "if ((Hyper-V\\Get-VHD -Path $d.Path).Size -lt #{gb}GB) { Hyper-V\\Resize-VHD -Path $d.Path -SizeBytes #{gb}GB }")
+  end
+
   # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
   # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)

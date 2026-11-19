@@ -1,5 +1,5 @@
-//! Hyper-V's part of a Vagrantfile: the relay of each published port, and the host port a
-//! forward takes.
+//! Hyper-V's part of a Vagrantfile: the relay of each published port, the host port a forward
+//! takes, and a disk size that grows the box's disk, never below its own.
 
 use isoloom_test_support::{assert_every, needs};
 
@@ -9,6 +9,33 @@ use crate::testing::{Outcome, VAGRANT_STAND_IN_RB, loadable, printed, vagrantfil
 /// start, from the host port its `forwarded_port` line names (the runner's choice, else the
 /// published one), and the relay goes with the VM. Alpine's controller keeps its hostname there:
 /// setting one restarts every interface, which closed the SSH session setting it.
+/// A machine's disk size grows the box's disk, never below its own: Vagrant's own disk setting
+/// does so in VirtualBox's and VMware's blocks, but on Hyper-V it shrinks a VHDX (which Hyper-V
+/// refuses when the box's disk is the bigger), so there it is Isoloom's step before the VM starts,
+/// and the machine has no disk setting Hyper-V would read.
+#[test]
+fn a_disk_size_grows_the_box_disk_on_hyperv_and_never_shrinks_it() -> Outcome {
+    let file = vagrantfile("segmented")?;
+    let r = isoloom_test_support::ruby_blocks(&file);
+    let cache = r.block("config.vm.define \"cache\"");
+    let primary = "o.vm.disk :disk, size: \"10GB\", primary: true";
+    assert!(
+        cache.statements("m.vm.disk").is_empty(),
+        "no disk setting every provider reads: {:?}",
+        cache.statements
+    );
+    for provider in ["virtualbox", "vmware_desktop"] {
+        let block = cache.block(&format!("m.vm.provider \"{provider}\" do |v, o|"));
+        assert!(block.statements.iter().any(|s| s == primary), "{provider}: {:?}", block.statements);
+    }
+    let hyperv = cache.block("m.vm.provider \"hyperv\" do |v, o|");
+    assert!(!hyperv.statements.iter().any(|s| s.contains("vm.disk")), "{:?}", hyperv.statements);
+    let starting = cache.block("m.trigger.before :\"VagrantPlugins::HyperV::Action::StartInstance\"");
+    assert_every!(starting.statements("t.ruby"), |s: &&str| s.contains("IsoloomHyperV.grow(machine, 10)"));
+    assert_eq!(starting.statements("t.ruby").len(), 1, "{:?}", starting.statements);
+    Ok(())
+}
+
 #[test]
 fn hyperv_relays_published_ports_and_alpine_keeps_its_hostname() -> Outcome {
     let file = vagrantfile("solo-web")?;

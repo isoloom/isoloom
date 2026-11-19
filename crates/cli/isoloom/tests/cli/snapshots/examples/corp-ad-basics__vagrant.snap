@@ -906,6 +906,16 @@ module IsoloomHyperV
        "elseif (-not (Hyper-V\\Get-VMSecurity -VM $vm).TpmEnabled) { Hyper-V\\Set-VMKeyProtector -VM $vm -NewLocalKeyProtector; Hyper-V\\Enable-VMTPM -VM $vm }")
   end
 
+  # Before the VM starts (a Hyper-V step, so this runs on Hyper-V only): its first disk grown to
+  # `gb` GB when it is smaller, never shrunk. Vagrant's own disk setting resizes a VHDX down too
+  # ("VHDX formats can be shrunk"), which Hyper-V refuses when the box's disk is the bigger: a
+  # disk size grows the box's disk, never below its own, as on the other providers.
+  def self.grow(machine, gb)
+    ps("$d = Hyper-V\\Get-VMHardDiskDrive -VM (Hyper-V\\Get-VM -Id #{q(machine.id)}) | " \
+       "Sort-Object ControllerType, ControllerNumber, ControllerLocation | Select-Object -First 1; " \
+       "if ((Hyper-V\\Get-VHD -Path $d.Path).Size -lt #{gb}GB) { Hyper-V\\Resize-VHD -Path $d.Path -SizeBytes #{gb}GB }")
+  end
+
   # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
   # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)
@@ -1373,13 +1383,13 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.40.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
@@ -1387,7 +1397,7 @@ Vagrant.configure("2") do |config|
       v.vmx["ethernet2.pcislotnumber"] = "224"
       v.vmx["ethernet3.pcislotnumber"] = "256"
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
@@ -1612,15 +1622,16 @@ Vagrant.configure("2") do |config|
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "10.40.20.5", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.disk :disk, size: "60GB", primary: true
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
+      o.vm.disk :disk, size: "60GB", primary: true
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.linked_clone = true
       v.cpus = 2
       v.memory = 4096
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
+      o.vm.disk :disk, size: "60GB", primary: true
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
@@ -1632,7 +1643,7 @@ Vagrant.configure("2") do |config|
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - dc01"
       v.linked_clone = true
       v.cpus = 2
@@ -1711,7 +1722,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "021588E46B79"]]) }
+      t.ruby { |_, machine| IsoloomHyperV.grow(machine, 60); IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "021588E46B79"]]) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1781,8 +1792,8 @@ Vagrant.configure("2") do |config|
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "10.40.20.21", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.disk :disk, size: "60GB", primary: true
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
+      o.vm.disk :disk, size: "60GB", primary: true
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.linked_clone = true
       v.cpus = 2
@@ -1790,7 +1801,8 @@ Vagrant.configure("2") do |config|
       v.customize ["modifyvm", :id, "--tpm-type", "2.0"]
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
+      o.vm.disk :disk, size: "60GB", primary: true
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
@@ -1802,7 +1814,7 @@ Vagrant.configure("2") do |config|
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-01"
       v.linked_clone = true
       v.cpus = 2
@@ -1884,7 +1896,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "0215080C2851"]]); IsoloomHyperV.tpm(machine, false) }
+      t.ruby { |_, machine| IsoloomHyperV.grow(machine, 60); IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "0215080C2851"]]); IsoloomHyperV.tpm(machine, false) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -1955,8 +1967,8 @@ Vagrant.configure("2") do |config|
     m.winrm.max_tries = 30
     m.winrm.retry_delay = 10
     m.vm.network "private_network", ip: "10.40.20.22", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.disk :disk, size: "60GB", primary: true
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
+      o.vm.disk :disk, size: "60GB", primary: true
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.linked_clone = true
       v.cpus = 2
@@ -1964,7 +1976,8 @@ Vagrant.configure("2") do |config|
       v.customize ["modifyvm", :id, "--tpm-type", "2.0"]
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
+      o.vm.disk :disk, size: "60GB", primary: true
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.vmx["numvcpus"] = "2"
       v.vmx["memsize"] = "4096"
@@ -1976,7 +1989,7 @@ Vagrant.configure("2") do |config|
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - ws-02"
       v.linked_clone = true
       v.cpus = 2
@@ -2058,7 +2071,7 @@ Vagrant.configure("2") do |config|
       t.ruby { |_, _| IsoloomHyperV.switches(["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp"]) }
     end
     m.trigger.before :"VagrantPlugins::HyperV::Action::StartInstance", type: :action do |t|
-      t.ruby { |_, machine| IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "02150F45D202"]]); IsoloomHyperV.tpm(machine, false) }
+      t.ruby { |_, machine| IsoloomHyperV.grow(machine, 60); IsoloomHyperV.attach(machine, [["isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", "02150F45D202"]]); IsoloomHyperV.tpm(machine, false) }
     end
     m.trigger.after :"VagrantPlugins::HyperV::Action::WaitForIPAddress", type: :action do |t|
       t.ruby do |_, machine|
@@ -2121,14 +2134,14 @@ Vagrant.configure("2") do |config|
     m.vm.hostname = "web01"
     m.vm.network "private_network", ip: "10.40.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -2141,7 +2154,7 @@ Vagrant.configure("2") do |config|
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - web01"
       v.linked_clone = true
       v.cpus = 1
@@ -2427,14 +2440,14 @@ systemctl restart systemd-resolved
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "user"
     m.vm.network "private_network", ip: "10.40.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -2446,7 +2459,7 @@ systemctl restart systemd-resolved
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - user"
       v.linked_clone = true
       v.cpus = 1
@@ -2727,13 +2740,13 @@ systemctl restart systemd-resolved
     m.vm.network "private_network", ip: "10.40.10.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-dmz", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.20.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-corp", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.40.99.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__network_name: "isoloom-corp-ad-basics-#{ISOLOOM_KEY}-access", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
@@ -2741,7 +2754,7 @@ systemctl restart systemd-resolved
       v.vmx["ethernet2.pcislotnumber"] = "224"
       v.vmx["ethernet3.pcislotnumber"] = "256"
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "corp-ad-basics-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
