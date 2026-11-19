@@ -392,6 +392,16 @@ module IsoloomHyperV
        "elseif (-not (Hyper-V\\Get-VMSecurity -VM $vm).TpmEnabled) { Hyper-V\\Set-VMKeyProtector -VM $vm -NewLocalKeyProtector; Hyper-V\\Enable-VMTPM -VM $vm }")
   end
 
+  # Before the VM starts (a Hyper-V step, so this runs on Hyper-V only): its first disk grown to
+  # `gb` GB when it is smaller, never shrunk. Vagrant's own disk setting resizes a VHDX down too
+  # ("VHDX formats can be shrunk"), which Hyper-V refuses when the box's disk is the bigger: a
+  # disk size grows the box's disk, never below its own, as on the other providers.
+  def self.grow(machine, gb)
+    ps("$d = Hyper-V\\Get-VMHardDiskDrive -VM (Hyper-V\\Get-VM -Id #{q(machine.id)}) | " \
+       "Sort-Object ControllerType, ControllerNumber, ControllerLocation | Select-Object -First 1; " \
+       "if ((Hyper-V\\Get-VHD -Path $d.Path).Size -lt #{gb}GB) { Hyper-V\\Resize-VHD -Path $d.Path -SizeBytes #{gb}GB }")
+  end
+
   # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
   # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)
@@ -857,14 +867,14 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "web"
     m.vm.network "private_network", ip: "10.63.0.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -876,7 +886,7 @@ Vagrant.configure("2") do |config|
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "ansible-pair-#{ISOLOOM_KEY} - web"
       v.linked_clone = true
       v.cpus = 1
@@ -1118,14 +1128,14 @@ systemctl restart systemd-resolved
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "cache"
     m.vm.network "private_network", ip: "10.63.0.20", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -1137,7 +1147,7 @@ systemctl restart systemd-resolved
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "ansible-pair-#{ISOLOOM_KEY} - cache"
       v.linked_clone = true
       v.cpus = 1
@@ -1379,19 +1389,19 @@ systemctl restart systemd-resolved
     m.vm.box = RbConfig::CONFIG["host_cpu"] =~ /arm|aarch64/ ? "bento/debian-12" : "generic/alpine319"
     m.vm.hostname = "isoloom-controller"
     m.vm.network "private_network", ip: "10.63.0.253", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__network_name: "isoloom-ansible-pair-#{ISOLOOM_KEY}-lab", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 768
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "768"
       v.vmx["ethernet1.pcislotnumber"] = "192"
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "ansible-pair-#{ISOLOOM_KEY} - isoloom-controller"
       v.linked_clone = true
       v.cpus = 1

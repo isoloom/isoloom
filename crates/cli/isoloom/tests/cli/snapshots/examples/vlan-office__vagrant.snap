@@ -420,6 +420,16 @@ module IsoloomHyperV
        "elseif (-not (Hyper-V\\Get-VMSecurity -VM $vm).TpmEnabled) { Hyper-V\\Set-VMKeyProtector -VM $vm -NewLocalKeyProtector; Hyper-V\\Enable-VMTPM -VM $vm }")
   end
 
+  # Before the VM starts (a Hyper-V step, so this runs on Hyper-V only): its first disk grown to
+  # `gb` GB when it is smaller, never shrunk. Vagrant's own disk setting resizes a VHDX down too
+  # ("VHDX formats can be shrunk"), which Hyper-V refuses when the box's disk is the bigger: a
+  # disk size grows the box's disk, never below its own, as on the other providers.
+  def self.grow(machine, gb)
+    ps("$d = Hyper-V\\Get-VMHardDiskDrive -VM (Hyper-V\\Get-VM -Id #{q(machine.id)}) | " \
+       "Sort-Object ControllerType, ControllerNumber, ControllerLocation | Select-Object -First 1; " \
+       "if ((Hyper-V\\Get-VHD -Path $d.Path).Size -lt #{gb}GB) { Hyper-V\\Resize-VHD -Path $d.Path -SizeBytes #{gb}GB }")
+  end
+
   # Once the VM has an address (a Hyper-V step, so this runs on Hyper-V only), when the guest
   # answers, before its provisioning: its addresses on the networks.
   def self.address(machine, script)
@@ -887,13 +897,13 @@ Vagrant.configure("2") do |config|
     m.vm.network "private_network", ip: "10.70.10.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.20.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.99.254", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 512
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "512"
@@ -901,7 +911,7 @@ Vagrant.configure("2") do |config|
       v.vmx["ethernet2.pcislotnumber"] = "224"
       v.vmx["ethernet3.pcislotnumber"] = "256"
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - isoloom-router"
       v.linked_clone = true
       v.cpus = 1
@@ -1117,14 +1127,14 @@ Vagrant.configure("2") do |config|
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "intranet"
     m.vm.network "private_network", ip: "10.70.99.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-servers", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -1136,7 +1146,7 @@ Vagrant.configure("2") do |config|
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - intranet"
       v.linked_clone = true
       v.cpus = 1
@@ -1461,14 +1471,14 @@ systemctl restart systemd-resolved
     m.vm.box = ENV.fetch("ISOLOOM_ACCESS_BOX", "bento/debian-12")
     m.vm.hostname = "staff"
     m.vm.network "private_network", ip: "10.70.10.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -1480,7 +1490,7 @@ systemctl restart systemd-resolved
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - staff"
       v.linked_clone = true
       v.cpus = 1
@@ -1795,14 +1805,14 @@ systemctl restart systemd-resolved
     m.vm.box = "bento/debian-12"
     m.vm.hostname = "guest"
     m.vm.network "private_network", ip: "10.70.20.10", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -1814,7 +1824,7 @@ systemctl restart systemd-resolved
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - guest"
       v.linked_clone = true
       v.cpus = 1
@@ -2094,14 +2104,14 @@ systemctl restart systemd-resolved
     m.vm.hostname = "admin"
     m.vm.network "private_network", ip: "10.70.10.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan10", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
     m.vm.network "private_network", ip: "10.70.20.50", netmask: "255.255.255.0", virtualbox__intnet: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__network_name: "isoloom-vlan-office-#{ISOLOOM_KEY}-office-vlan20", libvirt__forward_mode: "veryisolated", libvirt__dhcp_enabled: false
-    m.vm.provider "virtualbox" do |v|
+    m.vm.provider "virtualbox" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.linked_clone = true
       v.cpus = 1
       v.memory = 1024
       v.customize ["modifyvm", :id, "--vrde", IsoloomConsole.virtualbox_vrde? ? "on" : "off", "--vrdeaddress", "127.0.0.1", "--vrdeport", "3390-3489"]
     end
-    m.vm.provider "vmware_desktop" do |v|
+    m.vm.provider "vmware_desktop" do |v, o|
       v.vmx["displayName"] = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.vmx["numvcpus"] = "1"
       v.vmx["memsize"] = "1024"
@@ -2114,7 +2124,7 @@ systemctl restart systemd-resolved
         v.vmx["RemoteDisplay.vnc.password"] = console.fetch("password")
       end
     end
-    m.vm.provider "parallels" do |v|
+    m.vm.provider "parallels" do |v, o|
       v.name = "vlan-office-#{ISOLOOM_KEY} - admin"
       v.linked_clone = true
       v.cpus = 1

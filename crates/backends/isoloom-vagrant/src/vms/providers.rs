@@ -122,17 +122,11 @@ pub(crate) struct Guest<'a> {
     pub(crate) console: Option<&'a str>,
 }
 
-/// The provider blocks of `g`, after Vagrant's own disk setting (VirtualBox, VMware and Hyper-V
-/// resize the box's disk).
+/// The provider blocks of `g`. Its disk size grows the box's disk, never below its own: Vagrant's
+/// own disk setting in VirtualBox's and VMware's blocks (each grows a disk and leaves a bigger one
+/// as it is), Hyper-V's step before the VM starts ([`hyperv`]: Vagrant's setting would shrink a
+/// VHDX there, which Hyper-V refuses), QEMU's, libvirt's and ESXi's in their blocks.
 pub(crate) fn blocks(r: &mut Ruby, g: &Guest) {
-    if let Some(d) = g.size.disk {
-        r.call(
-            Call::new("m.vm.disk")
-                .arg(Value::sym("disk"))
-                .kw("size", Value::str(&format!("{d}GB")))
-                .kw("primary", true),
-        );
-    }
     // Data disks: Vagrant's own setting for VirtualBox, VMware and Hyper-V; libvirt and ESXi
     // in their blocks. QEMU and Parallels attach none (refused for them).
     for (name, gb) in &g.disks {
@@ -180,8 +174,24 @@ fn provider(p: Provider) -> Call {
 
 /// VirtualBox and Parallels: a name, CPUs, memory and linked clones, then what only that
 /// provider sets (`more`).
+/// Vagrant's own setting for the box's disk at `size`'s, in a provider's block (`o`, its
+/// override): VirtualBox and VMware grow a disk to it and leave a bigger one as it is.
+fn primary_disk(r: &mut Ruby, size: Size) {
+    if let Some(d) = size.disk {
+        r.call(
+            Call::new("o.vm.disk")
+                .arg(Value::sym("disk"))
+                .kw("size", Value::str(&format!("{d}GB")))
+                .kw("primary", true),
+        );
+    }
+}
+
 fn desktop(r: &mut Ruby, p: Provider, g: &Guest, more: impl FnOnce(&mut Ruby)) {
-    r.block(provider(p), "v", |r| {
+    r.block(provider(p), "v, o", |r| {
+        if p == Provider::VirtualBox {
+            primary_disk(r, g.size);
+        }
         r.assign("v.name", crate::vagrantfile::host_name(&g.label));
         r.assign("v.linked_clone", true);
         r.assign("v.cpus", g.size.cpus);
@@ -196,7 +206,8 @@ fn desktop(r: &mut Ruby, p: Provider, g: &Guest, more: impl FnOnce(&mut Ruby)) {
 /// VMware Workstation and Fusion: a display name, CPUs and memory, in the VM's `.vmx`, and each
 /// adapter on the environment's networks at a PCI slot of its own ([`pci_slot`]).
 fn vmware(r: &mut Ruby, g: &Guest) {
-    r.block(provider(Provider::VmwareDesktop), "v", |r| {
+    r.block(provider(Provider::VmwareDesktop), "v, o", |r| {
+        primary_disk(r, g.size);
         r.assign("v.vmx[\"displayName\"]", crate::vagrantfile::host_name(&g.label));
         r.assign("v.vmx[\"numvcpus\"]", Value::str(&g.size.cpus.to_string()));
         r.assign("v.vmx[\"memsize\"]", Value::str(&g.size.mem.to_string()));
