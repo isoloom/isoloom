@@ -1,0 +1,205 @@
+//! What every Vagrantfile Isoloom writes says the same way, as [`ruby`](crate::ruby) pieces: the
+//! inputs read at launch, the SSH proxy, libvirt's domain prefix, a published port, the
+//! constraints' prelude and the Docker install. `var` is the block variable the statement is
+//! for: `config` in a single-VM file, `m` inside a `config.vm.define`.
+
+use isoloom_plan::{Environment, HostName, Step};
+use isoloom_render::steps;
+use isoloom_spec::model::Protocol;
+
+use crate::ruby::{Call, Provision, Ruby, Value};
+use crate::settings;
+
+/// Vagrant's host-port check, corrected for macOS 27 (`vagrant_port_check.rb`): Vagrant's own
+/// reads every port as in use there (Ruby bug #22223), so a VM's fixed forwarded ports fail as
+/// collisions before it boots. Emitted after the project helpers in every Vagrantfile.
+pub(crate) const PORT_CHECK_RB: &str = include_str!("vagrant_port_check.rb");
+
+/// The copy's key, read once at a Vagrantfile's top (`vagrant_key.rb`): the runner's
+/// ([`isoloom_plan::KEY_VAR`]), else one made from the folder's path. Every name the file gives on
+/// the host holds it ([`host_name`]).
+pub(crate) const KEY_RB: &str = include_str!("vagrant_key.rb");
+
+/// The Ruby constant [`KEY_RB`] defines.
+const KEY: &str = "ISOLOOM_KEY";
+
+/// `name` as the Vagrantfile gives it: a string literal with the copy's key ([`KEY_RB`]) read
+/// into it when Vagrant loads the file (`"solo-web-#{ISOLOOM_KEY} - web"`).
+pub(crate) fn host_name(name: &HostName) -> Value {
+    let (before, after) = name.around_key();
+    let (before, after) = (crate::ruby::quote(&before), crate::ruby::quote(after));
+    // Two literals joined around the key: `"<before>` and `<after>"`, each quoted as a whole.
+    let (open, close) = (before.strip_suffix('"').unwrap_or_default(), after.strip_prefix('"').unwrap_or_default());
+    Value::raw(format!("{open}#{{{KEY}}}{close}"))
+}
+
+/// The derived-checks switch as a check provisioner's `env`: `{ "ISOLOOM_DERIVED" => ... }`, read
+/// from the host's environment when Vagrant runs (on, `1`, unless the host sets it).
+pub(crate) fn derived_from_host() -> Value {
+    let name = isoloom_spec::contract::DERIVED;
+    Value::hash([(Value::str(name), Value::raw(format!("ENV.fetch({}, {})", Value::str(name), Value::str("1"))))])
+}
+
+/// `<var>.vm.provision "shell", name: <name>`: a shell provisioner, its script still to add.
+pub(crate) fn shell(var: &str, name: &str) -> Provision {
+    Provision::new(var, "shell").kw("name", Value::str(name))
+}
+
+/// The values given at launch, read from the host's environment (empty when unset), as the
+/// `INPUTS` hash provisioners pass on, and the `isoloom_b64` they pass each value through when
+/// there are some, or `secrets` from the host's environment: a provisioner's environment is
+/// written into a double-quoted shell string, which would read a `$` or a backquote in a value.
+/// Nothing when there is neither.
+pub(crate) fn inputs(r: &mut Ruby, inputs: &[String], secrets: bool) {
+    if !inputs.is_empty() {
+        r.comment("Values provided at launch (empty when unset).");
+        let fetch = |i: &String| Value::raw(format!("ENV.fetch({}, {})", Value::str(i), Value::str("")));
+        r.hash("INPUTS", inputs.iter().map(|i| (Value::str(i), fetch(i))));
+    }
+    if secrets || !inputs.is_empty() {
+        r.comment("A value as a provisioner's environment carries it: in base64, which no shell reads anything into.");
+        r.text("def isoloom_b64(value)\n  [value.to_s].pack(\"m0\")\nend\n");
+    }
+}
+
+/// A tool that can't reach the machines itself (macOS keeps third-party tools off the local
+/// network) sets `ISOLOOM_SSH_PROXY_COMMAND`, e.g. "/usr/bin/nc %h %p", and Vagrant's SSH goes
+/// through it. Unset: Vagrant connects directly.
+pub(crate) fn ssh_proxy(r: &mut Ruby, var: &str) {
+    let proxy = settings::SSH_PROXY_COMMAND.raw();
+    r.assign_if(&format!("{var}.ssh.proxy_command"), Value::raw(&proxy), &proxy);
+}
+
+/// libvirt names a domain `<prefix><machine>`, the prefix defaulting to the folder's name: the
+/// copy's own ([`isoloom_plan::Names::libvirt_prefix`]) keeps two environments', two instances'
+/// and two copies' domains apart.
+pub(crate) fn libvirt_prefix(r: &mut Ruby, var: &str, prefix: &HostName) {
+    r.block(Call::new(format!("{var}.vm.provider")).arg(Value::str("libvirt")), "v", |r| {
+        r.assign("v.default_prefix", host_name(prefix));
+    });
+}
+
+/// The Ruby hash of the host ports the runner chose for this run, read once at a VM Vagrantfile's
+/// top (see [`chosen_ports`]) under the variable's own name; each forwarded port looks its own
+/// number up in it.
+const HOSTPORTS: &str = settings::HOSTPORTS.name;
+
+/// The runner's chosen host ports, read once at the top of a VM's Vagrantfile: a JSON object
+/// `{"<machine>/<port>": <host port>}` in `ISOLOOM_HOSTPORTS`, empty when it set none (a run with
+/// no ephemeral port, or an older runner). Each forwarded port then defaults to its own `publish`
+/// number, so the file still works without it.
+pub(crate) fn chosen_ports(r: &mut Ruby) {
+    r.text("require \"json\"\n");
+    r.comment("The host ports the runner chose for this run; each forward defaults to its own number.");
+    r.assign(HOSTPORTS, Value::raw(format!("(JSON.parse({}) rescue {{}})", settings::HOSTPORTS.fetch())));
+}
+
+/// A published port's host number as the Vagrantfile reads it: the runner's choice for this run,
+/// looked up in [`HOSTPORTS`] by `key` (`"<machine>/<port>"`), else `publish` (a fixed port, or an
+/// older runner that forwards at the published number). Whatever takes the port from the host
+/// (its forward, Hyper-V's relay) takes this one expression, so none can disagree with another.
+pub(crate) fn chosen_host(key: &str, publish: u16) -> Value {
+    Value::raw(format!("{HOSTPORTS}.fetch({}, {publish})", Value::str(key)))
+}
+
+/// [`chosen_host`], unless the runner keeps the port from an earlier operation:
+/// `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>` ([`kept_port_variable`]) wins, so a parked
+/// environment's ports come back where they were (qemu, UTM and VMware forward afresh at each
+/// start).
+pub(crate) fn kept_or_chosen_host(machine: &str, guest: u16, protocol: Protocol, key: &str, publish: u16) -> Value {
+    let variable = kept_port_variable(machine, guest, protocol);
+    Value::raw(format!("ENV.fetch({}, {}).to_i", Value::str(&variable), chosen_host(key, publish)))
+}
+
+/// The variable a runner keeps machine `machine`'s host port of `guest` in:
+/// `HOST_PORT_<MACHINE>_<GUEST>_<PROTO>`, the machine's name upper-cased with every
+/// character other than `A`–`Z` and `0`–`9` written `_` (one each), the guest port in decimal,
+/// `TCP` or `UDP`.
+pub(crate) fn kept_port_variable(machine: &str, guest: u16, protocol: Protocol) -> String {
+    let name: String = machine
+        .chars()
+        .map(|c| c.to_ascii_uppercase())
+        .map(|c| if c.is_ascii_uppercase() || c.is_ascii_digit() { c } else { '_' })
+        .collect();
+    let proto = if protocol.is_tcp() { "TCP" } else { "UDP" };
+    format!("HOST_PORT_{name}_{guest}_{proto}")
+}
+
+/// A port forwarded from the host's loopback: `guest` in the VM to `host` on this machine (a
+/// number, or [`chosen_host`]'s lookup). UDP says so (vagrant-libvirt skips those, with a
+/// warning; the runner repeats it).
+pub(crate) fn forwarded_port(var: &str, guest: u16, host: impl Into<Value>, protocol: Protocol) -> Call {
+    let call = Call::new(format!("{var}.vm.network"))
+        .arg(Value::str("forwarded_port"))
+        .kw("guest", guest)
+        .kw("host", host)
+        .kw("host_ip", Value::str("127.0.0.1"));
+    if protocol.is_tcp() {
+        call
+    } else {
+        call.kw("protocol", Value::str("udp"))
+            .comment("not on libvirt: vagrant-libvirt skips UDP forwards")
+    }
+}
+
+/// The constraints' provisioner.
+pub(crate) const CONSTRAINTS: &str = "constraints";
+
+/// The spec's constraints (proxy, mirrors, NTP) as the VM's first provisioner, rendered by the
+/// plan's [`Step::Prelude`]. Nothing when the spec has none.
+pub(crate) fn prelude(r: &mut Ruby, env: &Environment, var: &str) {
+    if let Some(sh) = steps::linux(env, "", &Step::Prelude) {
+        r.provision(shell(var, CONSTRAINTS).kw("inline", Value::str(&sh)));
+    }
+}
+
+/// The ESXi host a VM goes on (vagrant-vmware-esxi), from the host's environment:
+/// `ESXI_HOSTNAME`, `ESXI_HOSTPORT`, `ESXI_USERNAME`, `ESXI_PASSWORD` and `ESXI_DATASTORE`.
+pub(crate) fn esxi_host(r: &mut Ruby) {
+    r.assign("v.esxi_hostname", Value::raw(settings::ESXI_HOSTNAME.fetch()));
+    r.assign("v.esxi_hostport", Value::raw(format!("{}.to_i", settings::ESXI_HOSTPORT.fetch())));
+    r.assign("v.esxi_username", Value::raw(settings::ESXI_USERNAME.fetch()));
+    r.assign("v.esxi_password", Value::str(&format!("env:{}", settings::ESXI_PASSWORD.name)));
+    let store = settings::ESXI_DATASTORE.raw();
+    r.assign_if("v.esxi_disk_store", Value::raw(&store), &store);
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::Protocol;
+
+    use super::{forwarded_port, inputs, kept_port_variable, ssh_proxy};
+    use crate::ruby::Ruby;
+
+    #[test]
+    fn the_kept_port_variable_names_the_machine_the_guest_port_and_the_protocol() {
+        assert_eq!(kept_port_variable("web", 80, Protocol::Tcp), "HOST_PORT_WEB_80_TCP");
+        assert_eq!(kept_port_variable("web-1.lab", 53, Protocol::Udp), "HOST_PORT_WEB_1_LAB_53_UDP");
+        // One `_` per character, a non-ASCII one too.
+        assert_eq!(kept_port_variable("web\u{b7}1", 8080, Protocol::Tcp), "HOST_PORT_WEB_1_8080_TCP");
+    }
+
+    #[test]
+    fn udp_forwards_say_libvirt_skips_them() {
+        assert_eq!(
+            forwarded_port("m", 53, 5353u16, Protocol::Udp).to_string(),
+            "m.vm.network \"forwarded_port\", guest: 53, host: 5353, host_ip: \"127.0.0.1\", protocol: \"udp\" # not on libvirt: vagrant-libvirt skips UDP forwards"
+        );
+        assert_eq!(
+            forwarded_port("config", 80, 8080u16, Protocol::Tcp).to_string(),
+            "config.vm.network \"forwarded_port\", guest: 80, host: 8080, host_ip: \"127.0.0.1\""
+        );
+    }
+
+    #[test]
+    fn inputs_are_read_from_the_host_and_handed_on_in_base64() {
+        let mut r = Ruby::new();
+        inputs(&mut r, &[], false);
+        ssh_proxy(&mut r, "config");
+        inputs(&mut r, &["TOKEN".into()], false);
+        assert_eq!(
+            r.finish(),
+            "config.ssh.proxy_command = ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"] if ENV[\"ISOLOOM_SSH_PROXY_COMMAND\"]\n# Values provided at launch (empty when unset).\nINPUTS = {\n  \"TOKEN\" => ENV.fetch(\"TOKEN\", \"\"),\n}\n# A value as a provisioner's environment carries it: in base64, which no shell reads anything into.\ndef isoloom_b64(value)\n  [value.to_s].pack(\"m0\")\nend\n"
+        );
+    }
+}

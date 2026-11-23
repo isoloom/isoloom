@@ -1,0 +1,97 @@
+//! Oracle Cloud: what its `cloud-vm` module ([`vm`]) and its `cloud-docker` module ([`docker`])
+//! share: the provider, the compartment, the availability domains, the shape every instance
+//! has, the Ubuntu images for it, and the VCN's way to the internet.
+
+pub(crate) mod docker;
+pub(crate) mod vm;
+
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, index, reference, string};
+use isoloom_plan::Environment;
+
+use super::Base;
+use crate::cloud::instance;
+use crate::module::Usage;
+use crate::module::variable::Variable;
+
+/// What Oracle Cloud's modules share: the compartment and who may reach the machines, its
+/// configuration, the compartment and region, the provider with the tags, and the user its
+/// (Ubuntu) images sign in as.
+pub(crate) const BASE: Base = Base {
+    cloud: crate::cloud::Cloud::Oci,
+    usage: |folder| Usage {
+        after: "# Auth:   the oci provider reads ~/.oci/config; region defaults, override with -var region=<id>.\n",
+        ..Usage::with_key(folder, "-var compartment_id=<compartment ocid> -var allowed_cidr=<your IP>/32 \\\n#           ")
+    },
+    variables: |region| {
+        vec![
+            Variable::new("compartment_id", "string").describe("The compartment the environment goes in"),
+            crate::cloud::region_variable(region).describe("The OCI region to launch in"),
+            profile(),
+        ]
+    },
+    provider,
+    user: |_| vm::USER,
+};
+
+/// The shape every instance has: AMD, sized by its configuration.
+pub(crate) const SHAPE: &str = "VM.Standard.E4.Flex";
+
+/// The provider, in the region, signing in with the OCI CLI configuration's profile, and the
+/// free-form tags every resource carries (`local.tags`).
+pub(crate) fn provider(env: &Environment, module: &mut Module) -> Vec<(&'static str, Expression)> {
+    module.block(
+        Block::builder("provider")
+            .add_label("oci")
+            .add_attribute(("region", reference("var.region")))
+            .add_attribute(("config_file_profile", reference("var.config_file_profile")))
+            .build(),
+    );
+    vec![("tags", instance::tags_when_set(env))]
+}
+
+/// The OCI CLI configuration's profile the provider reads (`~/.oci/config`), a variable so a run
+/// records it and its destroy uses the same.
+pub(crate) fn profile() -> Variable {
+    Variable::new("config_file_profile", "string")
+        .default(string("DEFAULT"))
+        .describe("The profile of the OCI CLI's configuration (~/.oci/config) the provider signs in with")
+}
+
+/// A resource or data source in the compartment.
+pub(crate) fn in_compartment(b: BlockBuilder) -> BlockBuilder {
+    b.add_attribute(("compartment_id", reference("var.compartment_id")))
+}
+
+/// One of the environment's resources: in the compartment, with its tags.
+pub(crate) fn owned(b: BlockBuilder) -> BlockBuilder {
+    in_compartment(b).add_attribute(("freeform_tags", reference("local.tags")))
+}
+
+/// The compartment's availability domains (`data.oci_identity_availability_domains.ads`).
+pub(crate) fn availability_domains() -> Block {
+    in_compartment(Block::builder("data").add_label("oci_identity_availability_domains").add_label("ads")).build()
+}
+
+/// The first availability domain's name: where the instances land.
+pub(crate) fn availability_domain() -> Expression {
+    attr(index(reference("data.oci_identity_availability_domains.ads.availability_domains"), 0), "name")
+}
+
+/// The newest Canonical Ubuntu `version` for the shape, `data.oci_core_images.<name>`.
+pub(crate) fn ubuntu_images(name: &str, version: &str) -> Block {
+    in_compartment(Block::builder("data").add_label("oci_core_images").add_label(name))
+        .add_attribute(("operating_system", string("Canonical Ubuntu")))
+        .add_attribute(("operating_system_version", string(version)))
+        .add_attribute(("shape", string(SHAPE)))
+        .add_attribute(("sort_by", string("TIMECREATED")))
+        .add_attribute(("sort_order", string("DESC")))
+        .build()
+}
+
+/// A route table's way out: the internet through the internet gateway.
+pub(crate) fn route_out() -> Block {
+    Block::builder("route_rules")
+        .add_attribute(("destination", string("0.0.0.0/0")))
+        .add_attribute(("network_entity_id", reference("oci_core_internet_gateway.env.id")))
+        .build()
+}

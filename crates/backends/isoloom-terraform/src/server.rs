@@ -1,0 +1,246 @@
+//! The targets on a server of your own: a Proxmox server
+//! ([`proxmox`]) and a standalone ESXi host ([`esxi`]). Both put the environment behind a router
+//! VM of their own ([`router`]), boot a machine's disk through the hypervisor's firmware
+//! ([`boot`]), name what they create after the environment's `slot` on the server
+//! ([`slotted`]), and seal their `internet: false` networks at the router once the machines are
+//! set up (`crate::seal`).
+
+pub(crate) mod boot;
+pub(crate) mod esxi;
+pub(crate) mod proxmox;
+pub(crate) mod router;
+
+use crate::hcl_builder::{Block, Expression, Module, Template, object, reference, string};
+use isoloom_plan::{Capabilities, Environment, Feature, MachinePlan};
+use isoloom_render::Error as RenderError;
+use isoloom_render::GeneratedFile;
+use isoloom_render::backend::Files;
+use isoloom_spec::images::is_windows;
+use isoloom_spec::model::Target;
+
+use crate::machine::{self, windows};
+use crate::module::providers::{self, Provider};
+use crate::module::variable::Variable;
+use crate::module::{ProjectCopy, Usage, inputs};
+use crate::{Result, checks};
+
+/// What a server target renders: the VM core's features (`machine::FEATURES`), and networks
+/// outside the environment (an existing bridge or port group, `external`, or the server's LAN,
+/// `bridged`) and a machine's own firmware (`vm.boot`, each target refusing what its hypervisor
+/// has no setting for).
+pub(crate) fn features() -> impl Iterator<Item = Feature> {
+    machine::FEATURES
+        .into_iter()
+        .chain([Feature::ExternalNetworks, Feature::BridgedNetworks, Feature::OwnBoot])
+}
+
+/// A server target's own parts, in the order its module writes them. The rest is the same on
+/// both servers: the module's folder (the target's id), its first lines, its file, then the
+/// check runners.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Parts {
+    /// The target.
+    pub(crate) target: Target,
+    /// Why it can't run the environment, if it can't.
+    pub(crate) refusal: fn(&Environment) -> Option<String>,
+    /// How to start its module (what `apply` takes, what the host needs), from its folder.
+    pub(crate) usage: for<'a> fn(&'a str) -> Usage<'a>,
+    /// How its machines get the project.
+    pub(crate) copy: ProjectCopy,
+    /// Everything before the router: the providers, the variables, the connection, the
+    /// networks.
+    pub(crate) base: fn(&Environment, &mut Module),
+    /// The router.
+    pub(crate) router: fn(&Environment, &mut Module),
+    /// The machines, and the controller.
+    pub(crate) guests: fn(&Environment, &mut Module),
+    /// The outputs.
+    pub(crate) outputs: fn(&Environment, &mut Module),
+}
+
+impl Parts {
+    /// The target's files, once the plan's requirements (`capabilities`) and its own refusal let
+    /// it: its module, then the check runners.
+    pub(crate) fn render(&self, capabilities: &Capabilities, env: &Environment) -> std::result::Result<Files, RenderError> {
+        let target = self.target;
+        crate::target::render(
+            target,
+            capabilities,
+            env,
+            || (self.refusal)(env),
+            || {
+                let mut files = vec![self.module(env)?];
+                files.extend(checks::runners(env, target.id()));
+                Ok(files)
+            },
+        )
+    }
+
+    /// Why the target can't run `env`: the plan's requirements it lacks (`capabilities`), else
+    /// its own refusal.
+    pub(crate) fn refusal(&self, capabilities: &Capabilities, env: &Environment) -> Option<String> {
+        crate::target::refusal(env, capabilities, || (self.refusal)(env))
+    }
+
+    /// The module, part by part.
+    fn module(&self, env: &Environment) -> Result<GeneratedFile> {
+        let folder = self.target.id();
+        let mut m = crate::module::start(&(self.usage)(folder));
+        for part in [self.base, self.router, self.guests, self.outputs] {
+            part(env, &mut m);
+        }
+        crate::module::file(self.target, folder, m, self.copy)
+    }
+}
+
+/// A server module's start: the `terraform` block requiring the server's providers (`own`, and
+/// `random` for the Windows machines' password), the server's `variables` (the values a runner
+/// passes at launch too), the values given at launch (`inputs`), then its `provider`.
+pub(crate) fn head(env: &Environment, module: &mut Module, own: &[Provider], variables: Vec<Variable>, provider: Block) {
+    let mut required = own.to_vec();
+    if windows::any(env) {
+        required.push(providers::RANDOM);
+    }
+    module.block(providers::terraform(&required));
+    module.blocks(variables.into_iter().map(Variable::block));
+    module.blocks(inputs::variables(env));
+    module.block(provider);
+}
+
+/// Why a server can't give a machine of `env` its secrets, if it can't: a Linux VM gets them from
+/// the module's variables (cloud-init: its snippet on Proxmox, its guestinfo user data on ESXi), but a
+/// Windows machine's set-up (cloudbase-init, the controller over WinRM) and a container's (an LXC
+/// container on Proxmox) have no step that takes them.
+pub(crate) fn secrets_refusal(env: &Environment) -> Option<String> {
+    env.machines.iter().find_map(|(name, mp)| {
+        let linux_vm = mp.shape == isoloom_plan::MachineShape::Vm && !mp.is_windows();
+        (!mp.secrets.is_empty() && !linux_vm)
+            .then(|| format!("machine `{name}` gets `secrets` (a secret's or an input's value as a file), which a server writes into a Linux VM only"))
+    })
+}
+
+/// A base OS image pinned to a dated release, with the checksum that verifies the download.
+///
+/// The server targets never emit a floating `latest`/`current` URL: an image is pinned to a
+/// dated snapshot so an environment generated today keeps booting the same OS build, and every download is
+/// verified against the checksum published for that build before it boots. A refresh changes the
+/// URL and its checksum together. Debian publishes SHA-512 sums, Ubuntu and the RPM families SHA-256.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PinnedImage {
+    /// The download URL, at a dated release (never `latest`/`current`).
+    pub(crate) url: &'static str,
+    /// The checksum algorithm the published sums use (`sha256` or `sha512`).
+    pub(crate) algorithm: &'static str,
+    /// The image's checksum, lowercase hex, as the published sums give it.
+    pub(crate) checksum: &'static str,
+}
+
+impl PinnedImage {
+    /// An image published with SHA-256 sums (Ubuntu, Rocky, AlmaLinux, CentOS).
+    pub(crate) const fn sha256(url: &'static str, checksum: &'static str) -> Self {
+        Self {
+            url,
+            algorithm: "sha256",
+            checksum,
+        }
+    }
+
+    /// An image published with SHA-512 sums (Debian).
+    pub(crate) const fn sha512(url: &'static str, checksum: &'static str) -> Self {
+        Self {
+            url,
+            algorithm: "sha512",
+            checksum,
+        }
+    }
+}
+
+/// The first Linux VM whose OS has no image on the server (`has`: whether the server has one for
+/// that OS and machine), with its OS.
+pub(crate) fn without_image(env: &Environment, has: impl Fn(&str, &MachinePlan) -> bool) -> Option<(&str, &str)> {
+    env.vms()
+        .find_map(|vm| (!is_windows(vm.os) && !has(vm.os, vm.plan)).then_some((vm.name, vm.os)))
+}
+
+/// Machine `name`'s own DNS settings (`dns:` in its spec), when it has them.
+pub(crate) fn dns_of<'e>(env: &'e Environment, name: &str) -> Option<&'e isoloom_spec::model::Dns> {
+    env.spec().machines.get(name)?.dns.as_ref()
+}
+
+/// Machine `name`'s own search domain (`dns.domain`), when it has one.
+pub(crate) fn domain_of<'e>(env: &'e Environment, name: &str) -> Option<&'e str> {
+    dns_of(env, name)?.domain.as_deref()
+}
+
+/// The resolvers machine `name` asks: its own (`dns.servers`; an AD member points at its domain
+/// controller), else the site's (`constraints.dns`, else a public one), so it can still install
+/// software. `None` asks for the site's alone: Isoloom's own VMs' (the router's, the
+/// controller's).
+pub(crate) fn resolvers(env: &Environment, name: Option<&str>) -> Vec<String> {
+    let own = name.and_then(|n| dns_of(env, n)).filter(|d| !d.servers.is_empty());
+    match own {
+        Some(d) => d.servers.clone(),
+        None => isoloom_spec::model::resolvers(env.constraints.as_ref())
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+    }
+}
+
+/// What starts most names the servers' modules give: `iso<slot><suffix>`.
+pub(crate) const ISO: &str = "iso";
+
+/// A name unique per environment on the server: `prefix`, the run's slot, `suffix`. The module
+/// writes it with the slot as `var.slot` ([`SlotName::hcl`]).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct SlotName<'a> {
+    prefix: &'a str,
+    suffix: &'a str,
+}
+
+/// The name `prefix`, slot, `suffix` (`iso${var.slot}-lan`, `i${var.slot}n0`).
+pub(crate) fn slot_name<'a>(prefix: &'a str, suffix: &'a str) -> SlotName<'a> {
+    SlotName { prefix, suffix }
+}
+
+impl SlotName<'_> {
+    /// The name in the module, after `var.slot`.
+    pub(crate) fn hcl(self) -> Expression {
+        Template::text(self.prefix)
+            .with_expr(reference("var.slot"))
+            .with_text(self.suffix)
+            .into_expression()
+    }
+}
+
+/// `iso<slot><suffix>` in the module ([`slot_name`] with [`ISO`]).
+pub(crate) fn slotted(suffix: &str) -> Expression {
+    slot_name(ISO, suffix).hcl()
+}
+
+/// `slot`, the environment's slot on the server: 1 by default, checked to be 1 to `max`, which its
+/// description starts with before `unique` (how unique it must be, and why).
+pub(crate) fn slot_variable(max: u64, unique: &str) -> Variable {
+    use crate::hcl_builder::{BinaryOperator, binary, number};
+    let v = || reference("var.slot");
+    let condition = binary(
+        binary(v(), BinaryOperator::GreaterEq, number(1)),
+        BinaryOperator::And,
+        binary(v(), BinaryOperator::LessEq, number(max)),
+    );
+    Variable::new("slot", "number")
+        .default(number(1))
+        .describe(&format!("1 to {max}, {unique}"))
+        .validated(condition, &format!("slot is 1 to {max}."))
+}
+
+/// The `isoloom` user cloud-init creates on a server's VMs, with `sudo` and the SSH keys
+/// `keys`.
+pub(crate) fn user(keys: Expression) -> Expression {
+    object([
+        ("name", string(crate::machine::USER)),
+        ("sudo", string("ALL=(ALL) NOPASSWD:ALL")),
+        ("shell", string("/bin/bash")),
+        ("ssh_authorized_keys", keys),
+    ])
+}

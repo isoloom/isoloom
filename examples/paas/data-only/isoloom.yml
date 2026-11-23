@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://www.isoloom.com/schema/v1.json
+# A spec of services alone (`services:`, the `paas` feature, a draft): a PostgreSQL database
+# published to the player's address, nothing else. A container or a VM where the target runs
+# machines, RDS, a flexible server or Cloud SQL on a cloud; its address in the resolved output.
+#
+# Not one of the examples every target generates: it needs Isoloom built with `--features paas`.
+version: 1
+name: data-only
+
+networks:
+  lab: { cidr: 10.31.0.0/24 }
+
+inputs:
+  PLAYER_IP: { sensitive: false, description: "Who may reach the database, e.g. 203.0.113.7/32." }
+
+secrets:
+  db-password: { env: DATA_DB_PASSWORD }
+
+services:
+  db:
+    kind: postgres
+    version: "16"
+    networks: { lab: 40 }
+    password: db-password
+    publish: { allow: PLAYER_IP }

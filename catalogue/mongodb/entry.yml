@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The mongodb entry: MongoDB, from its official image (7 on Debian 12), or MongoDB's own build of
+# an exact release (fastdl.mongodb.org's tarball, pinned by its SHA-256 in `vars`) installed the
+# same way in every form: a VM, or a container built from the OS's image, on the Ubuntu release
+# MongoDB built it for. It runs without authentication, as a lab database on a trusted network.
+# The build's entrypoint keeps the image's first-start contract: /docker-entrypoint-initdb.d, and
+# a root user when MONGO_INITDB_ROOT_USERNAME is set in the image's environment (which a
+# translated Dockerfile writes to /etc/isoloom/image.env). A root-credential setting for the
+# image's form is a follow-up: the official image reads the password file as its non-root
+# `mongodb` user, which Isoloom's root-only secret mount denies. lock.yml beside it is written only
+# by `cargo xtask catalogue refresh mongodb`, which pins the image's digest.
+name: mongodb
+description: >-
+  MongoDB, from its official image or MongoDB's own build of an exact release: it serves a
+  database on a trusted lab network, without authentication.
+upstream: https://www.mongodb.com/
+licence:
+  software: SSPL-1.0
+  notes: The official image bundles its base distribution's packages under those packages' own licences.
+
+# MongoDB's major series as the official image (its tag the series, `7`).
+releases:
+  - version: "7"
+    source: distro
+    os: [debian@12]
+# MongoDB's builds of the exact releases labs pin, each on the Ubuntu it was built for (with
+# mongosh for 6.0 and 7.0, whose builds ship no shell; the older ones ship `mongo`).
+  - version: "3.4.24"
+    source: download
+    os: [ubuntu@16.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-3.4.24.tgz", sha256: 0063c44b0d4985c63a0d05d0daac9c23fa01530b2f84222f5e63e34a875dac7a }
+  - version: "4.0.3"
+    source: download
+    os: [ubuntu@18.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-4.0.3.tgz", sha256: 52596194f0c56b01f01aba2f6116465ee1e5b4e5a3f2c6655d46136c521102f0 }
+  - version: "4.0.4"
+    source: download
+    os: [ubuntu@18.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-4.0.4.tgz", sha256: c9ed0c5dbe3cb942e59f9aab8f744dfb189d5bd225895a931147158b63736262 }
+  - version: "4.0.28"
+    source: download
+    os: [ubuntu@18.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-4.0.28.tgz", sha256: bd651ec85c2e6bfb496b322595070d8fd71a3c448dcd5142070795dde81a2872 }
+  - version: "4.2.25"
+    source: download
+    os: [ubuntu@18.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-4.2.25.tgz", sha256: e3ee07f47462246018fabbe5ad223293bcc262310a5381c1d774c93e04a861b1 }
+  - version: "4.4.29"
+    source: download
+    os: [ubuntu@18.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-4.4.29.tgz", sha256: d9b707a81bcb9bf01ce8772c11bfdd9fe4e0d719229e25578208bb6caae06d41 }
+  - version: "6.0.2"
+    source: download
+    os: [ubuntu@18.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1804-6.0.2.tgz", sha256: dbd71a349df67a59b1899377f6f0e9449cdb32440a71033a766711150f4759b9 }
+  - version: "7.0.26"
+    source: download
+    os: [ubuntu@20.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2004-7.0.26.tgz", sha256: 5205a477797abbf8fd8f36bdd5464b21fd810d85ca67cf12364b81f3baf739e3 }
+  - version: "7.0.28"
+    source: download
+    os: [ubuntu@20.04]
+    vars: { url: "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu2004-7.0.28.tgz", sha256: 44cb0962d2e4d66a4d5a67b17254ef85e534e69463510f18eec99e999303f650 }
+default: "7"
+
+images:
+  debian@12: docker.io/library/mongo:{{ version }}
+
+ports:
+  mongodb: { port: 27017, protocol: tcp }
+
+data:
+  data: /data/db
+
+# The builds' form (every download release): never the official image, whose own entrypoint is
+# its first start.
+recipe:
+  install:
+    - packages: [ca-certificates, libcurl3, openssl, procps, util-linux]
+      when: { os: [ubuntu@16.04] }
+    - packages: [ca-certificates, libcurl4, openssl, procps, util-linux]
+      when: { os: [ubuntu@18.04, ubuntu@20.04] }
+    - file: { path: /var/cache/isoloom/mongodb.tgz, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+    - command: "sh -c 'mkdir -p /usr/local/mongodb && tar -xzf /var/cache/isoloom/mongodb.tgz --strip-components=1 -C /usr/local/mongodb && for b in /usr/local/mongodb/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
+      creates: /usr/local/mongodb/bin/mongod
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+    # The 6.0 and 7.0 builds ship no shell (the official images add mongosh): MongoDB's own
+    # mongosh build, pinned by its SHA-256, as the image has it.
+    - file: { path: /var/cache/isoloom/mongosh.tgz, url: "https://downloads.mongodb.com/compass/mongosh-2.14.2-linux-x64.tgz", sha256: 1523e16da7c6902333b681bf65d83bbef59bff558c46ac5636371d13beb4de53 }
+      when: { release: ["6.0", "7.0"] }
+    - command: "sh -c 'mkdir -p /usr/local/mongosh && tar -xzf /var/cache/isoloom/mongosh.tgz --strip-components=1 -C /usr/local/mongosh && ln -sf /usr/local/mongosh/bin/mongosh /usr/local/bin/mongosh'"
+      creates: /usr/local/mongosh/bin/mongosh
+      when: { release: ["6.0", "7.0"] }
+    - group: { name: mongodb, system: true }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+    - user: { name: mongodb, group: mongodb, system: true, home: /data/db, shell: /bin/false }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+
+  configure:
+    - file: { path: /data/db, state: directory, owner: mongodb, group: mongodb, mode: "0750" }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+    - file: { path: /docker-entrypoint-initdb.d, state: directory, mode: "0755" }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+    - template: { from: files/docker-entrypoint.sh, to: /usr/local/bin/docker-entrypoint.sh, mode: "0755" }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    - service: { name: mongodb, run: [/usr/local/bin/docker-entrypoint.sh, mongod] }
+      when: { os: [ubuntu@16.04, ubuntu@18.04, ubuntu@20.04] }
+
+  start: []

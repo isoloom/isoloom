@@ -1,0 +1,63 @@
+//! Generation across the backends, from the repository's examples and specs written in the
+//! tests: what each target writes, what it refuses and why, the resolved snapshot, its reports,
+//! the way the composition root puts them together.
+
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the tests run the binary and the tools that check its output: test code, not an adapter"
+)]
+
+mod appliances;
+mod chart;
+mod checks;
+mod clones;
+mod cloud_docker;
+mod cloud_vm_aws_kali;
+mod cloud_vm_azure;
+mod cloud_vm_digitalocean;
+mod cloud_vm_gcp;
+mod cloud_vm_linode;
+mod cloud_vm_oci;
+mod cloud_windows_secrets;
+mod constraints;
+mod defaults;
+mod determinism;
+mod disk;
+mod every_example;
+mod external;
+mod forwarding;
+mod generate;
+mod groups;
+mod guides;
+mod hardware;
+mod helper_images;
+mod host_folders;
+mod inbound;
+mod instance;
+mod machine_settings;
+mod managed;
+mod message;
+mod own_image_boot;
+#[cfg(feature = "paas")]
+mod paas;
+mod possible;
+mod project_copy;
+mod proxmox_controller;
+mod quoting;
+mod readme;
+mod reboot;
+mod report;
+mod reserved_names;
+mod resolved;
+mod server_slot;
+mod shared_volumes;
+mod spaced_paths;
+mod tags;
+mod tc;
+mod testing;
+mod tools;
+mod true_forms;
+mod trunks;
+mod vagrant_providers;
+mod vagrantfile;
+mod windows_names;

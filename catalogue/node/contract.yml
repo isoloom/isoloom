@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What node does, proven on both forms: the release asked for answers as `node`, with npm.
+cases:
+  default: {}
+
+checks:
+  - name: node reports the release asked for
+    exec: node --version
+    expect: "{{ version }}"
+  - name: npm answers
+    exec: npm --version
+    expect: "."
+
+facts:
+  - name: the runtime
+    exec: node --version

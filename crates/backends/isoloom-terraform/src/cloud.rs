@@ -1,0 +1,162 @@
+//! The clouds: the [`Cloud`]s the modules run on, what every cloud module shares (its head: the
+//! operator's variables, the provider, the environment's instance; the auto-stop), the targets
+//! on them (`cloud-vm`, `cloud-docker`), and each cloud's own folder: its
+//! pieces for both targets, and its driver of each (`<cloud>::vm::DRIVER`,
+//! `<cloud>::docker::DRIVER`), which holds only what the cloud does its own way.
+
+pub(crate) mod auto_stop;
+pub(crate) mod aws;
+pub(crate) mod azure;
+pub(crate) mod digitalocean;
+pub(crate) mod docker;
+pub(crate) mod gcp;
+pub(crate) mod instance;
+pub(crate) mod linode;
+pub(crate) mod oci;
+pub(crate) mod operator;
+pub(crate) mod user_data_limit;
+pub(crate) mod vm;
+
+use std::fmt;
+
+use crate::hcl_builder::{Expression, Module};
+use isoloom_plan::Environment;
+
+use crate::module::variable::Variable;
+use crate::module::{ProjectCopy, Usage};
+
+/// A cloud the `cloud-vm` and `cloud-docker` modules run on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum Cloud {
+    /// Amazon Web Services.
+    Aws,
+    /// Microsoft Azure.
+    Azure,
+    /// Google Cloud.
+    Gcp,
+    /// DigitalOcean.
+    DigitalOcean,
+    /// Linode (Akamai).
+    Linode,
+    /// Oracle Cloud Infrastructure.
+    Oci,
+}
+
+impl Cloud {
+    /// Every cloud, in the order the modules are written: AWS first.
+    pub const ALL: [Cloud; 6] = [Cloud::Aws, Cloud::Azure, Cloud::Gcp, Cloud::DigitalOcean, Cloud::Linode, Cloud::Oci];
+
+    /// Its id: its module's folder under the target's (`.isoloom/cloud-vm/aws/`), as a
+    /// refusal names it.
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        match self {
+            Cloud::Aws => "aws",
+            Cloud::Azure => "azure",
+            Cloud::Gcp => "gcp",
+            Cloud::DigitalOcean => "digitalocean",
+            Cloud::Linode => "linode",
+            Cloud::Oci => "oci",
+        }
+    }
+
+    /// The region its modules default to when the person's defaults set none (`isoloom defaults
+    /// --system` shows them): Paris where the cloud has one, else the nearest.
+    #[must_use]
+    pub const fn default_region(self) -> &'static str {
+        match self {
+            Cloud::Aws => "eu-west-3",
+            Cloud::Azure => "swedencentral",
+            Cloud::Gcp => "europe-west9",
+            Cloud::DigitalOcean => "fra1",
+            Cloud::Linode => "fr-par",
+            Cloud::Oci => "eu-paris-1",
+        }
+    }
+
+    /// Its modules' region for `env`: the one the person's defaults set
+    /// (`Environment::regions`), else its own.
+    pub(crate) fn region(self, env: &Environment) -> &str {
+        env.regions.get(self.id()).map_or(self.default_region(), String::as_str)
+    }
+
+    /// Its name, as a sentence says it (`Google Cloud`).
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Cloud::Aws => "AWS",
+            Cloud::Azure => "Azure",
+            Cloud::Gcp => "Google Cloud",
+            Cloud::DigitalOcean => "DigitalOcean",
+            Cloud::Linode => "Linode",
+            Cloud::Oci => "Oracle Cloud",
+        }
+    }
+}
+
+/// A cloud's provider in its modules: writes the provider's configuration, and gives the locals
+/// it adds to the environment's (`instance::id_and_locals`).
+pub(crate) type ProviderConfig = fn(&Environment, &mut Module) -> Vec<(&'static str, Expression)>;
+
+/// What a cloud's modules share on both targets (`cloud-vm` and `cloud-docker`), so they never
+/// drift: how to start one, the cloud's variables, its provider, and the user each OS's image
+/// signs in as (`<cloud>::BASE`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Base {
+    /// How to start its module (the settings `apply` takes, how it authenticates), from its
+    /// folder.
+    pub(crate) usage: for<'a> fn(&'a str) -> Usage<'a>,
+    /// The cloud.
+    pub(crate) cloud: Cloud,
+    /// Its variables before the operator's: where it runs (defaulting to the region given),
+    /// which account.
+    pub(crate) variables: fn(&str) -> Vec<Variable>,
+    /// Its provider's configuration.
+    pub(crate) provider: ProviderConfig,
+    /// The user the operator's key logs in as on a machine of this OS, from the cloud's image
+    /// table (it has `sudo`, or is root).
+    pub(crate) user: fn(&str) -> &'static str,
+}
+
+/// Why no cloud takes an environment, when none does, from each cloud's refusal (`None`: it
+/// takes it): each reason, the clouds sharing one named together. `None` as soon as one cloud
+/// takes it.
+pub(crate) fn none_takes(refusals: Vec<(Cloud, Option<String>)>) -> Option<String> {
+    let mut reasons: Vec<(Vec<&str>, String)> = Vec::new();
+    for (cloud, why) in refusals {
+        let why = why?;
+        match reasons.iter_mut().find(|(_, r)| *r == why) {
+            Some((clouds, _)) => clouds.push(cloud.id()),
+            None => reasons.push((vec![cloud.id()], why)),
+        }
+    }
+    let parts: Vec<String> = reasons.into_iter().map(|(clouds, why)| format!("{}: {why}", clouds.join(", "))).collect();
+    Some(format!("no cloud can run it ({})", parts.join("; ")))
+}
+
+/// A cloud module's `region` variable, defaulting to `region` ([`Cloud::region`]).
+pub(crate) fn region_variable(region: &str) -> Variable {
+    Variable::new("region", "string").default(crate::hcl_builder::string(region))
+}
+
+impl Base {
+    /// Its variables for `env`: the region defaulting to [`Cloud::region`].
+    pub(crate) fn variables(&self, env: &Environment) -> Vec<Variable> {
+        (self.variables)(self.cloud.region(env))
+    }
+}
+
+/// A cloud module's start after its `terraform` block, the same on every cloud and target: the
+/// cloud's `variables`, the operator's, then its provider and the environment's id and locals.
+pub(crate) fn head(env: &Environment, module: &mut Module, variables: Vec<Variable>, provider: ProviderConfig, copy: ProjectCopy) {
+    module.blocks(variables.into_iter().chain(operator::host_reaching()).map(Variable::block));
+    let locals = provider(env, module);
+    module.blocks(instance::id_and_locals(env, locals, copy));
+}
+
+impl fmt::Display for Cloud {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}

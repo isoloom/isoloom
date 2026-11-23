@@ -1,0 +1,162 @@
+//! What a machine runs from on a target: a container image (published, or built from the
+//! project's Dockerfile or from the steps Isoloom turns into one) or a VM's OS.
+
+use indexmap::IndexMap;
+use isoloom_spec::model::{BaseImage, Machine, Spec};
+
+use crate::configure::{ContainerProcess, Recipe};
+
+use super::MachineShape;
+use crate::images::{Images, tag_of};
+
+/// What a machine runs from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Image {
+    /// A container image.
+    Container {
+        /// The reference to run (pulled through a mirror when one is set; a built image's tag).
+        reference: String,
+        /// How the project builds it, if it does.
+        build: Option<Build>,
+        /// Whether `reference` is a published image, pullable from a registry (`app.image` was
+        /// given: an image-only machine, or the build+image combo), rather than a tag the project
+        /// only builds locally. When it is, a run pulls it before falling back to the build, so a
+        /// user runs the published image instead of building it.
+        published: bool,
+    },
+    /// A VM's operating system.
+    Vm {
+        /// The OS id (`ubuntu-24.04`, `windows-2022`...).
+        os: String,
+    },
+}
+
+/// A container image the project builds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Build {
+    /// The project's own Dockerfile (`app.build`).
+    Own {
+        /// The build context, from the project folder.
+        context: String,
+        /// The Dockerfile, from the project folder, when not the context's own.
+        dockerfile: Option<String>,
+        /// The Dockerfile's stage to build, when not its last.
+        target: Option<String>,
+        /// The spec's build arguments.
+        args: IndexMap<String, String>,
+    },
+    /// A Dockerfile Isoloom generates from the machine's recipe ([`super::MachinePlan::recipe`]),
+    /// built with the project folder as its context. Where it is written is the renderer's
+    /// (`isoloom_render::configure::dockerfile::path`).
+    Generated {
+        /// The image it starts `FROM`: the OS's official image, pinned by digest.
+        base: String,
+        /// What the container runs: Isoloom's supervisor as its entrypoint for its services, its own
+        /// command, or nothing (idle).
+        process: ContainerProcess,
+    },
+}
+
+/// What machine `name` runs from on the target, in `shape`, its configuration resolved as
+/// `recipe`.
+pub(super) fn of(spec: &Spec, shape: MachineShape, name: &str, m: &Machine, recipe: Option<&Recipe>) -> Option<Image> {
+    match shape {
+        MachineShape::Container => {
+            let d = m.docker.as_ref()?;
+            let tag = tag_of(spec, name, d.image.as_deref());
+            let own = d.build.as_ref().map(|context| Build::Own {
+                context: context.clone(),
+                dockerfile: d.dockerfile.clone(),
+                target: d.target.clone(),
+                args: d.args.clone(),
+            });
+            let generated = d.generated.as_ref().map(|g| Build::Generated {
+                base: g.base.clone(),
+                process: match (g.from, &g.after_start) {
+                    // An entry's official image keeps its own entrypoint and command, after the
+                    // entry's `start` steps when Isoloom's supervisor runs them.
+                    (BaseImage::Entry, Some(image)) => ContainerProcess::Started {
+                        entrypoint: image.entrypoint.clone(),
+                        command: image.command.clone(),
+                    },
+                    (BaseImage::Entry, None) => ContainerProcess::Image,
+                    // Lowering refuses a container whose services it can't run, so the validated
+                    // spec `build` plans resolves; no recipe at all is an idle container.
+                    _ => recipe.map_or(ContainerProcess::Idle, |r| {
+                        let process = ContainerProcess::resolve(r, m.command.as_ref(), !m.ports.is_empty());
+                        debug_assert!(
+                            process.is_ok(),
+                            "machine `{name}`: lowering let through a process that doesn't resolve: {process:?}"
+                        );
+                        process.unwrap_or(ContainerProcess::Idle)
+                    }),
+                },
+            });
+            Some(Image::Container {
+                reference: Images::of(spec).pull(&tag),
+                build: own.or(generated),
+                published: d.image.is_some(),
+            })
+        }
+        MachineShape::Vm => m.vm.as_ref().map(|vm| Image::Vm { os: vm.os.clone() }),
+        MachineShape::Supplied | MachineShape::External => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::Target;
+
+    use super::{Build, Image};
+    use crate::configure::ContainerProcess;
+    use crate::testing;
+
+    #[test]
+    fn a_container_runs_its_image_its_build_or_the_one_isoloom_generates_and_a_vm_its_os() {
+        let env = testing::environment(
+            "version: 1\nname: lab\nmachines:\n  pub: { app: { image: nginx } }\n  own: { app: { build: { context: web, dockerfile: web/Dockerfile.dev, target: prod, args: { A: '1' } } } }\n  gen: { os: debian@12, app: { steps: [{ packages: [curl] }] } }\n  user: { access: true }\n",
+            Target::Docker,
+        );
+        let image = |m: &str| env.machines.get(m).and_then(|m| m.image.clone());
+        assert_eq!(
+            image("pub"),
+            Some(Image::Container {
+                reference: "nginx".into(),
+                build: None,
+                published: true,
+            })
+        );
+        let Some(Image::Container {
+            reference,
+            build: Some(Build::Own {
+                context,
+                dockerfile,
+                target,
+                args,
+            }),
+            published: false,
+        }) = image("own")
+        else {
+            panic!("a build of the project's own, with no published image")
+        };
+        assert_eq!(
+            (reference.as_str(), context.as_str(), dockerfile.as_deref(), target.as_deref()),
+            ("localhost/isoloom/lab-own", "web", Some("web/Dockerfile.dev"), Some("prod"))
+        );
+        assert_eq!(args.get("A").map(String::as_str), Some("1"));
+        let Some(Image::Container {
+            reference: generated,
+            build: Some(Build::Generated { base, process }),
+            published: false,
+        }) = image("gen")
+        else {
+            panic!("a generated build, with no published image")
+        };
+        assert_eq!(generated, "localhost/isoloom/lab-gen");
+        assert!(base.starts_with("debian:12@sha256:"));
+        assert_eq!(process, ContainerProcess::Idle, "nothing to run: kept idle");
+        assert_eq!(image("user"), None, "a supplied machine runs from nothing of ours");
+        let vm = testing::environment("version: 1\nname: lab\nmachines:\n  m: { os: debian@12 }\n", Target::Vagrant);
+        assert_eq!(vm.machines.get("m").and_then(|m| m.image.clone()), Some(Image::Vm { os: "debian-12".into() }));
+    }
+}

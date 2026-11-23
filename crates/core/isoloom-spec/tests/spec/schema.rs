@@ -1,0 +1,116 @@
+//! The JSON Schema editors use agrees with the parser: every example is valid, typos are
+//! caught, the examples point editors to it, and the committed copy
+//! (`schemas/spec-v1.schema.json`) is the one the types generate.
+
+use isoloom_spec::schema::{MODELINE, schema};
+
+use crate::testing::{Outcome, workspace};
+
+// The committed file is the spec as the binary reads it, the paas feature off: with it on, the
+// services make it another.
+#[cfg(not(feature = "paas"))]
+#[test]
+fn the_committed_schema_is_current() {
+    // The committed schema is written by the catalogue, which adds each entry's `with:` rule.
+    const WRITE: &str = "ISOLOOM_WRITE_FIXTURES=1 cargo test -p isoloom-catalogue --test catalogue the_generated_schemas_are_current";
+    let committed = workspace().join("schemas/spec-v1.schema.json");
+    let on_disk: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(committed).unwrap_or_default()).unwrap_or_default();
+    // The catalogue adds one rule per entry (`with:` follows its settings); the rest is the
+    // spec's own.
+    let mut own = on_disk;
+    if let Some(machine) = own.pointer_mut("/$defs/Machine").and_then(serde_json::Value::as_object_mut) {
+        machine.remove("allOf");
+    }
+    assert!(own == schema(), "schemas/spec-v1.schema.json is out of date: run `{WRITE}`");
+}
+
+/// Every example of the project: its folder's name and its spec's text.
+fn examples() -> Outcome<Vec<(String, String)>> {
+    let dir = workspace().join("examples");
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if let (Some(name), Ok(text)) = (path.file_name(), std::fs::read_to_string(path.join("isoloom.yml"))) {
+            out.push((name.to_string_lossy().into_owned(), text));
+        }
+    }
+    Ok(out)
+}
+
+/// A validator of the spec's schema.
+fn validator() -> Outcome<jsonschema::Validator> {
+    Ok(jsonschema::validator_for(&schema())?)
+}
+
+#[test]
+fn every_example_is_valid_against_the_schema() -> Outcome {
+    let v = validator()?;
+    for (name, text) in examples()? {
+        let doc: serde_json::Value = serde_yaml_ng::from_str(&text).unwrap();
+        let errors: Vec<String> = v.iter_errors(&doc).map(|e| format!("{} at {}", e, e.instance_path())).collect();
+        assert!(errors.is_empty(), "{name}: {errors:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_schema_catches_what_editors_should_flag() -> Outcome {
+    let v = validator()?;
+    for bad in [
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, ap: { image: x } } }\n",
+        "version: 2\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, app: { image: x } } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, docker: { image: x } } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, os: windows-95 } }\n",
+        "version: 1\nname: x\nnetworks: { lab: { cidr: 10.0.0.0/24 } }\nmachines: { a: { networks: { lab: 5 }, os: debian@12, ports: [{ port: 80 }] } }\n",
+    ] {
+        let doc: serde_json::Value = serde_yaml_ng::from_str(bad).unwrap();
+        assert!(!v.is_valid(&doc), "should be flagged: {bad}");
+    }
+    Ok(())
+}
+
+/// The editor refuses a name `isoloom validate` refuses as too long (its own tests hold it to
+/// these lengths), and takes the longest it accepts: the environment's (55), a machine's (55) and
+/// a network's (63).
+#[test]
+fn the_schema_holds_names_to_the_lengths_validate_does() -> Outcome {
+    let v = validator()?;
+    let spec = |name: &str, machine: &str, network: &str| -> Outcome<serde_json::Value> {
+        let text = format!(
+            "version: 1\nname: {name}\nnetworks: {{ {network}: {{ cidr: 10.0.0.0/24 }} }}\nmachines: {{ {machine}: {{ networks: {{ {network}: 5 }}, os: debian@12 }} }}\n"
+        );
+        Ok(serde_yaml_ng::from_str(&text)?)
+    };
+    let (n55, n56, n63, n64) = ("n".repeat(55), "n".repeat(56), "n".repeat(63), "n".repeat(64));
+    assert!(v.is_valid(&spec(&n55, &n55, &n63)?));
+    for (name, machine, network) in [(&n56, &n55, &n63), (&n55, &n56, &n63), (&n55, &n55, &n64)] {
+        let doc = spec(name, machine, network)?;
+        assert!(!v.is_valid(&doc), "should be flagged: {doc}");
+    }
+    Ok(())
+}
+
+/// Regression: the schema took a VLAN id up to 9999 while validation refuses past 4094.
+#[test]
+fn the_schema_holds_vlan_ids_to_the_range_validate_does() -> Outcome {
+    let v = validator()?;
+    let spec = |id: u16| -> Outcome<serde_json::Value> {
+        let text = format!("version: 1\nname: v\nnetworks: {{ lan: {{ cidr: 10.0.0.0/16, vlans: {{ {id}: {{ cidr: 10.0.1.0/24 }} }} }} }}\n");
+        Ok(serde_yaml_ng::from_str(&text)?)
+    };
+    for id in [1, 9, 10, 99, 100, 999, 1000, 3999, 4000, 4089, 4090, 4094] {
+        assert!(v.is_valid(&spec(id)?), "{id} is a VLAN id");
+    }
+    for id in [0, 4095, 4099, 4100, 5000, 9999] {
+        assert!(!v.is_valid(&spec(id)?), "{id} isn't a VLAN id");
+    }
+    Ok(())
+}
+
+#[test]
+fn examples_point_editors_to_the_schema() -> Outcome {
+    for (name, text) in examples()? {
+        assert_eq!(text.lines().next(), Some(MODELINE), "{name}: first line should be the schema modeline");
+    }
+    Ok(())
+}

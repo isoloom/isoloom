@@ -1,0 +1,8 @@
+# A container built from a context the test makes a link out of the project: refused.
+version: 1
+name: build-context-link
+networks: { lan: { cidr: 10.0.0.0/24 } }
+machines:
+  web:
+    networks: { lan: 10 }
+    app: { build: ctx }

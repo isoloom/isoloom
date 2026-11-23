@@ -1,0 +1,325 @@
+//! The shell rendering: each step kind's library call, its arguments quoted, and the VM's
+//! set-up step around them.
+
+use isoloom_plan::configure::Family;
+use isoloom_spec::model::Target;
+
+use super::super::compact;
+use super::*;
+use crate::testing;
+
+/// Each step's call of a machine on `os` with `steps`, in order (`None` for a step the library
+/// doesn't run).
+fn calls(os: &str, steps: &str) -> Vec<Option<String>> {
+    calls_with(os, steps, &[])
+}
+
+/// As [`calls`], with the project's template texts.
+fn calls_with(os: &str, steps: &str, templates: &[(&str, &str)]) -> Vec<Option<String>> {
+    let m = format!("os: {os}, ports: {{ web: 80, dns: {{ port: 53, protocol: udp }} }}, app: {{ steps: {steps} }}");
+    testing::rendered(&m, Target::Vagrant, templates, call)
+}
+
+/// The one call of a machine on `os` with `step`.
+fn one(os: &str, step: &str) -> String {
+    calls(os, &format!("[{step}]")).remove(0).expect("a library call")
+}
+
+const KEY: &str = "key: { url: \"https://nginx.org/keys/nginx_signing.key\", sha256: 4c3f000000000000000000000000000000000000000000000000000000000000 }";
+
+#[test]
+fn packages_are_installed_by_name_or_at_their_version() {
+    assert_eq!(
+        one("debian@12", "{ packages: [curl, { name: nginx, version: 1.30.6-1~bookworm }] }"),
+        "isoloom_packages 'curl' 'nginx=1.30.6-1~bookworm'\n"
+    );
+}
+
+#[test]
+fn a_repository_is_of_the_kind_of_its_family() {
+    let apt = one(
+        "debian@12",
+        &format!("{{ repository: {{ name: nginx, url: \"https://nginx.org/packages/debian\", components: [nginx], {KEY} }} }}"),
+    );
+    assert_eq!(
+        apt,
+        "isoloom_repository 'apt' 'nginx' 'https://nginx.org/packages/debian' 'https://nginx.org/keys/nginx_signing.key' '4c3f000000000000000000000000000000000000000000000000000000000000' '' 'bookworm' 'nginx'\n"
+    );
+    let rpm = one(
+        "rocky@9",
+        &format!("{{ repository: {{ name: nginx, url: \"https://nginx.org/packages/centos/9/x86_64/\", priority: 10, {KEY} }} }}"),
+    );
+    assert_eq!(
+        rpm,
+        "isoloom_repository 'rpm' 'nginx' 'https://nginx.org/packages/centos/9/x86_64/' 'https://nginx.org/keys/nginx_signing.key' '4c3f000000000000000000000000000000000000000000000000000000000000' '10'\n",
+        "no suite or components on rpm"
+    );
+    let apk = one(
+        "alpine@3.19",
+        &format!("{{ repository: {{ name: edge, url: \"https://dl-cdn.alpinelinux.org/alpine/edge/main\", {KEY} }} }}"),
+    );
+    assert_eq!(
+        apk,
+        "isoloom_repository 'apk' 'edge' 'https://dl-cdn.alpinelinux.org/alpine/edge/main' 'https://nginx.org/keys/nginx_signing.key' '4c3f000000000000000000000000000000000000000000000000000000000000' ''\n"
+    );
+}
+
+#[test]
+fn copies_and_files_carry_their_owner_group_and_mode() {
+    assert_eq!(
+        one("debian@12", "{ copy: { from: site/, to: /var/www/, owner: www-data, mode: \"0755\" } }"),
+        "isoloom_copy 'site/' '/var/www/' 'www-data' '' '0755'\n"
+    );
+    assert_eq!(
+        one("debian@12", "{ file: { path: /srv/data, state: directory, owner: app, mode: \"0750\" } }"),
+        "isoloom_file '/srv/data' 'app' '' '0750' 'directory'\n"
+    );
+    assert_eq!(
+        one("debian@12", "{ file: { path: /srv/old, state: absent } }"),
+        "isoloom_file '/srv/old' '' '' '' 'absent'\n"
+    );
+    assert_eq!(
+        one("debian@12", "{ file: { path: /srv/current, link: /srv/v2 } }"),
+        "isoloom_file '/srv/current' '' '' '' 'link' '/srv/v2'\n"
+    );
+    let sha = "9f2c".to_owned() + &"0".repeat(60);
+    assert_eq!(
+        one(
+            "debian@12",
+            &format!("{{ file: {{ path: /opt/tool.tgz, url: \"https://example.org/tool.tgz\", sha256: {sha} }} }}")
+        ),
+        format!("isoloom_file '/opt/tool.tgz' '' '' '' 'download' 'https://example.org/tool.tgz' '{sha}'\n")
+    );
+}
+
+#[test]
+fn a_download_per_architecture_passes_each_ones_url_and_checksum() {
+    let (a, b) = ("a".repeat(64), "b".repeat(64));
+    assert_eq!(
+        one(
+            "debian@12",
+            &format!(
+                "{{ file: {{ path: /opt/db.tar, url: {{ amd64: \"https://example.org/x86_64.tar\", arm64: \"https://example.org/aarch64.tar\" }}, sha256: {{ amd64: {a}, arm64: {b} }} }} }}"
+            )
+        ),
+        format!(
+            "isoloom_file '/opt/db.tar' '' '' '' 'download-arch' 'amd64' 'https://example.org/x86_64.tar' '{a}' 'arm64' 'https://example.org/aarch64.tar' '{b}'\n"
+        )
+    );
+}
+
+/// The library downloads the file of the machine's architecture (`uname -m`'s, by a spec's
+/// name), and fails a machine none is for.
+#[cfg(unix)]
+#[test]
+fn the_library_downloads_the_file_of_the_machines_architecture() {
+    let run = |machine: &str| {
+        // `uname` and the download stand in for the machine's: the choice is what is checked.
+        let stubs = format!("uname() {{ echo {machine}; }}\nisoloom_download() {{ echo \"$1 $2 $3\"; }}\n");
+        let call = "isoloom_file /opt/db.tar '' '' '' download-arch amd64 https://x/x86_64 aaa arm64 https://x/aarch64 bbb";
+        std::process::Command::new("sh")
+            .args(["-c", &format!("{LIBRARY}\n{stubs}{call}")])
+            .output()
+            .expect("sh runs")
+    };
+    for (machine, fetched) in [
+        ("x86_64", "https://x/x86_64 /opt/db.tar aaa\n"),
+        ("aarch64", "https://x/aarch64 /opt/db.tar bbb\n"),
+    ] {
+        let out = run(machine);
+        assert!(out.status.success(), "{machine}: {}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(String::from_utf8_lossy(&out.stdout), fetched, "{machine}");
+    }
+    let other = run("riscv64");
+    assert!(!other.status.success());
+    assert!(
+        String::from_utf8_lossy(&other.stderr).contains("no download for this machine's architecture (riscv64)"),
+        "{}",
+        String::from_utf8_lossy(&other.stderr)
+    );
+}
+
+#[test]
+fn a_template_goes_in_filled_and_encoded() {
+    let found = calls_with(
+        "debian@12",
+        "[{ template: { from: conf/app.toml, to: /etc/app.toml, group: app, mode: \"0640\" } }]",
+        &[("conf/app.toml", "name = '{{ machine.name }}'\n")],
+    );
+    let encoded = isoloom_spec::shell::base64(b"name = 'm'\n");
+    assert_eq!(
+        found[0].as_deref(),
+        Some(format!("isoloom_template '/etc/app.toml' '' 'app' '0640' '{encoded}'\n").as_str())
+    );
+    let unread = calls("debian@12", "[{ template: { from: conf/app.toml, to: /etc/app.toml } }]");
+    assert_eq!(
+        unread[0].as_deref(),
+        Some("isoloom_fail 'the template conf/app.toml wasn'\\''t in the project when the files were generated: add it, then generate again'\n"),
+        "the set-up stops, saying why"
+    );
+}
+
+#[test]
+fn users_and_groups_carry_their_fields_and_a_hashed_password() {
+    let user = one(
+        "debian@12",
+        "{ user: { name: alice, uid: 1500, group: ops, groups: [sudo, adm], home: /home/alice, shell: /bin/bash, password: winter } }",
+    );
+    // The password goes in hashed, the same for the same lab, machine and user.
+    let hashed = super::super::password::hash("lab", "m", "alice", "winter");
+    assert_eq!(
+        user,
+        format!("isoloom_user 'alice' '1500' 'ops' 'sudo,adm' '/home/alice' '/bin/bash' 'no' '{hashed}'\n")
+    );
+    assert_eq!(
+        one("debian@12", "{ user: { name: svc, system: true } }"),
+        "isoloom_user 'svc' '' '' '' '' '' 'yes' ''\n"
+    );
+    assert_eq!(one("debian@12", "{ group: { name: ops, gid: 1600 } }"), "isoloom_group 'ops' '1600' 'no'\n");
+}
+
+#[test]
+fn a_service_is_the_unit_its_family_names_and_one_isoloom_defines_comes_with_its_unit() {
+    assert_eq!(one("debian@12", "{ service: ssh }"), "isoloom_service 'ssh' 'yes'\n");
+    assert_eq!(one("rocky@9", "{ service: ssh }"), "isoloom_service 'sshd' 'yes'\n");
+    assert_eq!(
+        one("debian@12", "{ service: { name: nginx, enabled: false } }"),
+        "isoloom_service 'nginx' 'no'\n"
+    );
+    // A service Isoloom defines: its family's unit file (`units`' own tests read it), then enabled.
+    let unit = |family, run: &[&str], user: Option<&str>, cwd: Option<&str>| {
+        let run = isoloom_spec::syntax::Argv::try_from(run.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>()).expect("a command");
+        let unit = super::super::units::linux(
+            family,
+            &"api".parse().expect("a unit name"),
+            &run,
+            user.and_then(|u| u.parse().ok()).as_ref(),
+            cwd.and_then(|d| d.parse().ok()).as_ref(),
+        );
+        format!("isoloom_unit 'api' {}\nisoloom_service 'api' 'yes'\n", isoloom_spec::shell::quote(&unit))
+    };
+    assert_eq!(
+        one("debian@12", "{ service: { name: api, run: [/srv/api, --port, '8000'], user: api, cwd: /srv } }"),
+        unit(Family::Debian, &["/srv/api", "--port", "8000"], Some("api"), Some("/srv"))
+    );
+    assert_eq!(
+        one("alpine@3.19", "{ service: { name: api, run: [/srv/api] } }"),
+        unit(Family::Alpine, &["/srv/api"], None, None)
+    );
+}
+
+#[test]
+fn a_command_runs_behind_its_guard() {
+    assert_eq!(
+        one("debian@12", "{ command: a2enmod rewrite, creates: /etc/apache2/mods-enabled/rewrite.load }"),
+        "isoloom_command 'creates' '1' '/etc/apache2/mods-enabled/rewrite.load' 'sh' '-c' 'a2enmod rewrite'\n"
+    );
+    assert_eq!(
+        one("debian@12", "{ command: [useradd, -r, svc], unless: [id, svc] }"),
+        "isoloom_command 'unless' '2' 'id' 'svc' 'useradd' '-r' 'svc'\n"
+    );
+    assert_eq!(
+        one("debian@12", "{ command: [touch, /done], unless: test -e /done }"),
+        "isoloom_command 'unless' '3' 'sh' '-c' 'test -e /done' 'touch' '/done'\n"
+    );
+}
+
+#[test]
+fn a_firewall_opens_its_ports_by_number_and_transport() {
+    assert_eq!(
+        one("rocky@9", "{ firewall: { allow: [web, dns, 8443] } }"),
+        "isoloom_firewall '80/tcp' '53/udp' '8443/tcp'\n"
+    );
+}
+
+#[test]
+fn scripts_reboots_and_playbooks_are_the_set_ups_own_steps() {
+    assert_eq!(calls("debian@12", "[{ run: a.sh }, reboot, { playbook: p.yml }]"), [None, None, None]);
+}
+
+#[test]
+fn a_vm_step_runs_the_library_then_its_calls_from_the_project_folder() {
+    let env = testing::machine("os: debian@12, app: { steps: [{ packages: [curl] }] }", Target::Vagrant, &[]);
+    let c = Configured::of(&env, "m").unwrap();
+    let resources: Vec<Resource> = c.recipe().resources().cloned().collect();
+    let fresh = script(&c, &resources, true);
+    let defined: Vec<String> = functions(&fresh).into_iter().map(|(name, _)| name).collect();
+    assert_eq!(
+        defined,
+        [
+            "isoloom_changed",
+            "isoloom_fail",
+            "isoloom_pm",
+            "isoloom_installed",
+            "isoloom_install",
+            "isoloom_packages"
+        ],
+        "only what the calls need"
+    );
+    let library: String = functions(&fresh).into_iter().map(|(_, text)| text).collect();
+    assert_eq!(
+        fresh,
+        format!(
+            "(\nset -eu\n{library}ISOLOOM_CHANGED=/run/isoloom/configure.changed\nrm -f \"$ISOLOOM_CHANGED\"\ncd /opt/isoloom\nisoloom_packages 'curl'\n)\n"
+        )
+    );
+    // Not the first apply: a step before may have changed something, which the mark says.
+    assert_eq!(
+        script(&c, &resources, false),
+        fresh.replace("\nrm -f \"$ISOLOOM_CHANGED\"\n", "\nmkdir -p /run/isoloom && : >\"$ISOLOOM_CHANGED\"\n")
+    );
+}
+
+#[test]
+fn every_function_the_library_calls_is_one_of_its_own() {
+    let functions = functions(LIBRARY);
+    assert_eq!(functions.len(), LIBRARY.matches("\n}\n").count(), "every function is found");
+    let names: BTreeSet<String> = functions.iter().map(|(n, _)| n.clone()).collect();
+    for (name, text) in &functions {
+        let unknown: Vec<String> = called(text).into_iter().filter(|c| !names.contains(c)).collect();
+        assert!(unknown.is_empty(), "{name} calls {unknown:?}");
+    }
+    assert_eq!(
+        needed(LIBRARY).lines().count(),
+        compact(LIBRARY).lines().filter(|l| !l.starts_with('#')).count()
+    );
+}
+
+/// The library and a recipe's script read as POSIX sh.
+#[cfg(unix)]
+#[test]
+fn the_library_and_a_script_parse_as_sh() {
+    let env = testing::machine(
+        "os: debian@12, app: { steps: [{ packages: [curl] }, { user: { name: \"a\", password: \"it's\" } }, { command: \"echo 'x' | tr x y\", creates: /done }] }",
+        Target::Vagrant,
+        &[],
+    );
+    let c = Configured::of(&env, "m").unwrap();
+    let resources: Vec<Resource> = c.recipe().resources().cloned().collect();
+    let status = std::process::Command::new("sh")
+        .args(["-n", "-c", &script(&c, &resources, true)])
+        .status()
+        .expect("sh runs");
+    assert!(status.success());
+}
+
+/// The library's apt pin names the repository's host alone, as the Ansible role's does: a port
+/// or a user in the URL would pin an origin apt never matches.
+#[cfg(unix)]
+#[test]
+fn the_library_url_host_leaves_out_a_user_and_a_port() {
+    for (url, host) in [
+        ("https://repo.example.com/deb", "repo.example.com"),
+        ("https://repo.example.com:8443/deb", "repo.example.com"),
+        ("https://user@repo.example.com/deb", "repo.example.com"),
+        ("https://user:pw@repo.example.com:8443/deb?x", "repo.example.com"),
+        ("https://[fd00::1]:8443/deb", "[fd00::1]"),
+    ] {
+        let out = std::process::Command::new("sh")
+            .args(["-c", &format!("{LIBRARY}\nisoloom_url_host \"$1\""), "sh", url])
+            .output()
+            .expect("sh runs");
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(String::from_utf8_lossy(&out.stdout), format!("{host}\n"), "{url}");
+    }
+}

@@ -1,0 +1,247 @@
+//! One `terraform_data` resource that sets a machine up from where Terraform runs: a connection,
+//! files to upload, then commands in one or more `remote-exec` provisioners, the machine
+//! restarting between two of them.
+
+use crate::hcl_builder::{BinaryOperator, Block, BlockBuilder, Expression, Template, binary, boolean, call, conditional, list, null, reference, string};
+use isoloom_render::project::{self, TarExclusion};
+
+/// How Terraform reaches the machine.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Connection {
+    /// SSH, with the operator's key (`var.ssh_private_key_file`).
+    Ssh {
+        /// The machine's address.
+        host: Expression,
+        /// The user it logs in as.
+        user: String,
+        /// Through the module's SOCKS5 proxy first, when one is set (see [`SOCKS_VARIABLES`]).
+        socks: bool,
+    },
+    /// SSH through a jump host (the router, the only VM on the host's own network), the same
+    /// user and key on both.
+    SshVia {
+        /// The machine's address, from the jump host.
+        host: Expression,
+        /// The user it logs in as, on both.
+        user: String,
+        /// The jump host's address.
+        bastion: Expression,
+        /// Through the module's SOCKS5 proxy first, when one is set (see [`SOCKS_VARIABLES`]).
+        socks: bool,
+    },
+    /// WinRM over HTTP, as `isoloom` with a password.
+    WinRm {
+        /// The machine's address.
+        host: Expression,
+        /// The password.
+        password: Expression,
+        /// NTLM authentication (an image whose WinRM listener doesn't take Basic over HTTP).
+        ntlm: bool,
+    },
+}
+
+/// A file Terraform puts on the machine before the commands.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Upload {
+    /// The project, archived on the host (`.isoloomignore` honored) as `<module>/.isoloom-project-<id>.tgz`.
+    Project {
+        /// The archive's id (the resource's name).
+        id: String,
+        /// Where it goes on the machine.
+        destination: &'static str,
+    },
+    /// A file made of `content`.
+    Content {
+        /// What it holds.
+        content: Expression,
+        /// Where it goes on the machine.
+        destination: String,
+    },
+}
+
+/// A machine's set-up as one `terraform_data` resource.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Provisioner {
+    /// The resource's name.
+    pub(crate) name: String,
+    /// What replaces it when it changes (the instance's id).
+    pub(crate) replace_on: Expression,
+    /// How Terraform reaches the machine.
+    pub(crate) connection: Connection,
+    /// The files, uploaded first.
+    pub(crate) uploads: Vec<Upload>,
+    /// The commands, one `remote-exec` each part; the machine restarts between two parts.
+    pub(crate) parts: Vec<Vec<Expression>>,
+    /// The resources it waits for.
+    pub(crate) depends_on: Vec<Expression>,
+}
+
+impl Provisioner {
+    /// The same set-up, reached through `bastion` when it goes over SSH.
+    #[must_use]
+    pub(crate) fn via(mut self, bastion: Expression) -> Provisioner {
+        if let Connection::Ssh { host, user, socks } = self.connection {
+            self.connection = Connection::SshVia { host, user, bastion, socks };
+        }
+        self
+    }
+
+    /// The `terraform_data` block.
+    pub(crate) fn block(self) -> Block {
+        let mut b = Block::builder("resource")
+            .add_label("terraform_data")
+            .add_label(self.name.as_str())
+            .add_attribute(("triggers_replace", list([self.replace_on])))
+            .add_block(connection(&self.connection));
+        for u in self.uploads {
+            b = b.add_blocks(upload(u));
+        }
+        for (i, part) in self.parts.into_iter().enumerate() {
+            if i > 0 {
+                b = b.add_block(restart());
+            }
+            b = b.add_block(remote_exec(part));
+        }
+        if !self.depends_on.is_empty() {
+            b = b.add_attribute(("depends_on", list(self.depends_on)));
+        }
+        b.build()
+    }
+}
+
+/// An SSH connection as `user` to `host`, through `bastion` when there is one (as the same
+/// user, with the same key), and through the module's SOCKS5 proxy first when `socks` (see
+/// [`SOCKS_VARIABLES`]).
+fn ssh(host: &Expression, user: &str, bastion: Option<&Expression>, socks: bool) -> BlockBuilder {
+    let key = || call("file", [call("pathexpand", [reference("var.ssh_private_key_file")])]);
+    let mut b = Block::builder("connection")
+        .add_attribute(("type", string("ssh")))
+        .add_attribute(("host", host.clone()))
+        .add_attribute(("user", string(user)))
+        .add_attribute(("private_key", key()));
+    if let Some(bastion) = bastion {
+        b = b
+            .add_attribute(("bastion_host", bastion.clone()))
+            .add_attribute(("bastion_user", string(user)))
+            .add_attribute(("bastion_private_key", key()));
+    }
+    if socks {
+        b = proxied(b);
+    }
+    b.add_attribute(("timeout", string("10m")))
+}
+
+/// A module whose SSH connections may start at a SOCKS5 proxy declares `ssh_proxy_host` and
+/// `ssh_proxy_port` (Proxmox's: its lab bridge may be one only the node reaches, a NAT bridge,
+/// so the machine running Terraform reaches the router through a tunnel to the node). Terraform
+/// then connects to the proxy, then to the bastion, then to the host. Unset (`""`), the
+/// attributes are null and the connection is a direct one.
+pub(crate) const SOCKS_VARIABLES: [&str; 2] = ["ssh_proxy_host", "ssh_proxy_port"];
+
+/// `b` with the proxy attributes of [`SOCKS_VARIABLES`], null while no proxy is set.
+fn proxied(b: BlockBuilder) -> BlockBuilder {
+    let [host, port] = SOCKS_VARIABLES.map(|v| reference(&format!("var.{v}")));
+    let set = || binary(host.clone(), BinaryOperator::NotEq, string(""));
+    b.add_attribute(("proxy_scheme", conditional(set(), string("socks5"), null())))
+        .add_attribute(("proxy_host", conditional(set(), host.clone(), null())))
+        .add_attribute(("proxy_port", conditional(set(), port, null())))
+}
+
+pub(crate) fn connection(c: &Connection) -> Block {
+    let b = Block::builder("connection");
+    match c {
+        Connection::Ssh { host, user, socks } => ssh(host, user, None, *socks),
+        Connection::SshVia { host, user, bastion, socks } => ssh(host, user, Some(bastion), *socks),
+        Connection::WinRm { host, password, ntlm } => {
+            let b = b
+                .add_attribute(("type", string("winrm")))
+                .add_attribute(("host", host.clone()))
+                .add_attribute(("user", string(super::USER)))
+                .add_attribute(("password", password.clone()))
+                .add_attribute(("https", boolean(false)));
+            let b = if *ntlm { b.add_attribute(("use_ntlm", boolean(true))) } else { b };
+            b.add_attribute(("timeout", string("30m")))
+        }
+    }
+    .build()
+}
+
+/// The provisioners of one upload: the project is archived on the host first.
+pub(crate) fn upload(u: Upload) -> Vec<Block> {
+    match u {
+        Upload::Project { id, destination } => {
+            let archive = format!("/.isoloom-project-{id}.tgz");
+            vec![
+                provisioner("local-exec").add_attribute(("command", archive_command(&archive))).build(),
+                provisioner("file")
+                    .add_attribute((
+                        "source",
+                        Template::new().with_expr(reference("path.module")).with_text(archive).into_expression(),
+                    ))
+                    .add_attribute(("destination", string(destination)))
+                    .build(),
+            ]
+        }
+        Upload::Content { content, destination } => vec![
+            provisioner("file")
+                .add_attribute(("content", content))
+                .add_attribute(("destination", string(destination)))
+                .build(),
+        ],
+    }
+}
+
+/// `tar` of the project's folder, its top folder kept (stripped when unpacked), leaving out what
+/// a copy leaves out: the files the module listed (`.isoloomignore`'s, Isoloom's outputs, the
+/// tools' state), and what appears once Terraform is applying (the archive itself, a state, a
+/// machine's login), by `tar`'s own exclusions of the same rules.
+fn archive_command(archive: &str) -> Expression {
+    let q = "\"";
+    let mut command = Template::text("tar -czf \"")
+        .with_expr(reference("path.module"))
+        .with_text(format!("{archive}{q}"));
+    for exclusion in project::tar_exclusions() {
+        command = match exclusion {
+            TarExclusion::UnderTop(p) => command
+                .with_text(format!(" --exclude={q}"))
+                .with_expr(call("basename", [reference("local.root")]))
+                .with_text(format!("/{p}{q}")),
+            TarExclusion::Anywhere(p) => command.with_text(format!(" --exclude={q}{p}{q}")),
+        };
+    }
+    command
+        .with_text(format!(" -X {q}"))
+        .with_expr(call("abspath", [reference("local_file.isoloom_project.filename")]))
+        .with_text("\" -C \"")
+        .with_expr(call("dirname", [reference("local.root")]))
+        .with_text("\" \"")
+        .with_expr(call("basename", [reference("local.root")]))
+        .with_text("\"")
+        .into_expression()
+}
+
+fn provisioner(kind: &str) -> BlockBuilder {
+    Block::builder("provisioner").add_label(kind)
+}
+
+fn remote_exec(commands: Vec<Expression>) -> Block {
+    provisioner("remote-exec").add_attribute(("inline", list(commands))).build()
+}
+
+/// The restart between two parts. New SSH connections are refused first (logins closed with
+/// `/run/nologin`, gone at boot, and the SSH listener stopped; the open session stays), so
+/// Terraform's next connection waits for the machine to be back rather than reaching it on its
+/// way down. The dropped connection is expected (`on_failure = continue`); the next part checks
+/// that the boot changed.
+fn restart() -> Block {
+    let commands = [
+        "sudo touch /run/nologin",
+        "sudo systemctl stop ssh.socket ssh.service sshd.service 2>/dev/null || true",
+        "sudo systemctl --no-block reboot",
+        "sleep 600",
+    ];
+    provisioner("remote-exec")
+        .add_attribute(("inline", list(commands.map(string))))
+        .add_attribute(("on_failure", reference("continue")))
+        .build()
+}

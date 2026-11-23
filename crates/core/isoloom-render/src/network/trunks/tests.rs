@@ -1,0 +1,59 @@
+use super::{Trunk, Vlan, interface, of_machines, vm_commands, vms};
+use crate::test_support::VLAN_OFFICE;
+use crate::testing;
+use isoloom_spec::model::Target;
+
+fn vlan(network: &str, id: u16, octet: u8) -> Vlan {
+    Vlan {
+        network: network.into(),
+        id,
+        octet,
+    }
+}
+
+fn admin() -> Trunk {
+    Trunk {
+        lan: "office".into(),
+        machine: "admin".into(),
+        vlans: vec![vlan("office-vlan10", 10, 50), vlan("office-vlan20", 20, 50)],
+    }
+}
+
+#[test]
+fn a_machine_on_two_vlans_of_one_lan_has_a_trunk_and_one_on_a_single_vlan_none() {
+    let spec = testing::spec(VLAN_OFFICE);
+    let ts = of_machines(&spec, |_, m| m.docker.is_some());
+    let machines: Vec<&str> = ts.iter().map(|t| t.machine.as_str()).collect();
+    assert_eq!(machines, ["admin", "nas", "ops"], "windows has no container form; staff carries one VLAN");
+    assert_eq!(ts[0], admin());
+    assert_eq!(
+        ts[1].vlans,
+        [vlan("office-vlan20", 20, 60), vlan("office-vlan10", 10, 60)],
+        "in the machine's order"
+    );
+}
+
+#[test]
+fn only_linux_vms_build_a_trunk_inside() {
+    let env = testing::env(VLAN_OFFICE, Target::Vagrant);
+    let machines: Vec<String> = vms(&env).into_iter().map(|t| t.machine).collect();
+    assert_eq!(machines, ["admin", "nas", "ops"]);
+}
+
+#[test]
+fn the_interface_is_named_after_the_lan_within_linux_s_limit() {
+    assert_eq!(interface("a-very-long-lan-name"), "a-very-lon");
+    assert_eq!(interface("abcdefghi-x"), "abcdefghi", "no trailing hyphen");
+}
+
+#[test]
+fn a_vm_builds_its_trunk_once_per_boot() {
+    let env = testing::env(VLAN_OFFICE, Target::Vagrant);
+    assert_eq!(
+        vm_commands(&env, &admin()),
+        [
+            "ip link show office >/dev/null 2>&1 || { ip link add office type veth peer name office-s && ip link set office up && ip link set office-s up && IF=$(ip -o -4 addr show | awk '$4 ~ /^10\\.70\\.10\\.50\\//{print $2}' | head -n 1) && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address 02:1f:0a:46:0a:32 && ip link add br10 type bridge && ip link set \"$IF\" master br10 && ip link set br10 up && ip link add link office-s name office-s.10 type vlan id 10 && ip link set office-s.10 master br10 && ip link set office-s.10 up && ip link add link office name office.10 address \"$MAC\" type vlan id 10 && ip addr add 10.70.10.50/24 dev office.10 && ip link set office.10 up && IF=$(ip -o -4 addr show | awk '$4 ~ /^10\\.70\\.20\\.50\\//{print $2}' | head -n 1) && MAC=$(cat \"/sys/class/net/$IF/address\") && ip addr flush dev \"$IF\" && ip link set \"$IF\" address 02:1f:0a:46:14:32 && ip link add br20 type bridge && ip link set \"$IF\" master br20 && ip link set br20 up && ip link add link office-s name office-s.20 type vlan id 20 && ip link set office-s.20 master br20 && ip link set office-s.20 up && ip link add link office name office.20 address \"$MAC\" type vlan id 20 && ip addr add 10.70.20.50/24 dev office.20 && ip link set office.20 up; }"
+        ],
+        "one command, which does nothing once the trunk is there"
+    );
+}

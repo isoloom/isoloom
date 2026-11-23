@@ -1,0 +1,295 @@
+//! Tables about an environment, from its resolved snapshot (`isoloom report`): addressing,
+//! ports, wiring and resources, as aligned text or Markdown. They read what
+//! [`crate::resolved::resolve`] worked out, so they can't disagree with the generated files.
+
+use serde_json::Value;
+
+use crate::resolved::{entries, ports};
+use crate::{Error, Result};
+
+/// The reports `isoloom report` knows, each with what it shows.
+pub const REPORTS: &[(&str, &str)] = &[
+    ("addressing", "every machine's address on every network"),
+    ("ports", "what answers on which port, and from which networks it may be reached"),
+    (
+        "wiring",
+        "how each target lays the networks out: Docker blocks, VirtualBox and libvirt network names, Kubernetes labels",
+    ),
+    ("resources", "CPUs, memory and disk per machine, and the totals"),
+];
+
+/// A table: its header, then its rows.
+type Table = (Vec<String>, Vec<Vec<String>>);
+
+/// One report, as text (aligned columns) or Markdown.
+///
+/// # Errors
+///
+/// [`Error::UnknownReport`] when no report has this name (see [`REPORTS`]).
+pub fn report(name: &str, r: &Value, markdown: bool) -> Result<String> {
+    let (head, rows) = match name {
+        "addressing" => addressing(r),
+        "ports" => ports(r),
+        "wiring" => wiring(r),
+        "resources" => resources(r),
+        other => {
+            return Err(Error::UnknownReport {
+                name: other.to_owned(),
+                known: REPORTS.iter().map(|(n, _)| *n).collect::<Vec<_>>().join(", "),
+            });
+        }
+    };
+    Ok(if markdown { markdown_table(&head, &rows) } else { text_table(&head, &rows) })
+}
+
+/// Under Vagrant's Hyper-V provider a published UDP port (`127.0.0.1:<port>/udp` in the ports
+/// report) isn't there: Hyper-V forwards no port, and the Vagrantfile's relay (Windows' port
+/// proxy) relays TCP only. A note saying so and where they are instead, when the environment
+/// publishes any; its TCP ports answer on this host as the report says.
+#[must_use]
+pub fn hyperv_ports_note(r: &Value) -> Option<String> {
+    let published: Vec<String> = entries(r, "machines")
+        .flat_map(|(m, v)| {
+            entries(v, "ports").filter_map(move |(_, s)| {
+                let port = s.get("port").and_then(Value::as_u64).unwrap_or(0);
+                let udp = s.get("protocol").and_then(Value::as_str) == Some("udp");
+                let publish = s.get("published").and_then(Value::as_u64);
+                publish.filter(|_| udp).map(|p| format!("127.0.0.1:{p}/udp ({m}:{port})"))
+            })
+        })
+        .collect();
+    (!published.is_empty()).then(|| {
+        format!(
+            "Note: on Vagrant's Hyper-V provider a UDP port isn't relayed to this host (Windows' port proxy relays TCP only), so {} {} not there: reach it at its VM's address on the first switch (`vagrant ssh-config <machine>` shows it).\n",
+            published.join(", "),
+            if published.len() == 1 { "is" } else { "are" }
+        )
+    })
+}
+
+/// The text at the pointer `at` of `v` (`/addresses/lan`), or empty.
+fn text(v: &Value, at: &str) -> String {
+    v.pointer(at).and_then(Value::as_str).unwrap_or("").to_owned()
+}
+
+/// The header cells.
+fn head(cells: &[&str]) -> Vec<String> {
+    cells.iter().map(|c| (*c).to_owned()).collect()
+}
+
+/// Every machine's address on every network, and the router's.
+fn addressing(r: &Value) -> Table {
+    let nets: Vec<&String> = entries(r, "networks").map(|(n, _)| n).collect();
+    let mut header = vec!["machine".to_owned()];
+    header.extend(nets.iter().map(|n| (*n).clone()));
+    let row = |name: String, v: &Value| -> Vec<String> { std::iter::once(name).chain(nets.iter().map(|n| text(v, &format!("/addresses/{n}")))).collect() };
+    let mut rows: Vec<Vec<String>> = entries(r, "machines").map(|(m, v)| row(m.clone(), v)).collect();
+    if let Some(router) = r.get("router").filter(|v| v.is_object()) {
+        rows.push(row("(router)".to_owned(), router));
+    }
+    (header, rows)
+}
+
+/// What answers on each port, and from which networks: a machine's own, and those a `reach`
+/// rule lets in on that port.
+fn ports(r: &Value) -> Table {
+    let header = head(&["machine", "port", "name", "http", "published", "reachable from"]);
+    let nets: Vec<&String> = entries(r, "networks").map(|(n, _)| n).collect();
+    let rules: Vec<&Value> = r.get("reach").and_then(Value::as_array).into_iter().flatten().collect();
+    let mut rows = Vec::new();
+    for (m, v) in entries(r, "machines") {
+        let own: Vec<&str> = entries(v, "addresses").map(|(n, _)| n.as_str()).collect();
+        for (name, s) in entries(v, "ports") {
+            let port = s.get("port").and_then(Value::as_u64).unwrap_or(0);
+            let reaches = |from: &str| {
+                own.contains(&from)
+                    || rules.iter().any(|rule| {
+                        rule.get("from").and_then(Value::as_str) == Some(from)
+                            && own.contains(&rule.get("to").and_then(Value::as_str).unwrap_or(""))
+                            && rule
+                                .get("ports")
+                                .and_then(Value::as_array)
+                                .is_some_and(|p| p.is_empty() || p.iter().any(|x| x.as_u64() == Some(port)))
+                    })
+            };
+            let from: Vec<&str> = nets.iter().map(|n| n.as_str()).filter(|n| reaches(n)).collect();
+            let http = matches!(s.get("protocol").and_then(Value::as_str), Some("http" | "https"));
+            rows.push(vec![
+                m.clone(),
+                ports::shown(s),
+                name.clone(),
+                if http { "yes".to_owned() } else { String::new() },
+                s.get("publish").and_then(Value::as_u64).map(|p| format!("127.0.0.1:{p}")).unwrap_or_default(),
+                from.join(", "),
+            ]);
+        }
+    }
+    (header, rows)
+}
+
+/// How each target lays the networks out: the Docker block, the VirtualBox and libvirt network
+/// (Vagrant's name), the Kubernetes label (Kubernetes' own), the gateway and the router.
+fn wiring(r: &Value) -> Table {
+    let name = r.get("name").and_then(Value::as_str).unwrap_or("");
+    let header = head(&[
+        "network",
+        "cidr",
+        "docker block",
+        "virtualbox / libvirt network",
+        "kubernetes label",
+        "gateway",
+        "router",
+        "internet",
+    ]);
+    let rows = entries(r, "networks")
+        .map(|(n, v)| {
+            let gateway = v
+                .get("gateway")
+                .and_then(Value::as_str)
+                .map(|g| format!("{g} ({})", text(v, "/gateway_address")));
+            vec![
+                n.clone(),
+                text(v, "/cidr"),
+                text(v, "/docker_cidr"),
+                isoloom_vagrant::network_name(name, n),
+                isoloom_kubernetes::network_member(n),
+                gateway.unwrap_or_default(),
+                text(v, "/router"),
+                if v.get("internet").and_then(Value::as_bool) == Some(false) {
+                    "no".to_owned()
+                } else {
+                    "yes".to_owned()
+                },
+            ]
+        })
+        .collect();
+    (header, rows)
+}
+
+/// Each machine's CPUs, memory, disk, OS and forms, then the totals. The snapshot sizes a
+/// machine per form (`resources.<shape>`, one entry a shape since its version 4; a container
+/// is sized smaller than the VM of the same machine): the row shows the largest form's size,
+/// what a host must afford, and the totals add those.
+fn resources(r: &Value) -> Table {
+    let header = head(&["machine", "cpus", "memory (MB)", "disk (GB)", "os", "shapes"]);
+    let mut rows = Vec::new();
+    let mut totals = [0_u64; 3];
+    for (name, v) in entries(r, "machines") {
+        let size = largest_form_size(v);
+        for (total, n) in totals.iter_mut().zip(size) {
+            *total += n;
+        }
+        let shapes: Vec<&str> = v
+            .get("shapes")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        let [cpus, memory, disk] = size.map(|n| n.to_string());
+        rows.push(vec![name.clone(), cpus, memory, disk, text(v, "/os"), shapes.join(", ")]);
+    }
+    let [cpus, memory, disk] = totals.map(|n| n.to_string());
+    rows.push(vec!["total".into(), cpus, memory, disk, String::new(), String::new()]);
+    (header, rows)
+}
+
+/// The largest of a machine's per-form sizes, `[cpus, memory_mb, disk_gb]`, each the maximum
+/// over its forms; zeros for a machine with none (the reader of the snapshot's earlier shape,
+/// `resources.cpus`, read zeros for every machine from version 4 on: commit 703331d0 changed the
+/// writer and three backends, not this reader).
+fn largest_form_size(machine: &Value) -> [u64; 3] {
+    let forms = machine.get("resources").and_then(Value::as_object).into_iter().flat_map(|forms| forms.values());
+    let mut size = [0_u64; 3];
+    for form in forms {
+        for (largest, key) in size.iter_mut().zip(["cpus", "memory_mb", "disk_gb"]) {
+            *largest = (*largest).max(form.get(key).and_then(Value::as_u64).unwrap_or(0));
+        }
+    }
+    size
+}
+
+/// A Markdown table cell's text, its pipes escaped: the one escaping of the crate's tables.
+pub(crate) fn md_cell(text: &str) -> String {
+    text.replace('|', "\\|")
+}
+
+/// A Markdown table, `|` in a cell escaped.
+fn markdown_table(head: &[String], rows: &[Vec<String>]) -> String {
+    let mut lines = vec![format!("| {} |", head.join(" | ")), format!("|{}", " --- |".repeat(head.len()))];
+    lines.extend(
+        rows.iter()
+            .map(|r| format!("| {} |", r.iter().map(|c| md_cell(c)).collect::<Vec<_>>().join(" | "))),
+    );
+    format!("{}\n", lines.join("\n"))
+}
+
+/// Aligned text columns, each as wide as its widest cell.
+fn text_table(head: &[String], rows: &[Vec<String>]) -> String {
+    let widths: Vec<usize> = head
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            rows.iter()
+                .filter_map(|r| r.get(i))
+                .map(String::len)
+                .chain(std::iter::once(h.len()))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+    let line = |cells: &[String]| -> String {
+        let padded: Vec<String> = cells.iter().zip(&widths).map(|(c, w)| format!("{c:<w$}")).collect();
+        format!("{}\n", padded.join("  ").trim_end())
+    };
+    std::iter::once(line(head)).chain(rows.iter().map(|r| line(r))).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cells(cells: &[&str]) -> Vec<String> {
+        head(cells)
+    }
+
+    #[test]
+    fn a_text_table_aligns_its_columns_and_trims_each_line() {
+        let text = text_table(&cells(&["machine", "port"]), &[cells(&["web", "80"]), cells(&["cache-server", ""])]);
+        assert_eq!(text, "machine       port\nweb           80\ncache-server\n");
+    }
+
+    #[test]
+    fn a_markdown_table_escapes_a_bar_in_a_cell() {
+        let md = markdown_table(&cells(&["a", "b"]), &[cells(&["x|y", "z"])]);
+        assert_eq!(md, "| a | b |\n| --- | --- |\n| x\\|y | z |\n");
+    }
+
+    /// The snapshot sizes a machine per form; the report shows the largest and adds those up.
+    #[test]
+    fn the_resources_report_reads_the_per_form_sizes() {
+        let snapshot = serde_json::json!({ "machines": {
+            "web": { "os": "debian-12", "shapes": ["docker", "vm"], "resources": {
+                "docker": { "cpus": 1, "memory_mb": 512, "disk_gb": 0 },
+                "vm": { "cpus": 2, "memory_mb": 2048, "disk_gb": 20 } } },
+            "db": { "os": "debian-12", "shapes": ["vm"], "resources": {
+                "vm": { "cpus": 2, "memory_mb": 4096, "disk_gb": 40 } } },
+        } });
+        let (_, rows) = resources(&snapshot);
+        assert_eq!(rows[0], cells(&["web", "2", "2048", "20", "debian-12", "docker, vm"]), "the largest form");
+        assert_eq!(rows[1], cells(&["db", "2", "4096", "40", "debian-12", "vm"]));
+        assert_eq!(rows[2], cells(&["total", "4", "6144", "60", "", ""]));
+    }
+
+    #[test]
+    fn an_unknown_report_names_the_known_ones() {
+        let e = report("nope", &Value::Null, false).err().map(|e| e.to_string());
+        assert_eq!(e.as_deref(), Some("no report named `nope`; one of: addressing, ports, wiring, resources"));
+        let services = report("services", &Value::Null, false).err().map(|err| err.to_string());
+        assert_eq!(
+            services.as_deref(),
+            Some("no report named `services`; one of: addressing, ports, wiring, resources"),
+            "only the names it lists"
+        );
+    }
+}

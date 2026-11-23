@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What mongodb does, the same as a container and as a VM. `cargo xtask catalogue check mongodb`
+# builds a small lab (`web`, an access machine `probe`) and runs it through a runner.
+cases:
+  default: {}
+
+checks:
+  - name: the port answers
+    tcp: "{{ machine }}:27017"
+    wait: 2m
+  - name: mongodb reports the release asked for
+    exec: mongod --version
+    expect: "v{{ version }}."
+  # Through the shell the form ships: mongosh (the image, the 6.0 and 7.0 builds), else the
+  # older builds' own `mongo`.
+  - name: the server answers a ping
+    exec: "$(command -v mongosh || command -v mongo) --quiet --eval 'db.runCommand({ping:1}).ok'"
+    expect: "1"
+
+facts:
+  - name: the server version
+    exec: mongod --version

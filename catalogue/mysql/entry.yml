@@ -1,0 +1,168 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The mysql entry: MySQL, from its official image (on Debian 12), or Oracle's generic Linux
+# build of an exact release (5.5 to 8.4) installed the same way in every form: a VM, or a
+# container built from the OS's image. Either initialises the data directory at first start from
+# the settings below (the image's entrypoint, or the entry's own with the same contract): the root
+# password, an application database, an application user, then /docker-entrypoint-initdb.d. Each
+# download release pins its archive's SHA-256 in `vars`, and 8.4.7 its arm64 archive's too
+# (`arm64_url`, `arm64_sha256`): the machine's own architecture's build is installed. lock.yml
+# beside it is written only by `cargo xtask catalogue refresh mysql`, which pins the images'
+# digests.
+name: mysql
+description: >-
+  MySQL, from its official image: it serves an application database, with a root password and an
+  application user whose passwords come from secrets.
+upstream: https://www.mysql.com/
+licence:
+  software: GPL-2.0-only
+  notes: The official image bundles its base distribution's packages under those packages' own licences.
+
+# MySQL's maintained LTS series; the image tag is the series (`8.4`).
+releases:
+  - version: "8.4"
+    channel: lts
+    source: distro
+    os: [debian@12]
+# Oracle's generic builds: 5.x links ncurses 5, which Debian 11 is the last to ship; 8.x links
+# libaio 1 by its old name, which Ubuntu 22.04 and Debian 12 still have, and its x86-64 `mysql`
+# client ncurses 5 too (the arm64 one ncurses 6). 8.4.7 is Oracle's build for both
+# architectures on a VM, and on Debian 12 its official image (both architectures) in a container.
+  - version: 5.5.62
+    source: download
+    os: [debian@11]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-5.5/mysql-5.5.62-linux-glibc2.12-x86_64.tar.gz", sha256: 4927306c4e3f895d2a757fcb2bedb6fadf4685388b7c9bd344354455579e44d0 }
+  - version: 5.7.44
+    source: download
+    os: [debian@11]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-5.7/mysql-5.7.44-linux-glibc2.12-x86_64.tar.gz", sha256: 798ff0a14cdc1ab259f8a3b6a7f683403e9bbaa85957d82e5370f82b27ba6805 }
+  - version: 8.0.21
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.21-linux-glibc2.12-x86_64.tar.xz", sha256: aad4e7e811e517d2fe4d80d53df8eb122f3f2ec577440b2ba23949cebfda3edc }
+  - version: 8.0.33
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.33-linux-glibc2.12-x86_64.tar.xz", sha256: 4900c972a508d5b2f6d28bb9c51cf45906b6746d616d978f3996fbf2ca59467f }
+  - version: 8.0.44
+    source: download
+    os: [ubuntu@22.04]
+    vars: { url: "https://cdn.mysql.com/archives/mysql-8.0/mysql-8.0.44-linux-glibc2.17-x86_64.tar.xz", sha256: db5e35f13cf98276388d8ddd778d31be684557458c3a4e64f7a8f4a2e4cb4f6f }
+  - version: 8.4.7
+    source: download
+    os: [ubuntu@22.04, debian@12]
+    vars:
+      url: "https://cdn.mysql.com/archives/mysql-8.4/mysql-8.4.7-linux-glibc2.17-x86_64.tar.xz"
+      sha256: 6386faf7301f3d84fb3fd3e11c87e1759a8868378a08c57aa4414703fa281d1f
+      arm64_url: "https://cdn.mysql.com/archives/mysql-8.4/mysql-8.4.7-linux-glibc2.28-aarch64.tar.xz"
+      arm64_sha256: 559574fd13cd27211fbb1c8c2b8407371c7c5f3b77d8b4adc374fd2e48a0abac
+default: "8.4"
+
+images:
+  debian@12: docker.io/library/mysql:{{ version }}
+
+settings:
+  password:
+    type: password
+    required: true
+    description: The root password (a literal, or a secret or input reference).
+  database:
+    type: string
+    default: app
+    pattern: "[A-Za-z0-9_]{1,64}"
+    description: The application database the image creates at first start.
+  user:
+    type: string
+    default: app
+    pattern: "[A-Za-z0-9_]{1,32}"
+    description: The application user the image creates at first start.
+  user_password:
+    type: password
+    required: true
+    description: The application user's password (a literal, or a secret or input reference).
+  privileges:
+    type: string
+    pattern: "[A-Z][A-Z ,]{0,127}"
+    description: >-
+      The application user's privileges on the application database, as GRANT writes them
+      (`SELECT`, `SELECT, INSERT, UPDATE, DELETE`). Without it, all of them, as the image grants.
+  port:
+    type: port
+    default: 3306
+    description: The port MySQL listens on, and the number of the machine's `mysql` port.
+  init:
+    type: folder
+    description: >-
+      A folder of the project (`db/`) whose scripts run once, at the first start, in name order,
+      on the application database: `*.sql`, `*.sql.gz` and `*.sh`, as the image's
+      /docker-entrypoint-initdb.d.
+
+image:
+  environment:
+    MYSQL_ROOT_PASSWORD_FILE: "{{ with.password.path }}"
+    MYSQL_DATABASE: "{{ with.database }}"
+    MYSQL_USER: "{{ with.user }}"
+    MYSQL_PASSWORD_FILE: "{{ with.user_password.path }}"
+
+ports:
+  mysql: { setting: port, protocol: tcp }
+
+data:
+  data: /var/lib/mysql
+
+# Oracle's builds (every download release), in a VM or a container built from the OS: `install`
+# lays the build out as the official image has its own, so `configure`, which also runs over the
+# image (8.4.7 on Debian 12), is the same in every form.
+recipe:
+  install:
+    - packages: [ca-certificates, libaio1, libnuma1, procps, xz-utils]
+      when: { release: ["5", "8.0", "8.4.7"] }
+    # The `mysql` client, which the entrypoint's first start runs: ncurses 5 for every x86-64
+    # build, ncurses 6 for the arm64 one.
+    - packages: [libncurses5, libncurses6]
+      when: { release: ["5", "8.0", "8.4.7"] }
+    # The build for the machine's architecture: 8.4.7 has both, the older releases x86-64 only.
+    - file:
+        path: /var/cache/isoloom/mysql.tar
+        url: { amd64: "{{ vars.url }}", arm64: "{{ vars.arm64_url }}" }
+        sha256: { amd64: "{{ vars.sha256 }}", arm64: "{{ vars.arm64_sha256 }}" }
+      when: { release: ["8.4.7"] }
+    - file: { path: /var/cache/isoloom/mysql.tar, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
+      when: { release: ["5", "8.0"] }
+    - command: "sh -c 'mkdir -p /usr/local/mysql && tar -xf /var/cache/isoloom/mysql.tar --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
+      creates: /usr/local/mysql/bin/mysqld
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - group: { name: mysql, system: true }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - user: { name: mysql, group: mysql, system: true, home: /var/lib/mysql, shell: /bin/false }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - file: { path: /var/lib/mysql, state: directory, owner: mysql, group: mysql, mode: "0750" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - file: { path: /var/lib/mysql-files, state: directory, owner: mysql, group: mysql, mode: "0750" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - file: { path: /docker-entrypoint-initdb.d, state: directory, mode: "0755" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - file: { path: /etc/mysql/conf.d, state: directory, mode: "0755" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - template: { from: files/my.cnf, to: /etc/my.cnf, mode: "0644" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    # The settings, read by the entrypoint at first start (the image reads them from its environment).
+    - template: { from: files/isoloom.env, to: /etc/mysql/isoloom.env, mode: "0600" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+    - template: { from: files/docker-entrypoint.sh, to: /usr/local/bin/docker-entrypoint.sh, mode: "0755" }
+      when: { release: ["5", "8.0", "8.4.7"] }
+
+  configure:
+    # Every form, the official image's included: the port, the first start's scripts, and the
+    # application user's privileges (a script of the first start, after the user is made).
+    - template: { from: files/port.cnf, to: /etc/mysql/conf.d/isoloom-port.cnf, mode: "0644" }
+    - copy: { from: "{{ with.init }}/", to: /docker-entrypoint-initdb.d/ }
+      when: { set: init }
+    - template: { from: files/privileges.sql, to: /docker-entrypoint-initdb.d/zz-isoloom-privileges.sql, mode: "0644" }
+      when: { set: privileges }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    # Over the official image: nothing, the image runs its own.
+    - service: { name: mysql, run: [/usr/local/bin/docker-entrypoint.sh, mysqld] }
+      when: { release: ["5", "8.0", "8.4.7"] }
+
+  start: []

@@ -1,0 +1,297 @@
+//! The module's base, before the router and the machines: its providers, variables, the
+//! connection, the locals every VM shares, the pool, the networks (an SDN zone, a VNet each),
+//! the generated credentials and the cloud images.
+
+use crate::hcl_builder::{
+    BinaryOperator, Block, Expression, Module, Template, binary, boolean, call, conditional, for_list, list, null, number, object, reference, string,
+};
+use isoloom_plan::Environment;
+use isoloom_spec::linux::PROJECT_DIR;
+
+use super::pinned;
+use crate::machine::controller;
+use crate::machine::credentials;
+use crate::module::providers;
+use crate::module::variable::{self, Variable};
+use crate::module::{ident, resource};
+use crate::server::{self, PinnedImage, slotted, user};
+
+/// The highest slot, two digits: the SDN's ids (`iso<slot>`, `i<slot>n<network>`) are kept short.
+const MAX_SLOT: u64 = 99;
+
+/// The environment's pool, as a VM or a container names it.
+pub(super) const POOL: &str = "proxmox_virtual_environment_pool.env.pool_id";
+
+/// Everything before the router.
+pub(super) fn blocks(env: &Environment, module: &mut Module) {
+    server::head(env, module, &[providers::PROXMOX, providers::TLS], variables(env), provider());
+    module.commented(
+        "The project, written to /opt/isoloom in each machine that has steps; the `isoloom` user on every VM.",
+        locals(env),
+    );
+    module.commented(
+        "The environment's VMs and containers, together in a pool of their own.",
+        resource("proxmox_virtual_environment_pool", "env")
+            .add_attribute(("pool_id", reference("local.zone")))
+            .add_attribute(("comment", string(format!("Isoloom: {}", env.name))))
+            .build(),
+    );
+    module.commented(
+        "Applies the SDN deletions on destroy, once the zone and its VNets are gone: every SDN object depends on it, so it goes last.",
+        resource("proxmox_sdn_applier", FINALIZER).build(),
+    );
+    let mut zone = resource("proxmox_sdn_zone_simple", "env")
+        .add_attribute(("id", reference("local.zone")))
+        .add_attribute(("nodes", list([reference("var.node")])));
+    if let Some(mtu) = super::links::zone_mtu(env) {
+        zone = zone.add_attribute(("mtu", number(mtu.into())));
+    }
+    zone = zone.add_attribute(("depends_on", list([reference(&format!("proxmox_sdn_applier.{FINALIZER}"))])));
+    module.commented("The environment's networks: an SDN simple zone, a VNet per network.", zone.build());
+    credentials(env, module);
+    let vnets = super::links::vnets(env, module);
+    module.commented(
+        "Applies the SDN objects once created, and again whenever one of them is replaced.",
+        applier(vnets),
+    );
+    images(env, module);
+    super::image::downloads(env, module);
+    super::firewall::ipsets(env, module);
+    super::virtiofs::mappings(env, module);
+}
+
+/// The applier that runs last on destroy (`proxmox_sdn_applier.finalizer`): the provider's own
+/// pattern, so the zone and VNet deletions don't stay pending on the server.
+const FINALIZER: &str = "finalizer";
+
+/// The applier of the zone and `vnets`: after them, and replaced (so run again) when one is.
+fn applier(vnets: Vec<Expression>) -> Block {
+    let mut triggers = vec![reference("proxmox_sdn_zone_simple.env")];
+    triggers.extend(vnets.iter().cloned());
+    resource("proxmox_sdn_applier", "env")
+        .add_block(Block::builder("lifecycle").add_attribute(("replace_triggered_by", list(triggers))).build())
+        .add_attribute(("depends_on", list(vnets)))
+        .build()
+}
+
+/// The module's variables, the values a runner passes at launch among them.
+pub(super) fn variables(env: &Environment) -> Vec<Variable> {
+    // No `isoloom_sealed` variable: the router's snippet never depends on it (a changed snippet
+    // would recreate the router VM), so the seal is applied live by the manifest's seal-reload
+    // step instead (`crate::server::router`).
+    [
+        server(
+            "The bridge the router reaches the internet through",
+            "unique per environment on this server (SDN ids are short)",
+        ),
+        super::windows::variables(env),
+        super::lxc::variables(env),
+        super::virtiofs::variables(env),
+    ]
+    .concat()
+}
+
+/// The server's variables (the `proxmox` module's): the
+/// connection, the node, where the disks, images and snippets go, the uplink bridge (`uplink`
+/// says what it is for), the environment's slot, 1 to [`MAX_SLOT`] (`slot` says how unique) and
+/// the key the `isoloom` user takes.
+pub(super) fn server(uplink: &str, slot: &str) -> Vec<Variable> {
+    let s = |name: &str| Variable::new(name, "string");
+    let mut v = connection("Uploading cloud-init snippets goes over SSH to the node");
+    v.extend([
+        node(),
+        s("datastore").default(string("local-lvm")).describe("Where VM disks go"),
+        s("image_datastore")
+            .default(string("local"))
+            .describe("A datastore with 'iso' content, for cloud images"),
+        s("snippets_datastore")
+            .default(string("local"))
+            .describe("A datastore with 'snippets' content, for cloud-init"),
+        s("uplink_bridge").default(string("vmbr0")).describe(uplink),
+        server::slot_variable(MAX_SLOT, slot),
+        variable::ssh_public_key(),
+        variable::ssh_private_key_file(),
+    ]);
+    v.extend(socks());
+    v
+}
+
+/// The SOCKS5 proxy Terraform's SSH connections to the router and the machines go through first
+/// ([`crate::machine::provisioner::SOCKS_VARIABLES`]): none by default. A server whose lab
+/// bridge only its node reaches (a NAT bridge) has the router's uplink address out of this
+/// machine's reach; a tunnel to the node (`ssh -D`) is then the way in.
+fn socks() -> [Variable; 2] {
+    let [host, port] = crate::machine::provisioner::SOCKS_VARIABLES;
+    [
+        Variable::new(host, "string").default(string("")).describe(
+            "A SOCKS5 proxy (its host) Terraform's SSH connections go through first, for a server whose lab bridge only its node reaches; empty for none",
+        ),
+        Variable::new(port, "number").default(number(0)).describe("The port of ssh_proxy_host"),
+    ]
+}
+
+/// The node the VMs go on: no default, since a server's first node can be named anything (the
+/// runner's user finds it when the server is added); an empty name is refused before anything is made.
+pub(super) fn node() -> Variable {
+    Variable::new("node", "string")
+        .describe("The Proxmox node the VMs go on (`pvesh get /nodes` lists them)")
+        .validated(
+            is_set("node"),
+            "Set `node` to the Proxmox node the environment's VMs go on (`pvesh get /nodes` lists them).",
+        )
+}
+
+/// The variables of the connection to the server: its API (a token, or a user and password),
+/// and SSH to the node, which uploads the snippets (`snippets` says how many).
+pub(super) fn connection(snippets: &str) -> Vec<Variable> {
+    let s = |name: &str| Variable::new(name, "string");
+    vec![
+        s("proxmox_endpoint").describe("https://<server>:8006/"),
+        s("proxmox_api_token")
+            .default(string(""))
+            .sensitive()
+            .describe("user@realm!name=secret; or use proxmox_username and proxmox_password"),
+        s("proxmox_username").default(string("root@pam")),
+        s("proxmox_password").default(string("")).sensitive(),
+        // Verified by default: a server with a self-signed API certificate is accepted only when
+        // the operator says so (`proxmox_insecure=true`), for the Proxmox API endpoint only.
+        Variable::new("proxmox_insecure", "bool")
+            .default(boolean(false))
+            .describe("Accept the server's self-signed certificate (TLS isn't verified)"),
+        s("proxmox_ssh_username").default(string("root")).describe(snippets),
+        s("proxmox_ssh_private_key_file").default(string("")),
+        s("proxmox_ssh_address")
+            .default(string(""))
+            .describe("The node's SSH address, when the API reports one this machine can't reach"),
+    ]
+}
+
+/// `var.<name> != ""`.
+pub(super) fn is_set(name: &str) -> Expression {
+    binary(reference(&format!("var.{name}")), BinaryOperator::NotEq, string(""))
+}
+
+/// `var.<name> == ""`.
+pub(super) fn is_unset(name: &str) -> Expression {
+    binary(reference(&format!("var.{name}")), BinaryOperator::Eq, string(""))
+}
+
+/// A cloud image downloaded to the node's image datastore, `proxmox_download_file.<id>`, as
+/// `iso<slot><suffix>`. A `pin` (Isoloom's own pinned images) adds the checksum the provider
+/// verifies the download against; a machine's own image (`overrides.proxmox`) has none, so the
+/// user vouches for its URL.
+pub(super) fn download(id: &str, url: &str, suffix: &str, pin: Option<PinnedImage>) -> Block {
+    let mut b = resource("proxmox_download_file", id)
+        .add_attribute(("node_name", reference("var.node")))
+        .add_attribute(("datastore_id", reference("var.image_datastore")))
+        .add_attribute(("content_type", string("iso")))
+        .add_attribute(("url", string(url)))
+        .add_attribute(("file_name", slotted(suffix)))
+        .add_attribute(("overwrite_unmanaged", boolean(true)));
+    if let Some(pin) = pin {
+        b = b
+            .add_attribute(("checksum", string(pin.checksum)))
+            .add_attribute(("checksum_algorithm", string(pin.algorithm)));
+    }
+    b.build()
+}
+
+/// The connection: an API token, else a user and password; SSH to the node for the snippets.
+pub(super) fn provider() -> Block {
+    let token = || is_set("proxmox_api_token");
+    let key = || is_set("proxmox_ssh_private_key_file");
+    let node = Block::builder("dynamic")
+        .add_label("node")
+        .add_attribute(("for_each", conditional(is_unset("proxmox_ssh_address"), list([]), list([number(1)]))))
+        .add_block(
+            Block::builder("content")
+                .add_attribute(("name", reference("var.node")))
+                .add_attribute(("address", reference("var.proxmox_ssh_address")))
+                .build(),
+        )
+        .build();
+    let ssh = Block::builder("ssh")
+        .add_attribute(("agent", boolean(false)))
+        .add_attribute(("username", reference("var.proxmox_ssh_username")))
+        .add_attribute(("password", conditional(key(), null(), reference("var.proxmox_password"))))
+        .add_attribute((
+            "private_key",
+            conditional(key(), call("file", [reference("var.proxmox_ssh_private_key_file")]), null()),
+        ))
+        .add_block(node)
+        .build();
+    Block::builder("provider")
+        .add_label("proxmox")
+        .add_attribute(("endpoint", reference("var.proxmox_endpoint")))
+        .add_attribute(("api_token", conditional(token(), reference("var.proxmox_api_token"), null())))
+        .add_attribute(("username", conditional(token(), null(), reference("var.proxmox_username"))))
+        .add_attribute(("password", conditional(token(), null(), reference("var.proxmox_password"))))
+        .add_attribute(("insecure", reference("var.proxmox_insecure")))
+        .add_block(ssh)
+        .build()
+}
+
+/// The SDN zone's id, the project's root and files, and the `isoloom` user: the operator's key
+/// and, with a controller, the controller's own key too, so it can run the playbooks over SSH.
+fn locals(env: &Environment) -> Block {
+    let f = || reference("f");
+    let file = object([
+        ("path", Template::text(format!("{PROJECT_DIR}/")).with_expr(f()).into_expression()),
+        ("encoding", string("b64")),
+        (
+            "content",
+            call(
+                "filebase64",
+                [Template::new()
+                    .with_expr(reference("local.root"))
+                    .with_text("/")
+                    .with_expr(f())
+                    .into_expression()],
+            ),
+        ),
+    ]);
+    let users = if controller::needed(env) {
+        list([user(call("compact", [list([reference("var.ssh_public_key"), controller::public_key()])]))])
+    } else {
+        conditional(is_unset("ssh_public_key"), list([]), list([user(list([reference("var.ssh_public_key")]))]))
+    };
+    Block::builder("locals")
+        .add_attribute(("zone", slotted("")))
+        .add_attribute((
+            "root",
+            call(
+                "abspath",
+                [Template::new().with_expr(reference("path.module")).with_text("/../..").into_expression()],
+            ),
+        ))
+        .add_attribute(("project_files", for_list("f", reference("local.project_paths"), file, None)))
+        .add_attribute(("users", users))
+        .build()
+}
+
+/// A cloud image per OS (the router's and the controller's Debian among them), per environment:
+/// a shared file would go with whichever environment is destroyed first.
+fn images(env: &Environment, module: &mut Module) {
+    let mut oses: Vec<(&str, bool)> = env
+        .vms()
+        .filter(|vm| !super::image::has_own(vm.plan))
+        .map(|vm| (vm.os, super::arch::is_arm(vm.plan)))
+        .collect();
+    oses.push((controller::OS, false));
+    oses.sort_unstable();
+    oses.dedup();
+    for (o, arm) in oses {
+        let pin = if arm { super::arch::pinned(o) } else { pinned(o) };
+        let Some(pin) = pin else { continue };
+        let (id, file) = if arm {
+            (format!("{}_arm64", ident(o)), format!("{o}-arm64"))
+        } else {
+            (ident(o), o.to_owned())
+        };
+        let block = download(&id, pin.url, &format!("-{file}.img"), Some(pin));
+        module.commented(
+            &format!("The `{o}` cloud image, per environment: a shared file would go with whichever environment is destroyed first."),
+            block,
+        );
+    }
+}

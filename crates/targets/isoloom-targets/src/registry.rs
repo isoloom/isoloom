@@ -1,0 +1,51 @@
+//! The registry of backends, one per target: Compose, Kubernetes, external (Ansible), Vagrant,
+//! Proxmox, ESXi, cloud-vm and cloud-docker. Every target
+//! renders the plan through the backend registered for it.
+
+use isoloom_ansible::ExternalBackend;
+use isoloom_compose::ComposeBackend;
+use isoloom_kubernetes::KubernetesBackend;
+use isoloom_render::backend::Backend;
+use isoloom_spec::model::Target;
+use isoloom_terraform::{CloudVmBackend, EsxiBackend, ProxmoxBackend};
+use isoloom_vagrant::VagrantBackend;
+
+use crate::composite::CloudDockerBackend;
+
+static DOCKER: ComposeBackend = ComposeBackend::DOCKER;
+static HOSTED: ComposeBackend = ComposeBackend::HOSTED;
+static CLOUD_DOCKER: CloudDockerBackend = CloudDockerBackend;
+static KUBERNETES: KubernetesBackend = KubernetesBackend;
+static VAGRANT: VagrantBackend = VagrantBackend;
+static PROXMOX: ProxmoxBackend = ProxmoxBackend;
+static ESXI: EsxiBackend = EsxiBackend;
+static CLOUD_VM: CloudVmBackend = CloudVmBackend;
+static EXTERNAL: ExternalBackend = ExternalBackend;
+
+/// The backend of `target`: every target has one.
+#[must_use]
+pub fn backend(target: Target) -> &'static dyn Backend {
+    match target {
+        Target::Docker => &DOCKER,
+        Target::Hosted => &HOSTED,
+        Target::CloudDocker => &CLOUD_DOCKER,
+        Target::Kubernetes => &KUBERNETES,
+        Target::Vagrant => &VAGRANT,
+        Target::Proxmox => &PROXMOX,
+        Target::Esxi => &ESXI,
+        Target::CloudVm => &CLOUD_VM,
+        Target::External => &EXTERNAL,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_targets_backend_renders_that_target() {
+        for t in Target::ALL {
+            assert_eq!(backend(t).target(), t);
+        }
+    }
+}

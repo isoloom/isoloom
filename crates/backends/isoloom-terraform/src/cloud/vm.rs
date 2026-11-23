@@ -1,0 +1,307 @@
+//! The `cloud-vm` target: one cloud VM per machine, a Terraform module per cloud under
+//! `.isoloom/cloud-vm/<cloud>/`, and the check runners every cloud shares under
+//! `.isoloom/cloud-vm/checks/`.
+//!
+//! Each cloud's module is its own ([`CloudVmModule`]): its refusal read from the plan, then its
+//! module, rendered from the plan through the VM core (`crate::machine`). No cloud stands for
+//! the others: a cloud whose refusal fires drops only its module, so a
+//! feature one cloud can't do never hides another cloud's working module. The target is
+//! refused only when every cloud refuses it ([`CloudVmBackend`]).
+//!
+//! What the clouds share lives here, by concept: what a cloud takes ([`rules`]: the features it
+//! lacks, its GPU types, nesting, MTU, volumes and images), its machines' set-up hooks, their
+//! interfaces after the first, their data disks, their own images, the networks routed through
+//! a machine, the private DNS zone's records, the `reach` rules, the Windows limits, the outputs,
+//! and a module's frame around a cloud's own part (its [`VmDriver`]: its first lines, its
+//! providers, its credentials).
+
+pub(crate) mod console;
+pub(crate) mod controller_setup;
+pub(crate) mod disks;
+pub(crate) mod gateways;
+pub(crate) mod gpus;
+pub(crate) mod hooks;
+pub(crate) mod interfaces;
+pub(crate) mod nested;
+pub(crate) mod outputs;
+pub(crate) mod own_image;
+pub(crate) mod private_dns;
+pub(crate) mod published;
+pub(crate) mod reach;
+pub(crate) mod rules;
+pub(crate) mod seal;
+pub(crate) mod sizes;
+pub(crate) mod windows;
+
+use std::net::Ipv4Addr;
+
+use crate::hcl_builder::{Expression, Module};
+use isoloom_plan::{Capabilities, Environment, Feature, Vm};
+use isoloom_render::Error as RenderError;
+use isoloom_render::GeneratedFile;
+use isoloom_render::backend::{Backend, Files};
+use isoloom_spec::model::Target;
+
+use super::{Base, Cloud, aws, azure, digitalocean, gcp, linode, oci};
+use crate::machine::{self, controller};
+use crate::module::providers::{self, LOCAL, Provider, TLS};
+use crate::module::variable::Variable;
+use crate::module::{self, ProjectCopy};
+use crate::{Result, checks, target};
+
+/// A cloud's own part of its `cloud-vm` module. The module's frame is the same on every cloud:
+/// its folder, its first lines, the `terraform` block, the module's head (`cloud::head`), the
+/// file.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct VmDriver {
+    /// What the cloud's modules share with its `cloud-docker` module: the usage, the variables,
+    /// the provider, the images' users.
+    pub(crate) base: Base,
+    /// The providers it requires, then those its Windows machines add.
+    pub(crate) requires: (&'static [Provider], &'static [Provider]),
+    /// Why it can't run the environment, if it can't.
+    pub(crate) refusal: fn(&Environment) -> Option<String>,
+    /// Its blocks after the module's head; refused when a machine can't be written (its user
+    /// data over the cloud's cap).
+    pub(crate) write: fn(&Environment, &mut Module) -> Result<()>,
+}
+
+/// The providers a cloud's module requires: `base` (the cloud's own), `local` for the project's
+/// archive (its exclusion list, `crate::ready`), TLS for the controller's key, and `windows`
+/// for the Windows machines (their password).
+fn required(env: &Environment, base: &[Provider], windows: &[Provider]) -> Vec<Provider> {
+    let mut p = base.to_vec();
+    p.push(LOCAL);
+    if controller::needed(env) {
+        p.push(TLS);
+    }
+    if machine::windows::any(env) {
+        p.extend(windows.iter().filter(|w| **w != LOCAL).copied());
+    }
+    p
+}
+
+/// A cloud's own variables for `env`: the driver's, then the launch-time inputs.
+pub(crate) fn own_variables(env: &Environment, driver: &VmDriver) -> Vec<Variable> {
+    let mut v = driver.base.variables(env);
+    // The values given at launch, each its own variable, read in the machines' user data.
+    v.extend(crate::module::inputs::variables_of(env));
+    v
+}
+
+/// Each VM with its first network and its address there, the one its instance's interface is on
+/// (a VM on no network has none).
+pub(crate) fn at_first_address(env: &Environment) -> impl Iterator<Item = (Vm<'_>, (&str, Ipv4Addr))> {
+    env.vms().filter_map(|vm| vm.plan.addresses.first().map(|(net, a)| (vm, (net.as_str(), *a))))
+}
+
+/// How a cloud's module writes a Windows VM.
+pub(crate) type WriteWindows = fn(&Environment, Vm<'_>, &mut Module);
+
+/// How a cloud's module writes its machines: a Linux VM, a Windows VM, the controller.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Machines {
+    /// A Linux VM's resources and set-up.
+    pub(crate) linux: fn(&Environment, Vm<'_>, &mut Module) -> Result<()>,
+    /// A Windows VM's resources and set-up (its user data is fixed: the administrator, WinRM, the
+    /// auto-stop, nothing a cap could refuse); `None` on a cloud whose refusal declines Windows.
+    pub(crate) windows: Option<WriteWindows>,
+    /// The controller's resources and set-up.
+    pub(crate) controller: fn(&Environment, &mut Module) -> Result<()>,
+    /// The kind of a Linux VM's instance (`aws_instance`): its id makes its readiness wait again.
+    pub(crate) instance: &'static str,
+}
+
+impl Machines {
+    /// Each VM in start order, then the controller when the environment needs one.
+    ///
+    /// # Errors
+    ///
+    /// The first machine that can't be written ([`crate::Error::Refused`]).
+    pub(crate) fn write(&self, env: &Environment, module: &mut Module) -> Result<()> {
+        for vm in env.vms() {
+            match (vm.plan.is_windows(), self.windows) {
+                (true, Some(windows)) => windows(env, vm, module),
+                (true, None) => {}
+                (false, _) => (self.linux)(env, vm, module)?,
+            }
+        }
+        if controller::needed(env) {
+            (self.controller)(env, module)?;
+        }
+        Ok(())
+    }
+
+    /// The credentials, the machines ([`Machines::write`]), then the outputs of a cloud whose
+    /// resources are named after the machines (`outputs::write_named`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Machines::write`].
+    pub(crate) fn write_with_outputs(
+        &self,
+        env: &Environment,
+        user: fn(&str) -> &'static str,
+        public_ip: fn(&str) -> Expression,
+        module: &mut Module,
+    ) -> Result<()> {
+        crate::machine::credentials(env, module);
+        self.write(env, module)?;
+        outputs::write_named(env, user, public_ip, self.instance, module);
+        Ok(())
+    }
+}
+
+/// What the clouds of the target can render: the VM core's features (`machine::FEATURES`),
+/// each cloud refusing on its own, with its reason, what it can't give (a router in the path
+/// for `tc`, a network's MTU, a further address on DigitalOcean); and these.
+fn capabilities() -> Capabilities {
+    Capabilities::of(machine::FEATURES.into_iter().chain([
+        // Addresses the cloud hands out: Oracle Cloud picks one in the subnet's prefix; Azure
+        // refuses it on its own, and the other clouds refuse IPv6 altogether.
+        Feature::Ipv6Auto,
+        // Given on AWS (NitroTPM), Azure, Google Cloud and Oracle Cloud; DigitalOcean and Linode
+        // refuse it on their own.
+        Feature::Tpm,
+        // A GPU instance type (each cloud's own table; refused where it has none).
+        Feature::VmGpus,
+        // A size that nests and the cloud's switch (refused by the clouds that have none).
+        Feature::NestedVirtualization,
+    ]))
+}
+
+/// The `cloud-vm` module on one cloud: its refusal, then its module (what [`CloudVmBackend`]
+/// writes for each cloud that takes the environment).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CloudVmModule(Cloud);
+
+impl From<Cloud> for CloudVmModule {
+    fn from(cloud: Cloud) -> CloudVmModule {
+        CloudVmModule(cloud)
+    }
+}
+
+impl CloudVmModule {
+    /// The module on `cloud`.
+    #[must_use]
+    pub const fn new(cloud: Cloud) -> CloudVmModule {
+        CloudVmModule(cloud)
+    }
+
+    /// Its cloud.
+    #[must_use]
+    pub const fn cloud(self) -> Cloud {
+        self.0
+    }
+
+    /// Its cloud's own part.
+    const fn driver(self) -> VmDriver {
+        match self.0 {
+            Cloud::Aws => aws::vm::DRIVER,
+            Cloud::Azure => azure::vm::DRIVER,
+            Cloud::Gcp => gcp::vm::DRIVER,
+            Cloud::DigitalOcean => digitalocean::vm::DRIVER,
+            Cloud::Linode => linode::vm::DRIVER,
+            Cloud::Oci => oci::vm::DRIVER,
+        }
+    }
+
+    /// Why its cloud can't run `env` beyond the plan's requirements: the cloud's own rules, then
+    /// a machine its module can't write (its user data over the cloud's cap, which only writing
+    /// it measures).
+    fn own_refusal(self, env: &Environment) -> Option<String> {
+        let driver = self.driver();
+        let own = (driver.refusal)(env);
+        #[cfg(feature = "paas")]
+        let own = own.or_else(|| crate::paas::refusal(self.0, env));
+        own.or_else(|| match (driver.write)(env, &mut Module::default()) {
+            Err(crate::Error::Refused { reason, .. }) => Some(reason),
+            _ => None,
+        })
+    }
+
+    /// Why its cloud can't run `env`: the plan's requirements the target lacks, else the
+    /// cloud's own rules.
+    #[must_use]
+    pub fn refusal(self, env: &Environment) -> Option<String> {
+        target::refusal(env, &capabilities(), || self.own_refusal(env))
+    }
+
+    /// Its module, `.isoloom/cloud-vm/<cloud>/main.tf`.
+    ///
+    /// # Errors
+    ///
+    /// The [`refusal`](Self::refusal) as an unsupported environment for `cloud-vm`, or the
+    /// module that couldn't be written.
+    pub fn render(self, env: &Environment) -> std::result::Result<GeneratedFile, RenderError> {
+        target::render(Target::CloudVm, &capabilities(), env, || self.own_refusal(env), || self.module(env))
+    }
+
+    /// Its module, for an environment it takes: how to start it, the providers, then the
+    /// cloud's own blocks.
+    fn module(self, env: &Environment) -> Result<GeneratedFile> {
+        let driver = self.driver();
+        let folder = format!("{}/{}", Target::CloudVm.id(), self.0.id());
+        let mut m = module::start(&(driver.base.usage)(&folder));
+        let (base, windows) = driver.requires;
+        m.block(providers::terraform(&required(env, base, windows)));
+        // Terraform brings the project in: over SSH to each Linux machine before it waits for its
+        // set-up (`crate::ready`), over WinRM to a Windows machine it sets up itself; an archive
+        // made from `local.root` either way.
+        let copy = ProjectCopy::Archive;
+        super::head(env, &mut m, own_variables(env, &driver), driver.base.provider, copy);
+        (driver.write)(env, &mut m)?;
+        #[cfg(feature = "paas")]
+        crate::paas::attach(self.0, env, &mut m);
+        module::file(Target::CloudVm, &folder, m, copy)
+    }
+}
+
+/// The `cloud-vm` backend: a module for every cloud whose model fits the environment.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct CloudVmBackend;
+
+impl CloudVmBackend {
+    /// Each cloud, AWS first, with why it can't run `env` (`None`: its module is written).
+    #[must_use]
+    pub fn refusals(self, env: &Environment) -> Vec<(Cloud, Option<String>)> {
+        Cloud::ALL.into_iter().map(|cloud| (cloud, CloudVmModule(cloud).refusal(env))).collect()
+    }
+
+    /// Why no cloud can run `env`, when none can ([`super::none_takes`]).
+    fn own_refusal(self, env: &Environment) -> Option<String> {
+        super::none_takes(self.refusals(env))
+    }
+
+    /// The module of each cloud that takes `env`, then the check runners.
+    fn files(self, env: &Environment) -> Result<Files> {
+        let mut files = Vec::new();
+        for (cloud, why) in self.refusals(env) {
+            if why.is_none() {
+                files.push(CloudVmModule(cloud).module(env)?);
+                #[cfg(feature = "paas")]
+                files.extend(crate::paas::file(cloud, env)?);
+            }
+        }
+        files.extend(checks::runners(env, Target::CloudVm.id()));
+        Ok(files)
+    }
+}
+
+impl Backend for CloudVmBackend {
+    fn target(&self) -> Target {
+        Target::CloudVm
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        capabilities()
+    }
+
+    fn render(&self, env: &Environment) -> std::result::Result<Files, RenderError> {
+        target::render(Target::CloudVm, &capabilities(), env, || self.own_refusal(env), || self.files(env))
+    }
+
+    fn refusal(&self, env: &Environment) -> Option<String> {
+        target::refusal(env, &capabilities(), || self.own_refusal(env))
+    }
+}

@@ -1,0 +1,4 @@
+# The collections the domain playbooks use, installed on the controller before they run.
+collections:
+  - name: ansible.windows
+  - name: microsoft.ad

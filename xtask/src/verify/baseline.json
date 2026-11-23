@@ -1,0 +1,674 @@
+{
+  "image": {
+    "tag": "isoloom-verify:431333886",
+    "id": "sha256:03b4bb5dd71f8744f29f2c66341a57be6ce056ad0c3983993502a9470ad62c02"
+  },
+  "causes": {
+    "shellcheck-embedded/SC1003": "A command quoted for `sh -c` inside a script that is itself quoted for `sh -c` (a step's `run` in the set-up, through shell::quote twice) reads as `\\'` inside single quotes to shellcheck's heuristic: the shell reads the quoting as written, the step's own command, and SC1003 is shellcheck's info, not an error.",
+    "shellcheck-embedded/SC1091": "The set-up reads `/var/lib/isoloom/secrets.env`, which Terraform writes into the machine from its sensitive variables: there is no such file to follow where the module is checked.",
+    "shellcheck-embedded/SC2015": "`<steps> && … || { echo 'failed: …'; exit 1; }` is the set-up's step form on purpose: the failure mark runs when any command of the chain fails, which is what the `||` is for.",
+    "shellcheck-embedded/SC2016": "A secret's delivery runs `env NAME=<value> sh -c '… \"$v\" …'`: the single quotes keep `$v` for the inner shell, which sets it, so nothing is meant to expand in the outer one."
+  },
+  "failures": [
+    {
+      "file": "air-gapped/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "air-gapped/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "air-gapped/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "air-gapped/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "air-gapped/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "air-gapped/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "arm-vm/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "corp-ad-basics/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dmz-jump/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dmz-jump/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dmz-jump/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dmz-jump/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dmz-jump/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dmz-jump/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dual-stack/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dual-stack/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dual-stack/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "dual-stack/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "edge-firewall/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "edge-firewall/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "edge-firewall/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "edge-firewall/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "existing-hosts/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "hello-stack/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "hello-stack/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "hello-stack/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "hello-stack/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "hello-stack/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "hello-stack/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1091",
+      "cause": "shellcheck-embedded/SC1091"
+    },
+    {
+      "file": "invoice-portal-api/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2015",
+      "cause": "shellcheck-embedded/SC2015"
+    },
+    {
+      "file": "mixed-office/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "mixed-office/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "private-names/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "segmented/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "segmented/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "segmented/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "segmented/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "segmented/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "segmented/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "several-addresses/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/cloud-vm/digitalocean/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "solo-web/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/linode/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2016",
+      "cause": "shellcheck-embedded/SC2016"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1091",
+      "cause": "shellcheck-embedded/SC1091"
+    },
+    {
+      "file": "supplier-portal-api/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC2015",
+      "cause": "shellcheck-embedded/SC2015"
+    },
+    {
+      "file": "tuned-web/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "tuned-web/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "tuned-web/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "tuned-web/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "tuned-web/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "udp-dns/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "udp-dns/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "udp-dns/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "udp-dns/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "udp-dns/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "udp-dns/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "vlan-office/.isoloom/cloud-vm/aws/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "vlan-office/.isoloom/cloud-vm/azure/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "vlan-office/.isoloom/cloud-vm/gcp/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "vlan-office/.isoloom/cloud-vm/oci/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "vlan-office/.isoloom/esxi/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    },
+    {
+      "file": "vlan-office/.isoloom/proxmox/main.tf",
+      "validator": "shellcheck-embedded",
+      "rule": "SC1003",
+      "cause": "shellcheck-embedded/SC1003"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+//! Linode's `cloud-docker` module: an instance of the Docker host's OS with the operator's key,
+//! behind a firewall.
+
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, call, list, reference, string};
+use isoloom_plan::Environment;
+use isoloom_spec::model::Protocol;
+
+use super::{Action, Way, rule, vm};
+use crate::cloud::docker::{DockerDriver, HOST_OS, HostSizes, SizeVariable};
+use crate::cloud::instance::tag_list;
+use crate::docker_host::{container_ports, tcp_ports};
+use crate::module::providers;
+
+/// Its `cloud-docker` driver.
+pub(crate) const DRIVER: DockerDriver = DockerDriver {
+    base: super::BASE,
+    requires: providers::LINODE,
+    size: Some(SizeVariable {
+        name: "type",
+        sizes: HostSizes::Table(super::vm::PLANS),
+    }),
+    resources,
+    instance: "linode_instance",
+};
+
+/// The cloud's resources, after the module's head, `user_data` in the instance's metadata (read
+/// by cloud-init); the Docker host's address.
+fn resources(env: &Environment, module: &mut Module, user_data: Expression) -> Expression {
+    module.block(
+        resource("linode_instance")
+            .add_attribute(("region", reference("var.region")))
+            .add_attribute(("type", reference("var.type")))
+            .add_attribute(("image", string(vm::image(HOST_OS).unwrap_or_default())))
+            .add_attribute(("authorized_keys", list([call("trimspace", [reference("var.ssh_public_key")])])))
+            .add_block(super::metadata(user_data))
+            .add_attribute(("tags", tag_list(env)))
+            .add_block(super::set_up_once())
+            .build(),
+    );
+    module.block(firewall(env));
+    call("one", [reference("linode_instance.env.ipv4")])
+}
+
+/// `resource "<kind>" "env"`, labelled after the environment.
+fn resource(kind: &str) -> BlockBuilder {
+    crate::module::resource(kind, "env").add_attribute(("label", reference("local.name")))
+}
+
+/// A rule letting `allowed_cidr` in on `ports` (`"22,8080"`).
+fn inbound(label: &str, protocol: &str, ports: &[u16]) -> Block {
+    let ports: Vec<String> = ports.iter().map(u16::to_string).collect();
+    rule(
+        (Way::In, Action::Accept),
+        label,
+        protocol,
+        Some(ports.join(",")),
+        list([reference("var.allowed_cidr")]),
+    )
+}
+
+/// SSH and the published ports in from `allowed_cidr`, the rest dropped; everything out.
+fn firewall(env: &Environment) -> Block {
+    let udp = container_ports(env, Protocol::Udp);
+    let mut b = resource("linode_firewall")
+        .add_attribute(("tags", tag_list(env)))
+        .add_attribute(("inbound_policy", string("DROP")))
+        .add_attribute(("outbound_policy", string("ACCEPT")))
+        .add_block(inbound("ssh-and-published", "TCP", &tcp_ports(env)));
+    if !udp.is_empty() {
+        b = b.add_block(inbound("published-udp", "UDP", &udp));
+    }
+    b.add_attribute(("linodes", list([reference("linode_instance.env.id")]))).build()
+}

@@ -1,0 +1,57 @@
+name: CI
+
+# Pull requests into dev and pushes to dev: the short list a change is merged with
+# (`cargo xtask check --fast`: the lockfile, rustfmt, clippy, the tests, and the Windows clippy) on
+# Linux, macOS and Windows. Everything else `cargo xtask check` has runs before main (gate.yml).
+#
+# A workflow here only installs a step's tools and runs `cargo xtask check` (xtask/src/check.rs),
+# the command a contributor runs: the two can't drift. `cargo run -p xtask --locked` rather than
+# the `cargo xtask` alias, so a stale Cargo.lock fails instead of being rewritten.
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fast:
+    name: The short list (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Windows clippy needs MinGW's C compiler: Linux has it, the others run the rest.
+          - os: ubuntu-24.04
+            check: --fast
+          - os: macos-15
+            check: --fast --skip windows-gnu
+          - os: windows-2025
+            check: --fast --skip windows-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The toolchain (its channel, components and targets) is pinned by rust-toolchain.toml.
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only dev writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-nextest@0.9.148
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
+      - run: cargo run -q -p xtask --locked -- check ${{ matrix.check }}

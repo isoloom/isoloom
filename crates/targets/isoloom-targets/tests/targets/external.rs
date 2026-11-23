@@ -1,0 +1,86 @@
+//! The `external` target: machines that already exist, described with their SSH endpoints.
+
+use isoloom_spec::Target;
+use isoloom_targets::{Lab, generate};
+
+use crate::testing::{Outcome, lab};
+
+/// The `existing-hosts` example.
+fn example() -> Outcome<Lab> {
+    crate::testing::example("existing-hosts")
+}
+
+#[test]
+fn a_spec_with_addresses_on_every_machine_gets_the_external_target() -> Outcome {
+    let spec = example()?;
+    assert_eq!(spec.problems(), vec![]);
+    let ids: Vec<&str> = spec.possible().into_iter().map(Target::id).collect();
+    assert!(ids.contains(&"external") && ids.contains(&"vagrant"), "{ids:?}");
+    let files = generate(&spec, Target::External)?;
+    let inv = isoloom_test_support::ini_groups(crate::testing::file(&files, ".isoloom/external/inventory.ini")?);
+    let web = "web ansible_host=192.168.1.20 ansible_user=admin ansible_ssh_private_key_file=~/.ssh/id_ed25519";
+    assert!(inv.values().any(|hosts| hosts.iter().any(|h| h == web)), "{inv:?}");
+    assert!(!files.iter().any(|f| f.path.ends_with("machines.json")), "no file for a runner that reads none");
+    // Derived checks run from each machine; probes only.
+    let runner = crate::testing::file(&files, ".isoloom/external/checks/web.sh")?;
+    let cache = crate::testing::check_line(runner, "cache:6379 from web")?;
+    assert!(cache.contains("_tcp '192.168.1.21' 6379"), "{cache}");
+    assert!(files.iter().any(|f| f.path == ".isoloom/resolved.json"));
+    Ok(())
+}
+
+#[test]
+fn external_blocks_are_checked_and_optional() -> Outcome {
+    let base = "version: 1\nname: t\nnetworks:\n  lab: { cidr: 10.9.0.0/24 }\nmachines:\n";
+    let spec = lab(&format!(
+        "{base}  a: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\noverrides: {{ external: {{ machines: {{ a: {{ ssh: {{ address: '' }} }} }} }} }}\n"
+    ))?;
+    // The problem is placed at the machine's `ssh` block (the lowered field's leaf isn't kept).
+    let first = spec.problems()[0].line();
+    assert!(first.starts_with("overrides.external.machines.a.ssh: an address"), "{first}");
+    let bad_port = lab(&format!(
+        "{base}  a: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\noverrides: {{ external: {{ machines: {{ a: {{ ssh: {{ address: 10.0.0.5, port: 0 }} }} }} }} }}\n"
+    ))?;
+    assert!(
+        bad_port.problems().iter().any(|p| p.line() == "overrides.external.machines.a.ssh: 1 to 65535"),
+        "{:?}",
+        bad_port.problems()
+    );
+    // One machine without an address: no external target, and it says so.
+    let missing = lab(&format!(
+        "{base}  a: {{ networks: {{ lab: 5 }}, app: {{ image: x }} }}\n  b: {{ networks: {{ lab: 6 }}, app: {{ image: x }} }}\noverrides: {{ external: {{ machines: {{ a: {{ ssh: {{ address: 10.0.0.5 }} }} }} }} }}\n"
+    ))?;
+    assert!(!missing.possible().contains(&Target::External));
+    assert_eq!(
+        missing.refusal(Target::External).map(|p| p.path.to_string()).as_deref(),
+        Some("overrides.external.machines.b")
+    );
+    Ok(())
+}
+
+#[test]
+fn existing_hosts_behind_a_gateway_machine_are_still_generated() -> Outcome {
+    let spec = lab(
+        "version: 1\nname: gw\nnetworks:\n  lan: { cidr: 10.9.0.0/24, gateway: fw }\n  wan: { cidr: 10.8.0.0/24 }\nmachines:\n  fw:\n    os: debian@12\n    networks: { wan: 2, lan: 1 }\n    app: { steps: [{ run: fw.sh }] }\n  pc:\n    os: debian@12\n    networks: { lan: 10 }\n    app: { steps: [{ run: pc.sh }] }\noverrides:\n  external:\n    machines:\n      fw: { ssh: { address: 192.168.1.2 } }\n      pc: { ssh: { address: 192.168.1.10 } }\n",
+    )?;
+    assert_eq!(spec.problems(), vec![]);
+    assert!(spec.possible().contains(&Target::External));
+    assert_eq!(isoloom_targets::refusal(&spec, Target::External).unwrap(), None);
+    generate(&spec, Target::External)?;
+    Ok(())
+}
+
+/// `external` refuses a tmpfs `mode` for itself, not as Kubernetes' (whose reason it once gave).
+#[test]
+fn external_refuses_a_tmpfs_mode_in_its_own_words() -> Outcome {
+    let spec = lab(
+        "version: 1\nname: t\nnetworks:\n  lan: { cidr: 10.9.0.0/24 }\nmachines:\n  a:\n    networks: { lan: 5 }\n    app: { image: x }\n    tmpfs: [{ path: /run/cache, mode: \"1777\" }]\noverrides: { external: { machines: { a: { ssh: { address: 192.168.1.5 } } } } }\n",
+    )?;
+    for target in [Target::External, Target::Kubernetes] {
+        let why = isoloom_targets::refusal(&spec, target)
+            .unwrap()
+            .ok_or_else(|| format!("{} refuses a tmpfs mode", target.id()))?;
+        assert!(why.contains("tmpfs `mode`") && !why.contains("Kubernetes"), "{}: {why}", target.id());
+    }
+    Ok(())
+}

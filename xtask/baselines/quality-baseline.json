@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "dup/clone": {
+      "isoloom-spec": 1
+    },
+    "exception/expect": {
+      "isoloom": 4,
+      "isoloom-render": 2,
+      "isoloom-spec": 2,
+      "isoloom-targets": 1,
+      "isoloom-test-support": 2,
+      "isoloom-vagrant": 2,
+      "xtask": 2,
+      "xtask-quality": 2
+    }
+  }
+}

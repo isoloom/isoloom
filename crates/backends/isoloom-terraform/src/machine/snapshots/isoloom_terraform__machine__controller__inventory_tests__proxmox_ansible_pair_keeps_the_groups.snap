@@ -1,0 +1,23 @@
+---
+source: crates/backends/isoloom-terraform/src/machine/controller.rs
+expression: "render(&example(\"ansible-pair\", Target::Proxmox),\n&server_access(\"${random_password.windows.result}\"))"
+---
+[linux]
+web ansible_host=10.63.0.10 ansible_user=isoloom
+cache ansible_host=10.63.0.20 ansible_user=isoloom maxmemory='"64mb"'
+
+[windows]
+
+[linux:vars]
+ansible_ssh_private_key_file=/etc/isoloom/id_ed25519
+ansible_become=true
+
+[webservers]
+web
+
+[caches]
+cache
+
+[pair]
+web
+cache

@@ -1,0 +1,2 @@
+refused: build/refused-unknown-base/Dockerfile line 1 (`FROM`): `vulhub/tomcat:8.5` is in neither the service matrix nor the fetched bases
+fix: `isoloom bases fetch` vendors its published Dockerfile; or give the machine `os` and `app.steps`

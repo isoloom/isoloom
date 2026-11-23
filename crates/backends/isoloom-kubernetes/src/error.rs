@@ -1,0 +1,122 @@
+//! Why the Kubernetes files aren't rendered, or the chart's copies of the project's scripts
+//! aren't made, and how a backend reports it.
+
+use isoloom_plan::Refusal;
+use isoloom_render::Error as RenderError;
+use isoloom_spec::model::Target;
+
+/// Why the Kubernetes files aren't rendered, or the chart's project copies aren't made.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// The environment needs what Kubernetes can't do (the plan's refusal).
+    #[error("{}: {refusal}", Target::Kubernetes.id())]
+    Refused {
+        /// The first requirement Kubernetes can't meet.
+        refusal: Refusal,
+    },
+    /// The environment needs what Kubernetes can't do, in Kubernetes' own words (a gateway
+    /// machine, GPUs it can't ask for).
+    #[error("{}: {reason}", Target::Kubernetes.id())]
+    Unsupported {
+        /// Why, as the refusal reads.
+        reason: String,
+    },
+    /// An object couldn't be written as YAML.
+    #[error("{}: {UNWRITABLE}", Target::Kubernetes.id())]
+    Unwritable {
+        /// What the YAML writer reported.
+        #[source]
+        source: serde_yaml_ng::Error,
+    },
+    /// The chart's values schema couldn't be written as JSON.
+    #[error("{}: {SCHEMA}", Target::Kubernetes.id())]
+    Schema {
+        /// What the JSON writer reported.
+        #[source]
+        source: serde_json::Error,
+    },
+    /// A script the pods run leads out of the project folder (through a link), or isn't there:
+    /// it is never read.
+    #[error("{path} (copied into the Helm chart)")]
+    Outside {
+        /// The script, from the project folder.
+        path: String,
+        /// Where it leads instead, or why it isn't a path inside the project.
+        #[source]
+        why: isoloom_spec::project_path::Escape,
+    },
+    /// A script the pods run exists in the project but can't be read.
+    #[error("{path} (copied into the Helm chart)")]
+    Read {
+        /// The script, from the project folder.
+        path: String,
+        /// Why it couldn't be read.
+        #[source]
+        source: std::io::Error,
+    },
+}
+
+/// A result whose error is this crate's [`Error`].
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+impl From<Error> for RenderError {
+    /// The error as every backend reports it: the plan's refusal, what Kubernetes doesn't
+    /// support, or a failure of this backend (what it couldn't write or read), with its cause.
+    fn from(e: Error) -> RenderError {
+        let target = Target::Kubernetes;
+        match e {
+            Error::Refused { refusal } => RenderError::Refused { target, refusal },
+            Error::Unsupported { reason } => RenderError::Unsupported { target, what: reason },
+            Error::Unwritable { source } => RenderError::internal(target, UNWRITABLE, source),
+            Error::Schema { source } => RenderError::internal(target, SCHEMA, source),
+            Error::Read { path, source } => RenderError::internal(target, format!("{path} (copied into the Helm chart) can't be read"), source),
+            Error::Outside { path, why } => RenderError::internal(target, format!("{path} (copied into the Helm chart) isn't read"), why),
+        }
+    }
+}
+
+/// What an [`Error::Unwritable`] is, after its target.
+const UNWRITABLE: &str = "a manifest couldn't be written as YAML";
+/// What an [`Error::Schema`] is, after its target.
+const SCHEMA: &str = "the values' schema couldn't be written as JSON";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_refusal_in_kubernetes_words_reads_as_the_backend_reports_it() {
+        let e = Error::Unsupported {
+            reason: "a Kubernetes cluster routes no network through a `gateway` machine".to_owned(),
+        };
+        let reads = e.to_string();
+        assert_eq!(reads, "kubernetes: a Kubernetes cluster routes no network through a `gateway` machine");
+        assert_eq!(RenderError::from(e).to_string(), reads);
+    }
+
+    /// What the backend couldn't write or read is its own failure, not a refusal, said with what
+    /// failed and its cause kept.
+    #[test]
+    fn a_failure_of_the_backend_is_internal_with_what_failed() {
+        let unreadable = Error::Read {
+            path: "setup/seed.sh".to_owned(),
+            source: std::io::Error::other("denied"),
+        };
+        let yaml = serde_yaml_ng::from_str::<u8>("x").expect_err("not a number");
+        let json = serde_json::from_str::<u8>("x").expect_err("not a number");
+        for (e, what) in [
+            (unreadable, "setup/seed.sh (copied into the Helm chart) can't be read"),
+            (Error::Unwritable { source: yaml }, UNWRITABLE),
+            (Error::Schema { source: json }, SCHEMA),
+        ] {
+            let reported = RenderError::from(e);
+            assert!(
+                matches!(&reported, RenderError::Internal { target: Target::Kubernetes, what: w, .. } if w == what),
+                "{reported:?}"
+            );
+            assert_eq!(reported.refusal(), None, "{what}: not a refusal");
+            assert!(std::error::Error::source(&reported).is_some(), "{what}: its cause kept");
+        }
+    }
+}

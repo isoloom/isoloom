@@ -1,0 +1,90 @@
+//! What every backend is: a target, the capabilities it has, and a rendering of a planned
+//! [`Environment`] into files. Defined here, below every backend crate, so each can implement
+//! it; `isoloom-targets` keeps the registry.
+
+use isoloom_plan::{Capabilities, Environment, refusal};
+use isoloom_spec::model::Target;
+
+use crate::{Error, GeneratedFile, Result};
+
+/// The files a backend writes, paths relative to the project folder.
+pub type Files = Vec<GeneratedFile>;
+
+/// A target's renderer.
+pub trait Backend: Sync {
+    /// The target it renders.
+    fn target(&self) -> Target;
+
+    /// What it can render.
+    fn capabilities(&self) -> Capabilities;
+
+    /// The environment's files.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Refused`] (without writing anything) when the environment needs a capability
+    /// the backend lacks; [`Error::Unsupported`] for a limit of the backend's own target.
+    fn render(&self, env: &Environment) -> Result<Files>;
+
+    /// Why it would refuse `env`, if it would: the plan's requirements against its
+    /// capabilities, without rendering.
+    fn refusal(&self, env: &Environment) -> Option<String> {
+        refusal(&env.requirements, &self.capabilities()).map(|r| r.to_string())
+    }
+}
+
+/// `env` checked against `caps`, for a backend's `render`.
+///
+/// # Errors
+///
+/// [`Error::Refused`] with the first of the plan's requirements `caps` can't meet.
+pub fn check(target: Target, env: &Environment, caps: &Capabilities) -> Result<()> {
+    match refusal(&env.requirements, caps) {
+        Some(refusal) => Err(Error::Refused { target, refusal }),
+        None => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_plan::{Capabilities, Feature, Requirement};
+    use isoloom_spec::model::Target;
+
+    use super::{Backend, Files, check};
+    use crate::{Error, Result, testing};
+
+    /// A backend with no capability at all.
+    struct Bare;
+
+    impl Backend for Bare {
+        fn target(&self) -> Target {
+            Target::Kubernetes
+        }
+
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::of([])
+        }
+
+        fn render(&self, _env: &isoloom_plan::Environment) -> Result<Files> {
+            Ok(Vec::new())
+        }
+    }
+
+    const ALIASED: &str =
+        "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, aliases: [www], app: { image: nginx } }\n";
+
+    #[test]
+    fn a_backend_refuses_the_first_requirement_it_lacks_and_says_why() {
+        let env = testing::env(ALIASED, Target::Kubernetes);
+        let refused = check(Target::Kubernetes, &env, &Capabilities::of([]));
+        assert!(
+            matches!(&refused, Err(Error::Refused { target: Target::Kubernetes, refusal }) if refusal.requirement == Requirement::MachineAliases),
+            "{refused:?}"
+        );
+        assert_eq!(check(Target::Kubernetes, &env, &Capabilities::of([Feature::MachineAliases])), Ok(()));
+        assert_eq!(
+            Bare.refusal(&env).as_deref(),
+            Some("machine `aliases` (dotted DNS names) aren't Kubernetes Service names")
+        );
+    }
+}

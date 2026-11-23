@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's php entry: the php image's helper, through the archive's
+# phpenmod.
+for a in "$@"; do
+  case $a in -*) ;; *) phpenmod -v {{ vars.series }} "$a" || true ;; esac
+done

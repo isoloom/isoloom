@@ -1,0 +1,446 @@
+//! One machine, lowered: its settings copied over, its ports named, its files split by source
+//! (configuration as files, run-time values as secret files), and its forms as `docker:` and
+//! `vm:` blocks, each built from the recipe that gives it ([`super::forms`]).
+
+use indexmap::IndexMap;
+use isoloom_spec::model::{self, BaseImage, DockerImpl, Generated, HttpCheck, Protocol, VmImpl};
+use isoloom_spec::syntax::{self, Code, EnvValue, FieldPath, HealthProbe, Kind, Octets, PortProtocol, PortRef, Problem, Publish, Recipe, Step, Tpm};
+
+use isoloom_spec::model::Shape;
+
+use super::forms::{self, Container, Service, Vm};
+use super::overrides;
+use super::trail::Trail;
+use super::{Lowering, Scope};
+
+mod split;
+
+use split::files;
+
+/// A lowered machine, the inputs its files read (the secret each becomes → the input), and what
+/// couldn't be lowered, at the field the author wrote.
+pub(super) struct LoweredMachine {
+    pub machine: model::Machine,
+    pub inputs: Vec<(String, String)>,
+    pub problems: Vec<Problem>,
+}
+
+/// The secret an input's file becomes: `input-<name>`, kebab-case (`APP_TOKEN` is
+/// `input-app-token`).
+pub(super) fn input_secret(input: &str) -> String {
+    format!("input-{}", input.to_ascii_lowercase().replace('_', "-"))
+}
+
+/// Machine `name` (as written: `written`), lowered: as its catalogue services make it, when it
+/// runs any.
+pub(super) fn lower(l: &Lowering<'_>, name: &str, written: &syntax::Machine, trail: &mut Trail) -> LoweredMachine {
+    let service = l.services.get(name);
+    let (m, mut problems) = super::service::effective(name, written, service);
+    let m = m.as_ref();
+    let (files, secrets, inputs) = files(name, m, trail);
+    trail.machine(name, m);
+    trail.overrides(l.source, name);
+    let at = FieldPath::new("machines").key(name);
+    let (ports, unnumbered) = ports(&at, m);
+    problems.extend(unnumbered);
+    let (healthcheck, unknown_port) = m.healthcheck.as_ref().map(|h| healthcheck(&at, m, h)).unzip();
+    problems.extend(unknown_port.flatten());
+    let docker = docker(l, name, m, service);
+    let image = ContainerImage::of(docker.as_ref());
+    let (networks, more_addresses) = addresses(&m.networks);
+    // Every field the spec's machine gives; the others (`count`, `supplied`) keep their default.
+    let mut out = model::Machine::default();
+    out.networks = networks;
+    out.more_addresses = more_addresses;
+    out.aliases.clone_from(&m.aliases);
+    out.os = m.os.map(|o| o.to_string());
+    out.arch = m.hardware.arch;
+    out.platform = platform(l.source, name, m, service, image);
+    out.rate_limit.clone_from(&m.rate_limit);
+    out.privileged = m.privileged;
+    out.seal = m.seal;
+    out.nested_virtualization = m.hardware.nested_virtualization;
+    out.gpus.clone_from(&m.hardware.gpus);
+    out.devices.clone_from(&m.hardware.devices);
+    out.read_only = m.read_only;
+    out.tmpfs.clone_from(&m.tmpfs);
+    out.shm_size.clone_from(&m.shm_size);
+    out.dns.clone_from(&m.dns);
+    out.environment = environment(m, image_environment(l, image, service));
+    out.sysctls.clone_from(&m.sysctls);
+    out.ulimits.clone_from(&m.ulimits);
+    out.ports = ports;
+    out.inputs = environment_inputs(m);
+    out.secrets = secrets;
+    out.resources = m.resources;
+    out.command = m.command.as_ref().map(|c| c.run.clone());
+    out.working_dir = m.command.as_ref().and_then(|c| c.cwd.clone());
+    out.healthcheck = healthcheck.flatten();
+    out.depends_on.clone_from(&m.depends_on);
+    out.volumes.clone_from(&m.volumes);
+    out.files = files;
+    out.disks.clone_from(&m.disks);
+    out.host_folders.clone_from(&m.host_folders);
+    out.access = m.access;
+    out.vm = vm(l.source, name, m, service);
+    out.docker = docker;
+    out.external = overrides::external(l.source, name);
+    out.configuration = configuration(l, m, service, image);
+    problems.extend(unresolved(&at, out.configuration.as_ref(), &out.ports, service, l.services.daemons()));
+    // On Proxmox, a machine run as an LXC container is that container only.
+    if out.docker.as_ref().is_some_and(|d| d.lxc) {
+        out.vm = None;
+    }
+    LoweredMachine {
+        machine: out,
+        inputs,
+        problems,
+    }
+}
+
+/// Which image a machine's container is: the catalogue entry's own, or one built for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContainerImage {
+    /// The entry's published image, as is: its platforms, variables and configuration are its.
+    Catalogue,
+    /// An image built for the machine (or no container at all).
+    Own,
+}
+
+impl ContainerImage {
+    /// Which image `docker`'s container is: the catalogue entry's when it is generated from it.
+    fn of(docker: Option<&DockerImpl>) -> ContainerImage {
+        if docker.and_then(|d| d.generated.as_ref()).is_some_and(|g| g.from == BaseImage::Entry) {
+            ContainerImage::Catalogue
+        } else {
+            ContainerImage::Own
+        }
+    }
+}
+
+/// The architecture machine `name`'s container is pinned to: the one its spec asks for, else the
+/// only one its catalogue image is published for (its container is that image). `None`: it runs
+/// on the host's own.
+fn platform(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>, image: ContainerImage) -> Option<model::Arch> {
+    // An architecture other than the default is asked for, wherever it was written (a spec
+    // built in code has no spans).
+    if m.hardware.arch != model::Arch::default() || source.writes(name, "hardware.arch") {
+        return Some(m.hardware.arch);
+    }
+    let Some(Ok(resolved)) = service else { return None };
+    match resolved.first()?.image.as_ref()?.platforms.as_slice() {
+        [only] if image == ContainerImage::Catalogue => Some(*only),
+        _ => None,
+    }
+}
+
+/// The variables an entry's official image reads, when the target runs the machine as that
+/// image.
+fn image_environment(l: &Lowering<'_>, image: ContainerImage, service: Service<'_>) -> IndexMap<String, String> {
+    match service {
+        Some(Ok(resolved)) if image == ContainerImage::Catalogue && runs_containers(l) => super::service::image_environment(resolved),
+        _ => IndexMap::new(),
+    }
+}
+
+/// Whether the target runs a machine with a container form as a container (`docker` and the
+/// container targets).
+fn runs_containers(l: &Lowering<'_>) -> bool {
+    l.scope.target().is_some_and(|t| matches!(t.needs(), Shape::Docker))
+}
+
+/// The inputs its environment reads.
+fn environment_inputs(m: &syntax::Machine) -> Vec<String> {
+    m.environment
+        .values()
+        .filter_map(|v| match v {
+            EnvValue::Input(i) => Some(i.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// What configures the machine: its services' phases (on a container target over its entry's
+/// official image, `configure` and the image's files alone), else its app's steps on its OS,
+/// when it has both.
+fn configuration(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>, image: ContainerImage) -> Option<model::Configuration> {
+    if let Some(Ok(resolved)) = service {
+        return if image == ContainerImage::Catalogue && runs_containers(l) {
+            super::service::image_configuration(resolved)
+        } else {
+            super::service::configuration(resolved)
+        };
+    }
+    let (os, steps) = (m.os?, &m.app()?.steps);
+    (!steps.is_empty()).then(|| model::Configuration::app(os, steps.clone()))
+}
+
+/// The steps of a service machine's configuration (its entries' phases) that its OS's family
+/// can't carry at all, at its `service`, so the plan resolves every configuration of an environment that
+/// lowered clean ([`crate::configure::Recipe::of`]). An app's own steps are refused per target,
+/// at each step (`super::refusals`).
+fn unresolved(
+    at: &FieldPath,
+    c: Option<&model::Configuration>,
+    ports: &[model::Port],
+    service: Service<'_>,
+    daemons: &crate::configure::DaemonTable,
+) -> Vec<Problem> {
+    let (Some(c), Some(Ok(resolved))) = (c, service) else {
+        return Vec::new();
+    };
+    let Err(unportable) = crate::configure::Recipe::of(c, ports, daemons) else {
+        return Vec::new();
+    };
+    let entries: Vec<&str> = resolved.iter().map(|r| r.entry.as_str()).collect();
+    unportable
+        .into_iter()
+        .map(|u| {
+            Problem::new(
+                Code::Conflict,
+                at.key("service"),
+                format!("{}'s recipe on {}: {}", entries.join(", "), c.os, u.reason),
+            )
+            .fix(u.fix)
+        })
+        .collect()
+}
+
+/// Whether the machine's configuration starts a service (in a container, its supervisor runs it).
+fn serves(l: &Lowering<'_>, m: &syntax::Machine, service: Service<'_>) -> bool {
+    let Some(c) = configuration(l, m, service, ContainerImage::Own) else {
+        return false;
+    };
+    crate::configure::Recipe::of(&c, &[], l.services.daemons()).is_ok_and(|r| !r.daemons.is_empty())
+}
+
+/// Each network's first address, and the further ones where a list gives several.
+fn addresses(networks: &IndexMap<String, Octets>) -> (IndexMap<String, u8>, IndexMap<String, Vec<u8>>) {
+    let mut first = IndexMap::new();
+    let mut more = IndexMap::new();
+    for (n, o) in networks {
+        match o {
+            Octets::One(a) => {
+                first.insert(n.clone(), *a);
+            }
+            Octets::Several(list) => {
+                if let Some((a, rest)) = list.split_first() {
+                    first.insert(n.clone(), *a);
+                    if !rest.is_empty() {
+                        more.insert(n.clone(), rest.to_vec());
+                    }
+                }
+            }
+        }
+    }
+    (first, more)
+}
+
+/// The fixed environment values (an input's goes through `inputs`), after `image`'s (an entry's
+/// official image's): the machine's own win.
+fn environment(m: &syntax::Machine, image: IndexMap<String, String>) -> IndexMap<String, String> {
+    let own = m.environment.iter().filter_map(|(k, v)| match v {
+        EnvValue::Text(t) => Some((k.clone(), t.clone())),
+        EnvValue::Input(_) | EnvValue::Secret(_) => None,
+    });
+    image.into_iter().chain(own).collect()
+}
+
+/// The ports, each named after its key (`at`: the machine's path). A port without its number
+/// is a problem at its `port`, and stays out; on a catalogue service's machine the number is the
+/// entry's, so it stays out without one (the machine is refused at its `service` until the
+/// catalogue has the entry).
+fn ports(at: &FieldPath, m: &syntax::Machine) -> (Vec<model::Port>, Vec<Problem>) {
+    let service = matches!(m.kind, Kind::Service(_));
+    let mut problems = Vec::new();
+    let ports = m
+        .ports
+        .iter()
+        .filter_map(|(name, p)| {
+            let Some(number) = p.port else {
+                if !service {
+                    let path = at.key("ports").key(name.as_str()).key("port");
+                    problems.push(Problem::new(Code::MissingField, path, "a port says its number"));
+                }
+                return None;
+            };
+            let port = number.get();
+            let (publish, fixed, free) = match p.publish {
+                None => (None, false, false),
+                Some(Publish::Free) => (Some(port), false, true),
+                Some(Publish::Preferred(h)) => (Some(h.get()), false, false),
+                Some(Publish::Fixed(h)) => (Some(h.get()), true, false),
+            };
+            Some(model::Port {
+                port,
+                name: Some(name.to_string()),
+                http: p.protocol.is_http(),
+                tls: p.protocol.is_tls(),
+                publish,
+                fixed,
+                free,
+                dormant: p.dormant,
+                protocol: if p.protocol == PortProtocol::Udp { Protocol::Udp } else { Protocol::Tcp },
+                login: p.login.clone(),
+            })
+        })
+        .collect();
+    (ports, problems)
+}
+
+/// The healthcheck, its page's port by number (`at`: the machine's path). A page on a port the
+/// machine doesn't name is a problem at its `port`, and the page stays out; so does one on a
+/// catalogue service's port, whose number is the entry's. With nothing left to try, the
+/// healthcheck stays out (the spec's own checks report one that says nothing to try).
+fn healthcheck(at: &FieldPath, m: &syntax::Machine, h: &syntax::Healthcheck) -> (Option<model::Healthcheck>, Option<Problem>) {
+    let mut unknown = None;
+    let (test, page) = match &h.probe {
+        HealthProbe::Test(test) => (Some(test.clone()), None),
+        HealthProbe::Http(page) => (None, Some(page)),
+    };
+    let http = page.and_then(|page| {
+        let port = match &page.port {
+            PortRef::Number(n) => Some(n.get()),
+            PortRef::Name(n) => {
+                let Some(p) = m.ports.get(n) else {
+                    let path = at.key("healthcheck").key("http").key("port");
+                    unknown = Some(Problem::new(Code::UnknownReference, path, format!("the machine has no port named `{n}`")));
+                    return None;
+                };
+                p.port.map(std::num::NonZeroU16::get)
+            }
+        };
+        port.map(|port| HttpCheck { port, path: page.path.clone() })
+    });
+    if test.is_none() && http.is_none() {
+        return (None, unknown);
+    }
+    let lowered = model::Healthcheck {
+        test,
+        http,
+        interval: h.interval.clone(),
+        timeout: h.timeout.clone(),
+        retries: h.retries,
+        start_period: h.start_period.clone(),
+    };
+    (Some(lowered), unknown)
+}
+
+/// The container form, as a `docker:` block.
+fn docker(l: &Lowering<'_>, name: &str, m: &syntax::Machine, service: Service<'_>) -> Option<DockerImpl> {
+    let (source, scope) = (l.source, l.scope);
+    let idle = m.command.is_none();
+    // What the forms below don't set keeps its default (no image, no build, not idle).
+    let mut d = DockerImpl::default();
+    d.init.clone_from(&m.setup);
+    d.lxc = overrides::lxc(source, name, scope);
+    // No container form: the target refuses the machine there (`refusals`), or the lab lowers
+    // it with the forms it has.
+    match forms::container(m, service, l.services.daemons()).ok()? {
+        Container::Supplied => return None,
+        Container::Recipe(Recipe::Image(i)) => d.image = Some(i.clone()),
+        Container::Recipe(Recipe::Build(b)) => {
+            // `image` beside `build` (the Compose combo): the build is tagged as that published
+            // name. Without it the build is tagged locally (`image` stays `None`).
+            d.image.clone_from(&b.image);
+            d.build = Some(b.context.clone());
+            d.dockerfile.clone_from(&b.dockerfile);
+            d.target.clone_from(&b.target);
+            d.args.clone_from(&b.args);
+        }
+        Container::Recipe(Recipe::Appliance(a)) => {
+            d.image.clone_from(&a.image);
+            d.appliance = Some(a.kind);
+            d.config.clone_from(&a.config);
+            d.firmware.clone_from(&a.firmware);
+        }
+        Container::Steps { os, base } => {
+            d.generated = Some(Generated {
+                os: os.name().to_owned(),
+                base: base.to_owned(),
+                from: BaseImage::Os,
+                after_start: None,
+            });
+            // Isoloom's supervisor is the process of a container that runs services.
+            d.idle = idle && !serves(l, m, service);
+        }
+        Container::Os { image } => {
+            d.image = Some(image.to_owned());
+            d.idle = idle;
+        }
+        Container::Entry { os, image, start } => {
+            d.generated = Some(Generated {
+                os: os.name().to_owned(),
+                base: image.reference.clone(),
+                from: BaseImage::Entry,
+                after_start: (!start.is_empty()).then(|| model::OwnProcess {
+                    entrypoint: image.entrypoint.clone(),
+                    command: image.command_override.clone().unwrap_or_else(|| image.command.clone()),
+                }),
+            });
+        }
+    }
+    Some(d)
+}
+
+/// The VM form, as a `vm:` block: a fresh VM of the OS, set up by the steps a VM runs.
+fn vm(source: &syntax::Spec, name: &str, m: &syntax::Machine, service: Service<'_>) -> Option<VmImpl> {
+    // No VM form: the target refuses the machine there (`refusals`), or the lab lowers it with
+    // the forms it has; a supplied machine has no VM to describe.
+    let Ok(Vm::Os(os)) = forms::vm(m, service) else { return None };
+    let provision = m
+        .app()
+        .map(|a| {
+            a.steps
+                .iter()
+                .filter_map(|s| match s {
+                    Step::Run { script, .. } => Some(script.to_string()),
+                    Step::Reboot => Some(model::REBOOT_STEP.to_owned()),
+                    Step::Playbook(p) => Some(p.to_string()),
+                    // The other steps are its configuration's, which the set-up renders.
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut vm = VmImpl::new(os.name());
+    vm.provision = provision;
+    vm.image = overrides::vm_image(source, name);
+    vm.tpm = match m.hardware.tpm {
+        Tpm::Auto => None,
+        Tpm::Required => Some(true),
+        Tpm::None => Some(false),
+    };
+    vm.boot.clone_from(&m.hardware.boot);
+    vm.setup.clone_from(&m.setup);
+    Some(vm)
+}
+
+/// DNS servers named by machine, replaced by that machine's address on a network both share
+/// (its Docker block's on the Docker targets).
+pub(super) fn resolve_dns(spec: &mut model::Spec, scope: Scope) {
+    let laid_out = match scope.target() {
+        Some(t) => crate::environment::lay_out(spec, t),
+        None => spec.clone(),
+    };
+    for (name, m) in &mut spec.machines {
+        let Some(dns) = &mut m.dns else { continue };
+        for server in &mut dns.servers {
+            if server.parse::<std::net::IpAddr>().is_ok() {
+                continue;
+            }
+            if let Some(a) = address_on_shared(&laid_out, name, server) {
+                *server = a.to_string();
+            }
+        }
+    }
+}
+
+/// `server`'s address on the first network it shares with `machine`.
+fn address_on_shared(spec: &model::Spec, machine: &str, server: &str) -> Option<std::net::Ipv4Addr> {
+    let (m, s) = (spec.machines.get(machine)?, spec.machines.get(server)?);
+    m.networks.keys().find_map(|n| {
+        let octet = s.networks.get(n).filter(|_| spec.networks.contains_key(n))?;
+        Some(crate::addressing::address(spec, n, *octet))
+    })
+}

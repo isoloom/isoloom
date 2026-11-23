@@ -1,0 +1,192 @@
+//! The machines and the controller: each a VM on its networks, the router its gateway. A Linux
+//! machine is then set up by Terraform over SSH through the router with the VM core's
+//! transports (its steps from the plan), a Windows one by cloudbase-init at its first boot; the
+//! controller runs the playbooks once every machine is set up.
+
+use crate::hcl_builder::{Expression, Module, reference, string};
+use isoloom_plan::{Environment, MachinePlan, Vm};
+
+use super::SERVICE_OS;
+use super::guest::{Guest, GuestDns, Nic};
+use crate::machine::cloud_init::CloudConfig;
+use crate::machine::controller::{self, Ssh};
+use crate::machine::linux;
+use crate::machine::{Remote, cloudbase_init};
+use crate::module::ident;
+use crate::server::router::is_default_gateway;
+
+/// The controller's place among the VMs (after the router; the machines follow).
+const CONTROLLER_INDEX: u64 = 1;
+
+/// What Terraform's connections go through: the router's uplink address.
+fn bastion() -> Expression {
+    reference("local.router_address")
+}
+
+/// The prefix length of a network's range.
+fn len(env: &Environment, net: &str) -> u8 {
+    env.block(net).prefix()
+}
+
+/// An interface on network `net` at `address`: its MTU, and the default route through the
+/// router at `gateway`.
+pub(super) fn nic(env: &Environment, net: &str, address: String, gateway: bool) -> Nic {
+    let mut nic = Nic::at(reference(&format!("esxi_portgroup.{}.name", ident(net))), Some(address));
+    nic.gateway = gateway.then(|| env.block(net).router().to_string());
+    nic.mtu = env.networks.get(net).and_then(|n| n.mtu);
+    nic
+}
+
+/// The machine's interfaces: one per network (the router its default route on the first,
+/// unless a bridged LAN's DHCP gives it), then one per outside network.
+fn nics(env: &Environment, mp: &MachinePlan) -> Vec<Nic> {
+    let routed = is_default_gateway(env, mp);
+    let mut out: Vec<Nic> = mp
+        .addresses
+        .iter()
+        .enumerate()
+        .map(|(n, (net, addr))| nic(env, net, format!("{addr}/{}", len(env, net)), n == 0 && routed))
+        .collect();
+    out.extend(super::outside::nics(env, mp));
+    out
+}
+
+/// The machines, each set up through the router, then the controller.
+pub(super) fn guests(env: &Environment, module: &mut Module) {
+    for (i, vm) in (0..).zip(env.vms()) {
+        machine(env, vm, i, module);
+    }
+    if controller::needed(env) {
+        controller(env, module);
+    }
+    // Terraform sets each Linux machine and the controller up itself: the seal comes after.
+    let mut set_up: Vec<Expression> = env
+        .vms()
+        .filter(|vm| !vm.plan.is_windows())
+        .map(|vm| reference(&format!("terraform_data.{}", ident(vm.name))))
+        .collect();
+    if controller::needed(env) {
+        set_up.push(reference("terraform_data.isoloom_controller"));
+    }
+    module.blocks(crate::server::router::seal(env, reference("esxi_guest.isoloom_router.id"), set_up, false));
+}
+
+/// Machine `name` (the `i`th VM): its data disks, its VM and its set-up.
+fn machine(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, i: u64, module: &mut Module) {
+    let id = ident(name);
+    let dns = crate::server::dns_of(env, name);
+    let servers = crate::server::resolvers(env, Some(name));
+    let windows = mp.is_windows();
+    let guest = Guest {
+        id: id.clone(),
+        name: name.to_owned(),
+        index: CONTROLLER_INDEX + 1 + i,
+        os: os.to_owned(),
+        size: mp.size(),
+        nics: nics(env, mp),
+        // Its own domain, else the private zone's (`dns.private`), whose names its hosts file
+        // carries: ESXi has no DNS of its own to serve them.
+        dns: GuestDns {
+            servers,
+            search: dns
+                .and_then(|d| d.domain.clone())
+                .or_else(|| env.private_dns.as_ref().map(|z| z.domain.clone())),
+        },
+        user_data: if windows {
+            cloudbase_init::user_data(env, (name, mp))
+        } else {
+            let mut config = CloudConfig::new(name, reference("local.users"));
+            // The secrets' values, root's alone, for the set-up over SSH to put in place.
+            if let Some(content) = crate::module::inputs::secrets_file(mp) {
+                config.files.push(crate::machine::cloud_init::file(
+                    crate::machine::cloud_init::WRITTEN_SECRETS,
+                    Some("0600"),
+                    content,
+                ));
+            }
+            config.document()
+        },
+        wait_for_address: None,
+        depends_on: vec![reference("esxi_guest.isoloom_router")],
+        firmware: super::boot::firmware(mp),
+        guestos: isoloom_render::esxi::guest_os(os),
+        disks: super::disks::blocks(name, &mp.disks, module),
+        windows,
+        lifecycle: None,
+    };
+    let what = if windows { ": set up by cloudbase-init at its first boot" } else { "" };
+    module.commented(&format!("Machine `{name}`{what}."), guest.block(&env.name));
+    let Some(address) = mp.addresses.values().next().filter(|_| !windows) else {
+        return;
+    };
+    let setup = linux::provisioner(linux::Machine {
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("esxi_guest.{id}.id")),
+            host: string(address.to_string()),
+        },
+        user: crate::machine::USER.to_owned(),
+    });
+    module.commented(
+        "Its set-up: its steps from the plan, over SSH through the router.",
+        setup.via(bastion()).block(),
+    );
+}
+
+/// The controller: on every network at the controller address, then its playbooks over SSH
+/// through the router once every machine is set up (a Linux one's set-up done, a Windows one
+/// answering WinRM with its ready marker).
+fn controller(env: &Environment, module: &mut Module) {
+    let nics: Vec<Nic> = controller::addresses(env)
+        .iter()
+        .enumerate()
+        .map(|(n, (net, at))| nic(env, net, format!("{at}/{}", len(env, net)), n == 0))
+        .collect();
+    let Some(host) = nics.first().and_then(|n| n.addresses.first()?.split('/').next().map(str::to_owned)) else {
+        return;
+    };
+    let guest = Guest {
+        id: "isoloom_controller".to_owned(),
+        name: controller::NAME.to_owned(),
+        index: CONTROLLER_INDEX,
+        os: SERVICE_OS.to_owned(),
+        size: controller::size(env),
+        nics,
+        dns: GuestDns {
+            servers: crate::server::resolvers(env, None),
+            search: None,
+        },
+        user_data: CloudConfig::new(controller::NAME, reference("local.users")).document(),
+        wait_for_address: None,
+        depends_on: vec![reference("esxi_guest.isoloom_router")],
+        firmware: None,
+        guestos: None,
+        disks: Vec::new(),
+        windows: false,
+        lifecycle: None,
+    };
+    module.commented(
+        "The controller: runs the environment's playbooks once every machine is set up.",
+        guest.block(&env.name),
+    );
+    let ssh = Ssh {
+        env,
+        replace_on: reference("esxi_guest.isoloom_controller.id"),
+        host: string(host),
+        user: crate::machine::USER.to_owned(),
+        at_boot: Vec::new(),
+        inventory: controller::inventory_template(env, controller::server_access),
+    };
+    let mut setup = controller::provisioner_waiting(ssh, &controller::windows_waits(env));
+    // A Windows machine has no Terraform set-up: its VM, and the wait above, stand for it.
+    setup.depends_on = env
+        .vms()
+        .map(|Vm { name: n, plan: mp, .. }| {
+            let kind = if mp.is_windows() { "esxi_guest" } else { "terraform_data" };
+            reference(&format!("{kind}.{}", ident(n)))
+        })
+        .collect();
+    module.block(setup.via(bastion()).block());
+}

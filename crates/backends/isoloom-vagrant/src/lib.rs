@@ -1,0 +1,60 @@
+//! Isoloom's Vagrant backend: the `vagrant` target (one VM per machine, on every provider). Every
+//! Vagrantfile is written with one Ruby builder, so no value can end a string or interpolate,
+//! and the statements every Vagrantfile shares are written once.
+//!
+//! It sits with the other backends, above the rendering layer (`isoloom-render`) and below the
+//! targets' registry (`isoloom-targets`), and depends on no other backend: [`VagrantBackend`]
+//! renders a planned [`Environment`](isoloom_plan::Environment), purely, into files;
+//! [`provider_refusal`] says what a provider can't run.
+//!
+//! # Example
+//!
+//! ```
+//! use isoloom_plan::{Environment, Lab};
+//! use isoloom_render::backend::Backend;
+//! use isoloom_spec::model::Target;
+//! use isoloom_vagrant::{VagrantBackend, provider_refusal};
+//!
+//! let lab = Lab::new(isoloom_spec::parse(
+//!     "version: 1
+//! name: hello
+//! networks: { lan: { cidr: 10.9.0.0/24 } }
+//! machines:
+//!   web: { networks: { lan: 10 }, ports: { web: 80 }, os: debian@12 }
+//! ",
+//! )?);
+//! let spec = lab.for_target(Target::Vagrant);
+//! let env = lab.plan(&spec, Target::Vagrant, None)?;
+//! let files = VagrantBackend.render(&env)?;
+//! let vagrantfile = files.iter().find(|f| f.path == ".isoloom/vagrant/Vagrantfile").ok_or("no Vagrantfile")?;
+//! assert!(vagrantfile.contents.contains("config.vm.define \"web\" do |m|"));
+//! assert_eq!(provider_refusal(&env, "virtualbox"), None);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
+#![cfg_attr(
+    all(test, not(windows)),
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
+mod backend;
+mod boxes;
+mod console;
+mod error;
+mod host_folders;
+mod ruby;
+mod settings;
+#[cfg(test)]
+mod testing;
+mod vagrantfile;
+mod vms;
+
+pub use backend::VagrantBackend;
+pub use error::{Error, Result};
+/// A Ruby string literal holding any text, as every Vagrantfile string is written.
+pub use ruby::quote as ruby_quote;
+pub use vms::network_name;
+pub use vms::provider::provider_refusal;

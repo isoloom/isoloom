@@ -1,0 +1,107 @@
+# Proxmox VE: `proxmox`
+
+The `proxmox` target writes a Terraform module (`.isoloom/proxmox/main.tf`, provider
+`bpg/proxmox ~> 0.116.1`) that makes one VM per machine on a Proxmox VE server, with an SDN zone
+and VNet per network, a resource pool, a router VM (between the networks, by the `reach` rules,
+and out to the internet), and Proxmox firewall rules.
+
+The module is checked by `terraform validate`, `tflint` and `terraform test` (the provider
+mocked).
+
+## Prerequisites
+
+- Proxmox VE with SDN available, reachable from where Terraform runs (its API on port 8006, SSH
+  to the node).
+- Terraform 1.6 or later ([tool versions](../../reference/tool-versions.md)),
+  and an OpenSSH client.
+- Datastores: `local-lvm` for VM disks, and one with `iso` content and one with `snippets`
+  content (`local` by default) for the cloud images and cloud-init files. Each is a variable.
+- An uplink bridge for the router's way out (`vmbr0` by default).
+
+## Credentials
+
+Two things, both given as Terraform variables (a runner fills them from its own secret inputs, as
+`TF_VAR_*` in the Terraform steps' environment only):
+
+| Variable | What |
+|---|---|
+| `proxmox_endpoint` | `https://<server>:8006/` |
+| `proxmox_api_token` | An API token, `user@realm!name=secret` (or `proxmox_username` and `proxmox_password`) |
+| `proxmox_ssh_username`, `proxmox_ssh_private_key_file` | SSH to the node, which uploads the cloud-init snippets (default user `root`) |
+| `node` | The node the VMs go on (required: `pvesh get /nodes` lists them) |
+
+Prefer an API token of a dedicated user over `root@pam`. An outline of the privileges its role
+needs, on `/` or narrowed to the pool, the datastores, `/sdn` and the node (check them against the
+`bpg/proxmox` provider's documentation for your Proxmox version):
+
+- `VM.Allocate`, `VM.Audit`, `VM.Clone`, `VM.Config.*` (CD-ROM, Cloudinit, CPU, Disk, HWType,
+  Memory, Network, Options), `VM.PowerMgmt`, and the guest agent's audit privilege;
+- `Datastore.Allocate`, `Datastore.AllocateSpace`, `Datastore.AllocateTemplate`,
+  `Datastore.Audit` (cloud images and snippets);
+- `SDN.Allocate`, `SDN.Audit`, `SDN.Use` (the zone and VNets);
+- `Pool.Allocate`, `Pool.Audit`;
+- `Sys.Audit`, `Sys.Modify` (firewall options and rules).
+
+The SSH user must be able to write to the snippets datastore's folder on the node.
+
+### TLS
+
+`proxmox_insecure` defaults to `false`: the module verifies the Proxmox API's certificate. A
+server that presents its own self-signed certificate, as a fresh Proxmox install does, needs
+`proxmox_insecure=true`, or better, a certificate your machines trust (from your corporate CA, or
+ACME). See
+[security considerations](../../explanation/security.md#proxmox-tls).
+
+## Generate and run
+
+```sh
+isoloom generate --target proxmox
+terraform -chdir=.isoloom/proxmox init
+terraform -chdir=.isoloom/proxmox apply \
+  -var proxmox_endpoint=https://pve.example.internal:8006/ \
+  -var proxmox_api_token='isoloom@pve!ci=...' \
+  -var node=pve
+```
+
+Give it your key too (`-var ssh_public_key="$(cat ~/.ssh/id_ed25519.pub)" -var
+ssh_private_key_file=~/.ssh/id_ed25519`): the machines let it in, and Terraform signs in with it,
+through the router, to wait for each machine's set-up from its cloud-init
+(`terraform_data.isoloom_ready_<machine>` reads `/var/lib/isoloom/ready`, `isoloom-ready/1`, and
+fails the apply with the end of `/var/log/cloud-init-output.log` when a step failed). Once every
+machine is set up, `terraform_data.isoloom_seal` seals the `internet: false` networks at the
+router. So the apply ends with the environment ready. The environment's inputs are variables of
+their own names (`-var TOKEN=...`, or `TF_VAR_TOKEN`).
+
+When `uplink_bridge` is one only the node reaches (a NAT bridge with private addresses), the
+router's uplink address is out of reach of the machine running Terraform. Give the module a SOCKS5
+proxy through the node: `ssh_proxy_host` and `ssh_proxy_port` (unset by default). Terraform's SSH
+connections (the waits and the seal) then go to the proxy first, then to the router, then to the
+machine. A tunnel to the node is one:
+
+```sh
+ssh -N -D 127.0.0.1:1080 root@pve.example.internal &
+terraform -chdir=.isoloom/proxmox apply ... -var ssh_proxy_host=127.0.0.1 -var ssh_proxy_port=1080
+```
+
+Or with a runner, which also gives the module the environment's inputs (the
+machines take the project from their cloud-init; a Linux VM's secrets come from the module's
+`ISOLOOM_SECRET_<NAME>` variables in its cloud-init snippet, and Terraform stores sensitive values
+in its state, as it does for every variable; a Windows machine's or an LXC container's are
+refused):
+
+```sh
+isothrum up .isoloom/proxmox
+isothrum down .isoloom/proxmox
+```
+
+## Teardown
+
+`terraform destroy` with the same variables, or `isothrum down`. Everything the module makes is in
+its resource pool and named after the environment. Proxmox runs have no expiry: nothing stops
+them but a teardown.
+
+## Cost
+
+None beyond your server. A VM defaults to 1 CPU, 1024 MB and 20 GB (`machines.<name>.resources`);
+`isoloom resources` adds them up. Each environment on one server needs its own `slot` (1 to 99,
+default 1): SDN ids are short, and the slot keeps them apart.

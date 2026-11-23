@@ -1,0 +1,60 @@
+# Written by `cargo xtask catalogue refresh postgres`, never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. `--check` exits 1
+# when upstream has moved under a pin.
+refreshed: 2026-11-14
+keys:
+  https://www.postgresql.org/media/keys/ACCC4CF8.asc:
+    fingerprint: B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
+    sha256: 0144068502a1eddd2a0280ede10ef607d1ec592ce819940991203941564e8e76
+releases:
+  '16':
+    images:
+      debian@12:
+        digest: sha256:a49f7438ba03589f9b1ca062f2da82e899b48ea1dc50d2449fa09a70be83ebca
+        platforms:
+        - amd64
+        - arm64
+        entrypoint:
+        - docker-entrypoint.sh
+        command:
+        - postgres
+  '10.5':
+    packages:
+      ubuntu@18.04:
+        postgresql-10: 10.5-2.pgdg18.04+1
+        postgresql-client-10: 10.5-2.pgdg18.04+1
+  '10.7':
+    packages:
+      ubuntu@18.04:
+        postgresql-10: 10.7-1.pgdg18.04+1
+        postgresql-client-10: 10.7-1.pgdg18.04+1
+  '11.5':
+    packages:
+      ubuntu@18.04:
+        postgresql-11: 11.5-3.pgdg18.04+1
+        postgresql-client-11: 11.5-3.pgdg18.04+1
+  '12.22':
+    packages:
+      ubuntu@24.04:
+        postgresql-12: 12.22-3.pgdg24.04+1
+        postgresql-client-12: 12.22-3.pgdg24.04+1
+  '13.23':
+    packages:
+      ubuntu@24.04:
+        postgresql-13: 13.23-1.pgdg24.04+1
+        postgresql-client-13: 13.23-1.pgdg24.04+1
+  '14.25':
+    packages:
+      ubuntu@24.04:
+        postgresql-14: 14.25-1.pgdg24.04+1
+        postgresql-client-14: 14.25-1.pgdg24.04+1
+  '15.4':
+    packages:
+      ubuntu@22.04:
+        postgresql-15: 15.4-2.pgdg22.04+1
+        postgresql-client-15: 15.4-2.pgdg22.04+1
+  '16.16':
+    packages:
+      ubuntu@24.04:
+        postgresql-16: 16.16-1.pgdg24.04+1
+        postgresql-client-16: 16.16-1.pgdg24.04+1

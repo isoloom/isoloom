@@ -1,0 +1,6 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's jenkins entry: the jenkins/jenkins image's
+# `jenkins-plugin-cli`, the plugin installation manager run on the image's Java with $JAVA_OPTS.
+# shellcheck disable=SC2086 # JAVA_OPTS is a list of options, as the image reads it.
+exec java $JAVA_OPTS -jar /opt/jenkins-plugin-manager.jar "$@"

@@ -1,0 +1,18 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's php entry: the php image's helper, an extension being its
+# package from the Debian PHP archive (the image compiles it from PHP's source).
+set -e
+pkgs=
+for a in "$@"; do
+  case $a in
+    -*|[0-9]*) ;;
+    pdo|json|tokenizer|ctype|fileinfo|filter|hash|iconv|session|sockets|posix|pcntl|exif|calendar|ftp|gettext|shmop|sysvmsg|sysvsem|sysvshm) ;;
+    pdo_mysql|mysqli|mysql) pkgs="$pkgs php{{ vars.series }}-mysql" ;;
+    pdo_pgsql|pgsql) pkgs="$pkgs php{{ vars.series }}-pgsql" ;;
+    pdo_sqlite|sqlite3) pkgs="$pkgs php{{ vars.series }}-sqlite3" ;;
+    *) pkgs="$pkgs php{{ vars.series }}-$a" ;;
+  esac
+done
+# shellcheck disable=SC2086 # one word per package
+[ -z "$pkgs" ] || DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $pkgs

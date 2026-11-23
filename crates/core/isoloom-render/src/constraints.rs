@@ -1,0 +1,219 @@
+//! What the network an environment runs in imposes (see [`Constraints`]), as each target needs
+//! it, from the plan's constraints ([`isoloom_plan::Environment::constraints`], whose proxy's
+//! `no_proxy` the plan has completed):
+//!
+//! - images: every `image:` of the Compose file and the Kubernetes manifests, and the `FROM` of
+//!   the Dockerfiles Isoloom writes, go through the registry mirrors ([`rewrite_image`], as each
+//!   backend writes them);
+//! - containers: the machines (never Isoloom's own checks or router) get the proxy and the
+//!   package mirrors as environment variables ([`machine_env`]), and their builds the same as
+//!   build arguments;
+//! - Linux VMs: a shell preamble run as root before anything else (`linux_prelude`) sets the
+//!   proxy for the shell, apt, dnf and Docker, rewrites the apt sources to the mirrors, writes
+//!   pip's and npm's configuration and the time servers.
+
+pub use isoloom_plan::images::rewrite_image;
+use isoloom_spec::model::{Constraints, Mirrors};
+use isoloom_spec::shell::quote;
+
+/// `constraints`, when they change something.
+#[must_use]
+pub(crate) fn of(constraints: Option<&Constraints>) -> Option<&Constraints> {
+    constraints.filter(|c| c.proxy.is_some() || !c.registries.is_empty() || c.mirrors.is_some() || !c.ntp.is_empty())
+}
+
+/// The proxy's URLs, `https` defaulting to `http`; `None` without a proxy (validation gives
+/// every proxy its `http`).
+fn proxies(c: &Constraints) -> Option<(&str, &str)> {
+    let p = c.proxy.as_ref()?;
+    let http = p.http.as_deref()?;
+    Some((http, p.https.as_deref().unwrap_or(http)))
+}
+
+/// The proxy's `(http, https)` URLs as `NAME=value` pairs, both cases (tools read one or the
+/// other), and what bypasses it (its `no_proxy`).
+fn proxy_env(c: &Constraints, (http, https): (&str, &str)) -> Vec<(String, String)> {
+    let np = c.proxy.iter().flat_map(|p| p.no_proxy.iter().map(String::as_str)).collect::<Vec<_>>().join(",");
+    [
+        ("HTTP_PROXY", "http_proxy", http),
+        ("HTTPS_PROXY", "https_proxy", https),
+        ("NO_PROXY", "no_proxy", np.as_str()),
+    ]
+    .into_iter()
+    .flat_map(|(upper, lower, value)| [(upper.to_owned(), value.to_owned()), (lower.to_owned(), value.to_owned())])
+    .collect()
+}
+
+/// The environment a machine's container (and its image's build) gets from `constraints`: the
+/// proxy (Docker's predefined build `ARG`s, so a Dockerfile needs no change), and the package
+/// mirrors tools read from the environment.
+#[must_use]
+pub fn machine_env(constraints: Option<&Constraints>) -> Vec<(String, String)> {
+    let Some(c) = of(constraints) else { return Vec::new() };
+    let proxy = proxies(c).map(|urls| proxy_env(c, urls)).unwrap_or_default();
+    let mirrors = c.mirrors.iter().flat_map(|m| {
+        [("PIP_INDEX_URL", &m.pypi), ("NPM_CONFIG_REGISTRY", &m.npm)]
+            .into_iter()
+            .filter_map(|(k, url)| Some((k.to_owned(), url.clone()?)))
+    });
+    proxy.into_iter().chain(mirrors).collect()
+}
+
+/// The shell (run as root, idempotent) that applies `constraints` on a Linux VM, before its own
+/// set-up and steps. `None` when there are none.
+#[must_use]
+pub(crate) fn linux_prelude(constraints: Option<&Constraints>) -> Option<String> {
+    let c = of(constraints)?;
+    let mirrors = c.mirrors.as_ref().map(mirror_lines).unwrap_or_default();
+    Some(format!("set -e\n{}{mirrors}{}", proxy(c), ntp(&c.ntp)))
+}
+
+/// The mirrors: Debian's and Ubuntu's apt sources rewritten to them, pip's and npm's
+/// configuration.
+fn mirror_lines(m: &Mirrors) -> String {
+    let sources = "/etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources";
+    let debian = m.debian.as_deref().map(|u| {
+        format!(
+            "# Debian's packages from the mirror.\n. /etc/os-release; if [ \"$ID\" = debian ]; then for f in {sources}; do if [ -f \"$f\" ]; then sed -i -E 's#https?://(deb|httpredir|ftp)\\.debian\\.org/debian/?([[:space:]]|$)#{}/\\2#g' \"$f\"; fi; done; fi\n",
+            u.trim_end_matches('/')
+        )
+    });
+    let ubuntu = m.ubuntu.as_deref().map(|u| {
+        format!(
+            "# Ubuntu's packages from the mirror.\n. /etc/os-release; if [ \"$ID\" = ubuntu ]; then for f in {sources}; do if [ -f \"$f\" ]; then sed -i -E 's#https?://([a-z0-9-]+\\.)?(archive|security)\\.ubuntu\\.com/ubuntu/?([[:space:]]|$)#{}/\\3#g' \"$f\"; fi; done; fi\n",
+            u.trim_end_matches('/')
+        )
+    });
+    let pypi = m
+        .pypi
+        .as_deref()
+        .map(|u| format!("printf '[global]\\nindex-url = %s\\n' {} > /etc/pip.conf\n", quote(u)));
+    let npm = m.npm.as_deref().map(|u| format!("printf 'registry=%s\\n' {} > /etc/npmrc\n", quote(u)));
+    [debian, ubuntu, pypi, npm].into_iter().flatten().collect()
+}
+
+/// The time servers: chrony's when it's there, else systemd-timesyncd's. Nothing without any.
+fn ntp(servers: &[String]) -> String {
+    if servers.is_empty() {
+        return String::new();
+    }
+    format!(
+        "# Time from the site's servers: chrony when it's there, else systemd-timesyncd.\n\
+         if [ -d /etc/chrony ]; then mkdir -p /etc/chrony/conf.d /etc/chrony/sources.d; printf '%s\\n' {} > /etc/chrony/sources.d/isoloom.sources; systemctl restart chrony 2>/dev/null || systemctl restart chronyd 2>/dev/null || true; \
+         else mkdir -p /etc/systemd/timesyncd.conf.d && printf '[Time]\\nNTP=%s\\n' {} > /etc/systemd/timesyncd.conf.d/isoloom.conf && (systemctl restart systemd-timesyncd 2>/dev/null || true); fi\n",
+        servers.iter().map(|s| quote(&format!("server {s} iburst"))).collect::<Vec<_>>().join(" "),
+        quote(&servers.join(" ")),
+    )
+}
+
+/// Whether a variable is spelled in capitals (`HTTP_PROXY`): the case systemd and Docker read.
+fn upper(k: &str) -> bool {
+    k.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_')
+}
+
+/// The proxy, when the constraints set one: for every login shell, systemd's services, sudo,
+/// apt, dnf/yum and Docker's daemon. Nothing without one.
+fn proxy(c: &Constraints) -> String {
+    let Some(urls) = proxies(c) else { return String::new() };
+    let env = proxy_env(c, urls);
+    let lines: String = env.iter().map(|(k, v)| format!("{k}={v}\n")).collect::<Vec<_>>().concat();
+    let exports: String = env.iter().map(|(k, v)| format!("export {k}={}\n", quote(v))).collect::<Vec<_>>().concat();
+    let systemd = env
+        .iter()
+        .filter(|(k, _)| upper(k))
+        .map(|(k, v)| format!("\"{k}={v}\""))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "# The proxy, for every login shell, systemd's services and sudo.\n\
+         grep -v -i -E '^(http|https|no)_proxy=' /etc/environment > /etc/environment.isoloom 2>/dev/null || true\n\
+         printf %s {} >> /etc/environment.isoloom && mv /etc/environment.isoloom /etc/environment\n\
+         printf %s {} > /etc/profile.d/isoloom-proxy.sh\n\
+         mkdir -p /etc/systemd/system.conf.d && printf '[Manager]\\nDefaultEnvironment=%s\\n' {} > /etc/systemd/system.conf.d/isoloom-proxy.conf\n\
+         if [ -d /etc/sudoers.d ]; then printf 'Defaults env_keep += \"http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY\"\\n' > /etc/sudoers.d/isoloom-proxy && chmod 0440 /etc/sudoers.d/isoloom-proxy; fi\n{}",
+        quote(&lines),
+        quote(&exports),
+        quote(&systemd),
+        package_proxies(urls, &env),
+    )
+}
+
+/// The proxy's `(http, https)` URLs for apt, dnf/yum and Docker's daemon (`env`: the proxy's
+/// variables).
+fn package_proxies((http, https): (&str, &str), env: &[(String, String)]) -> String {
+    let apt = format!("Acquire::http::Proxy \"{http}\";\nAcquire::https::Proxy \"{https}\";\n");
+    let docker: String = env
+        .iter()
+        .filter(|(k, _)| upper(k))
+        .map(|(k, v)| format!("Environment=\"{k}={v}\"\n"))
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "# apt, dnf/yum and Docker's daemon through it.\n\
+         if [ -d /etc/apt/apt.conf.d ]; then printf %s {} > /etc/apt/apt.conf.d/95isoloom-proxy; fi\n\
+         for f in /etc/dnf/dnf.conf /etc/yum.conf; do if [ -f \"$f\" ]; then sed -i '/^proxy=/d' \"$f\" && printf 'proxy=%s\\n' {} >> \"$f\"; fi; done\n\
+         mkdir -p /etc/systemd/system/docker.service.d && printf '[Service]\\n%s' {} > /etc/systemd/system/docker.service.d/isoloom-proxy.conf\n\
+         systemctl daemon-reload 2>/dev/null || true; if systemctl is-active --quiet docker 2>/dev/null; then systemctl restart docker; fi\n",
+        quote(&apt),
+        quote(http),
+        quote(&docker),
+    )
+}
+
+/// Adds the certificate authorities at `sources` (paths on the machine) to a Linux trust store,
+/// as root: Debian's, Ubuntu's and Alpine's `update-ca-certificates`, Red Hat's
+/// `update-ca-trust`, else appended to the bundle OpenSSL reads; then a running Docker daemon
+/// restarts to pull with them. Running it again changes nothing.
+#[must_use]
+pub(crate) fn trust_linux(sources: &[String]) -> String {
+    let copies = |dir: &str, ext: &str| -> String {
+        sources
+            .iter()
+            .enumerate()
+            .map(|(n, src)| format!("install -m 0644 {} {dir}/isoloom-{n}.{ext}\n", quote(src)))
+            .collect::<Vec<_>>()
+            .concat()
+    };
+    // Without either tool, each one is appended to the bundle OpenSSL reads, once: its copy
+    // beside the bundle says it is in.
+    let appended = sources
+        .iter()
+        .enumerate()
+        .map(|(n, src)| {
+            let copy = format!("/etc/ssl/certs/isoloom-{n}.pem");
+            format!(
+                "if ! cmp -s {0} {copy}; then install -m 0644 {0} {copy} && cat {0} >> /etc/ssl/certs/ca-certificates.crt; fi\n",
+                quote(src)
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    format!(
+        "# The site's certificate authorities, trusted beside the public ones.\n\
+         if command -v update-ca-certificates >/dev/null; then\nmkdir -p /usr/local/share/ca-certificates\n{}update-ca-certificates >/dev/null\n\
+         elif command -v update-ca-trust >/dev/null; then\n{}update-ca-trust extract\n\
+         else\nmkdir -p /etc/ssl/certs\n{appended}fi\n\
+         if systemctl is-active --quiet docker 2>/dev/null; then systemctl restart docker; fi\n",
+        copies("/usr/local/share/ca-certificates", "crt"),
+        copies("/etc/pki/ca-trust/source/anchors", "pem"),
+    )
+}
+
+/// Imports the certificate authorities at `sources` (paths on the machine) into a Windows
+/// machine's trusted root store.
+#[must_use]
+pub(crate) fn trust_windows(sources: &[String]) -> String {
+    sources
+        .iter()
+        .map(|src| {
+            format!(
+                "Import-Certificate -FilePath {} -CertStoreLocation Cert:\\LocalMachine\\Root | Out-Null\n",
+                crate::powershell::quote(src)
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat()
+}
+
+#[cfg(test)]
+mod tests;

@@ -1,0 +1,190 @@
+---
+source: crates/targets/isoloom-targets/tests/targets/paas.rs
+expression: "serde_json::to_string_pretty(&resolved[\"services\"]).unwrap()"
+---
+{
+  "db": {
+    "kind": "postgres",
+    "host": "db.shop.internal",
+    "host_on_kubernetes": "db",
+    "port": 5432,
+    "network": "lab",
+    "published": {
+      "allow_input": "PLAYER_IP"
+    },
+    "targets": {
+      "docker": "machine",
+      "hosted": "machine",
+      "cloud-docker": "machine",
+      "kubernetes": "machine",
+      "vagrant": "machine",
+      "proxmox": "machine",
+      "esxi": "machine",
+      "cloud-vm": "managed",
+      "external": {
+        "refused": "`external` creates nothing: run the service as one of its machines"
+      }
+    },
+    "clients": {
+      "web": {
+        "access": "keys",
+        "environment": {
+          "DATABASE_HOST": "db.shop.internal",
+          "DATABASE_PORT": "5432",
+          "DATABASE_NAME": "shop",
+          "DATABASE_USER": "shop",
+          "DATABASE_SSLMODE": "prefer",
+          "DATABASE_PASSWORD_FILE": "/etc/isoloom/services/db/password"
+        },
+        "files": [
+          {
+            "variable": "DATABASE_PASSWORD_FILE",
+            "path": "/etc/isoloom/services/db/password",
+            "credential": true
+          }
+        ],
+        "wait": null
+      }
+    }
+  },
+  "files": {
+    "kind": "object-storage",
+    "host": "files.shop.internal",
+    "host_on_kubernetes": "files",
+    "port": 8333,
+    "network": "lab",
+    "published": null,
+    "targets": {
+      "docker": "machine",
+      "hosted": "machine",
+      "cloud-docker": "machine",
+      "kubernetes": "machine",
+      "vagrant": "machine",
+      "proxmox": "machine",
+      "esxi": "machine",
+      "cloud-vm": "managed",
+      "external": {
+        "refused": "`external` creates nothing: run the service as one of its machines"
+      }
+    },
+    "clients": {
+      "web": {
+        "access": "keys",
+        "environment": {
+          "STORAGE_AUTH": "keys",
+          "STORAGE_WAIT": "/etc/isoloom/services/wait-for",
+          "STORAGE_ENDPOINT_FILE": "/etc/isoloom/services/files/endpoint",
+          "STORAGE_BUCKET_FILE": "/etc/isoloom/services/files/bucket",
+          "STORAGE_REGION_FILE": "/etc/isoloom/services/files/region",
+          "STORAGE_API_FILE": "/etc/isoloom/services/files/api",
+          "STORAGE_ACCESS_KEY_FILE": "/etc/isoloom/services/files/access-key",
+          "STORAGE_SECRET_KEY_FILE": "/etc/isoloom/services/files/secret-key"
+        },
+        "files": [
+          {
+            "variable": "STORAGE_ENDPOINT_FILE",
+            "path": "/etc/isoloom/services/files/endpoint",
+            "credential": false
+          },
+          {
+            "variable": "STORAGE_BUCKET_FILE",
+            "path": "/etc/isoloom/services/files/bucket",
+            "credential": false
+          },
+          {
+            "variable": "STORAGE_REGION_FILE",
+            "path": "/etc/isoloom/services/files/region",
+            "credential": false
+          },
+          {
+            "variable": "STORAGE_API_FILE",
+            "path": "/etc/isoloom/services/files/api",
+            "credential": false
+          },
+          {
+            "variable": "STORAGE_ACCESS_KEY_FILE",
+            "path": "/etc/isoloom/services/files/access-key",
+            "credential": true
+          },
+          {
+            "variable": "STORAGE_SECRET_KEY_FILE",
+            "path": "/etc/isoloom/services/files/secret-key",
+            "credential": true
+          }
+        ],
+        "wait": {
+          "helper": "/etc/isoloom/services/wait-for",
+          "default_timeout_s": 300,
+          "usage": "wait-for FILE [SECONDS]"
+        }
+      }
+    }
+  },
+  "bus": {
+    "kind": "kafka",
+    "host": "bus.shop.internal",
+    "host_on_kubernetes": "bus",
+    "port": 9092,
+    "network": "lab",
+    "published": null,
+    "targets": {
+      "docker": "machine",
+      "hosted": "machine",
+      "cloud-docker": "machine",
+      "kubernetes": "machine",
+      "vagrant": "machine",
+      "proxmox": "machine",
+      "esxi": "machine",
+      "cloud-vm": "managed",
+      "external": {
+        "refused": "`external` creates nothing: run the service as one of its machines"
+      }
+    },
+    "clients": {
+      "web": {
+        "access": "keys",
+        "environment": {
+          "BUS_AUTH": "keys",
+          "BUS_WAIT": "/etc/isoloom/services/wait-for",
+          "BUS_BOOTSTRAP_FILE": "/etc/isoloom/services/bus/bootstrap",
+          "BUS_SECURITY_PROTOCOL_FILE": "/etc/isoloom/services/bus/security-protocol",
+          "BUS_SASL_MECHANISM_FILE": "/etc/isoloom/services/bus/sasl-mechanism",
+          "BUS_USER_FILE": "/etc/isoloom/services/bus/user",
+          "BUS_PASSWORD_FILE": "/etc/isoloom/services/bus/password"
+        },
+        "files": [
+          {
+            "variable": "BUS_BOOTSTRAP_FILE",
+            "path": "/etc/isoloom/services/bus/bootstrap",
+            "credential": false
+          },
+          {
+            "variable": "BUS_SECURITY_PROTOCOL_FILE",
+            "path": "/etc/isoloom/services/bus/security-protocol",
+            "credential": false
+          },
+          {
+            "variable": "BUS_SASL_MECHANISM_FILE",
+            "path": "/etc/isoloom/services/bus/sasl-mechanism",
+            "credential": false
+          },
+          {
+            "variable": "BUS_USER_FILE",
+            "path": "/etc/isoloom/services/bus/user",
+            "credential": true
+          },
+          {
+            "variable": "BUS_PASSWORD_FILE",
+            "path": "/etc/isoloom/services/bus/password",
+            "credential": true
+          }
+        ],
+        "wait": {
+          "helper": "/etc/isoloom/services/wait-for",
+          "default_timeout_s": 300,
+          "usage": "wait-for FILE [SECONDS]"
+        }
+      }
+    }
+  }
+}

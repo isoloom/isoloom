@@ -1,0 +1,49 @@
+---
+source: crates/frontends/isoloom-topology/tests/topology/fixtures.rs
+expression: "compiled(\"cisco-ospf\", &[\"docker\"])"
+---
+version: 1
+name: cisco-ospf
+networks:
+  branch-a:
+    cidr: 10.30.1.0/24
+    gateway: r1
+  branch-b:
+    cidr: 10.30.2.0/24
+    gateway: r2
+  link-0:
+    cidr: 10.200.0.0/29
+    internet: false
+machines:
+  r1:
+    app:
+      image: vrnetlab/cisco_iol:17.12.01
+      appliance: cisco-iol
+      config: configs/r1.cfg
+    networks:
+      branch-a: 1
+      link-0: 2
+  r2:
+    app:
+      appliance: cisco-dynamips
+      firmware: images/r2.bin
+    networks:
+      branch-b: 1
+      link-0: 3
+  pc-a:
+    app:
+      image: alpine:3.20
+    command:
+    - sleep
+    - infinity
+    networks:
+      branch-a: 11
+    access: true
+  pc-b:
+    app:
+      image: nicolaka/netshoot:v0.13
+    command:
+    - sleep
+    - infinity
+    networks:
+      branch-b: 11

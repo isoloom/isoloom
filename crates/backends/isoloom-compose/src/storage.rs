@@ -1,0 +1,225 @@
+//! A container's storage in Compose: its volumes (all of one, or the folder of a shared one it
+//! takes), its data disks (a named volume each: a container shares the host's disk), its tmpfs
+//! mounts with a size or a mode (the long form), and the named volumes the file declares, kept
+//! past `down` or existing already.
+
+use indexmap::IndexMap;
+use isoloom_plan::{Environment, Lifetime, MachinePlan, MachineShape, VolumeKind};
+use isoloom_render::container::{UTILITY_IMAGE, host_folders};
+use isoloom_spec::model::{HostFolder, HostPath, Machine, TmpfsMode};
+use isoloom_spec::shell;
+
+use crate::file::{BindOptions, Condition, LongMount, Mount, NetworkMode, Restart, SELINUX_SHARED, Service, TmpfsOptions, Volume, VolumeOptions};
+use crate::labels::PERSISTENT_LABEL;
+use crate::layout::ROOT;
+
+/// The one-shot service creating the folders machines take of shared volumes.
+pub(crate) const FOLDERS_JOB: &str = "isoloom-volume-folders";
+
+/// A machine's volumes and data disks, as its service mounts them.
+pub(crate) fn volume_mounts(plan: &MachinePlan) -> Vec<Mount> {
+    let volumes = plan.volumes.iter().map(|v| match &v.subpath {
+        Some(sub) => Mount::Long(LongMount::Volume {
+            source: v.key.clone(),
+            target: v.path.clone(),
+            read_only: false,
+            volume: VolumeOptions { subpath: sub.clone() },
+        }),
+        None => Mount::Short(format!("{}:{}", v.key, v.path)),
+    });
+    let disks = plan.disks.iter().filter_map(|d| Some(Mount::Short(format!("{}:{}", d.key, d.mount.as_ref()?))));
+    volumes.chain(disks).collect()
+}
+
+/// A machine's tmpfs mounts: the plain ones (Compose's `tmpfs:`), and the ones with a size or a
+/// mode (long-form mounts).
+pub(crate) fn tmpfs(machine: &Machine) -> (Vec<String>, Vec<Mount>) {
+    let mut plain = Vec::new();
+    let mut long = Vec::new();
+    for t in &machine.tmpfs {
+        if t.size().is_none() && t.mode().is_none() {
+            plain.push(t.path().to_owned());
+            continue;
+        }
+        long.push(Mount::Long(LongMount::Tmpfs {
+            target: t.path().to_owned(),
+            tmpfs: TmpfsOptions {
+                size: t.size().map(String::from),
+                mode: t.mode().map(TmpfsMode::bits),
+            },
+        }));
+    }
+    (plain, long)
+}
+
+/// A machine's host folders, each bound from `${<its variable>:-<where it is on this computer>}`:
+/// the folder itself on this computer's Docker, where the VM shares it when Compose runs in one
+/// (the commands there set the variable). Created when missing.
+pub(crate) fn host_folders(name: &str, mp: &MachinePlan) -> Vec<Mount> {
+    mp.host_folders
+        .iter()
+        .enumerate()
+        .map(|(n, f)| {
+            Mount::Long(LongMount::Bind {
+                source: format!("${{{}:-{}}}", host_folders::variable(name, n), on_this_computer(f, ROOT)),
+                target: f.path.clone(),
+                read_only: f.read_only,
+                bind: BindOptions {
+                    create_host_path: true,
+                    selinux: SELINUX_SHARED,
+                },
+            })
+        })
+        .collect()
+}
+
+/// Where Compose on this computer finds `f`, from its file `root` (the project folder, relative
+/// to the Compose file): a project folder under `root`, a home one as `~` (Compose expands it),
+/// an absolute one as it is.
+fn on_this_computer(f: &HostFolder, root: &str) -> String {
+    match f.host() {
+        HostPath::Project(p) => format!("{root}/{}", p.trim_start_matches("./")),
+        HostPath::Home(p) | HostPath::Absolute(p) => p.to_owned(),
+    }
+}
+
+/// The named volumes of the containers: each machine's (shared ones once), then its disks'. A
+/// persistent one is labelled for `down` to keep; an existing one is only named.
+pub(crate) fn declared(env: &Environment) -> IndexMap<String, Volume> {
+    let mut out = IndexMap::new();
+    for m in env.machines.values().filter(|m| m.shape == MachineShape::Container) {
+        for v in &m.volumes {
+            let vol = match &v.lifetime {
+                Lifetime::Environment => Volume::default(),
+                Lifetime::Persistent => Volume {
+                    labels: IndexMap::from([(PERSISTENT_LABEL.to_owned(), "true".to_owned())]),
+                    ..Volume::default()
+                },
+                Lifetime::External { name } => Volume {
+                    external: true,
+                    name: Some(name.clone()),
+                    ..Volume::default()
+                },
+            };
+            out.entry(v.key.clone()).or_insert(vol);
+        }
+        out.extend(m.disks.iter().filter(|d| d.mount.is_some()).map(|d| (d.key.clone(), Volume::default())));
+    }
+    out
+}
+
+/// The one-shot job creating, in each shared volume, the folders machines take of it: started
+/// once the volume's owner is (Docker seeds an empty volume from the owner's image first), and
+/// waited for by the machines taking a folder (Docker mounts only a folder that exists).
+pub(crate) fn folders(env: &Environment, services: &mut IndexMap<String, Service>) {
+    let mut cmds = Vec::new();
+    let mut mounts: Vec<String> = Vec::new();
+    let mut owners = Vec::new();
+    for (name, m) in env.machines.iter().filter(|(_, m)| m.shape == MachineShape::Container) {
+        for v in &m.volumes {
+            let (Some(sub), VolumeKind::Shared { owner, .. }) = (&v.subpath, &v.kind) else {
+                continue;
+            };
+            let at = format!("/volumes/{}", v.key);
+            if !mounts.iter().any(|x| x.ends_with(&format!(":{at}"))) {
+                mounts.push(format!("{}:{at}", v.key));
+            }
+            cmds.push(format!("mkdir -p {}", shell::quote(&format!("{at}/{sub}"))));
+            owners.push(owner.clone());
+            if let Some(svc) = services.get_mut(name) {
+                svc.after(FOLDERS_JOB, Condition::CompletedSuccessfully);
+            }
+        }
+    }
+    if cmds.is_empty() {
+        return;
+    }
+    let mut job = Service {
+        image: Some(env.images.pull(UTILITY_IMAGE)),
+        entrypoint: vec!["sh".into(), "-c".into(), cmds.join(" && ")],
+        volumes: mounts.into_iter().map(Mount::Short).collect(),
+        network_mode: Some(NetworkMode::None),
+        restart: Some(Restart::No),
+        ..Service::default()
+    };
+    for o in owners.into_iter().filter(|o| services.contains_key(o)) {
+        job.after(o, Condition::Started);
+    }
+    services.insert(FOLDERS_JOB.to_owned(), job);
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_spec::model::HostFolder;
+
+    use crate::labels::PERSISTENT_LABEL;
+    use crate::testing::environment;
+
+    fn folder(from: &str) -> HostFolder {
+        HostFolder {
+            from: from.into(),
+            path: "/x".into(),
+            read_only: false,
+        }
+    }
+
+    #[test]
+    fn compose_on_this_computer_reads_a_project_folder_from_its_root_and_the_others_as_written() {
+        let read = ["shared", "./shared", "../up", "~/notes", "/srv/share", "C:\\share"].map(|f| super::on_this_computer(&folder(f), "../.."));
+        assert_eq!(read, ["../../shared", "../../shared", "../../../up", "~/notes", "/srv/share", "C:\\share"]);
+    }
+
+    const SPEC: &str = "version: 1
+name: store
+networks: { lan: { cidr: 10.9.0.0/24 } }
+volumes: { data: { persistent: true } }
+machines:
+  db: { networks: { lan: 10 }, app: { image: postgres }, volumes: { data: /var/lib/postgresql/data } }
+  web: { networks: { lan: 11 }, app: { image: nginx }, tmpfs: [/run, { path: /cache, size: 64m, mode: '1777' }] }
+";
+
+    #[test]
+    fn a_kept_volume_is_labelled_for_down_to_keep() {
+        let volumes = super::declared(&environment(SPEC));
+        assert_eq!(volumes.keys().collect::<Vec<_>>(), ["data"]);
+        isoloom_test_support::assert_every!(volumes.values(), |v: &&crate::file::Volume| v
+            .labels
+            .get(PERSISTENT_LABEL)
+            .is_some_and(|l| l == "true"));
+    }
+
+    /// A machine taking a folder of a shared volume mounts that folder, which a one-shot job
+    /// makes first (Docker mounts only a folder that exists), once the volume's owner started.
+    #[test]
+    fn a_folder_of_a_shared_volume_is_made_before_the_machine_taking_it_starts() {
+        let env = environment(
+            "version: 1\nname: t\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nvolumes: { site: { owner: web } }\nmachines:\n  web: { networks: { lan: 10 }, app: { image: nginx }, volumes: { site: /srv } }\n  docs: { networks: { lan: 11 }, app: { image: nginx }, volumes: { site: { path: /usr/share/nginx/html, subpath: 'docs site' } } }\n",
+        );
+        let file = crate::render::compose_file(crate::backend::ComposeTarget::Docker, &env).expect("renders").file;
+        let job = &file.services[super::FOLDERS_JOB];
+        assert_eq!(job.entrypoint, ["sh", "-c", "mkdir -p '/volumes/site/docs site'"]);
+        assert_eq!(serde_yaml_ng::to_string(&job.volumes).expect("serializes"), "- site:/volumes/site\n");
+        assert_eq!(job.network_mode, Some(crate::file::NetworkMode::None));
+        assert!(job.runs_once(), "a one-shot job");
+        let after = |s: &crate::file::Service| s.depends_on.iter().map(|(n, d)| (n.clone(), d.condition)).collect::<Vec<_>>();
+        assert_eq!(after(job), [("web".to_owned(), crate::file::Condition::Started)]);
+        assert!(
+            after(&file.services["docs"]).contains(&(super::FOLDERS_JOB.to_owned(), crate::file::Condition::CompletedSuccessfully)),
+            "{:?}",
+            after(&file.services["docs"])
+        );
+        assert_eq!(
+            serde_yaml_ng::to_string(&super::volume_mounts(&env.machines["docs"])).expect("serializes"),
+            "- type: volume\n  source: site\n  target: /usr/share/nginx/html\n  volume:\n    subpath: docs site\n"
+        );
+    }
+
+    #[test]
+    fn a_tmpfs_with_a_size_or_a_mode_is_a_long_mount() {
+        let env = environment(SPEC);
+        let (plain, long) = super::tmpfs(&env.spec().machines["web"]);
+        assert_eq!(plain, ["/run"]);
+        let yaml = serde_yaml_ng::to_string(&long).expect("serializes");
+        assert_eq!(yaml, "- type: tmpfs\n  target: /cache\n  tmpfs:\n    size: 64m\n    mode: 1023\n");
+    }
+}

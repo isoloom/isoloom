@@ -1,0 +1,13 @@
+# Who reviews what. GitHub requests a review from the owners of the files a pull request changes;
+# with the ruleset's "Require review from Code Owners", their approval is required.
+*                       @florianamette
+
+# The release path and the supply chain: workflows, the Action, the install script, dependency
+# policy, licences.
+/.github/               @florianamette
+/action.yml             @florianamette
+/packaging/             @florianamette
+/deny.toml              @florianamette
+/Cargo.lock             @florianamette
+/LICENSE                @florianamette
+/NOTICE                 @florianamette

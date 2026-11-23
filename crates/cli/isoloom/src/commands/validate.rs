@@ -1,0 +1,73 @@
+//! `isoloom validate`: the spec's mistakes, the paths it mentions that don't exist, and what it
+//! says that is likely not what its author means (warnings, which never fail it).
+
+use std::path::PathBuf;
+
+use super::{Console, Result, Verdict, spec};
+use crate::error::CliError;
+
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {
+    /// The project folder (holding isoloom.yml).
+    #[arg(default_value = ".")]
+    dir: PathBuf,
+    /// Don't check that files mentioned by the spec exist.
+    #[arg(long)]
+    skip_files: bool,
+    /// Machine-readable output.
+    #[arg(long)]
+    json: bool,
+    #[command(flatten)]
+    settings: spec::Settings,
+}
+
+/// Lists the spec's problems, then its warnings: its answer is the verdict (the problems'), so a
+/// spec with problems is a no, not an error, and one with warnings only is a yes.
+pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
+    // A folder with no spec is an error: there is nothing to give a verdict on.
+    isoloom_spec::find(&a.dir)?;
+    let file = spec::file_name(&a.dir);
+    // The lab as `generate` reads it, the defaults applied: a tag they add is validated too.
+    // A template it can't read is left out: the file checks report it.
+    let (name, problems, warnings) = match spec::settled(profile.load(&a.dir)?.as_ref(), &a.dir, &a.settings, spec::Unread::Skipped) {
+        Ok((lab, _)) => {
+            let problems = if a.skip_files { lab.problems() } else { lab.problems_with_files(&a.dir) };
+            (lab.spec().name.clone(), problems, lab.warnings())
+        }
+        Err(CliError::InvalidSpec { problems, .. }) => (String::new(), problems, Vec::new()),
+        Err(e) => return Err(e),
+    };
+    if a.json {
+        console.json(&serde_json::json!({
+            "ok": problems.is_empty(),
+            "specFormat": spec_format(&problems),
+            "isoloomVersion": env!("CARGO_PKG_VERSION"),
+            "problems": problems,
+            "warnings": warnings,
+        }))?;
+        return Ok(Verdict::of(problems.is_empty()));
+    }
+    for p in &problems {
+        console.line(format_args!("✗ {}", p.render(&file)))?;
+    }
+    for w in &warnings {
+        console.line(format_args!("! {}", w.render(&file)))?;
+    }
+    if problems.is_empty() {
+        console.line(format_args!("✓ {name} is valid"))?;
+    } else {
+        console.line(format_args!("{} problem{}", problems.len(), if problems.len() == 1 { "" } else { "s" }))?;
+    }
+    Ok(Verdict::of(problems.is_empty()))
+}
+
+/// The spec's format, so the publish path reads it authoritatively instead of matching the YAML:
+/// `legacy` when the spec still uses a removed key (the old `services:`/`docker:`/`vm:` form),
+/// otherwise `v1`, the only format this isoloom reads.
+fn spec_format(problems: &[isoloom_spec::syntax::Problem]) -> &'static str {
+    if problems.iter().any(|p| p.code == isoloom_spec::syntax::Code::RemovedField) {
+        "legacy"
+    } else {
+        "v1"
+    }
+}

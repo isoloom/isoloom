@@ -1,0 +1,139 @@
+//! How an OS installs and starts things: its family. The configuration renderers write one
+//! implementation of each resource per family (apt and systemd, dnf and systemd, apk and OpenRC,
+//! Windows); a recipe is resolved for the family of its machine's OS, and the daemon table names
+//! a daemon's unit and package per family.
+
+use std::str::FromStr;
+
+use isoloom_spec::os::{Installer, Os};
+use isoloom_spec::syntax::OsRef;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+/// An OS family, as the configuration model sees it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Family {
+    /// Debian, Ubuntu and Kali: apt, systemd.
+    Debian,
+    /// Rocky, AlmaLinux, Fedora and CentOS: dnf (yum on CentOS 7), systemd.
+    #[serde(rename = "redhat")]
+    RedHat,
+    /// Alpine: apk, OpenRC.
+    Alpine,
+    /// Windows and Windows Server: features, Windows services.
+    Windows,
+}
+
+impl Family {
+    /// Every family.
+    pub const ALL: [Family; 4] = [Family::Debian, Family::RedHat, Family::Alpine, Family::Windows];
+
+    /// The family of `os`: how it installs packages ([`Os::installer`]) decides it.
+    #[must_use]
+    pub fn of(os: Os) -> Family {
+        match os.installer {
+            Installer::Apt => Family::Debian,
+            Installer::Dnf => Family::RedHat,
+            Installer::Apk => Family::Alpine,
+            Installer::Windows => Family::Windows,
+        }
+    }
+
+    /// The family's name, as a refusal names it (`Debian`).
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Family::Debian => "Debian",
+            Family::RedHat => "Red Hat",
+            Family::Alpine => "Alpine",
+            Family::Windows => "Windows",
+        }
+    }
+
+    /// How an entry writes it (`redhat`).
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            Family::Debian => "debian",
+            Family::RedHat => "redhat",
+            Family::Alpine => "alpine",
+            Family::Windows => "windows",
+        }
+    }
+}
+
+impl From<OsRef> for Family {
+    fn from(os: OsRef) -> Family {
+        Family::of(os.os())
+    }
+}
+
+/// A repository's `suite` and `components` on `os`, as a step gives them or by apt's defaults:
+/// the OS's codename and `main`. They are apt's: off apt, no suite, and the components as given
+/// (which the spec refuses).
+#[must_use]
+pub fn apt_defaults<S: FromStr, C: FromStr>(os: Os, suite: Option<S>, components: Option<Vec<C>>) -> (Option<S>, Vec<C>) {
+    if !os.installs_with_apt() {
+        return (None, components.unwrap_or_default());
+    }
+    let suite = suite.or_else(|| os.codename().and_then(|c| c.parse().ok()));
+    let components = components.unwrap_or_else(|| "main".parse().ok().into_iter().collect());
+    (suite, components)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn os(text: &str) -> Os {
+        text.parse::<OsRef>().map_or_else(|e| panic!("{text}: {e}"), OsRef::os)
+    }
+
+    #[test]
+    fn each_os_has_its_family() {
+        for (text, family) in [
+            ("debian@12", Family::Debian),
+            ("ubuntu@24.04", Family::Debian),
+            ("kali", Family::Debian),
+            ("rocky@9", Family::RedHat),
+            ("alma", Family::RedHat),
+            ("centos@7", Family::RedHat),
+            ("alpine", Family::Alpine),
+            ("windows-server@2022", Family::Windows),
+            ("windows@11", Family::Windows),
+        ] {
+            assert_eq!(Family::of(os(text)), family, "{text}");
+        }
+    }
+
+    #[test]
+    fn every_apt_release_has_its_codename() {
+        for spelling in isoloom_spec::os::spellings() {
+            let o = os(&spelling);
+            assert_eq!(o.codename().is_some(), Family::of(o) == Family::Debian, "{spelling}");
+        }
+        assert_eq!(os("debian@12").codename(), Some("bookworm"));
+    }
+
+    #[test]
+    fn an_apt_repository_defaults_to_the_codename_and_main_and_others_have_neither() {
+        let given = |os_text: &str, suite: Option<&str>, components: Option<Vec<String>>| {
+            apt_defaults::<String, String>(os(os_text), suite.map(str::to_owned), components)
+        };
+        assert_eq!(given("debian@12", None, None), (Some("bookworm".to_owned()), vec!["main".to_owned()]));
+        assert_eq!(given("kali", None, None), (Some("kali-rolling".to_owned()), vec!["main".to_owned()]));
+        let own = given("ubuntu@24.04", Some("stable"), Some(vec!["contrib".to_owned()]));
+        assert_eq!(own, (Some("stable".to_owned()), vec!["contrib".to_owned()]));
+        for other in ["rocky@9", "alpine", "windows-server@2022"] {
+            assert_eq!(given(other, Some("stable"), None), (None, Vec::new()), "{other}");
+        }
+    }
+
+    #[test]
+    fn an_entry_writes_each_family_by_its_id() {
+        for f in Family::ALL {
+            assert_eq!(serde_yaml_ng::from_str::<Family>(f.id()).ok(), Some(f));
+        }
+    }
+}

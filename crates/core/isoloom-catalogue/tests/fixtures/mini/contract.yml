@@ -1,0 +1,4 @@
+cases:
+  default: {}
+checks:
+  - { name: it runs, exec: "mini --version" }

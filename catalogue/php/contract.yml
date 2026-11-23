@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What php does the same as a container and as a VM. `cargo xtask catalogue check php` builds one
+# small lab per case: this machine (`web`), and an access machine (`probe`) running the checks, on
+# `docker` and on `vagrant` through a runner. A case passes when every check passes in both forms
+# and every fact reads the same in both.
+cases:
+  default: {}
+  apache:
+    with: { server: apache }
+  fpm:
+    with: { server: fpm }
+
+checks:
+  - name: php reports the release asked for
+    exec: php -v 2>&1
+    expect: "PHP {{ version }}"
+  - name: php evaluates code
+    exec: php -r 'echo 6 * 7;'
+    expect: "42"
+  - name: the image's helper installs an extension from the archive
+    exec: docker-php-ext-install mysqli >/dev/null && php -m
+    expect: mysqli
+  - name: apache serves php
+    case: apache
+    tcp: "{{ machine }}:80"
+    wait: 2m
+  - name: php-fpm answers on the image's port
+    case: fpm
+    tcp: "{{ machine }}:9000"
+    wait: 2m
+
+# Equal in both forms, or the case fails.
+facts:
+  - name: the OS
+    exec: . /etc/os-release && echo "$ID $VERSION_ID"
+  - name: php's build
+    exec: php -v 2>&1 | head -n 1

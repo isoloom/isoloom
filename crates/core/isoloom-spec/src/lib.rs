@@ -1,0 +1,66 @@
+//! The Isoloom spec: the format an author writes ([`syntax`]: parsed into types that hold no
+//! invalid state, every problem coded and placed), the form the plan lowers it into ([`model`]),
+//! the schema and the reference page read from the types, normalization (groups, clones, VLANs,
+//! profiles, instances, defaults, the image table) and validation.
+//!
+//! ```
+//! let spec = isoloom_spec::syntax::parse(
+//!     "version: 1\nname: hello\nnetworks:\n  lab: { cidr: 10.1.0.0/24 }\nmachines:\n  web:\n    os: debian@12\n    networks: { lab: 10 }\n    ports: { web: { port: 80, protocol: http } }\n",
+//! )?;
+//! assert!(isoloom_spec::syntax::check(&spec).is_empty());
+//! assert_eq!(spec.machines["web"].os.map(|os| os.to_string()).as_deref(), Some("debian@12"));
+//! # Ok::<(), Vec<isoloom_spec::syntax::Problem>>(())
+//! ```
+
+#![cfg_attr(
+    all(test, not(windows)),
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
+pub mod appliance;
+mod as_written;
+pub mod check_line;
+mod clones;
+pub mod contract;
+pub mod defaults;
+mod error;
+pub mod groups;
+pub mod host;
+pub mod host_access;
+pub mod ignore;
+pub mod images;
+pub mod instance;
+pub mod linux;
+mod load;
+pub mod model;
+pub mod net;
+pub mod os;
+#[cfg(feature = "paas")]
+pub mod paas;
+pub mod path;
+pub mod placeholders;
+pub mod probe;
+pub mod profile;
+pub mod project_path;
+pub mod ready_line;
+pub mod reference;
+pub mod schema;
+pub mod shell;
+mod sizing;
+pub mod syntax;
+pub mod tags;
+#[cfg(test)]
+mod testing;
+pub mod validate;
+pub mod vlans;
+pub mod windows;
+
+pub use error::{Error, Result};
+pub use load::{SPEC_FILE, SPEC_FILES, find, load, load_profiled, parse};
+pub use model::{Appliance, Arch, Check, Expect, Machine, Target, Tc};
+pub use sizing::{CONTAINER_MEMORY_MB, DEFAULT_CPUS, Form, MachineSize, Totals, totals, totals_for};
+pub use syntax::Spec;
+pub use validate::{Problem, validate, validate_files};

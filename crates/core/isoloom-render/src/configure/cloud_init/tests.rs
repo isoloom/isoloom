@@ -1,0 +1,67 @@
+//! The cloud-init carrier: the script delivered compressed in `write_files` and run from
+//! `runcmd`, and the user-data size limits.
+
+use isoloom_plan::configure::Resource;
+use isoloom_spec::model::Target;
+
+use super::*;
+use crate::configure::Configured;
+use crate::testing;
+
+/// The resources of machine `m` (as `testing::machine` writes it).
+fn resources(env: &isoloom_plan::Environment) -> Vec<Resource> {
+    Configured::of(env, "m").expect("a recipe").recipe().resources().cloned().collect()
+}
+
+#[test]
+fn the_script_is_the_shell_renderers_text_compressed() {
+    let env = testing::machine(
+        "os: debian@12, app: { steps: [{ packages: [nginx] }, { service: nginx }] }",
+        Target::Proxmox,
+        &[],
+    );
+    let c = Configured::of(&env, "m").expect("a recipe");
+    let res = resources(&env);
+    let carried = configure(&c, &res, true, 0);
+    assert_eq!(carried.file.path, "/var/lib/isoloom/configure/configure-0.sh");
+    assert_eq!(carried.file.permissions, "0700");
+    assert_eq!(carried.command, "sh /var/lib/isoloom/configure/configure-0.sh");
+    // The carried content is the shell renderer's own script, only compressed.
+    assert_eq!(carried.file.content, gz_b64(&shell::script(&c, &res, true)));
+}
+
+#[test]
+fn the_run_index_names_the_script() {
+    let env = testing::machine("os: debian@12, app: { steps: [{ packages: [curl] }] }", Target::Proxmox, &[]);
+    let c = Configured::of(&env, "m").expect("a recipe");
+    let res = resources(&env);
+    let second = configure(&c, &res, false, 1);
+    assert_eq!(second.file.path, "/var/lib/isoloom/configure/configure-1.sh");
+    assert_eq!(second.command, "sh /var/lib/isoloom/configure/configure-1.sh");
+    // `fresh` false carries a different script (it keeps the change mark) from `fresh` true.
+    assert_ne!(second.file.content, configure(&c, &res, true, 1).file.content);
+}
+
+#[test]
+fn the_carried_text_is_what_cloud_init_decodes_back_to_the_script() {
+    use std::io::Read as _;
+    let script = "#!/bin/sh\nset -eu\nisoloom_packages 'nginx'\n";
+    // `gz+b64`: standard base64 (padded), then gzip.
+    let compressed = isoloom_test_support::b64_decode(&gz_b64(script)).expect("standard base64");
+    let mut decoded = String::new();
+    flate2::read::GzDecoder::new(compressed.as_slice()).read_to_string(&mut decoded).expect("gzip");
+    assert_eq!(decoded, script);
+}
+
+/// The same script gives the same compressed bytes whatever else is in the build: the deflate
+/// implementation is pinned (zlib-rs), so a binary built alone and one built in the workspace write
+/// the same cloud-init file. The bytes are zlib-rs's at the best level, with no time or name in the
+/// header.
+#[test]
+fn gzip_gives_the_same_bytes_from_every_build() {
+    let script = "#!/bin/sh\nset -e\n".repeat(50) + "echo done\n";
+    assert_eq!(super::base64(&gzip(&script)), EXPECTED_GZIP);
+}
+
+/// What [`gzip_gives_the_same_bytes_from_every_build`] compresses to.
+const EXPECTED_GZIP: &str = "H4sIAAAAAAAC/1NW1E/KzNMvzuAqTi1R0E3lUh4VGBUYFSBfIDU5I18hJT8vlQsAEDUs6lwDAAA=";

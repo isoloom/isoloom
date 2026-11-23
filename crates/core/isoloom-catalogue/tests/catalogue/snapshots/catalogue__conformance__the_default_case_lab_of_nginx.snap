@@ -1,0 +1,39 @@
+---
+source: crates/core/isoloom-catalogue/tests/catalogue/conformance.rs
+expression: lab.spec
+---
+version: 1
+name: conformance-nginx-default
+networks:
+  lab:
+    cidr: 10.77.0.0/24
+    internet: true
+machines:
+  web:
+    os: debian@12
+    service: nginx@1.30.6
+    with: {}
+    networks:
+      lab: 10
+  probe:
+    access: true
+    networks:
+      lab: 200
+checks:
+- name: the port answers
+  from: probe
+  http: http://web:80/
+  expect: any
+  wait: 120
+- name: nginx reports the release asked for
+  from: web
+  exec: nginx -v 2>&1
+  expect: nginx/1.30.6
+- name: 'fact: the OS'
+  from: web
+  exec: ( . /etc/os-release && echo "$ID $VERSION_ID" ) 2>&1 | tr '\n' ' '
+  expect: isoloom-fact-output-follows
+- name: 'fact: nginx''s build'
+  from: web
+  exec: ( nginx -V 2>&1 | head -n 1 ) 2>&1 | tr '\n' ' '
+  expect: isoloom-fact-output-follows

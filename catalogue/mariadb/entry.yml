@@ -1,0 +1,116 @@
+# yaml-language-server: $schema=../entry.schema.json
+#
+# The mariadb entry: MariaDB, from its official image (11.4 on Debian 12), or MariaDB's own
+# binary build of an exact release installed the same way in every form: a VM, or a container
+# built from the OS's image. Either initialises the data directory at first start from the
+# settings below (the image's entrypoint, or the entry's own with the same contract): the root
+# password, an application database, an application user, then /docker-entrypoint-initdb.d. Each
+# download release pins its archive's SHA-256 (MariaDB's own sha256sums.txt) in `vars`; lock.yml
+# beside it is written only by `cargo xtask catalogue refresh mariadb`, which pins the image's
+# digest.
+name: mariadb
+description: >-
+  MariaDB, from its official image: it serves an application database, with a root password and an
+  application user whose passwords come from secrets.
+upstream: https://mariadb.org/
+licence:
+  software: GPL-2.0-only
+  notes: The official image bundles its base distribution's packages under those packages' own licences.
+
+# MariaDB's maintained LTS series; the image tag is the series (`11.4`).
+releases:
+  - version: "11.4"
+    channel: lts
+    source: distro
+    os: [debian@12]
+# MariaDB's binary builds of the exact releases labs pin (libaio 1 by its old name: Ubuntu 22.04,
+# Debian 11).
+  - version: 10.6.3
+    source: download
+    os: [ubuntu@22.04, debian@11]
+    vars: { url: "https://archive.mariadb.org/mariadb-10.6.3/bintar-linux-systemd-x86_64/mariadb-10.6.3-linux-systemd-x86_64.tar.gz", sha256: 3bcfadba0083b6e97ce6c6350091b25bf4e9a91774dfa2a1c1f9e1abcd80fb6e }
+  - version: 10.8.3
+    source: download
+    os: [ubuntu@22.04, debian@11]
+    vars: { url: "https://archive.mariadb.org/mariadb-10.8.3/bintar-linux-systemd-x86_64/mariadb-10.8.3-linux-systemd-x86_64.tar.gz", sha256: e27a7d28ecf2c86b79dd7048bc42ef82c6e06db8ecfaf308d0fbf0623ebe33e7 }
+  - version: 10.11.20
+    source: download
+    os: [ubuntu@22.04, debian@11]
+    vars: { url: "https://archive.mariadb.org/mariadb-10.11.20/bintar-linux-systemd-x86_64/mariadb-10.11.20-linux-systemd-x86_64.tar.gz", sha256: 3e28539f79de3ca9df72f4a4b93f9092eb4f05a9648391ddf37c44fb4ed84727 }
+  - version: 11.8.10
+    source: download
+    os: [ubuntu@22.04, debian@11]
+    vars: { url: "https://archive.mariadb.org/mariadb-11.8.10/bintar-linux-systemd-x86_64/mariadb-11.8.10-linux-systemd-x86_64.tar.gz", sha256: 15ca40274597af84fa8f89f8248b37740c5a712c003df80b4c7b32a4486e2027 }
+default: "11.4"
+
+images:
+  debian@12: docker.io/library/mariadb:{{ version }}
+
+settings:
+  password:
+    type: password
+    required: true
+    description: The root password (a literal, or a secret or input reference).
+  database:
+    type: string
+    default: app
+    pattern: "[A-Za-z0-9_]{1,64}"
+    description: The application database the image creates at first start.
+  user:
+    type: string
+    default: app
+    pattern: "[A-Za-z0-9_]{1,32}"
+    description: The application user the image creates at first start.
+  user_password:
+    type: password
+    required: true
+    description: The application user's password (a literal, or a secret or input reference).
+
+image:
+  environment:
+    MARIADB_ROOT_PASSWORD_FILE: "{{ with.password.path }}"
+    MARIADB_DATABASE: "{{ with.database }}"
+    MARIADB_USER: "{{ with.user }}"
+    MARIADB_PASSWORD_FILE: "{{ with.user_password.path }}"
+
+ports:
+  mysql: { port: 3306, protocol: tcp }
+
+data:
+  data: /var/lib/mysql
+
+# The VM form (and the container built from the OS) of the download releases: never the
+# official image, whose OS (Debian 12) no download release runs on.
+recipe:
+  install:
+    - packages: [ca-certificates, libaio1, libnuma1, libncurses6, procps]
+      when: { os: [ubuntu@22.04, debian@11] }
+    - file: { path: /var/cache/isoloom/mariadb.tar.gz, url: "{{ vars.url }}", sha256: "{{ vars.sha256 }}" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    - command: "sh -c 'mkdir -p /usr/local/mysql && tar -xzf /var/cache/isoloom/mariadb.tar.gz --strip-components=1 -C /usr/local/mysql && for b in /usr/local/mysql/bin/*; do ln -sf \"$b\" /usr/local/bin/; done'"
+      creates: /usr/local/mysql/bin/mariadbd
+      when: { os: [ubuntu@22.04, debian@11] }
+    - group: { name: mysql, system: true }
+      when: { os: [ubuntu@22.04, debian@11] }
+    - user: { name: mysql, group: mysql, system: true, home: /var/lib/mysql, shell: /bin/false }
+      when: { os: [ubuntu@22.04, debian@11] }
+
+  configure:
+    - file: { path: /var/lib/mysql, state: directory, owner: mysql, group: mysql, mode: "0750" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    - file: { path: /docker-entrypoint-initdb.d, state: directory, mode: "0755" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    - file: { path: /etc/mysql/conf.d, state: directory, mode: "0755" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    - template: { from: files/my.cnf, to: /etc/my.cnf, mode: "0644" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    # The settings, read by the entrypoint at first start (the image reads them from its environment).
+    - template: { from: files/isoloom.env, to: /etc/mysql/isoloom.env, mode: "0600" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    - template: { from: files/docker-entrypoint.sh, to: /usr/local/bin/docker-entrypoint.sh, mode: "0755" }
+      when: { os: [ubuntu@22.04, debian@11] }
+    # On a VM: a unit, enabled and started. In a built container: the supervisor's one process.
+    - service: { name: mariadb, run: [/usr/local/bin/docker-entrypoint.sh, mariadbd] }
+      when: { os: [ubuntu@22.04, debian@11] }
+
+  start: []

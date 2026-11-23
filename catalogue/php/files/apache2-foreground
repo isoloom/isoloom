@@ -1,0 +1,10 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Written by Isoloom from the catalogue's php entry: the php image's Apache command, in the
+# foreground, reading $PHP_INI_DIR/conf.d as the image's PHP does.
+set -e
+. /etc/apache2/envvars
+export PHP_INI_SCAN_DIR="/etc/php/{{ vars.series }}/apache2/conf.d:/usr/local/etc/php/conf.d"
+mkdir -p "$APACHE_RUN_DIR" "$APACHE_LOCK_DIR" "$APACHE_LOG_DIR"
+rm -f "$APACHE_PID_FILE"
+exec apache2 -DFOREGROUND "$@"

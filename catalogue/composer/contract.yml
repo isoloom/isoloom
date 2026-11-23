@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../contract.schema.json
+#
+# What composer does, the same as a container and as a VM. `cargo xtask catalogue check composer`
+# builds a small lab (`web`, an access machine `probe`) and runs it through a runner.
+cases:
+  default: {}
+
+checks:
+  # The phar alone: a machine's own PHP runs it (the php entry's contract runs PHP).
+  - name: the release's composer.phar is in place
+    exec: grep -a -o "const VERSION = '[^']*'" /usr/bin/composer
+    expect: "{{ version }}"
+
+facts:
+  - name: composer.phar
+    exec: sha256sum /usr/bin/composer

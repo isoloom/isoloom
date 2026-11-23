@@ -1,0 +1,21 @@
+# What the workspace's tests share and no product code uses: stand-in tools on a PATH of their
+# own, a guard that ends a helper process with what it started, asserts that can't pass on
+# nothing, and parsers that let a test assert on a rendered file's values instead of its text.
+[package]
+name = "isoloom-test-support"
+description = "Test support shared by the Isoloom crates' tests (not published)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+hcl.workspace = true
+serde.workspace = true
+serde_yaml_ng.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

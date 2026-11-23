@@ -1,0 +1,121 @@
+//! Writing the Vagrant draft: the shared parts through [`Writer`]; the steps, the boxes kept as
+//! overrides and the environment's playbooks here.
+
+use super::{Bridge, Import, Machine, REBOOT};
+use crate::draft::quoting::{quoted, scalar};
+use crate::draft::writer::{Header, Writer};
+use crate::naming::network_names;
+
+/// The draft: the header, the networks, the machines, then the boxes kept and the
+/// environment-level playbooks.
+pub(super) fn draft_yaml(import: &Import, machines: &[Machine], name: &str, source: &str) -> String {
+    // Network names: the VirtualBox internal network's, else net, net-2...
+    let names = network_names(
+        import
+            .nets
+            .iter()
+            .map(|(key, net)| (key.clone(), (!net.name.is_empty()).then(|| net.name.trim_start_matches("isoloom-").to_owned()))),
+    );
+    let mut y = Writer::new(&Header {
+        tool: "vagrant",
+        source,
+        review: "Review it with the notes the import printed.",
+        next: "add `app.image` or `app.build` to machines that should be a container rather than their steps' build, and `checks` that prove the behavior.",
+        name,
+    });
+    for (key, net) in &import.nets {
+        let network = names.get(key).map_or(crate::naming::DRAFT_NETWORK, String::as_str);
+        match &net.bridged {
+            Some(b) => y.bridged(network, net.cidr, &bridged(b)),
+            None => y.network(network, 0, net.cidr, true),
+        }
+    }
+    y.machines();
+    for m in machines {
+        y.machine(&m.name);
+        y.machine_networks(m.networks.iter().filter_map(|(k, o)| Some((names.get(k)?, *o))));
+        y.ports(m.publish.iter().copied());
+        y.resources(m.cpus, m.memory_mb);
+        y.os(m.os);
+        if !m.host_folders.is_empty() {
+            let each: Vec<String> = m
+                .host_folders
+                .iter()
+                .map(|f| {
+                    // Read-only is the spec's default: a folder Vagrant shares both ways says so.
+                    let ro = if f.read_only { "" } else { ", read_only: false" };
+                    format!("{{ from: {}, path: {}{ro} }}", scalar(&f.from), scalar(&f.path))
+                })
+                .collect();
+            y.line(format!("    host_folders: [{}]", each.join(", ")));
+        }
+        if !m.steps.is_empty() {
+            let steps: Vec<String> = m.steps.iter().map(|s| step(s)).collect();
+            y.line(format!("    app:\n      steps: [{}]", steps.join(", ")));
+        }
+    }
+    boxes(&mut y, machines);
+    if !import.env_playbooks.is_empty() {
+        y.line("\nprovision:");
+        for p in &import.env_playbooks {
+            y.line(format!("  - ansible: {}", scalar(p.trim_start_matches("./"))));
+        }
+    }
+    y.finish()
+}
+
+/// A public network's `bridged` mapping.
+fn bridged(b: &Bridge) -> String {
+    let mut keys = Vec::new();
+    if let Some(i) = &b.interface {
+        keys.push(format!("interface: {}", quoted(i)));
+    }
+    if b.dhcp {
+        keys.push("dhcp: true".to_owned());
+    }
+    if b.default_route {
+        keys.push("default_route: true".to_owned());
+    }
+    format!("{{ {} }}", keys.join(", "))
+}
+
+/// A provisioning step as an `app.steps` item: a playbook, a script, or a reboot.
+fn step(s: &str) -> String {
+    let playbook = isoloom_spec::syntax::is_yaml_file(s);
+    if s == REBOOT {
+        s.to_owned()
+    } else if playbook {
+        format!("{{ playbook: {} }}", scalar(s))
+    } else {
+        format!("{{ run: {} }}", scalar(s))
+    }
+}
+
+/// The boxes the Vagrantfile pins, as `overrides.vagrant`, when any machine has one.
+fn boxes(y: &mut Writer, machines: &[Machine]) {
+    let pinned: Vec<(&str, &str, Option<&str>)> = machines
+        .iter()
+        .filter_map(|m| m.image.as_ref().map(|(b, v)| (m.name.as_str(), b.as_str(), v.as_deref())))
+        .collect();
+    if pinned.is_empty() {
+        return;
+    }
+    y.line("\noverrides:\n  vagrant:\n    machines:");
+    for (name, b, v) in pinned {
+        let version = v.map(|v| format!(", box_version: {}", quoted(v))).unwrap_or_default();
+        y.line(format!("      {name}: {{ box: {}{version} }}", quoted(b)));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_step_is_a_script_a_playbook_or_a_reboot() {
+        assert_eq!(step("provision/web.sh"), "{ run: provision/web.sh }");
+        assert_eq!(step("site.YML"), "{ playbook: site.YML }");
+        assert_eq!(step(REBOOT), REBOOT);
+        assert_eq!(step("my scripts/a.sh"), "{ run: \"my scripts/a.sh\" }");
+    }
+}

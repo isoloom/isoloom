@@ -1,0 +1,531 @@
+//! What an environment asks of a backend, and what a backend offers. A backend refuses an
+//! environment when it lacks the capability one of its requirements needs: the refusal comes
+//! from the plan, without generating anything.
+
+mod feature;
+mod wording;
+
+use std::collections::BTreeSet;
+use std::fmt;
+
+use isoloom_spec::model::Spec;
+
+use crate::checks::{self, Position, Probe};
+use crate::environment::MachineShape;
+use crate::hardware::Need;
+
+/// A capability a backend may have: the kind of a [`Requirement`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Feature {
+    /// Environment-level provisioning (`provision:`), run by a controller.
+    EnvironmentProvisioning,
+    /// Checks that are Ansible playbooks (run from a controller).
+    PlaybookChecks,
+    /// `exec` checks from a position with no container of its own.
+    ExecWithoutContainer,
+    /// Network appliances (`docker.appliance`), wired the way Docker attaches networks.
+    NetworkAppliances,
+    /// Networks routed by a machine of the environment (a network's `gateway`).
+    Gateways,
+    /// One shared volume mounted by containers and VMs alike.
+    VolumesAcrossShapes,
+    /// A VM that waits for a container (`depends_on`).
+    VmAfterContainer,
+    /// Extra names for a machine (`aliases`), dotted ones included.
+    MachineAliases,
+    /// The tools beside the environment (`tools:`), each a machine of its own on every network.
+    Tools,
+    /// Per-container process limits (`ulimits`).
+    Ulimits,
+    /// Link impairment (`tc`), applied on the path into a network.
+    TrafficControl,
+    /// Dual-stack networks (`ipv6`), with addresses derived from the octets.
+    Ipv6,
+    /// IPv6-only networks (`ipv6.only`).
+    Ipv6Only,
+    /// IPv6 addresses the target hands out (`ipv6.addresses: auto`).
+    Ipv6Auto,
+    /// Secrets delivered as files when the machines start (`machines.*.secrets`).
+    Secrets,
+    /// A secret file owned by a given user or group (`uid`, `gid`).
+    SecretOwners,
+    /// Joining an existing network by name (`external`), which the target never makes.
+    ExternalNetworks,
+    /// Bridging a network to an interface of the host (`bridged`).
+    BridgedNetworks,
+    /// A container's file from the project with its own owner or mode (see [`crate::machine_files`]).
+    OwnedProjectFiles,
+    /// Files written on a host that already exists.
+    ExistingHostFiles,
+    /// A machine's own settings (`environment`, `sysctls`, `ulimits`) on a host that already
+    /// exists, which Isoloom doesn't set up: no backend has it.
+    ExistingHostSettings,
+    /// Two machines (or a counted machine's clones) asking for one host port, one of them for a
+    /// free one (`publish: true`): only a format that picks each host port itself gives it.
+    FreeHostPorts,
+    /// A check that runs a project script on a host that already exists, which has no copy of
+    /// the project: no backend has it.
+    ExistingHostScriptChecks,
+    /// A check among hosts that already exist with none of them to run from (no `from`, no
+    /// access machine): no backend has it.
+    ExistingHostChecksFromNoHost,
+    /// A virtual TPM 2.0 in a VM.
+    Tpm,
+    /// A process Isoloom starts on the machine: its own `command` (with its `cwd`) or
+    /// `healthcheck`.
+    MachineProcess,
+    /// A VM booting its own way (`vm.boot`): a kernel, firmware, boot order or network boot.
+    OwnBoot,
+    /// GPUs for a container (`gpus`), from the host its runtime runs on.
+    ContainerGpus,
+    /// The host's devices for a container (`devices`).
+    ContainerDevices,
+    /// VMs inside a container (`nested_virtualization`): no backend has it.
+    ContainerNestedVirtualization,
+    /// GPUs for a VM (`gpus`): passed through, or sized in.
+    VmGpus,
+    /// The host's devices for a VM (`devices`): no backend has it.
+    VmDevices,
+    /// VMs inside a VM (`nested_virtualization`).
+    NestedVirtualization,
+    /// A network's own MTU (`mtu`).
+    NetworkMtu,
+    /// A bandwidth cap on a machine's links (`rate_limit`).
+    RateLimit,
+    /// Names served under the environment's private DNS zone (`dns.private`).
+    PrivateDns,
+    /// Volumes kept past `down` (`persistent`).
+    PersistentVolumes,
+    /// Volumes that exist already (`external`), mounted by name.
+    ExternalVolumes,
+    /// Data disks beside a machine's own (`disks`).
+    DataDisks,
+    /// Data disks left unformatted, as block devices (`fs: raw`).
+    RawDisks,
+    /// A mode on a memory-backed mount (`tmpfs[].mode`).
+    TmpfsModes,
+    /// Folders of the computer that runs the environment, mounted in its machines (`host_folders`).
+    HostFolders,
+    /// Several addresses on one network for a VM (`lan: [10, 11]`), added by its set-up.
+    VmMoreAddresses,
+    /// Several addresses on one network for a container or an existing host: no backend has it.
+    ContainerMoreAddresses,
+}
+
+/// One thing the environment needs from the backend that renders it, with what in the spec
+/// asks for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Requirement {
+    /// The spec has `provision:` steps.
+    EnvironmentProvisioning,
+    /// A check is an Ansible playbook.
+    PlaybookChecks,
+    /// An `exec` check stands where no container of the environment runs.
+    ExecWithoutContainer {
+        /// The check's name.
+        check: String,
+    },
+    /// A machine is a network appliance.
+    NetworkAppliance {
+        /// The machine.
+        machine: String,
+    },
+    /// A network is routed by one of the environment's machines.
+    Gateway {
+        /// The network.
+        network: String,
+    },
+    /// A shared volume is mounted by a container and by a VM.
+    VolumeAcrossShapes {
+        /// The volume.
+        volume: String,
+    },
+    /// A VM waits for a container.
+    VmDependsOnContainer {
+        /// The VM.
+        vm: String,
+        /// The container it waits for.
+        container: String,
+    },
+    /// A machine has `aliases`.
+    MachineAliases,
+    /// The environment has tools beside it (`tools:`).
+    Tools {
+        /// The first tool, by name.
+        tool: String,
+    },
+    /// A machine sets `ulimits`.
+    Ulimits {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A network has `tc`.
+    TrafficControl,
+    /// A network has an IPv6 block.
+    Ipv6 {
+        /// The first such network.
+        network: String,
+    },
+    /// A network is IPv6-only.
+    Ipv6Only {
+        /// The first such network.
+        network: String,
+    },
+    /// A network leaves its IPv6 addresses to the target.
+    Ipv6Auto {
+        /// The first such network.
+        network: String,
+    },
+    /// A machine gets secrets.
+    Secrets {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine's secret sets its owner (`uid` or `gid`).
+    SecretOwner {
+        /// The first machine whose secret does.
+        machine: String,
+    },
+    /// A network is an existing one, joined by name.
+    ExternalNetwork {
+        /// The network.
+        network: String,
+        /// Its name on the target.
+        name: String,
+    },
+    /// A network is bridged to an interface of the host.
+    BridgedNetwork {
+        /// The network.
+        network: String,
+    },
+    /// A container's file comes from the project with a `uid`, `gid` or `mode`.
+    OwnedProjectFile {
+        /// The machine.
+        machine: String,
+        /// Where the file goes in it.
+        path: String,
+    },
+    /// An existing host has `files`.
+    ExistingHostFiles {
+        /// The machine.
+        machine: String,
+    },
+    /// An existing host has its own `environment`, `sysctls` or `ulimits`.
+    ExistingHostSettings {
+        /// The machine.
+        machine: String,
+        /// The field (`environment`, `sysctls`, `ulimits`).
+        field: &'static str,
+    },
+    /// Two machines ask for one host port, at least one of them for a free one.
+    SharedHostPort {
+        /// The machine that asked first.
+        first: String,
+        /// The machine that asked again.
+        second: String,
+        /// The host port.
+        port: u16,
+    },
+    /// A check runs a project script on an existing host.
+    ExistingHostScriptCheck {
+        /// The check's name.
+        check: String,
+    },
+    /// A check has no existing host to run from.
+    ExistingHostCheckFromNoHost {
+        /// The check's name.
+        check: String,
+    },
+    /// A VM asks for a virtual TPM (`hardware.tpm: required`).
+    Tpm {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine sets its own process (`command`, `healthcheck`).
+    MachineProcess {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A VM sets `vm.boot`.
+    OwnBoot {
+        /// The first VM that does.
+        machine: String,
+    },
+    /// A machine asks for hardware (`gpus`, `devices`, `nested_virtualization`).
+    Hardware {
+        /// The machine.
+        machine: String,
+        /// What it asks for, in its shape on the target.
+        need: Need,
+    },
+    /// A network sets its `mtu`.
+    NetworkMtu {
+        /// The first such network.
+        network: String,
+    },
+    /// A machine sets a `rate_limit`.
+    RateLimit {
+        /// The first such machine.
+        machine: String,
+    },
+    /// The environment's names are served under a private DNS zone.
+    PrivateDns {
+        /// The zone's domain.
+        domain: String,
+    },
+    /// A volume is `persistent`.
+    PersistentVolume {
+        /// The first such volume.
+        volume: String,
+    },
+    /// A volume is `external`.
+    ExternalVolume {
+        /// The first such volume.
+        volume: String,
+    },
+    /// A machine has `disks`.
+    DataDisks {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine has a disk with `fs: raw`.
+    RawDisks {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine's tmpfs mount has a `mode`.
+    TmpfsModes {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine mounts folders of the computer that runs the environment (`host_folders`).
+    HostFolders {
+        /// The first machine that does.
+        machine: String,
+    },
+    /// A machine has several addresses on one network (`lan: [10, 11]`).
+    MoreAddresses {
+        /// The first machine that does.
+        machine: String,
+        /// Its first network with several.
+        network: String,
+        /// How the target produces it.
+        shape: MachineShape,
+    },
+}
+
+impl Requirement {
+    /// The capability this requirement needs.
+    #[must_use]
+    pub fn feature(&self) -> Feature {
+        match self {
+            Requirement::EnvironmentProvisioning => Feature::EnvironmentProvisioning,
+            Requirement::PlaybookChecks => Feature::PlaybookChecks,
+            Requirement::ExecWithoutContainer { .. } => Feature::ExecWithoutContainer,
+            Requirement::NetworkAppliance { .. } => Feature::NetworkAppliances,
+            Requirement::Gateway { .. } => Feature::Gateways,
+            Requirement::VolumeAcrossShapes { .. } => Feature::VolumesAcrossShapes,
+            Requirement::VmDependsOnContainer { .. } => Feature::VmAfterContainer,
+            Requirement::MachineAliases => Feature::MachineAliases,
+            Requirement::Tools { .. } => Feature::Tools,
+            Requirement::Ulimits { .. } => Feature::Ulimits,
+            Requirement::TrafficControl => Feature::TrafficControl,
+            Requirement::Ipv6 { .. } => Feature::Ipv6,
+            Requirement::Ipv6Only { .. } => Feature::Ipv6Only,
+            Requirement::Ipv6Auto { .. } => Feature::Ipv6Auto,
+            Requirement::Secrets { .. } => Feature::Secrets,
+            Requirement::SecretOwner { .. } => Feature::SecretOwners,
+            Requirement::ExternalNetwork { .. } => Feature::ExternalNetworks,
+            Requirement::BridgedNetwork { .. } => Feature::BridgedNetworks,
+            Requirement::OwnedProjectFile { .. } => Feature::OwnedProjectFiles,
+            Requirement::ExistingHostFiles { .. } => Feature::ExistingHostFiles,
+            Requirement::ExistingHostSettings { .. } => Feature::ExistingHostSettings,
+            Requirement::SharedHostPort { .. } => Feature::FreeHostPorts,
+            Requirement::ExistingHostScriptCheck { .. } => Feature::ExistingHostScriptChecks,
+            Requirement::ExistingHostCheckFromNoHost { .. } => Feature::ExistingHostChecksFromNoHost,
+            Requirement::Tpm { .. } => Feature::Tpm,
+            Requirement::MachineProcess { .. } => Feature::MachineProcess,
+            Requirement::OwnBoot { .. } => Feature::OwnBoot,
+            Requirement::Hardware { need, .. } => need.feature(),
+            Requirement::NetworkMtu { .. } => Feature::NetworkMtu,
+            Requirement::RateLimit { .. } => Feature::RateLimit,
+            Requirement::PrivateDns { .. } => Feature::PrivateDns,
+            Requirement::PersistentVolume { .. } => Feature::PersistentVolumes,
+            Requirement::ExternalVolume { .. } => Feature::ExternalVolumes,
+            Requirement::DataDisks { .. } => Feature::DataDisks,
+            Requirement::RawDisks { .. } => Feature::RawDisks,
+            Requirement::TmpfsModes { .. } => Feature::TmpfsModes,
+            Requirement::HostFolders { .. } => Feature::HostFolders,
+            Requirement::MoreAddresses { shape: MachineShape::Vm, .. } => Feature::VmMoreAddresses,
+            Requirement::MoreAddresses { .. } => Feature::ContainerMoreAddresses,
+        }
+    }
+}
+
+/// What a backend can render.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Capabilities {
+    features: BTreeSet<Feature>,
+}
+
+impl Capabilities {
+    /// A backend with these capabilities.
+    pub fn of(features: impl IntoIterator<Item = Feature>) -> Capabilities {
+        Capabilities {
+            features: features.into_iter().collect(),
+        }
+    }
+
+    /// These capabilities and `feature`.
+    #[must_use]
+    pub fn with(mut self, feature: Feature) -> Capabilities {
+        self.features.insert(feature);
+        self
+    }
+
+    /// These capabilities but `features`.
+    #[must_use]
+    pub fn without(mut self, features: &[Feature]) -> Capabilities {
+        self.features.retain(|f| !features.contains(f));
+        self
+    }
+
+    /// Whether the backend has `feature`.
+    #[must_use]
+    pub fn has(&self, feature: Feature) -> bool {
+        self.features.contains(&feature)
+    }
+}
+
+/// Why a backend won't render an environment: the first requirement it can't meet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refusal {
+    /// The requirement the backend lacks the capability for.
+    pub requirement: Requirement,
+}
+
+impl fmt::Display for Refusal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.requirement.fmt(f)
+    }
+}
+
+/// The first of `requirements` that `caps` can't meet, in the order the plan lists them.
+#[must_use]
+pub fn refusal(requirements: &[Requirement], caps: &Capabilities) -> Option<Refusal> {
+    requirements.iter().find(|r| !caps.has(r.feature())).map(|r| Refusal { requirement: r.clone() })
+}
+
+/// Everything `spec` requires, most fundamental first.
+#[must_use]
+pub(crate) fn of(spec: &Spec) -> Vec<Requirement> {
+    let mut out = Vec::new();
+    if !spec.provision.is_empty() {
+        out.push(Requirement::EnvironmentProvisioning);
+    }
+    out.extend(container_checks(spec));
+    out.extend(
+        spec.machines
+            .iter()
+            .filter(|(_, m)| m.docker.as_ref().is_some_and(|d| d.appliance.is_some()))
+            .map(|(name, _)| Requirement::NetworkAppliance { machine: name.clone() }),
+    );
+    if spec.machines.values().any(|m| !m.aliases.is_empty()) {
+        out.push(Requirement::MachineAliases);
+    }
+    out.extend(
+        spec.networks
+            .iter()
+            .filter(|(_, n)| n.gateway.is_some())
+            .map(|(name, _)| Requirement::Gateway { network: name.clone() }),
+    );
+    out.extend(limits(spec));
+    out.extend(crate::ipv6::requirements(spec));
+    out.extend(crate::links::requirements(spec));
+    out.extend(crate::private_dns::requirements(spec));
+    out.extend(crate::storage::requirements(spec));
+    // Last: a target that refuses the environment for another reason too says that one first.
+    if let Some(tool) = spec.tools.keys().next() {
+        out.push(Requirement::Tools { tool: tool.clone() });
+    }
+    out
+}
+
+/// The name of the first machine `pred` holds for, in the spec's order.
+fn first_machine(spec: &Spec, pred: impl Fn(&isoloom_spec::Machine) -> bool) -> Option<String> {
+    spec.machines.iter().find(|(_, m)| pred(m)).map(|(name, _)| name.clone())
+}
+
+/// What the containers' limits, the links' impairment and the machines' own processes ask for:
+/// at most one requirement of each kind, the first machine or network that asks.
+fn limits(spec: &Spec) -> Vec<Requirement> {
+    let mut out = Vec::new();
+    if let Some(machine) = first_machine(spec, |m| !m.ulimits.is_empty()) {
+        out.push(Requirement::Ulimits { machine });
+    }
+    if spec.networks.values().any(|n| n.tc.is_some()) {
+        out.push(Requirement::TrafficControl);
+    }
+    if let Some(machine) = first_machine(spec, |m| !crate::process::Process::of(m).is_empty()) {
+        out.push(Requirement::MachineProcess { machine });
+    }
+    out.extend(secrets(spec));
+    out
+}
+
+/// What the machines' secrets ask for: delivering them at all, then owning their files.
+fn secrets(spec: &Spec) -> Vec<Requirement> {
+    let mut out = Vec::new();
+    if let Some(machine) = first_machine(spec, |m| !m.secrets.is_empty()) {
+        out.push(Requirement::Secrets { machine });
+    }
+    let owned = |m: &isoloom_spec::Machine| m.secrets.iter().any(|s| s.mount().uid.is_some() || s.mount().gid.is_some());
+    if let Some(machine) = first_machine(spec, owned) {
+        out.push(Requirement::SecretOwner { machine });
+    }
+    out
+}
+
+/// What mixing containers and VMs in one environment asks for: a shared volume mounted by both,
+/// a VM waiting for a container. `shape` is each machine's shape on the target; only containers
+/// and VMs count (an external or supplied machine is neither), so nothing comes out unless the
+/// target runs both.
+pub(crate) fn mixed_shapes(spec: &Spec, shape: impl Fn(&str) -> Option<MachineShape>) -> Vec<Requirement> {
+    let is = |name: &str, s: MachineShape| shape(name) == Some(s);
+    let volumes = spec.volumes.keys().filter(|v| {
+        let users = spec.volume_users(v);
+        users.iter().any(|u| is(u, MachineShape::Container)) && users.iter().any(|u| is(u, MachineShape::Vm))
+    });
+    let mut out: Vec<Requirement> = volumes.map(|v| Requirement::VolumeAcrossShapes { volume: v.clone() }).collect();
+    for (name, m) in spec.machines.iter().filter(|(n, _)| is(n, MachineShape::Vm)) {
+        if let Some(dep) = m.depends_on.iter().find(|d| is(d, MachineShape::Container)) {
+            out.push(Requirement::VmDependsOnContainer {
+                vm: name.clone(),
+                container: dep.clone(),
+            });
+        }
+    }
+    out
+}
+
+/// The checks' requirements beyond probing from a container: playbooks, and `exec` checks that
+/// would have no container to run in. At most one of them: the first, as a container output
+/// reports it.
+pub(crate) fn container_checks(spec: &Spec) -> Option<Requirement> {
+    if spec.checks.iter().any(isoloom_spec::Check::is_playbook) {
+        return Some(Requirement::PlaybookChecks);
+    }
+    checks::plan(spec)
+        .into_iter()
+        .filter(|c| matches!(c.probe, Probe::Exec { .. }))
+        .find(|c| match &c.position {
+            Position::Machine(m) => !spec.machines.get(m).is_some_and(|m| m.docker.is_some() && !m.supplied),
+            Position::Networks => true,
+        })
+        .map(|c| Requirement::ExecWithoutContainer { check: c.name })
+}
+
+#[cfg(test)]
+mod tests;

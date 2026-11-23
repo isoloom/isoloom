@@ -1,0 +1,9 @@
+# The toolchain every host builds Isoloom with (rustup installs it on first use). The extra
+# targets let clippy check the Linux-only and Windows-only code from any host: `x86_64-pc-windows-gnu`
+# for `cargo xtask check`'s windows-gnu step (with a MinGW C compiler on PATH), `msvc` for the
+# Windows release build.
+[toolchain]
+channel = "1.99.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-gnu", "x86_64-pc-windows-msvc"]

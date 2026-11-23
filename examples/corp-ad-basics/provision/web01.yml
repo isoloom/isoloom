@@ -1,0 +1,8 @@
+# web01 as a VM: the same page as the container, served by nginx.
+- hosts: all
+  become: true
+  tasks:
+    - name: nginx
+      ansible.builtin.apt: { name: nginx, update_cache: true }
+    - name: The intranet page
+      ansible.builtin.copy: { src: "{{ playbook_dir }}/../build/web01/index.html", dest: /var/www/html/index.html, mode: "0644" }

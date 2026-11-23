@@ -1,0 +1,11 @@
+# A VM that boots from files of the hypervisor's computer, serves its root folder over TFTP and
+# shares it as a host folder: each is refused until allowed.
+version: 1
+name: vm-host-boot
+networks: { lan: { cidr: 10.0.0.0/24 } }
+machines:
+  vm1:
+    networks: { lan: 20 }
+    os: debian@12
+    hardware: { boot: { kernel: /boot/vmlinuz, initrd: /root/.ssh/id_rsa, order: [network, hd], network: { tftp_root: / } } }
+    host_folders: [{ from: '/', path: /host }]

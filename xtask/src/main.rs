@@ -1,0 +1,159 @@
+//! Isoloom's development tasks, run as `cargo xtask <task>` (the alias is in
+//! `.cargo/config.toml`), the same way on macOS, Linux and Windows:
+//!
+//! - `check`: every check a change must pass (`--fast` for the short list), locally and in CI;
+//! - `verify`: the official validators on every generated file, in the pinned image;
+//! - `tf-test`: the cloud and server modules' logic, `terraform test` with mocked providers;
+//! - `generate-all`: every example generated into one tree, for `verify`;
+//! - `quality`: the ratchet, the clean-code counts per crate against
+//!   `xtask/baselines/quality-baseline.json`;
+//! - `test`: the tests under cargo-nextest, then the doctests;
+//! - `msrv` and `features`: every crate checked with its declared minimum Rust, and with every
+//!   combination of its features (cargo-hack);
+//! - `fuzz`: the fuzz targets of `fuzz/` (cargo-fuzz), each for a while;
+//! - `fuzz-combos`: many thousands of random but valid specs generated for every target, with the
+//!   pipeline's invariants asserted;
+//! - `conformance`: the configuration renderers' resource conformance, each step kind applied
+//!   twice in each Linux family's container image;
+//! - `mutants`: mutation testing of the core crates (cargo-mutants);
+//! - `bench`: the generation benchmarks against `xtask/baselines/bench-baseline.json`;
+//! - `catalogue refresh` and `catalogue check`: the catalogue's pins, and an entry's parity
+//!   contract run for real;
+//! - `wasm`: the topology editor's engine (`isoloom-wasm`) built for the browser (`web/pkg/`), and
+//!   with `--copy-to <dir>` the two files a page serves copied there.
+//!
+//! Each task is a module; `process` runs the tools they drive, `repo` finds the checkouts. `deps`
+//! is the test that keeps the workspace's dependencies one way (and Isoloom off the runner's
+//! crates), `guardrails` the scans of the product's sources clippy can't express.
+
+#![expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "the tasks report on the terminal: printing is their interface, not stray debugging output"
+)]
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the development tasks drive the tools (cargo, docker, terraform, the validators): each task is the adapter of its tools"
+)]
+
+mod bench;
+mod catalogue;
+mod check;
+mod conformance;
+#[cfg(test)]
+mod deps;
+mod fuzz;
+mod fuzz_combos;
+mod generate_all;
+#[cfg(test)]
+mod guardrails;
+mod hack;
+mod mutants;
+mod process;
+mod quality;
+mod repo;
+mod test;
+#[cfg(test)]
+mod testing;
+mod text;
+mod tf_test;
+mod verify;
+mod wasm;
+
+use std::process::ExitCode;
+
+use clap::{Parser, Subcommand};
+
+/// What a task returns: its exit code, or the error printed as `xtask: ...` (exit code 2).
+type Res<T> = Result<T, Box<dyn std::error::Error>>;
+
+#[derive(Parser)]
+#[command(name = "xtask", bin_name = "cargo xtask", about = "Isoloom's development tasks.")]
+struct Cli {
+    #[command(subcommand)]
+    task: Task,
+}
+
+#[derive(Subcommand)]
+enum Task {
+    /// Every check a change must pass, the same locally and in CI (xtask/src/check.rs);
+    /// `--fast` runs the short list (lockfile, fmt, clippy, test, windows-gnu), `--list` names
+    /// the steps; exits 1 when one is red.
+    Check(check::Args),
+    /// The official validators on generated files, in the pinned image (xtask/src/verify),
+    /// against the baseline (xtask/src/verify/baseline.json); exits 1 on a failure the baseline
+    /// doesn't know.
+    Verify(verify::Args),
+    /// The cloud and server modules' routing, gateways, firewalls, published ports, private
+    /// names and ready file, asserted by `terraform test` with mocked providers in the pinned
+    /// image (tests/terraform); exits 1 when an assertion fails.
+    TfTest(tf_test::Args),
+    /// Every example (or the spec folders given) generated for every target it can be, into one
+    /// tree that `verify` checks.
+    GenerateAll(generate_all::Args),
+    /// The ratchet: every clean-code count per crate against
+    /// xtask/baselines/quality-baseline.json; fails when
+    /// one goes up, or when the baseline is missing (`--update` writes them when they only went
+    /// down, `--init` the first baseline).
+    Quality(quality::Args),
+    /// The workspace's tests under cargo-nextest (`.config/nextest.toml`), then the doctests, in a
+    /// temporary folder of their own that must be empty after (`ISOLOOM_KEEP_TEMP=1` keeps it).
+    Test(test::Args),
+    /// Every crate checked with the toolchain its `rust-version` names (cargo-hack).
+    Msrv,
+    /// Every crate checked with every combination of its features (cargo-hack).
+    Features,
+    /// The fuzz targets of fuzz/ (cargo-fuzz, nightly), each for a while; exits 1 when one
+    /// crashes.
+    Fuzz(fuzz::Args),
+    /// Combination fuzzing: many thousands of random but valid specs generated for every target,
+    /// with the pipeline's invariants asserted; exits 1 when one breaks. `--deep` runs the big
+    /// run, the normal gate a fast one.
+    FuzzCombos(fuzz_combos::Args),
+    /// The configuration renderers' resource conformance: each step kind, rendered by the shell
+    /// library and the Dockerfile, applied twice in each Linux family's container image; the
+    /// second apply must change nothing.
+    Conformance(conformance::Args),
+    /// Mutation testing of the core crates (cargo-mutants): exits 1 when a mutant survives.
+    Mutants(mutants::Args),
+    /// The generation benchmarks (criterion) against xtask/baselines/bench-baseline.json; exits 1
+    /// when one is slower than the threshold allows.
+    Bench(bench::Args),
+    /// The catalogue: `refresh` pins what the entries fetch (lock.yml); `check <entry>` runs an
+    /// entry's parity contract in both forms through a runner's command line.
+    Catalogue(catalogue::Args),
+    /// The topology editor's engine (crates/frontends/isoloom-wasm) built for the browser with
+    /// wasm-pack, for size, into web/pkg/; `--copy-to <dir>` copies the two files a page serves
+    /// (the JavaScript glue and the WebAssembly) there.
+    Wasm(wasm::Args),
+}
+
+fn main() -> ExitCode {
+    match run(Cli::parse()) {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("xtask: {e}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn run(cli: Cli) -> Res<ExitCode> {
+    match cli.task {
+        Task::Check(a) => check::run(&a),
+        Task::Verify(a) => Ok(verify::run(&a)),
+        Task::TfTest(a) => Ok(tf_test::run(&a)),
+        Task::GenerateAll(a) => generate_all::run(&a),
+        Task::Quality(a) => quality::run(&a),
+        Task::Test(a) => test::run(&a),
+        Task::Msrv => hack::msrv(),
+        Task::Features => hack::features(),
+        Task::Fuzz(a) => fuzz::run(&a),
+        Task::FuzzCombos(a) => fuzz_combos::run(&a),
+        Task::Conformance(a) => Ok(conformance::run(&a)),
+        Task::Mutants(a) => mutants::run(&a),
+        Task::Bench(a) => bench::run(&a),
+        Task::Catalogue(a) => catalogue::run(&a),
+        Task::Wasm(a) => wasm::build(&a).map(|()| ExitCode::SUCCESS),
+    }
+}

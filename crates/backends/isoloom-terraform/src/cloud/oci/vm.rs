@@ -1,0 +1,338 @@
+//! Oracle Cloud's `cloud-vm` module, `.isoloom/cloud-vm/oci/main.tf`, rendered from the plan
+//! through the VM core. One compute instance per machine on one VCN, a subnet per network; OCI
+//! pins a VNIC's private IP, so every machine keeps its spec address, with a VNIC on each of its
+//! networks. Each network has its own security list (`network`), and a network a machine routes
+//! goes through it. Linux environments: the module refuses Windows and a controller.
+//!
+//! A dual-stack network carries the spec's IPv6 block as its subnet's prefix, and each VNIC on it
+//! an address from that prefix (`ipv6`). An IPv6-only network is refused by the plan: machines
+//! are set up over their public IPv4 address, and a private prefix never reaches the internet.
+//!
+//! Each machine's published ports open on its own VNIC only, through a network security group
+//! of its own; the subnet's security list holds what every machine shares (the VCN, SSH).
+//!
+//! The image is looked up, not given: a `data "oci_core_images"` finds the newest Canonical
+//! Ubuntu for the shape, as the `cloud-docker` module does. Oracle Cloud ships no Debian platform
+//! image, so Debian environments run on Ubuntu too; the SSH login is `ubuntu` either way.
+
+mod addresses;
+mod ipv6;
+mod metadata;
+mod network;
+mod private_dns;
+mod published;
+
+use std::net::Ipv4Addr;
+
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, attr, boolean, call, entry, index, list, number, object, reference, string};
+use isoloom_plan::{Environment, MachinePlan, Vm};
+
+use super::{SHAPE, availability_domain, availability_domains, owned, ubuntu_images};
+use crate::cloud::Cloud;
+use crate::cloud::instance::{self, name_with};
+use crate::cloud::user_data_limit::Limit;
+use crate::cloud::vm::rules::{FIREWALLS_TC, ImageTable, Images, Mtu, Need, Networks, OsImages, PLAYBOOK_CHECKS, Rules, Volumes, listed};
+use crate::cloud::vm::{self, VmDriver, disks, gateways, gpus::GpuSizes, hooks, interfaces, nested, outputs, own_image};
+use crate::limits::Limits;
+use crate::machine::user_data::Capped;
+use crate::module::{ident, providers, resource};
+
+/// What Oracle Cloud takes: Ubuntu, and Debian on the newest Ubuntu LTS (it has no Debian image).
+/// Any other OS needs an image of its own (`vm.image.oci`) rather than running Ubuntu in its place.
+const RULES: Rules = Rules {
+    cloud: Cloud::Oci,
+    networks: Networks::Several,
+    limits: Limits {
+        arm64: Some("Isoloom generates no arm64 VM on Oracle Cloud"),
+        // The VCN routes a network through its gateway machine (`network`).
+        gateways: None,
+        playbook_checks: Some(PLAYBOOK_CHECKS),
+        tc: Some(FIREWALLS_TC),
+        // The VCN takes the spec's blocks as its private IPv6 prefixes (`network`).
+        ipv6: None,
+    },
+    gpus: GpuSizes {
+        gpu: "",
+        sizes: &[],
+        none: "Isoloom gives no GPU on Oracle Cloud (its GPU shapes are fixed, not the flexible shape every machine has, and take images built for them)",
+    },
+    // The AMD shape exposes its virtualization instructions when asked (`platform_config`).
+    nests: true,
+    need: Need::of,
+    sizes: None,
+    nesting_sizes: None,
+    mtu: Mtu::Fixed,
+    // A VNIC on an `auto` network takes the address Oracle Cloud picks (`ipv6`).
+    picks_ipv6: true,
+    volumes: Volumes { smallest_gb: 50, most: 15 },
+    tpm: true,
+    subnets: None,
+    kept: None,
+    images: Images {
+        table: &IMAGES,
+        own: own_image::oci,
+    },
+};
+
+/// The SSH user of every instance (Ubuntu's).
+pub(super) const USER: &str = "ubuntu";
+
+/// Why Oracle Cloud can't run this environment, if it can't: its rules, then what its VCN can't
+/// hold.
+fn refusal(env: &Environment) -> Option<String> {
+    RULES
+        .linux_refusal(env)
+        .or_else(|| size_refusal(env))
+        .or_else(|| network::refusal(env))
+        .or_else(|| ipv6::refusal(env))
+}
+
+/// The Ubuntu version each OS runs on: Oracle Cloud has no Debian image, so Debian environments fall back
+/// to the newest Ubuntu LTS, as cloud-docker does.
+const IMAGES: UbuntuImages = UbuntuImages(OsImages(&[
+    ("ubuntu-22.04", "22.04"),
+    ("ubuntu-24.04", NEWEST_UBUNTU),
+    ("debian-12", NEWEST_UBUNTU),
+    ("debian-13", NEWEST_UBUNTU),
+]));
+
+/// The newest Ubuntu LTS, which an OS with no image of its own runs on.
+const NEWEST_UBUNTU: &str = "24.04";
+
+/// Oracle Cloud's images: Canonical's Ubuntu, by the version each OS runs on.
+#[derive(Debug)]
+struct UbuntuImages(OsImages<&'static str>);
+
+impl ImageTable for UbuntuImages {
+    fn oses(&self) -> Vec<&'static str> {
+        self.0.oses()
+    }
+
+    /// Ubuntu's own versions, then the OSes that run on one (`Debian 12/13 on Ubuntu 24.04`).
+    fn listed(&self) -> String {
+        let own = |os: &str, v: &str| os.strip_prefix("ubuntu-") == Some(v);
+        let mut parts = vec![listed(self.0.0.iter().filter(|(os, v)| own(os, v)).map(|(os, _)| *os))];
+        let mut versions: Vec<&str> = self.0.0.iter().filter(|(os, v)| !own(os, v)).map(|(_, v)| *v).collect();
+        versions.dedup();
+        for v in versions {
+            let on = self.0.0.iter().filter(|(os, u)| *u == v && !own(os, u)).map(|(os, _)| *os);
+            parts.push(format!("{} on Ubuntu {v}", listed(on)));
+        }
+        parts.join(", ")
+    }
+}
+
+/// The Ubuntu version an OS runs on (the newest LTS for one Oracle Cloud has no image for, which
+/// the refusal already turned away).
+pub(super) fn ubuntu(os: &str) -> &'static str {
+    IMAGES.0.of(os).unwrap_or(NEWEST_UBUNTU)
+}
+
+/// The `oci_core_images` data source of an Ubuntu version.
+pub(super) fn image_source(version: &str) -> String {
+    format!("ubuntu_{}", version.replace('.', ""))
+}
+
+/// The shape's sizing for a machine: an OCPU per two of its CPUs (an AMD OCPU is two vCPUs) and
+/// one per 8 GB of its memory, the more of the two (one at least); its memory in whole GB, at
+/// least 1 GB an OCPU, as the shape takes.
+fn sizing(need: &Need) -> (u32, u32) {
+    let gb = need.memory_mb.div_ceil(1024).max(1);
+    let ocpus = need.cpus.div_ceil(2).max(gb / 8).max(1);
+    (ocpus, gb.max(ocpus))
+}
+
+/// The most OCPUs and memory (GB) the shape takes
+/// (<https://docs.oracle.com/iaas/Content/Compute/References/computeshapes.htm#flexible>).
+const MOST: (u32, u32) = (64, 1024);
+
+/// Why a machine can't have its size on the shape, if one can't: more OCPUs or memory than it
+/// takes.
+fn size_refusal(env: &Environment) -> Option<String> {
+    env.vms().find_map(|Vm { name, plan: mp, .. }| {
+        let (ocpus, gb) = sizing(&Need::of(mp));
+        let (most_ocpus, most_gb) = MOST;
+        (ocpus > most_ocpus || gb > most_gb).then(|| {
+            format!(
+                "machine `{name}` asks for {ocpus} OCPUs and {gb} GB of memory: a {SHAPE} takes {most_ocpus} OCPUs ({} CPUs) and {most_gb} GB at most",
+                most_ocpus * 2
+            )
+        })
+    })
+}
+
+/// How Oracle Cloud takes an instance's user data: a metadata value, base64, within the
+/// 32000 bytes of all its metadata.
+const CAP: Capped = Capped {
+    limit: Limit(Cloud::Oci),
+    gzipped: false,
+};
+
+/// Its `cloud-vm` driver: its module takes the compartment it goes in, and authenticates with
+/// the OCI CLI's configuration.
+pub(crate) const DRIVER: VmDriver = VmDriver {
+    base: super::BASE,
+    requires: (&[providers::OCI], &[]),
+    refusal,
+    write,
+};
+
+/// The module after its providers: the images, the VCN, its security list and subnet, each machine, the outputs.
+fn write(env: &Environment, module: &mut Module) -> crate::Result<()> {
+    let env = &*gateways::relocated(env);
+    module.commented(
+        "The compartment's availability domains; the instances land in the first.",
+        availability_domains(),
+    );
+    images(env, module);
+    network::blocks(env, module);
+    private_dns::write(env, module);
+    for (vm, at) in vm::at_first_address(env) {
+        machine(env, vm, at, module)?;
+    }
+    network::gateway_routes(env, module);
+    outputs::write_as(env, super::BASE.user, &public_ip, "oci_core_instance", module);
+    Ok(())
+}
+
+/// An instance's public address.
+fn public_ip(name: &str) -> Expression {
+    reference(&format!("oci_core_instance.{}.public_ip", ident(name)))
+}
+
+/// The newest Canonical Ubuntu for the shape, one lookup per version the machines use.
+fn images(env: &Environment, module: &mut Module) {
+    let mut versions: Vec<&str> = env
+        .vms()
+        .filter(|vm| own_image::of(vm.plan, own_image::oci).is_none())
+        .map(|vm| ubuntu(vm.os))
+        .collect();
+    versions.sort_unstable();
+    versions.dedup();
+    for v in versions {
+        module.commented(
+            &format!("Ubuntu {v}: Oracle Cloud has no Debian image of its own."),
+            ubuntu_images(&image_source(v), v),
+        );
+    }
+}
+
+/// Machine `name`'s instance at its fixed address, set up from its user data (its other VNICs
+/// found at boot through the metadata service), its VNICs and further addresses.
+///
+/// # Errors
+///
+/// [`crate::Error::Refused`] when its user data is over [`CAP`].
+fn machine(env: &Environment, vm: Vm<'_>, (net, address): (&str, Ipv4Addr), module: &mut Module) -> crate::Result<()> {
+    let Vm { name, plan: mp, .. } = vm;
+    let group = published::group(name, mp, module);
+    let mut at_boot = interfaces::up_found(env, &mp.addresses, &|_, a| metadata::mac(a));
+    at_boot.extend(ipv6::at_boot(env, mp));
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
+    module.commented(
+        &format!("Machine `{name}`, at its fixed address {address}."),
+        instance(env, vm, (net, &address.to_string()), (group, setup)),
+    );
+    vnics(env, (name, mp), module);
+    addresses::blocks((name, mp), module);
+    Ok(())
+}
+
+/// Machine `name`'s instance, its first VNIC on network `net` at `address` (with its published
+/// ports' `group`), set up by `setup` (its user data, which cloud-init runs).
+fn instance(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, (net, address): (&str, &str), (group, setup): (Option<Expression>, Expression)) -> Block {
+    // A gateway forwards traffic that isn't its own; a machine on several networks answers from
+    // the interface its default route leaves by.
+    let forwards = mp.is_gateway || mp.addresses.len() > 1;
+    let (ocpus, memory_gb) = sizing(&Need::of(mp));
+    let shape = Block::builder("shape_config")
+        .add_attribute(("ocpus", number(u64::from(ocpus))))
+        .add_attribute(("memory_in_gbs", number(u64::from(memory_gb))))
+        .build();
+    let images = reference(&format!("data.oci_core_images.{}.images", image_source(ubuntu(os))));
+    // OCI boot volumes start at 50 GB.
+    let boot = mp.size().disk_gb.max(50);
+    let source = Block::builder("source_details")
+        .add_attribute(("source_type", string("image")))
+        .add_attribute((
+            "source_id",
+            own_image::of(mp, own_image::oci).map_or_else(|| attr(index(images, 0), "id"), string),
+        ))
+        .add_attribute(("boot_volume_size_in_gbs", number(u64::from(boot))))
+        .build();
+    let vnic = ipv6::vnic(env, mp, net, primary_vnic(name, net, address, forwards, group)).build();
+    let metadata = object([
+        ("ssh_authorized_keys", reference("var.ssh_public_key")),
+        ("user_data", call("base64encode", [setup])),
+    ]);
+    owned(resource("oci_core_instance", &ident(name)))
+        .add_attribute(("availability_domain", availability_domain()))
+        .add_attribute(("display_name", name_with(&format!("-{name}"))))
+        .add_attribute(("shape", string(SHAPE)))
+        .add_block(shape)
+        .add_blocks(platform(mp))
+        .add_block(source)
+        .add_block(vnic)
+        .add_blocks(disks::oci(name, &mp.disks))
+        .add_attribute(("metadata", metadata))
+        .add_block(instance::set_up_once(entry(reference("metadata"), "user_data")).build())
+        .build()
+}
+
+/// The instance's first VNIC, on its first network at its address, with its published ports'
+/// group when it has one.
+fn primary_vnic(name: &str, net: &str, address: &str, forwards: bool, group: Option<Expression>) -> BlockBuilder {
+    let mut vnic = Block::builder("create_vnic_details")
+        .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(net)))))
+        .add_attribute(("private_ip", string(address)))
+        .add_attribute(("assign_public_ip", boolean(true)))
+        .add_attribute(("hostname_label", string(name)))
+        .add_attribute(("skip_source_dest_check", boolean(forwards)));
+    if let Some(group) = group {
+        vnic = vnic.add_attribute(("nsg_ids", list([group])));
+    }
+    vnic
+}
+
+/// A VNIC on each network after the first, at the machine's address there (forwarding, as the
+/// first), and its MAC address, which finds it at boot.
+fn vnics(env: &Environment, (name, mp): (&str, &MachinePlan), module: &mut Module) {
+    let id = ident(name);
+    for (net, address) in mp.addresses.iter().skip(1) {
+        let nic = format!("{id}_{}", ident(net));
+        let details = Block::builder("create_vnic_details")
+            .add_attribute(("subnet_id", reference(&format!("oci_core_subnet.{}.id", ident(net)))))
+            .add_attribute(("private_ip", string(address.to_string())))
+            .add_attribute(("assign_public_ip", boolean(false)))
+            .add_attribute(("skip_source_dest_check", boolean(true)));
+        let details = ipv6::vnic(env, mp, net, details).build();
+        module.block(
+            resource("oci_core_vnic_attachment", &nic)
+                .add_attribute(("instance_id", reference(&format!("oci_core_instance.{id}.id"))))
+                .add_attribute(("display_name", name_with(&format!("-{name}-{net}"))))
+                .add_block(details)
+                .build(),
+        );
+    }
+}
+
+/// The AMD shape's platform, when the machine asks for what it gives: a shielded instance for a
+/// TPM (its virtual TPM, secure and measured boot; Canonical's images are shielded-instance
+/// images), and the virtualization instructions for a machine running VMs of its own.
+fn platform(mp: &MachinePlan) -> Option<Block> {
+    let (tpm, nested) = (mp.tpm.is_some(), nested::wanted(mp));
+    if !tpm && !nested {
+        return None;
+    }
+    let mut b = Block::builder("platform_config").add_attribute(("type", string("AMD_VM")));
+    if tpm {
+        b = b
+            .add_attribute(("is_secure_boot_enabled", boolean(true)))
+            .add_attribute(("is_measured_boot_enabled", boolean(true)))
+            .add_attribute(("is_trusted_platform_module_enabled", boolean(true)));
+    }
+    if nested {
+        b = b.add_attribute(("are_virtual_instructions_enabled", boolean(true)));
+    }
+    Some(b.build())
+}

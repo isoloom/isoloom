@@ -1,0 +1,328 @@
+//! The values a VM gets at launch, from the host's environment when Vagrant runs (Vagrant's own
+//! way, decided for the Vagrant targets: the runner hands them to `vagrant up` and `vagrant
+//! provision`, never to a generated file): its inputs, and its secret files (an input's file
+//! included).
+//!
+//! Vagrant passes a provisioner's `env` by writing `NAME="value"` into the shell (or `$env:NAME
+//! = "value"` into the PowerShell) that runs the script, escaping quotes only: a `$(...)` or a
+//! backquote in a value would run in the guest, as root. So every value travels in base64
+//! (`isoloom_b64`, defined with the inputs), which no shell reads anything into, and the script
+//! decodes it.
+//!
+//! An input the runner gives no value (unset or empty) is its spec's default, when it declares
+//! one, the first time: the guest's script holds the default and keeps it as it keeps a given
+//! value, so a re-provision given no value keeps the launch's value rather than the default.
+
+use isoloom_plan::{Environment, SecretFile, ValueSource};
+use isoloom_render::{secrets, steps};
+use isoloom_spec::contract::secret_variable;
+use isoloom_spec::shell::quote;
+
+use super::transport::Os;
+use crate::ruby::{Ruby, Value};
+use crate::vagrantfile;
+
+/// The Ruby that reads input `name` from the host's environment, in base64.
+fn input(name: &str) -> Value {
+    Value::raw(format!("isoloom_b64(INPUTS[{}])", Value::str(name)))
+}
+
+/// Inputs `names` from the host's environment, each in base64: a provisioner's environment, which
+/// its script decodes (PowerShell, [`windows_decode`]; a shell, the inputs file of
+/// [`linux_inputs`]).
+pub(crate) fn encoded(names: &[String]) -> Value {
+    Value::hash(names.iter().map(|n| (Value::str(n), input(n))))
+}
+
+/// The machine's inputs from the host's environment, in base64, when it reads some: the
+/// environment its steps run with.
+pub(crate) fn inputs_env(env: &Environment, machine: &str) -> Option<Value> {
+    let names = &env.machines.get(machine)?.inputs;
+    (!names.is_empty()).then(|| encoded(names))
+}
+
+/// PowerShell's text of `$v`, a value in base64 ([`encoded`]): UTF-8, as the host encoded it.
+const DECODED: &str = "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v))";
+
+/// PowerShell decoding the machine's inputs in its own environment before a step runs: what the
+/// step's script reads is the value itself, or the input's default when it is given none. Empty
+/// when it reads none.
+pub(crate) fn windows_decode(env: &Environment, machine: &str) -> String {
+    let Some(mp) = env.machines.get(machine).filter(|mp| !mp.inputs.is_empty()) else {
+        return String::new();
+    };
+    format!(
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}) }} }}; {}",
+        list(&mp.inputs),
+        windows_defaults(env, &mp.inputs, "")
+    )
+}
+
+/// PowerShell setting each of `inputs` that has a default to it when it holds no value (in
+/// `scope`: `""` for the process, `, 'Machine'` machine-wide). Empty when none has a default.
+fn windows_defaults(env: &Environment, inputs: &[String], scope: &str) -> String {
+    let q = isoloom_render::powershell::quote;
+    let lines: Vec<String> = inputs
+        .iter()
+        .filter_map(|k| env.input_default(k).map(|d| (q(k), q(d))))
+        .map(|(k, d)| format!("if (-not [Environment]::GetEnvironmentVariable({k}{scope})) {{ [Environment]::SetEnvironmentVariable({k}, {d}{scope}) }}; "))
+        .collect();
+    lines.concat()
+}
+
+/// `names` as a PowerShell list's items.
+fn list(names: &[String]) -> String {
+    names.iter().map(|n| isoloom_render::powershell::quote(n)).collect::<Vec<_>>().join(", ")
+}
+
+/// Where a Linux machine keeps each input's value, root's alone: a provisioning given none (a
+/// runner provisioning again without the launch's values, which it keeps none of) keeps the
+/// value given before, as its secrets are kept.
+pub(crate) const KEPT_INPUTS_DIR: &str = isoloom_spec::linux_state_path!("/inputs");
+
+/// A Linux machine's inputs, decoded into the file its steps read (`KEY='value'` lines, readable
+/// by root alone); then the step itself (kept on disk when a reboot comes). Each value is kept
+/// first ([`KEPT_INPUTS_DIR`]): an unset or empty variable writes the input's default the first
+/// time (else an empty value), and keeps the value kept after.
+pub(crate) fn linux_inputs(r: &mut Ruby, env: &Environment, machine: &str, step: &isoloom_plan::lifecycle::Step) {
+    let Some(mp) = env.machines.get(machine) else { return };
+    let file = steps::INPUTS_FILE;
+    // A line per input, rather than a loop over them, which would run once for one input.
+    let lines = mp
+        .inputs
+        .iter()
+        .map(|k| {
+            let kept = quote(&format!("{KEPT_INPUTS_DIR}/{k}"));
+            let fallback = env.input_default(k).map_or(String::new(), |d| {
+                format!(
+                    "if [ -z \"$v\" ] && [ ! -e {kept} ]; then v={}; fi; ",
+                    quote(&isoloom_spec::shell::base64(d.as_bytes()))
+                )
+            });
+            let k = quote(k);
+            format!(
+                "v=\"$(printenv {k} || true)\"; {fallback}if [ -n \"$v\" ] || [ ! -e {kept} ]; then printf '%s' \"$v\" | base64 -d > {kept}; fi\n\
+                 printf \"%s='%s'\\n\" {k} \"$(sed \"s/'/'\\\\\\\\''/g\" {kept})\" >> {file}\n"
+            )
+        })
+        .collect::<Vec<_>>()
+        .concat();
+    let mut script = format!("umask 077\nmkdir -p {KEPT_INPUTS_DIR}\n: > {file}\n{lines}unset v\n");
+    script.push_str(&steps::linux(env, machine, step).unwrap_or_default());
+    let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
+    r.provision(call.script("inline", &script));
+}
+
+/// A Windows machine's inputs, kept as machine-wide environment variables: its `setup`, `before`
+/// and command scripts (the last two startup tasks, run at every boot) read them as a Linux
+/// machine's read its inputs file. Only inputs the spec lets show (`sensitive: false`) reach an
+/// environment; a sensitive one is a file. A provisioning given no value keeps the one set
+/// before (unset, a variable is empty), else sets the input's default when it has one.
+pub(crate) fn windows_inputs(r: &mut Ruby, env: &Environment, machine: &str) {
+    let Some(mp) = env.machines.get(machine).filter(|mp| !mp.inputs.is_empty()) else {
+        return;
+    };
+    let defaults = windows_defaults(env, &mp.inputs, ", 'Machine'");
+    let defaults = defaults.trim_end_matches("; ");
+    let script = format!(
+        "foreach ($k in @({})) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, {DECODED}, 'Machine') }} }}{}{defaults}",
+        list(&mp.inputs),
+        if defaults.is_empty() { "" } else { "; " }
+    );
+    let call = vagrantfile::shell("m", "inputs").kw_opt("env", inputs_env(env, machine));
+    r.provision(call.script("inline", &script));
+}
+
+/// The variable a secret file's value travels in, and the Ruby reading it from the host's
+/// environment in base64: an input's from `INPUTS`, a secret's from `ISOLOOM_SECRET_<NAME>`
+/// (where the runner delivers it).
+fn secret_value(f: &SecretFile) -> (String, Value) {
+    let read = match &f.source {
+        ValueSource::Input(name) => input(name),
+        ValueSource::Secret(name) => Value::raw(format!("isoloom_b64(ENV.fetch({}, {}))", Value::str(&secret_variable(name)), Value::str(""))),
+    };
+    (secret_variable(&f.name), read)
+}
+
+/// The machine's secret files, their values from the host's environment: kept, then put in
+/// place now and at every boot. Nothing when it has none.
+pub(crate) fn secret_files(r: &mut Ruby, env: &Environment, machine: &str, os: Os) {
+    let Some(mp) = env.machines.get(machine).filter(|mp| !mp.secrets.is_empty()) else {
+        return;
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    let unique: Vec<&SecretFile> = mp.secrets.iter().filter(|f| seen.insert(f.kept())).collect();
+    let read: Vec<(String, Value)> = unique.iter().map(|f| secret_value(f)).collect();
+    let values: Vec<(String, String)> = unique.iter().zip(&read).map(|(f, (var, _))| (f.kept().to_owned(), var.clone())).collect();
+    // An input's file falls back to the input's default, kept under the input's name.
+    let defaults: Vec<(String, String)> = unique
+        .iter()
+        .filter_map(|f| match &f.source {
+            ValueSource::Input(name) => env.input_default(name).map(|d| (f.kept().to_owned(), d.to_owned())),
+            ValueSource::Secret(_) => None,
+        })
+        .collect();
+    let script = match os {
+        Os::Linux => secrets::from_environment(&values, &defaults, &mp.secrets),
+        Os::Windows => secrets::windows::from_environment(&values, &defaults, &mp.secrets),
+    };
+    let hash = Value::hash(read.into_iter().map(|(var, value)| (Value::str(&var), value)));
+    r.provision(vagrantfile::shell("m", "secrets").kw("env", hash).script("inline", &script));
+}
+
+/// The variables `env`'s VMs read from the host's environment, as a user sets them for `vagrant
+/// up`: each input by its own name, then each secret as `ISOLOOM_SECRET_<NAME>`, in the spec's
+/// order.
+pub(crate) fn variables(env: &Environment) -> Vec<String> {
+    let mut out = env.input_names();
+    for f in env.machines.values().flat_map(|mp| &mp.secrets) {
+        if let ValueSource::Secret(name) = &f.source {
+            let var = secret_variable(name);
+            if !out.contains(&var) {
+                out.push(var);
+            }
+        }
+    }
+    out
+}
+
+/// Whether a provisioner of `env`'s VMs reads a secret from the host's environment (in base64,
+/// as inputs always are).
+pub(crate) fn any_secret(env: &Environment) -> bool {
+    env.machines.values().any(|mp| !mp.secrets.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testing::environment;
+
+    const SPEC: &str = r"
+version: 1
+name: t
+inputs: { DEMO_SECRET: {}, MODE: { sensitive: false } }
+secrets: { db-password: { env: DB_PASSWORD } }
+networks: { lab: { cidr: 10.84.0.0/24 } }
+machines:
+  web:
+    networks: { lab: 10 }
+    os: debian@12
+    environment: { MODE: { input: MODE } }
+    files:
+      - { path: /srv/secret, input: DEMO_SECRET }
+      - { path: /srv/db, secret: db-password }
+    app: { steps: [{ run: a.sh }] }
+  dc:
+    networks: { lab: 20 }
+    os: windows-server@2019
+    environment: { MODE: { input: MODE } }
+    files: [{ path: C:/secret.txt, input: DEMO_SECRET }]
+    setup: [s.ps1]
+    app: { steps: [{ run: dc.ps1 }] }
+";
+
+    fn text(write: impl FnOnce(&mut Ruby)) -> String {
+        let mut r = Ruby::new();
+        write(&mut r);
+        r.finish()
+    }
+
+    #[test]
+    fn secret_files_come_from_the_hosts_environment_without_waiting_for_a_delivery() {
+        let env = environment(SPEC);
+        let s = text(|r| secret_files(r, &env, "web", Os::Linux));
+        let head = s.lines().next().unwrap_or_default();
+        assert_eq!(
+            head,
+            "m.vm.provision \"shell\", name: \"secrets\", env: { \"ISOLOOM_SECRET_INPUT_DEMO_SECRET\" => isoloom_b64(INPUTS[\"DEMO_SECRET\"]), \"ISOLOOM_SECRET_DB_PASSWORD\" => isoloom_b64(ENV.fetch(\"ISOLOOM_SECRET_DB_PASSWORD\", \"\")) }, inline: <<~'SH'"
+        );
+        assert!(!s.contains("isoloom run"), "nothing waits for the old runtime: {s}");
+        assert!(
+            // An input's file is kept under the input's own name.
+            s.contains("install -D -o 0 -g 0 -m 0400 /var/lib/isoloom/secrets/DEMO_SECRET '/srv/secret'"),
+            "{s}"
+        );
+        let w = text(|r| secret_files(r, &env, "dc", Os::Windows));
+        assert!(
+            w.contains("'DEMO_SECRET' = 'ISOLOOM_SECRET_INPUT_DEMO_SECRET'") && !w.contains("isoloom run"),
+            "{w}"
+        );
+    }
+
+    #[test]
+    fn an_inputs_file_falls_back_to_the_inputs_default_and_a_secret_to_nothing() {
+        let env = environment(&SPEC.replace("DEMO_SECRET: {}", "DEMO_SECRET: { default: dev-secret }"));
+        let s = text(|r| secret_files(r, &env, "web", Os::Linux));
+        let default = isoloom_spec::shell::base64(b"dev-secret");
+        assert!(
+            s.contains(&format!(
+                "v=\"$(printenv ISOLOOM_SECRET_INPUT_DEMO_SECRET || true)\"; if [ -z \"$v\" ] && [ ! -e /var/lib/isoloom/secrets/DEMO_SECRET ]; then v='{default}'; fi; "
+            )),
+            "{s}"
+        );
+        assert!(
+            s.contains("v=\"$(printenv ISOLOOM_SECRET_DB_PASSWORD || true)\"; if [ -n \"$v\" ]"),
+            "a secret has no default: {s}"
+        );
+        let w = text(|r| secret_files(r, &env, "dc", Os::Windows));
+        assert!(w.contains(&format!("$d = @{{ 'DEMO_SECRET' = '{default}' }}")), "{w}");
+    }
+
+    #[test]
+    fn a_secret_value_reaches_its_file_as_given_whatever_it_holds() {
+        // Vagrant writes `NAME="value"` into the shell that runs the script: only base64 keeps a
+        // `$(...)` in a secret from running as root in the guest.
+        let script = isoloom_render::secrets::from_environment(&[("input-demo-secret".into(), "V".into())], &[], &[]);
+        let dir = tempfile::Builder::new().prefix("isoloom-values-").tempdir().expect("a temporary folder");
+        let dir = dir.path();
+        // The kept folder as a relative path, the shell in the test's folder: a Windows path in a
+        // shell script (Git's `sh` on Windows) loses its backslashes.
+        let script = script
+            .replace("/var/lib/isoloom/secrets", ".")
+            .lines()
+            .take_while(|l| !l.starts_with("touch"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let tricky = "secret{$(touch injected)`id`\"'}\n";
+        let encoded = isoloom_spec::shell::base64(tricky.as_bytes());
+        // As Vagrant runs it: the value in double quotes on the command line.
+        let Some(mut posix) = isoloom_render::test_support::posix_sh() else { return };
+        let status = posix
+            .arg("-c")
+            .arg(format!("V=\"{encoded}\" sh -c '{}'", script.replace('\'', "'\\''")))
+            .current_dir(dir)
+            .status()
+            .expect("sh runs");
+        let kept = std::fs::read_to_string(dir.join("input-demo-secret")).unwrap_or_default();
+        let injected = dir.join("injected").exists();
+        assert!(status.success() && !injected);
+        assert_eq!(kept, tricky);
+    }
+
+    #[test]
+    fn a_windows_machine_keeps_its_inputs_for_its_setup_and_startup_tasks() {
+        let env = environment(SPEC);
+        let set = |scope: &str| {
+            format!(
+                "foreach ($k in @('MODE')) {{ $v = [Environment]::GetEnvironmentVariable($k); if ($v) {{ [Environment]::SetEnvironmentVariable($k, [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($v)){scope}) }} }}"
+            )
+        };
+        // Machine-wide, and only when given: a provisioning given none keeps the value set before.
+        assert_eq!(
+            text(|r| windows_inputs(r, &env, "dc")),
+            format!(
+                "m.vm.provision \"shell\", name: \"inputs\", env: {{ \"MODE\" => isoloom_b64(INPUTS[\"MODE\"]) }}, inline: \"{}\"\n",
+                set(", 'Machine'")
+            )
+        );
+        // A step's own decoding, in its process.
+        assert_eq!(windows_decode(&env, "dc"), format!("{}; ", set("")));
+    }
+
+    #[test]
+    fn a_secret_from_the_hosts_environment_is_one_a_machine_gets() {
+        assert!(any_secret(&environment(SPEC)));
+        let none = "version: 1\nname: t\ninputs: [MODE]\nnetworks: { lab: { cidr: 10.84.0.0/24 } }\nmachines:\n  web: { networks: { lab: 10 }, os: debian@12, app: { steps: [{ run: a.sh }] } }\n";
+        assert!(!any_secret(&environment(none)));
+    }
+}

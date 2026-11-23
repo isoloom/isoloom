@@ -1,0 +1,2 @@
+refused: build/refused-run-mount/Dockerfile line 2 (`RUN`): `RUN --mount`/`--network` needs BuildKit's build sandbox
+fix: a plain `RUN`

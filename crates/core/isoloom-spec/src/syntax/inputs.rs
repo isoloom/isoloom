@@ -1,0 +1,162 @@
+//! The spec's `inputs`: values the runner, CI or the command line provides at each start.
+//! `inputs: [TOKEN]` is short for `inputs: { TOKEN: {} }`. An input is sensitive unless it says
+//! otherwise, and a sensitive one can only reach a machine as a file (or a catalogue setting).
+//! An input may declare a `default`: the value the generated files use when the runner gives
+//! none (unset or empty), so the environment also starts without a launch.
+
+use std::borrow::Cow;
+use std::fmt;
+
+use indexmap::IndexMap;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use super::names::InputName;
+
+/// One input.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Input {
+    /// Whether the value must stay hidden (default `true`): a sensitive input may be a file's
+    /// `input` or a `with:` value, never an `environment` value, which `docker inspect` shows.
+    #[serde(default = "yes")]
+    pub sensitive: bool,
+    /// What the value is, shown when a runner asks for it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The value used when the runner gives none (unset or empty): a local run, CI, an import
+    /// without a launch. Text without a NUL (nor a `}` when a machine's `environment` reads it); `""` starts it empty. It is written in the generated
+    /// files as it is, so anyone reading them reads it: a sensitive input's default is a public
+    /// development value (`dev-launch-token`), never a real secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+}
+
+impl Default for Input {
+    fn default() -> Input {
+        Input {
+            sensitive: true,
+            description: None,
+            default: None,
+        }
+    }
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// The spec's inputs, by name, in the order written.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Inputs(#[serde(deserialize_with = "inputs")] pub IndexMap<InputName, Input>);
+
+impl Inputs {
+    /// The input named `name`, when declared.
+    #[must_use]
+    pub fn get(&self, name: &InputName) -> Option<&Input> {
+        self.0.get(name)
+    }
+}
+
+// What the schema shows and the reader returns, before the names are checked once each.
+/// `inputs:` as written, for the schema.
+#[derive(JsonSchema)]
+#[serde(untagged)]
+enum InputsInput {
+    /// Input names, each sensitive.
+    Names(Vec<InputName>),
+    /// Inputs by name, each with whether it is sensitive, what it is and its default.
+    Full(IndexMap<InputName, Input>),
+}
+
+impl<'de> Deserialize<'de> for InputsInput {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<InputsInput, D::Error> {
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = InputsInput;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a list of input names, or a map of name to `{ sensitive, description, default }`")
+            }
+            fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<InputsInput, A::Error> {
+                Vec::<InputName>::deserialize(de::value::SeqAccessDeserializer::new(seq)).map(InputsInput::Names)
+            }
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<InputsInput, A::Error> {
+                // `TOKEN:` alone (null) is an input with every default.
+                let raw = IndexMap::<InputName, Option<Input>>::deserialize(de::value::MapAccessDeserializer::new(map))?;
+                Ok(InputsInput::Full(raw.into_iter().map(|(k, v)| (k, v.unwrap_or_default())).collect()))
+            }
+            fn visit_unit<E: de::Error>(self) -> Result<InputsInput, E> {
+                Ok(InputsInput::Names(Vec::new()))
+            }
+        }
+        d.deserialize_any(V)
+    }
+}
+
+/// The inputs `inputs:` declares, each name once.
+fn inputs<'de, D: Deserializer<'de>>(d: D) -> Result<IndexMap<InputName, Input>, D::Error> {
+    match InputsInput::deserialize(d)? {
+        InputsInput::Full(inputs) => Ok(inputs),
+        InputsInput::Names(names) => {
+            let mut out = IndexMap::new();
+            for name in names {
+                if out.contains_key(&name) {
+                    return Err(de::Error::custom(format!("`{name}` is listed twice")));
+                }
+                out.insert(name, Input::default());
+            }
+            Ok(out)
+        }
+    }
+}
+
+impl JsonSchema for Inputs {
+    fn schema_name() -> Cow<'static, str> {
+        "Inputs".into()
+    }
+
+    fn json_schema(g: &mut SchemaGenerator) -> Schema {
+        InputsInput::json_schema(g)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use isoloom_test_support::assert_every;
+
+    use super::*;
+
+    #[test]
+    fn inputs_are_a_list_or_a_map_each_sensitive_unless_it_says_otherwise() {
+        let list: Inputs = serde_yaml_ng::from_str("[DEMO_SECRET, API_URL]").unwrap();
+        assert_every!(list.0.values(), |i: &&Input| i.sensitive);
+        let map: Inputs = serde_yaml_ng::from_str("{ DEMO_SECRET: , API_URL: { sensitive: false }, TOKEN: { description: the token } }").unwrap();
+        let secrets: Vec<bool> = map.0.values().map(|i| i.sensitive).collect();
+        assert_eq!(secrets, [true, false, true]);
+        let none: Inputs = serde_yaml_ng::from_str("~").unwrap();
+        assert_eq!(none, Inputs::default());
+        let wrong = serde_yaml_ng::from_str::<Inputs>("5").unwrap_err().to_string();
+        assert!(
+            wrong.contains("a list of input names, or a map of name to `{ sensitive, description, default }`"),
+            "{wrong}"
+        );
+        let twice = serde_yaml_ng::from_str::<Inputs>("[DEMO_SECRET, DEMO_SECRET]").unwrap_err().to_string();
+        assert!(twice.contains("twice"), "{twice}");
+        let e = serde_yaml_ng::from_str::<Inputs>("[1SECRET]").unwrap_err().to_string();
+        assert!(e.contains("named like an environment variable"), "{e}");
+    }
+
+    #[test]
+    fn an_input_may_declare_its_default_as_text() {
+        let map: Inputs = serde_yaml_ng::from_str("{ TOKEN: { default: dev-token }, URL: { sensitive: false }, MODE: }").unwrap();
+        let defaults: Vec<Option<&str>> = map.0.values().map(|i| i.default.as_deref()).collect();
+        assert_eq!(defaults, [Some("dev-token"), None, None]);
+        // A value is text, as an environment variable's: a number reads as its digits.
+        let number: Inputs = serde_yaml_ng::from_str("{ PORT: { default: 8080 } }").unwrap();
+        assert_eq!(number.0.values().next().and_then(|i| i.default.as_deref()), Some("8080"));
+        let list = serde_yaml_ng::from_str::<Inputs>("{ PORT: { default: [a] } }").unwrap_err().to_string();
+        assert!(list.contains("expected a string"), "{list}");
+    }
+}

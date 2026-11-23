@@ -1,0 +1,292 @@
+//! The runner scripts' probes against real servers on 127.0.0.1, run by the runner's `sh`: a
+//! greeting read, a line sent, a redirect followed. Unix only, as the runner's shell is.
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::JoinHandle;
+
+use isoloom_plan::checks::{self, Position, Probe};
+use isoloom_spec::check_line::CheckLine;
+
+use super::{BASE, runner};
+use crate::testing::{Outcome, check_line, lab};
+
+/// The runner's line for a check that passed.
+fn pass(name: &str) -> CheckLine {
+    CheckLine::Pass { name: name.into() }
+}
+
+/// The runner's line for a check that failed, and why.
+fn fail(name: &str, reason: &str) -> CheckLine {
+    CheckLine::Fail {
+        name: name.into(),
+        reason: reason.into(),
+    }
+}
+
+/// A server on 127.0.0.1, read as its port. Dropping it stops its listener and joins every
+/// thread it started, so none outlives the test that started it.
+struct Server {
+    port: u16,
+    stop: Arc<AtomicBool>,
+    listener: Option<JoinHandle<()>>,
+}
+
+impl std::fmt::Display for Server {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.port)
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        // The listener waits in `accept`: a connection of its own wakes it to see the stop.
+        drop(std::net::TcpStream::connect(("127.0.0.1", self.port)));
+        if let Some(listener) = self.listener.take() {
+            drop(listener.join());
+        }
+    }
+}
+
+/// A server on 127.0.0.1 answering each connection with `answer` (of the line it read, when
+/// `wait_line`) after `delay_ms`, then holding the connection open (as a service does) until the
+/// client closes it or the test drops the server.
+fn serve(wait_line: bool, delay_ms: u64, answer: fn(&str) -> String) -> Outcome<Server> {
+    let l = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let port = l.local_addr()?.port();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stopped = Arc::clone(&stop);
+    let listener = std::thread::spawn(move || {
+        let mut connections = Vec::new();
+        for c in l.incoming() {
+            if stopped.load(Ordering::SeqCst) {
+                break;
+            }
+            // A connection that drops is the check's to report, not the server's.
+            if let Ok(c) = c {
+                let held = Arc::clone(&stopped);
+                connections.push(std::thread::spawn(move || answer_one(c, wait_line, delay_ms, answer, &held).ok()));
+            }
+        }
+        for c in connections {
+            drop(c.join());
+        }
+    });
+    Ok(Server {
+        port,
+        stop,
+        listener: Some(listener),
+    })
+}
+
+/// One connection of [`serve`]: the line read when `wait_line`, the answer after `delay_ms`,
+/// then the connection held open as a service holds it: until the client closes it, or `stop`
+/// (the test dropping the server), never on a clock of its own that a check's window could
+/// outlast on a slow host.
+fn answer_one(mut c: std::net::TcpStream, wait_line: bool, delay_ms: u64, answer: fn(&str) -> String, stop: &AtomicBool) -> std::io::Result<()> {
+    use std::io::{BufRead, BufReader, Read, Write};
+    let mut line = String::new();
+    if wait_line {
+        BufReader::new(c.try_clone()?).read_line(&mut line)?;
+    }
+    std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+    c.write_all(answer(line.trim_end_matches('\n')).as_bytes())?;
+    // A short timeout only to look at `stop` between reads.
+    c.set_read_timeout(Some(std::time::Duration::from_millis(100)))?;
+    let mut sink = [0_u8; 64];
+    while !stop.load(Ordering::SeqCst) {
+        match c.read(&mut sink) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn tcp_checks_send_their_line_and_look_for_their_text() -> Outcome {
+    let spec = lab(&format!(
+        "{BASE}checks:\n  \
+         - {{ name: banner, tcp: '127.0.0.1:7001', contains: SSH-2.0, wait: 0 }}\n  \
+         - {{ name: ping, tcp: '127.0.0.1:7002', send: PING, contains: +PONG }}\n"
+    ))?;
+    let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
+    let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
+    let ping = check_line(&script, "ping")?;
+    assert!(ping.starts_with("if _retry 30 _tcp_read '127.0.0.1' 7002 'PING' '+PONG'; "), "{ping}");
+    let banner = check_line(&script, "banner")?;
+    assert!(banner.starts_with("if _retry 0 _tcp_read '127.0.0.1' 7001 '' 'SSH-2.0'; "), "{banner}");
+    Ok(())
+}
+
+#[test]
+#[ignore = "needs nc or bash, and waits on sockets for seconds: the runner's probes against servers on 127.0.0.1; `cargo xtask test` runs it"]
+fn tcp_checks_read_a_greeting_and_send_a_line() -> Outcome {
+    let banner = serve(false, 0, |_| "SSH-2.0-OpenSSH_9.6\r\n".into())?;
+    let late = serve(false, 1500, |_| "220 mail ESMTP ready\r\n".into())?;
+    let pong = serve(true, 0, |l| if l == "PING" { "+PONG\r\n".into() } else { format!("-ERR unknown '{l}'\r\n") })?;
+    let silent = serve(false, 0, |_| String::new())?;
+    let spec = lab(&format!(
+        "{BASE}checks:\n  \
+         - {{ name: banner, tcp: '127.0.0.1:{banner}', contains: SSH-2.0 }}\n  \
+         - {{ name: late, tcp: '127.0.0.1:{late}', contains: ESMTP, wait: 0 }}\n  \
+         - {{ name: ping, tcp: '127.0.0.1:{pong}', send: PING, contains: +PONG }}\n  \
+         - {{ name: wrong, tcp: '127.0.0.1:{pong}', send: PING, contains: HELLO, wait: 0 }}\n  \
+         - {{ name: silent, tcp: '127.0.0.1:{silent}', contains: x, wait: 0 }}\n"
+    ))?;
+    assert_eq!(spec.problems(), vec![]);
+    let plan: Vec<checks::Resolved> = checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect();
+    let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
+    let out = std::process::Command::new("sh").arg("-c").arg(&script).output().expect("sh runs");
+    let lines: Vec<CheckLine> = String::from_utf8_lossy(&out.stdout).lines().filter_map(CheckLine::parse).collect();
+    let text = String::from_utf8_lossy(&out.stdout).to_string();
+    for ok in ["banner", "late", "ping"] {
+        assert!(lines.contains(&pass(ok)), "{ok}: {text}");
+    }
+    assert!(
+        lines.contains(&fail("wrong", &format!("127.0.0.1:{pong} answered \"+PONG \", without the expected text"))),
+        "{text}"
+    );
+    assert!(
+        lines.contains(&fail("silent", &format!("nothing read from 127.0.0.1:{silent} within 5s"))),
+        "{text}"
+    );
+    assert_eq!(lines.last(), Some(&CheckLine::End { passed: 3, failed: 2 }), "{text}");
+    Ok(())
+}
+
+/// The runner's sh, with only these tools on its PATH (plus what the runtime itself needs): a
+/// runner where curl, or wget, is all there is.
+fn run_with_only(script: &str, tools: &[(&str, &str)]) -> Outcome<String> {
+    let first = tools.first().map_or("none", |(name, _)| *name);
+    let dir = tempfile::Builder::new().prefix(&format!("isoloom-path-{first}-")).tempdir()?;
+    let dir = dir.path();
+    for t in ["sh", "sed", "head", "tail", "grep", "mktemp", "rm", "date", "sleep", "cat", "tr"] {
+        let found = which(t)?.ok_or_else(|| format!("no {t} on this host"))?;
+        std::os::unix::fs::symlink(found, dir.join(t))?;
+    }
+    for (name, target) in tools {
+        std::os::unix::fs::symlink(target, dir.join(name))?;
+    }
+    let out = std::process::Command::new(dir.join("sh")).arg("-c").arg(script).env("PATH", dir).output()?;
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// A server for the redirect checks: /old redirects to /new (200); /loop redirects to itself
+/// for ever; /login answers a POST with a redirect to /home, which takes GET only.
+fn redirecting_server() -> Outcome<Server> {
+    serve(true, 0, |l| {
+        let path = l.split_whitespace().nth(1).unwrap_or("/");
+        match path {
+            "/old" => "HTTP/1.1 302 Found\r\nLocation: /new\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            "/loop" => "HTTP/1.1 302 Found\r\nLocation: /loop\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            // A login form: a POST is answered with a redirect to a page that takes GET only.
+            "/login" if l.starts_with("POST ") => "HTTP/1.1 302 Found\r\nLocation: /home\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            "/home" if !l.starts_with("GET ") => "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            _ => "HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nwelcome\n".into(),
+        }
+    })
+}
+
+/// The runner's lines for the redirect checks against `u`, as they must read (`with_body`: the
+/// checks that send a body or look for text ran too).
+fn expect_redirect_lines(text: &str, u: &str, with_body: bool) {
+    let lines: Vec<CheckLine> = text.lines().filter_map(CheckLine::parse).collect();
+    for ok in ["first", "followed"] {
+        assert!(lines.contains(&pass(ok)), "{ok}: {text}");
+    }
+    let unfollowed = fail("unfollowed", &format!("expected HTTP 200 from {u}/old, got 302"));
+    assert!(lines.contains(&unfollowed), "{text}");
+    let looping = fail("looping", &format!("expected HTTP 200 from {u}/loop (after redirects), got 302"));
+    assert!(lines.contains(&looping), "{text}");
+    if with_body {
+        // A POST answered with a redirect goes on as a GET, as in a browser.
+        for ok in ["followed body", "login", "empty post", "unfollowed post"] {
+            assert!(lines.contains(&pass(ok)), "{ok}: {text}");
+        }
+    }
+}
+
+/// Where a tool is on this host's PATH, if it is.
+fn which(tool: &str) -> Outcome<Option<String>> {
+    let out = std::process::Command::new("sh").arg("-c").arg(format!("command -v {tool}")).output()?;
+    Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_owned()).filter(|p| !p.is_empty()))
+}
+
+/// The redirect checks against `u`: the first answer, unfollowed, followed, looping, and those
+/// that send a body or look for text.
+fn redirect_checks(u: &str) -> Outcome<Vec<checks::Resolved>> {
+    let spec = lab(&format!(
+        "{BASE}checks:\n  \
+         - {{ name: first, http: '{u}/old', expect: 302, wait: 0 }}\n  \
+         - {{ name: unfollowed, http: '{u}/old', wait: 0 }}\n  \
+         - {{ name: followed, http: '{u}/old', follow: true, wait: 0 }}\n  \
+         - {{ name: looping, http: '{u}/loop', follow: true, wait: 0 }}\n  \
+         - {{ name: followed body, http: '{u}/old', follow: true, contains: welcome, wait: 0 }}\n  \
+         - {{ name: login, http: '{u}/login', method: post, body: 'user=a', follow: true, contains: welcome, wait: 0 }}\n  \
+         - {{ name: empty post, http: '{u}/login', method: POST, follow: true, wait: 0 }}\n  \
+         - {{ name: unfollowed post, http: '{u}/login', method: POST, body: 'user=a', expect: 302, wait: 0 }}\n"
+    ))?;
+    assert_eq!(spec.problems(), vec![]);
+    Ok(checks::plan(&spec.spec()).into_iter().filter(|c| !c.derived).collect())
+}
+
+/// The checks of `plan` a runner with wget alone can run: no method of their own, no text to look for.
+fn plain_gets(plan: &[checks::Resolved]) -> Vec<&checks::Resolved> {
+    plan.iter()
+        .filter(|c| matches!(&c.probe, Probe::Http { request, .. } if request.method.is_none() && request.contains.is_none()))
+        .collect()
+}
+
+#[test]
+fn http_checks_follow_redirects_when_asked() -> Outcome {
+    let u = "http://127.0.0.1:7003";
+    let plan = redirect_checks(u)?;
+    assert!(matches!(&plan[2].probe, Probe::Http { request, .. } if request.follow));
+    let script = runner(&Position::Machine("user".into()), &plan.iter().collect::<Vec<_>>());
+    let followed = check_line(&script, "followed")?;
+    assert!(followed.starts_with(&format!("if _retry 0 _http_is '{u}/old' 200 follow; ")), "{followed}");
+    for (name, request) in [
+        ("followed body", format!("-L --max-redirs 5 '{u}/old'")),
+        ("login", format!("-L --max-redirs 5 --data-binary 'user=a' '{u}/login'")),
+        ("empty post", format!("-L --max-redirs 5 -d '' '{u}/login'")),
+        ("unfollowed post", format!("-X 'POST' --data-binary 'user=a' '{u}/login'")),
+    ] {
+        let line = check_line(&script, name)?;
+        assert!(line.contains(&request), "{name}: {line}");
+    }
+    let unfollowed = check_line(&script, "unfollowed")?;
+    assert!(!unfollowed.contains(" follow;"), "{unfollowed}");
+    Ok(())
+}
+
+#[test]
+#[ignore = "needs curl, wget or busybox, run against a server on 127.0.0.1: the runner's HTTP client each way it finds one; `cargo xtask test` runs it"]
+fn http_checks_follow_redirects_with_curl_wget_and_busybox() -> Outcome {
+    let server = redirecting_server()?;
+    let u = format!("http://127.0.0.1:{server}");
+    let plan = redirect_checks(&u)?;
+    let position = Position::Machine("user".into());
+    let script = runner(&position, &plan.iter().collect::<Vec<_>>());
+    let get_script = runner(&position, &plain_gets(&plan));
+    let expect = |text: &str, with_body: bool| expect_redirect_lines(text, &u, with_body);
+    // curl, else GNU wget, else busybox's: the same answers (wget follows whatever it's told).
+    let mut clients = 0;
+    if let Some(curl) = which("curl")? {
+        expect(&run_with_only(&script, &[("curl", &curl)])?, true);
+        clients += 1;
+    }
+    if let Some(gnu) = which("wget")? {
+        expect(&run_with_only(&get_script, &[("wget", &gnu)])?, false);
+        clients += 1;
+    }
+    if let Some(busybox) = which("busybox")? {
+        expect(&run_with_only(&get_script, &[("wget", &busybox)])?, false);
+        clients += 1;
+    }
+    assert!(clients > 0, "none of curl, wget and busybox is on this host's PATH");
+    Ok(())
+}

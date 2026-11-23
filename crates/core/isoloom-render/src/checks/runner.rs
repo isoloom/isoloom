@@ -1,0 +1,382 @@
+//! The POSIX sh runner a position's checks become. The lines it prints are the `isoloom-check/1`
+//! protocol's, written from [`CheckLine`], which the runner's `check` reads them back with.
+
+use isoloom_plan::checks::{Host, HttpExpect, HttpRequest, Position, Probe, Resolved, TcpExchange, TcpExpect};
+use isoloom_spec::check_line::CheckLine;
+use isoloom_spec::contract::DERIVED;
+use isoloom_spec::shell::quote as sq;
+
+/// How many redirects an `http` check with `follow` goes through before giving up (the status
+/// compared is then that of the last answer, a redirect).
+const HTTP_MAX_REDIRECTS: u32 = 5;
+
+/// How a target writes the runner for one position.
+pub struct Render<'a> {
+    /// A symbolic host as this target reaches it from the position (an address, or a name).
+    pub host: &'a dyn Fn(&Host, &Position) -> String,
+    /// The shell command that runs a project script (`cd /opt/isoloom && sh checks/x.sh`), when
+    /// this target can.
+    pub script: Option<&'a dyn Fn(&str) -> String>,
+    /// The shell command that runs a playbook, when this target can.
+    pub playbook: Option<&'a dyn Fn(&str) -> String>,
+}
+
+/// Escaped for the inside of a double-quoted sh string.
+fn dq(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"").replace('$', "\\$").replace('`', "\\`")
+}
+
+/// The sh runner for one position's checks. It needs `sh` and either `curl`, `wget` or `bash`
+/// (plus `nc` or `bash` for TCP), prints a PASS or FAIL line per check, and exits 1 when any
+/// failed. Derived checks are skipped when `ISOLOOM_DERIVED=0`.
+#[must_use]
+pub fn script(position: &Position, checks: &[&Resolved], r: &Render) -> String {
+    let mut s = format!(
+        "#!/bin/sh\n{}# The environment's checks, {}: each prints a PASS or FAIL line.\n{}{}",
+        crate::header("#"),
+        position.label(),
+        counters(),
+        runtime(),
+    );
+    for c in checks {
+        s.push('\n');
+        if c.derived {
+            s.push_str("if [ \"${");
+            s.push_str(DERIVED);
+            s.push_str(":-1}\" != 0 ]; then\n");
+        }
+        s.push_str(&with_directives(&check_lines(c, position, r)));
+        if c.derived {
+            s.push_str("fi\n");
+        }
+    }
+    s.push_str("\necho \"");
+    s.push_str(&CheckLine::end_line("$passed", "$failed"));
+    s.push_str("\"\n[ \"$failed\" -eq 0 ]\n");
+    s
+}
+
+/// The runner's counts, and `pass NAME` and `fail NAME REASON`, which print a check's line.
+fn counters() -> String {
+    format!(
+        "passed=0; failed=0\npass() {{ passed=$((passed+1)); echo \"{}\"; }}\nfail() {{ failed=$((failed+1)); echo \"{}\"; }}\n",
+        CheckLine::pass_line("$1"),
+        CheckLine::fail_line("$1", "$2"),
+    )
+}
+
+/// The sh lines that run one check and print its PASS or FAIL line.
+fn check_lines(c: &Resolved, position: &Position, r: &Render) -> String {
+    let n = sq(&c.name);
+    let host = |h: &Host| (r.host)(h, position);
+    match &c.probe {
+        Probe::Http { url, expect, request } if !request.is_plain() && *expect != HttpExpect::Blocked => {
+            http_request_lines(&n, c.wait, &url.render(&host(&url.host)), *expect, request)
+        }
+        Probe::Http { url, expect, request } => http_lines(&n, c.wait, &url.render(&host(&url.host)), *expect, request.follow),
+        Probe::Tcp {
+            host: h,
+            port,
+            expect: TcpExpect::Open,
+            exchange: TcpExchange { send, contains: Some(want) },
+        } => tcp_read_lines(&n, c.wait, &host(h), *port, (send.as_deref(), want)),
+        Probe::Tcp { host: h, port, expect, .. } => tcp_lines(&n, c.wait, &host(h), *port, *expect),
+        Probe::Exec { command, expect } => format!(
+            "if _retry {w} _exec {cmd} {want}; then pass {n}; else fail {n} \"$(printf '%s' \"$out\" | tail -n 1)\"; fi\n",
+            w = c.wait,
+            cmd = sq(command),
+            want = sq(expect.as_deref().unwrap_or("")),
+        ),
+        Probe::Script { path } => match r.script {
+            Some(run) => project_file_lines(&n, c.wait, path, &run(path), "exited non-zero"),
+            None => format!("fail {n} \"project scripts don't run from this position\"\n"),
+        },
+        Probe::Playbook { path } => match r.playbook {
+            Some(pb) => project_file_lines(&n, c.wait, path, &pb(path), "failed"),
+            None => format!("fail {n} \"Ansible checks don't run from this position\"\n"),
+        },
+    }
+}
+
+/// The directive shellcheck needs on the line before each statement of `lines` that
+/// single-quotes what looks like an expansion (a `$name`, `$(`, `${` or a backticked text): the
+/// spec's own text (an `exec` command, a header, the text to find), quoted on purpose so this
+/// script never expands it; only an `exec` command's own shell does. A statement is one or more
+/// lines: a quoted value may hold line breaks, and nothing is ever written inside it, so the
+/// value reaches the check as written.
+fn with_directives(lines: &str) -> String {
+    let mut out = String::new();
+    let mut statement = String::new();
+    let mut open = Quote::None;
+    for line in lines.lines() {
+        statement.push_str(line);
+        statement.push('\n');
+        open = open.after(line);
+        if open != Quote::None {
+            continue;
+        }
+        if single_quoted(&statement).into_iter().any(looks_expanded) {
+            let indent: String = statement.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+            out.push_str(&indent);
+            out.push_str("# shellcheck disable=SC2016 # the check's own text, quoted as written\n");
+        }
+        out.push_str(&statement);
+        statement.clear();
+    }
+    // Text left in an open quote is written as it is, with no directive inside it.
+    out.push_str(&statement);
+    out
+}
+
+/// The quote an sh line leaves open at its end.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Quote {
+    /// None: the line ends a statement.
+    None,
+    /// A single-quoted string, which only `'` ends.
+    Single,
+    /// A double-quoted string.
+    Double,
+}
+
+impl Quote {
+    /// The quote open after `line`, read from `self`. A `#` that starts a word outside quotes
+    /// starts a comment, whose quotes are text.
+    fn after(self, line: &str) -> Quote {
+        let mut state = self;
+        let mut chars = line.chars();
+        let mut word_start = true;
+        while let Some(c) = chars.next() {
+            if state == Quote::None && c == '#' && word_start {
+                break;
+            }
+            word_start = state == Quote::None && c.is_whitespace();
+            state = match (state, c) {
+                (Quote::Single, '\'') | (Quote::Double, '"') => Quote::None,
+                (Quote::None, '\'') => Quote::Single,
+                (Quote::None, '"') => Quote::Double,
+                (Quote::None | Quote::Double, '\\') => {
+                    chars.next();
+                    state
+                }
+                (other, _) => other,
+            };
+        }
+        state
+    }
+}
+
+/// The single-quoted parts of an sh line, outside double quotes (`'a'\\''b'` is `a`, then `b`).
+fn single_quoted(line: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let (mut rest, mut double) = (line, false);
+    while let Some((i, c)) = rest.char_indices().find(|&(_, c)| matches!(c, '\'' | '"' | '\\')) {
+        let after = rest.get(i + 1..).unwrap_or_default();
+        rest = match c {
+            '\\' => after.get(after.chars().next().map_or(0, char::len_utf8)..).unwrap_or_default(),
+            '"' => {
+                double = !double;
+                after
+            }
+            _ if double => after,
+            _ => {
+                let end = after.find('\'').unwrap_or(after.len());
+                parts.push(after.get(..end).unwrap_or_default());
+                after.get(end + 1..).unwrap_or_default()
+            }
+        };
+    }
+    parts
+}
+
+/// Whether shellcheck reads `text`, single-quoted, as an expansion meant to happen (SC2016):
+/// `$` before a name, a digit, `{` or `(`, or a backticked text.
+fn looks_expanded(text: &str) -> bool {
+    let dollar = text
+        .split('$')
+        .skip(1)
+        .any(|after| after.starts_with(|c: char| c.is_ascii_alphanumeric() || matches!(c, '_' | '{' | '(')));
+    // What follows each backtick; all but the last part are between two of them.
+    let after: Vec<&str> = text.split('`').skip(1).collect();
+    dollar || after.split_last().is_some_and(|(_, between)| between.iter().any(|t| !t.is_empty()))
+}
+
+/// An HTTP check beyond a GET and its status (a method, headers, a body, text to find), with
+/// curl: `_req`.
+fn http_request_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, request: &HttpRequest) -> String {
+    // A request that must be blocked is a plain one (`http_lines`).
+    let status = match expect {
+        HttpExpect::Status(code) => code.to_string(),
+        HttpExpect::Any | HttpExpect::Blocked => "any".to_owned(),
+    };
+    format!(
+        "if _retry {wait} _req {status} {t}{args} {u}; then pass {n}; else fail {n} \"$out\"; fi\n",
+        t = sq(request.contains.as_deref().unwrap_or("")),
+        args = curl_args(request),
+        u = sq(url),
+    )
+}
+
+/// The curl arguments for a request's redirects, method, headers and body, each after a space.
+fn curl_args(request: &HttpRequest) -> String {
+    let mut args: Vec<String> = Vec::new();
+    if request.follow {
+        args.push(format!("-L --max-redirs {HTTP_MAX_REDIRECTS}"));
+    }
+    let method = request.method.as_deref().map(str::to_uppercase);
+    match method.as_deref() {
+        // Following redirects, a POST is sent as curl sends a form (`--data-binary`,
+        // or an empty `-d ''`), not forced with `-X`: a 301/302/303 is then followed
+        // with a GET, as browsers do. `-X POST` would POST to every hop (a login
+        // page's redirect to a GET-only page answering 405).
+        Some("POST") if request.follow => {
+            if request.body.is_none() {
+                args.push("-d ''".to_owned());
+            }
+        }
+        Some("HEAD") if request.follow => args.push("-I".to_owned()),
+        Some(m) => args.push(format!("-X {}", sq(m))),
+        None => {}
+    }
+    args.extend(request.headers.iter().map(|(k, v)| format!("-H {}", sq(&format!("{k}: {v}")))));
+    args.extend(request.body.iter().map(|b| format!("--data-binary {}", sq(b))));
+    args.iter().flat_map(|a| [" ", a.as_str()]).collect()
+}
+
+/// A plain HTTP check: a status, any answer, or none.
+fn http_lines(n: &str, wait: u32, url: &str, expect: HttpExpect, follow: bool) -> String {
+    // The URL as an argument, and as text inside a double-quoted message.
+    let (arg, text) = (sq(url), dq(url));
+    // `_http`'s second argument: follow redirects.
+    let f = if follow { " follow" } else { "" };
+    let after = if follow { " (after redirects)" } else { "" };
+    match expect {
+        HttpExpect::Status(code) => format!(
+            "if _retry {wait} _http_is {arg} {code}{f}; then pass {n}; else fail {n} \"expected HTTP {code} from {text}{after}, got $(_http {arg}{f})\"; fi\n"
+        ),
+        HttpExpect::Any => format!("if _retry {wait} _http_any {arg}{f}; then pass {n}; else fail {n} \"nothing answers at {text}\"; fi\n"),
+        HttpExpect::Blocked => {
+            format!("c=$(_http {arg}); if [ \"$c\" = 000 ]; then pass {n}; else fail {n} \"{text} answered (HTTP $c); it should be blocked\"; fi\n")
+        }
+    }
+}
+
+/// A TCP check that writes a line (if any) and looks for text in what comes back: `_tcp_read`.
+fn tcp_read_lines(n: &str, wait: u32, host: &str, port: u16, (send, expected): (Option<&str>, &str)) -> String {
+    format!(
+        "if _retry {wait} _tcp_read {h} {port} {snd} {t}; then pass {n}; else fail {n} \"$out\"; fi\n",
+        h = sq(host),
+        snd = sq(send.unwrap_or("")),
+        t = sq(expected),
+    )
+}
+
+/// A bare TCP check: something listens, or nothing does.
+fn tcp_lines(n: &str, wait: u32, host: &str, port: u16, expect: TcpExpect) -> String {
+    // The host as an argument, and as text inside a double-quoted message.
+    let (arg, text) = (sq(host), dq(host));
+    match expect {
+        TcpExpect::Open => {
+            format!("if _retry {wait} _tcp {arg} {port}; then pass {n}; else fail {n} \"nothing listens at {text}:{port}\"; fi\n")
+        }
+        TcpExpect::Blocked => {
+            format!("if _tcp {arg} {port}; then fail {n} \"{text}:{port} answered; it should be blocked\"; else pass {n}; fi\n")
+        }
+    }
+}
+
+/// A project file (a script, a playbook) run by `cmd`, its path echoed first; `failure` says
+/// what went wrong after the path.
+fn project_file_lines(n: &str, wait: u32, path: &str, cmd: &str, failure: &str) -> String {
+    format!(
+        "echo {hdr}\nif _retry {wait} sh -c {cmd}; then pass {n}; else fail {n} \"{p} {failure}\"; fi\n",
+        hdr = sq(&format!("== {path}")),
+        cmd = sq(cmd),
+        p = dq(path)
+    )
+}
+
+/// The helpers every runner starts with, after its [`counters`]: [`RUNTIME`] with its redirect
+/// limit filled in from [`HTTP_MAX_REDIRECTS`], the one the curl arguments follow too.
+fn runtime() -> String {
+    RUNTIME
+        .replace("@MAX_REDIRS@", &HTTP_MAX_REDIRECTS.to_string())
+        .replace("@ANSWERS@", &(HTTP_MAX_REDIRECTS + 1).to_string())
+}
+
+/// The helpers' text; `@MAX_REDIRS@` is the redirect limit and `@ANSWERS@` the answers it
+/// allows (the first, then one per redirect), filled in by [`runtime`].
+const RUNTIME: &str = r#"# _http URL [follow] -> the status code, 000 when nothing answers (curl, else wget, else bash):
+# the first answer's, or with `follow` the last one's after at most @MAX_REDIRS@ redirects (bash: the first).
+_http() {
+  if command -v curl >/dev/null 2>&1; then
+    if [ -n "$2" ]; then set -- "$1" -L --max-redirs @MAX_REDIRS@; else set -- "$1"; fi
+    c=$(curl -sk -o /dev/null -m 5 -w '%{http_code}' "$@" 2>/dev/null)
+  elif command -v wget >/dev/null 2>&1; then
+    # wget follows redirects whatever it's told (busybox's can't be told): -S prints each answer.
+    if [ -n "$2" ]; then _n=@ANSWERS@; else _n=1; fi
+    c=$(wget -q -S -O /dev/null -T 5 --no-check-certificate "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p' | head -n $_n | tail -n 1)
+  else
+    u=${1#*://}; hp=${u%%/*}; p=/${u#*/}; [ "$u" = "$hp" ] && p=/
+    h=${hp%%:*}; port=${hp#*:}; [ "$hp" = "$h" ] && port=80
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $U, for its /dev/tcp
+    c=$(H=$h P=$port U=$p timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P && printf "GET %s HTTP/1.0\r\nHost: %s\r\n\r\n" "$U" "$H" >&3 && read -r l <&3 && echo "$l"' 2>/dev/null | sed -n 's/^HTTP\/[0-9.]* \([0-9][0-9][0-9]\).*/\1/p')
+  fi
+  echo "${c:-000}"
+}
+_http_is() { [ "$(_http "$1" "$3")" = "$2" ]; }
+# _req STATUS|any TEXT CURL-ARGS... -> 0 when the request gets that status (any answer for `any`)
+# and its body contains TEXT (if any); $out says why not. Needs curl.
+_req() {
+  want=$1; text=$2; shift 2
+  command -v curl >/dev/null 2>&1 || { out="curl is needed for this check"; return 1; }
+  b=$(mktemp); c=$(curl -sk -m 10 -o "$b" -w '%{http_code}' "$@" 2>/dev/null); c=${c:-000}; r=0
+  if [ "$want" = any ]; then [ "$c" != 000 ] || r=1; else [ "$c" = "$want" ] || r=1; fi
+  if [ $r = 1 ]; then out="expected HTTP $want, got $c"
+  elif [ -n "$text" ] && ! grep -qF -- "$text" "$b"; then r=1; out="HTTP $c, but the response doesn't contain the expected text"
+  fi
+  rm -f "$b"; return $r
+}
+_http_any() { [ "$(_http "$1" "$2")" != 000 ]; }
+# _tcp HOST PORT -> 0 when it connects (nc, else bash).
+_tcp() {
+  if command -v nc >/dev/null 2>&1; then nc -z -w 5 "$1" "$2" >/dev/null 2>&1
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H and $P, for its /dev/tcp
+    H=$1 P=$2 timeout 5 bash -c 'exec 3<>/dev/tcp/$H/$P' >/dev/null 2>&1
+  fi
+}
+# _tcp_read HOST PORT LINE TEXT -> 0 when the bytes read within 5s of connecting (after writing
+# LINE and a newline, if any) contain TEXT; $out says why not (nc, else bash). Stdin stays open
+# while reading (some nc quit at its end), and nc is stopped after 5s whatever its flavor.
+_tcp_read() {
+  f=$(mktemp); i=0; r=1
+  if command -v nc >/dev/null 2>&1; then
+    { [ -z "$3" ] || printf '%s\n' "$3"; j=0; while [ ! -e "$f.end" ] && [ $j -lt 6 ]; do sleep 1; j=$((j+1)); done; } | nc "$1" "$2" >"$f" 2>/dev/null &
+  else
+    # shellcheck disable=SC2016 # the inner bash expands $H, $P and $L, for its /dev/tcp
+    H=$1 P=$2 L=$3 timeout 6 bash -c 'exec 3<>/dev/tcp/$H/$P || exit 1; [ -z "$L" ] || printf "%s\n" "$L" >&3; cat <&3' >"$f" 2>/dev/null &
+  fi
+  p=$!
+  while :; do
+    if grep -qF -- "$4" "$f"; then r=0; break; fi
+    if [ $i -ge 5 ] || ! kill -0 $p 2>/dev/null; then break; fi
+    sleep 1; i=$((i+1))
+  done
+  [ $r = 0 ] || ! grep -qF -- "$4" "$f" || r=0
+  touch "$f.end"; kill $p 2>/dev/null
+  if [ $r = 1 ]; then
+    if [ -s "$f" ]; then out="$1:$2 answered \"$(head -c 100 "$f" | tr -d '\000\r' | tr '\n\t' '  ')\", without the expected text"
+    elif [ $i -lt 5 ]; then out="$1:$2 refused the connection or closed it without a word"
+    else out="nothing read from $1:$2 within 5s"; fi
+  fi
+  rm -f "$f" "$f.end"; return $r
+}
+# _exec COMMAND TEXT -> 0 when the command succeeds and its output contains TEXT (if any).
+_exec() { out=$(sh -c "$1" 2>&1) && { [ -z "$2" ] || printf '%s\n' "$out" | grep -qF -- "$2"; }; }
+# _retry SECONDS COMMAND... -> keeps trying every 2s until it passes or the time is up.
+_retry() { _end=$(( $(date +%s) + $1 )); shift; while ! "$@"; do [ "$(date +%s)" -lt "$_end" ] || return 1; sleep 2; done; }
+"#;
+
+#[cfg(test)]
+mod tests;

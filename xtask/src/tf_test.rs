@@ -1,0 +1,301 @@
+//! `cargo xtask tf-test`: the cloud and server modules' logic proven without clouds. The
+//! examples the suites name (`tests/terraform/`, see [`suite`]) are generated into
+//! `target/tf-test/tree`, and `terraform test` runs against each suite's module, inside the
+//! pinned validator image (`xtask/src/verify/Dockerfile`, Terraform 1.7 or later for mocked
+//! providers): every provider is mocked (`mock_provider`) and every run plans only, so there are
+//! no credentials, no cloud and no provisioner. The assertions read the planned values: each
+//! network's routes, the gateways, the firewalls, the published ports and their outputs, the
+//! private names, the ready file.
+//!
+//! The same on macOS, Linux and Windows, as `verify`: the tree goes into the container as a tar
+//! stream and the results come back on its standard output; the only mount is `verify`'s cache
+//! volume (`$VERIFY_CACHE`, default `isoloom-verify-cache`), whose providers serve `init`
+//! without the network once a `verify` (or a first `tf-test`) has filled it. The container may
+//! use `ISOLOOM_VERIFY_CPUS` CPUs (default 4) and tests as many modules at once.
+//!
+//! The report names each failure's example, target, run, assertion and the planned values it
+//! read; it is also written to `report.txt` in `$TF_TEST_OUT` (default `target/tf-test`), beside
+//! the tree, the container's input and its raw output. A run named `known_bug_<what>` records
+//! a bug of a generated module: it must fail (see [`report`]). `--fast` runs the quick subset,
+//! for every change. Exit status: 0 when every run holds, 1 when one fails, 2 when the harness
+//! itself failed.
+
+mod report;
+mod results;
+mod suite;
+
+use std::collections::BTreeSet;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::process::{ExitCode, Stdio};
+use std::time::Instant;
+
+use crate::{Res, generate_all, process, repo, verify};
+
+/// The arguments of `cargo xtask tf-test`.
+#[derive(clap::Args)]
+pub(crate) struct Args {
+    /// Only the fast subset (one rich example on every target the suites cover), for the
+    /// quick check of every change.
+    #[arg(long)]
+    fast: bool,
+    /// Only the suites whose path under tests/terraform contains this text (`cloud-vm/aws`).
+    #[arg(long)]
+    filter: Option<String>,
+}
+
+/// The script the container runs.
+const SCRIPT: &str = include_str!("tf_test/run.sh");
+
+/// Runs the suites; the exit status says how it went.
+pub(crate) fn run(a: &Args) -> ExitCode {
+    tf_test(a).unwrap_or_else(|e| {
+        eprintln!("tf-test: {e}");
+        ExitCode::from(2)
+    })
+}
+
+fn tf_test(a: &Args) -> Res<ExitCode> {
+    let started = Instant::now();
+    let root = repo::root();
+    let suites = suite::discover(&root, a.fast, a.filter.as_deref())?;
+    if suites.is_empty() {
+        return Err(format!("no suite under {} matches", suite::DIR).into());
+    }
+    let out = std::env::var_os("TF_TEST_OUT").map_or_else(|| repo::target_dir(&root).join("tf-test"), PathBuf::from);
+    std::fs::create_dir_all(&out)?;
+    let tree = out.join("tree");
+    let examples: BTreeSet<&str> = suites.iter().map(|s| s.example.as_str()).collect();
+    let specs: Vec<PathBuf> = examples.iter().map(|e| root.join("examples").join(e)).collect();
+    generate_all::generate(&generate_all::binary(&root)?, &specs, &tree)?;
+    if process::quiet(process::tool("docker").arg("info")).is_err() {
+        return Err("Docker isn't running".into());
+    }
+    let image = verify::image(&root)?;
+    let input = pack(&root, &tree, &suites, &out)?;
+    let output = container(&image, &input, verify::cpus(std::env::var("ISOLOOM_VERIFY_CPUS").ok().as_deref())?)?;
+    std::fs::write(out.join("output.jsonl"), &output)?;
+    let named: Vec<(suite::Suite, String)> = suites
+        .into_iter()
+        .map(|s| {
+            let shown = s.file.strip_prefix(&root).map_or_else(|_| s.file.display().to_string(), repo::slashed);
+            (s, shown)
+        })
+        .collect();
+    let (text, tally) = report::report(&named, &results::parse(&output));
+    std::fs::write(out.join("report.txt"), &text)?;
+    print!("{text}");
+    println!(
+        "tf-test: {} suites, {} runs held, {} failed, {} known bugs ({}s)",
+        named.len(),
+        tally.passed,
+        tally.failed,
+        tally.known,
+        started.elapsed().as_secs()
+    );
+    Ok(process::exit_code(tally.failed == 0))
+}
+
+/// The container's input, `<out>/in.tar`: the tree (`tree/`), each suite's test file and the
+/// shared mocks in its module's `tests/`, the modules' list (`modules`) and the script
+/// (`run.sh`).
+fn pack(root: &Path, tree: &Path, suites: &[suite::Suite], out: &Path) -> Res<PathBuf> {
+    let path = out.join("in.tar");
+    let mut tar = tar::Builder::new(File::create(&path)?);
+    tar.follow_symlinks(false);
+    verify::add_tree(&mut tar, tree, Path::new("tree"))?;
+    let mocks = root.join(suite::DIR).join(suite::MOCKS);
+    let mut modules = String::new();
+    for s in suites {
+        let tests = Path::new("tree").join(&s.module).join("tests");
+        tar.append_path_with_name(&s.file, tests.join(format!("{}.tftest.hcl", s.example)))?;
+        if mocks.is_dir() {
+            verify::add_tree(&mut tar, &mocks, &tests.join("mocks"))?;
+        }
+        modules.push_str(&s.module);
+        modules.push('\n');
+    }
+    for (name, bytes) in [("modules", modules.as_bytes()), ("run.sh", SCRIPT.as_bytes())] {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(u64::try_from(bytes.len())?);
+        header.set_mode(0o644);
+        header.set_cksum();
+        tar.append_data(&mut header, name, bytes)?;
+    }
+    tar.into_inner()?;
+    Ok(path)
+}
+
+/// Runs the script in the image on `input`, capped at `cpus` CPUs and testing as many modules at
+/// once; what it printed. Its progress goes to the terminal.
+fn container(image: &str, input: &Path, cpus: u16) -> Res<String> {
+    let cache = std::env::var("VERIFY_CACHE").unwrap_or_else(|_| "isoloom-verify-cache".into());
+    let script = "mkdir -p /work && tar -xf - -C /work --no-same-owner --warning=no-unknown-keyword || exit 2; exec bash /work/run.sh";
+    let mut docker = process::tool("docker");
+    docker.args(["run", "--rm", "-i", "--platform", "linux/amd64", "--cpus", &cpus.to_string()]);
+    docker.args(["-v", &format!("{cache}:/cache"), "-e", &format!("TF_TEST_JOBS={cpus}")]);
+    docker.args([image, "bash", "-c", script]);
+    docker.stdin(File::open(input)?).stdout(Stdio::piped()).stderr(Stdio::inherit());
+    let done = docker.output()?;
+    if !done.status.success() {
+        return Err(format!("the container failed ({})", done.status).into());
+    }
+    Ok(String::from_utf8_lossy(&done.stdout).into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `run.sh` with its folders (`/work`, `/out`, `/cache`, `/tmp`) under `at`.
+    #[cfg(unix)]
+    fn script_under(at: &std::path::Path) -> String {
+        let marked = SCRIPT
+            .replace("/tmp/", "\u{1}tmp/")
+            .replace("/cache", "\u{1}cache")
+            .replace("/out", "\u{1}out")
+            .replace("/work", "\u{1}work");
+        marked.replace('\u{1}', &format!("{}/", at.display()))
+    }
+
+    /// The script against a stand-in `terraform` (each call logged with its module's folder): a
+    /// module whose init fails offline and online, one whose provider starts too slowly once, one
+    /// that isn't there. Every module is reported in the list's order, whatever order the jobs
+    /// ended in, with its status and what Terraform said.
+    #[cfg(unix)]
+    #[test]
+    fn the_script_reports_every_module_in_the_list_s_order() {
+        let bin = isoloom_test_support::FakeBin::named("tf-test").unwrap();
+        let at = bin.dir().join("root");
+        let log = bin.log();
+        bin.stand_in(
+            "terraform",
+            &format!(
+                r#"here=$(basename "$PWD")
+echo "terraform $* @$here" >> '{log}'
+case "$1" in
+  init) [ "$here" != broken ] || {{ echo "Error: no provider"; exit 1; }} ;;
+  test)
+    if [ "$here" = slow ] && [ ! -f retried ]; then : > retried; echo '{{"note":"timeout while waiting for plugin to start"}}'; exit 1; fi
+    echo "{{\"ran\":\"$here\"}}" ;;
+esac"#,
+                log = log.display()
+            ),
+        )
+        .unwrap()
+        // `flock` holds the cache's lock around the online init: here, it only runs the command.
+        .stand_in("flock", "shift; exec \"$@\"")
+        .unwrap()
+        .link_real(&["bash", "awk", "xargs", "cat", "sed", "grep", "mkdir", "env", "basename"])
+        .unwrap();
+        for module in ["a/.isoloom/proxmox", "broken", "slow"] {
+            std::fs::create_dir_all(at.join("work/tree").join(module)).unwrap();
+        }
+        std::fs::write(at.join("work/modules"), "a/.isoloom/proxmox\nbroken\nslow\nmissing\n").unwrap();
+        std::fs::create_dir_all(at.join("tmp")).unwrap();
+        std::fs::write(at.join("run.sh"), script_under(&at)).unwrap();
+        let out = bin.run(&format!("bash '{}'", at.join("run.sh").display()), &[]).unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            "@@module a/.isoloom/proxmox\n@@status 0\n{\"ran\":\"proxmox\"}\n\
+             @@module broken\n@@status init-failed\n@@log Error: no provider\n\
+             @@module slow\n@@status 0\n{\"ran\":\"slow\"}\n\
+             @@module missing\n@@status missing\n@@log no such module\n"
+        );
+        let calls = bin.calls().unwrap();
+        let of = |verb: &str, here: &str| {
+            calls
+                .iter()
+                .filter(|c| c.get(1).map(String::as_str) == Some(verb) && c.last().map(String::as_str) == Some(here))
+                .count()
+        };
+        // No state backend is ever configured; a failed init is tried once more online; a slow
+        // provider start is retried; a module whose init failed is never tested.
+        isoloom_test_support::assert_every!(calls.iter().filter(|c| c.get(1).map(String::as_str) == Some("init")), |c: &&Vec<String>| c
+            .iter()
+            .any(|w| w == "-backend=false"));
+        assert_eq!((of("init", "@broken"), of("test", "@broken")), (2, 0), "{calls:?}");
+        assert_eq!((of("test", "@slow"), of("test", "@proxmox")), (2, 1), "{calls:?}");
+        isoloom_test_support::assert_every!(calls.iter().filter(|c| c.get(1).map(String::as_str) == Some("test")), |c: &&Vec<String>| c
+            .iter()
+            .any(|w| w == "-json"));
+    }
+
+    /// The container's input for one suite: the tree, the suite's file at its module's
+    /// `tests/`, the shared mocks beside it, the modules' list and the script.
+    #[test]
+    fn the_input_holds_the_tree_each_suites_file_and_mocks_at_its_module_the_list_and_the_script() {
+        let dir = tempfile::Builder::new().prefix("isoloom-xtask-tf-test-").tempdir().unwrap();
+        let (root, tree, out) = (dir.path().join("root"), dir.path().join("tree"), dir.path().join("out"));
+        let tests = root.join(suite::DIR).join("proxmox");
+        std::fs::create_dir_all(&tests).unwrap();
+        std::fs::create_dir_all(root.join(suite::DIR).join(suite::MOCKS)).unwrap();
+        std::fs::write(root.join(suite::DIR).join(suite::MOCKS).join("proxmox.tfmock.hcl"), "").unwrap();
+        std::fs::write(tests.join("web.tftest.hcl"), "run \"x\" {}\n").unwrap();
+        std::fs::create_dir_all(tree.join("web/.isoloom/proxmox")).unwrap();
+        std::fs::write(tree.join("web/.isoloom/proxmox/main.tf"), "").unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        let s = suite::Suite {
+            file: tests.join("web.tftest.hcl"),
+            example: "web".into(),
+            target: "proxmox".into(),
+            module: "web/.isoloom/proxmox".into(),
+        };
+        let input = pack(&root, &tree, &[s], &out).unwrap();
+        let mut archive = tar::Archive::new(File::open(&input).unwrap());
+        let mut files: Vec<(String, String)> = Vec::new();
+        for entry in archive.entries().unwrap() {
+            let mut entry = entry.unwrap();
+            if entry.header().entry_type().is_file() {
+                let mut text = String::new();
+                std::io::Read::read_to_string(&mut entry, &mut text).unwrap();
+                files.push((entry.path().unwrap().display().to_string(), text));
+            }
+        }
+        let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "tree/web/.isoloom/proxmox/main.tf",
+                "tree/web/.isoloom/proxmox/tests/web.tftest.hcl",
+                "tree/web/.isoloom/proxmox/tests/mocks/proxmox.tfmock.hcl",
+                "modules",
+                "run.sh",
+            ]
+        );
+        assert_eq!(files[3].1, "web/.isoloom/proxmox\n");
+        assert_eq!(files[4].1, SCRIPT);
+    }
+
+    /// A stand-in `docker run` printing `said` and exiting `status`, each call logged.
+    #[cfg(unix)]
+    fn docker(said: &str, status: u8) -> isoloom_test_support::FakeBin {
+        let bin = isoloom_test_support::FakeBin::named("xtask-tf-test").unwrap();
+        let body = format!(
+            "echo \"docker $*\" >> '{}'\ncat > /dev/null\nprintf '%s\\n' '{said}'\nexit {status}",
+            bin.log().display()
+        );
+        bin.stand_in("docker", &body).unwrap();
+        bin
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_container_runs_the_script_capped_at_its_cpus_and_what_it_printed_is_read() {
+        let bin = docker("@@module web", 0);
+        let input = bin.dir().join("in.tar");
+        std::fs::write(&input, "").unwrap();
+        let said = crate::process::testing::with_stand_ins(&bin.path(), || container("isoloom-verify:1", &input, 3)).unwrap();
+        assert_eq!(said, "@@module web\n");
+        let call = bin.calls().unwrap().remove(0);
+        assert_eq!(
+            call.get(..8),
+            Some(&["docker", "run", "--rm", "-i", "--platform", "linux/amd64", "--cpus", "3"].map(String::from)[..])
+        );
+        assert!(call.windows(2).any(|w| w == ["-e", "TF_TEST_JOBS=3"]), "{call:?}");
+        let failed = docker("", 2);
+        let e = crate::process::testing::with_stand_ins(&failed.path(), || container("isoloom-verify:1", &input, 3)).unwrap_err();
+        assert_eq!(e.to_string(), "the container failed (exit status: 2)");
+    }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "vlans",
+  "networks": {
+    "vlan10": { "cidr": "10.10.10.0/24", "switch": "sw1", "vlan": 10 },
+    "vlan20": { "cidr": "10.10.20.0/24", "switch": "sw1", "vlan": 20, "internet": false }
+  },
+  "nodes": {
+    "router": { "kind": { "router": {} }, "networks": { "vlan10": null, "vlan20": null } },
+    "pc1": { "kind": { "vm": { "os": "debian@12" } }, "access": true, "networks": { "vlan10": null } },
+    "pc2": { "kind": { "container": { "image": "alpine:3.20", "idle": true } }, "networks": { "vlan10": null } },
+    "srv": { "kind": { "container": { "image": "nginx:1.27-alpine" } }, "services": [{ "port": 80 }], "networks": { "vlan20": null } }
+  }
+}

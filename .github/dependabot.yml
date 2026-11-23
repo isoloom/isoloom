@@ -1,0 +1,30 @@
+# Dependency updates: the Rust crates (the workspace and the fuzz targets' own workspace) and the
+# GitHub Actions, which are pinned to commits. Minor and patch updates come grouped, one pull
+# request per ecosystem a week; a major update comes alone. A new release waits a week before it
+# is proposed, so a release that is pulled soon after publication never reaches a pull request.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directories: ["/", "/fuzz"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "Dependencies:"
+    groups:
+      cargo-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "CI:"
+    groups:
+      actions:
+        patterns: ["*"]

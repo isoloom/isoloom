@@ -1,0 +1,5 @@
+# Written by `cargo xtask catalogue refresh golang`, never by hand: the
+# pins of entry.yml's repository keys, official images and vendor packages. golang installs pinned
+# archives (each `download` release's SHA-256 is in entry.yml), and has no official image form
+# here, so there is nothing to pin.
+refreshed: 2026-11-13

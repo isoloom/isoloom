@@ -1,0 +1,6 @@
+# cargo-about: the licences of every crate `isoloom` is built from, shipped in each release
+# archive as THIRD-PARTY-LICENSES.md (release.yml renders about.hbs, beside this file). The
+# accepted licences are deny.toml's.
+accepted = ["MIT", "Apache-2.0", "BSL-1.0", "Unicode-3.0", "Unlicense", "Zlib"]
+ignore-build-dependencies = false
+ignore-dev-dependencies = true

@@ -1,0 +1,77 @@
+# A made-up entry for the catalogue's tests: every feature of the format, small.
+name: demo
+description: A made-up service for the catalogue's own tests.
+upstream: https://example.org/
+licence: { software: MIT }
+releases:
+  - version: 2.4.1
+    channel: stable
+    source: vendor
+    os: [debian@12, debian@13, rocky@9]
+    vars: { path: stable }
+  - version: 2.5.0
+    channel: edge
+    source: vendor
+    os: [debian@12]
+    vars: { path: edge }
+  - version: "2.4"
+    channel: os
+    source: distro
+    os: [ubuntu@24.04]
+default: 2.4.1
+images:
+  debian@13: docker.io/library/demo:{{ version }}
+settings:
+  port: { type: port, default: 8080, description: The port. }
+  greeting: { type: string, pattern: "[a-z ]+", description: What the page says. }
+  admin: { type: password, owner: demo, description: The admin's password. }
+  users:
+    type: list
+    description: The users.
+    items:
+      name: { type: string, pattern: "[a-z]+", required: true, description: Its name. }
+      password: { type: password, description: Its password. }
+  peer: { type: endpoint, description: A peer. }
+ports:
+  web: { setting: port, protocol: http }
+  admin: { port: 9090 }
+data:
+  state: /var/lib/demo
+daemons:
+  demo:
+    unit: { debian: demo, redhat: demo-server }
+    package: demo
+    foreground: [demo, --foreground]
+    logs: { /var/log/demo.log: stdout }
+image:
+  environment: { DEMO_PORT: "{{ with.port }}" }
+recipe:
+  install:
+    - repository:
+        name: demo
+        url: "https://example.org/{{ vars.path }}/{{ os.family }}"
+        key: { url: "https://example.org/key.asc", fingerprint: 0123456789ABCDEF0123456789ABCDEF01234567 }
+      when: { family: [debian] }
+    - repository:
+        name: demo
+        url: "https://example.org/{{ vars.path }}/rpm/{{ os.version }}"
+        key: { url: "https://example.org/key.rpm", sha256: "1111111111111111111111111111111111111111111111111111111111111111" }
+      when: { family: [rocky], release: [stable] }
+    - packages: [{ name: demo, version: "{{ version }}" }]
+      when: { release: [stable, edge] }
+    - packages: [demo]
+      when: { release: [os] }
+  configure:
+    - template: { from: files/demo.conf, to: /etc/demo/demo.conf, mode: "0644" }
+    - command: "echo {{ with.greeting }} > /etc/demo/greeting"
+      creates: /etc/demo/greeting
+      when: { set: greeting }
+    - template: { from: files/user.conf, to: "/etc/demo/users/{{ item.name }}.conf" }
+      for_each: users
+    - template: { from: files/peer.conf, to: /etc/demo/peer.conf }
+      when: { set: peer }
+    - service: demo
+  start:
+    - command: [demo-admin, --password-file, "{{ with.admin.path }}"]
+      unless: [demo-admin, --check]
+      when: { set: admin }

@@ -1,0 +1,157 @@
+{
+ "children": {
+  "vm": {
+   "calls": [
+    {
+     "name": "define",
+     "args": [
+      "web"
+     ],
+     "block": {
+      "children": {
+       "vm": {
+        "settings": {
+         "box": "bento/debian-12",
+         "hostname": "www"
+        },
+        "calls": [
+         {
+          "name": "network",
+          "args": [
+           "private_network",
+           {
+            "type": "dhcp"
+           }
+          ]
+         },
+         {
+          "name": "network",
+          "args": [
+           "public_network",
+           {
+            "bridge": [
+             "en0",
+             "en1"
+            ]
+           }
+          ]
+         },
+         {
+          "name": "network",
+          "args": [
+           "forwarded_port",
+           {
+            "guest": 80
+           }
+          ]
+         },
+         {
+          "name": "provider",
+          "args": [
+           "virtualbox"
+          ],
+          "block": {
+           "settings": {
+            "cpus": 2,
+            "memory": "2G"
+           },
+           "calls": [
+            {
+             "name": "customize",
+             "args": [
+              [
+               "modifyvm",
+               "x"
+              ]
+             ]
+            }
+           ]
+          }
+         },
+         {
+          "name": "provision",
+          "args": [
+           "ansible_local",
+           {}
+          ]
+         },
+         {
+          "name": "provision",
+          "args": [
+           "ansible",
+           {
+            "playbook": "site.yml"
+           }
+          ]
+         },
+         {
+          "name": "provision",
+          "args": [
+           "file",
+           {
+            "source": "a",
+            "destination": "/tmp/a"
+           }
+          ]
+         },
+         {
+          "name": "provision",
+          "args": [
+           "puppet",
+           {}
+          ]
+         },
+         {
+          "name": "provision",
+          "args": [
+           "shell",
+           {
+            "path": "setup.py"
+           }
+          ]
+         }
+        ]
+       }
+      }
+     }
+    },
+    {
+     "name": "define",
+     "args": [
+      "dc"
+     ],
+     "block": {
+      "children": {
+       "vm": {
+        "settings": {
+         "box": "gusztavvargadr/windows-server-2022"
+        },
+        "calls": [
+         {
+          "name": "network",
+          "args": [
+           "private_network",
+           {
+            "ip": "192.168.40.11"
+           }
+          ]
+         },
+         {
+          "name": "provision",
+          "args": [
+           "shell",
+           {
+            "path": "dc.ps1",
+            "reboot": true
+           }
+          ]
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

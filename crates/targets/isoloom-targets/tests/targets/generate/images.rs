@@ -1,0 +1,115 @@
+//! The image table: the runner's access machine, and boxes between the built-in ones and the
+//! spec's.
+
+use isoloom_spec::Target;
+use isoloom_targets::{Lab, generate};
+
+use crate::testing::{Outcome, example, generated, source};
+
+#[test]
+fn the_runner_supplies_the_access_machine_through_its_image_table() -> Outcome {
+    // segmented's access machine without an `os` of its own: the runner supplies it.
+    let mut supplied = source("segmented")?;
+    supplied.machines["user"].os = None;
+    let table = isoloom_spec::images::Table::parse("access:\n  docker: registry.example.com/workstation:1\n  vm: ubuntu@24.04\n").unwrap();
+    let applied = Lab::new(supplied).with_images(table.clone());
+    let compose = generated(&applied, Target::Docker, ".isoloom/docker/compose.yml")?;
+    // The access machine is a real container now, kept running idle under the engine's init, not
+    // the check stand-in. It is on demand: its image is the runner-overridable `ISOLOOM_ACCESS_IMAGE`
+    // (its table image the fallback) and it sits in the `access` profile, so the initial `up` skips it.
+    let c = isoloom_test_support::yaml(&compose);
+    let at = |key: &str| isoloom_test_support::yaml_str(&c, &format!("services.user.{key}"));
+    assert_eq!(at("image"), "${ISOLOOM_ACCESS_IMAGE:-registry.example.com/workstation:1}");
+    assert_eq!(isoloom_test_support::yaml_strs(&c, "services.user.profiles"), ["access"]);
+    assert_eq!(at("init"), "true");
+    assert_eq!(isoloom_test_support::yaml_strs(&c, "services.user.entrypoint"), ["sleep", "infinity"]);
+    // A check that runs from its position can't depend on it (it is on demand, in the `access`
+    // profile), so the check-profile stand-in `isoloom-access` stands in at its addresses; the
+    // access box keeps its own `user` service above and is never collapsed into the stand-in.
+    assert!(isoloom_test_support::yaml_keys_at(&c, "services").contains(&"isoloom-access".to_owned()));
+    // Its VM too: defined but not started by `up` (`autostart: false`), its box overridable.
+    let vagrant = crate::testing::vagrantfile(&applied)?;
+    let user = crate::testing::define(&vagrant, "user");
+    assert!(user.head.starts_with("config.vm.define \"user\", autostart: false do"), "{}", user.head);
+    assert_eq!(
+        user.statements.first().map(String::as_str),
+        Some("m.vm.box = ENV.fetch(\"ISOLOOM_ACCESS_BOX\", \"bento/ubuntu-24.04\")")
+    );
+    // An access machine with its own `os` is the spec's, which wins over the table.
+    let spec = example("segmented")?;
+    let with_table = example("segmented")?.with_images(table);
+    for t in [Target::Docker, Target::Vagrant] {
+        assert_eq!(generate(&with_table, t).ok(), generate(&spec, t).ok(), "{t:?}");
+    }
+    // Without the table, nothing changes.
+    assert_eq!(isoloom_spec::images::Table::default().apply(&spec.spec()), spec.spec());
+    Ok(())
+}
+
+#[test]
+fn a_target_the_image_table_gives_no_form_for_the_access_machine_refuses_it() -> Outcome {
+    // Left out, the machine would still be in every other machine's hosts file (and Docker's
+    // service would have no image): refused instead, at its `os`.
+    let mut supplied = source("segmented")?;
+    supplied.machines["user"].os = None;
+    let refused = |lab: &Lab, t: Target| match generate(lab, t) {
+        Err(isoloom_targets::Error::Generate(isoloom_targets::GenerateError::Unsupported { what, .. })) => what,
+        other => format!("not refused: {:?}", other.map(|f| f.len())),
+    };
+    let bare = Lab::new(supplied.clone());
+    for t in [
+        Target::Docker,
+        Target::Kubernetes,
+        Target::Vagrant,
+        Target::Proxmox,
+        Target::Esxi,
+        Target::CloudVm,
+    ] {
+        assert!(
+            refused(&bare, t).starts_with("machines.user.os: without `os`, the access machine"),
+            "{t:?}: {}",
+            refused(&bare, t)
+        );
+        assert!(!bare.possible().contains(&t), "{t:?}");
+    }
+    // A table with the container only: the container targets generate it, the VM targets don't.
+    let container = isoloom_spec::images::Table::parse("access: { docker: registry.example.com/workstation:1 }\n").unwrap();
+    let half = Lab::new(supplied).with_images(container);
+    generate(&half, Target::Docker)?;
+    assert!(refused(&half, Target::Vagrant).contains("`access.vm`"), "{}", refused(&half, Target::Vagrant));
+    Ok(())
+}
+
+#[test]
+fn the_image_table_sits_between_built_in_images_and_the_spec() -> Outcome {
+    let table = isoloom_spec::images::Table::parse("os:\n  debian@12: { vagrant: my-org/debian-12, vagrant_version: \"1.2.0\" }\n").unwrap();
+    let vagrant = crate::testing::vagrantfile(&example("hello-stack")?.with_images(table))?;
+    for vm in ["web", "cache"] {
+        assert_eq!(
+            crate::testing::define(&vagrant, vm).statements("m.vm.box"),
+            ["m.vm.box = \"my-org/debian-12\"", "m.vm.box_version = \"1.2.0\""],
+            "{vm}"
+        );
+    }
+    // A spec's own box (`overrides.vagrant`) still wins.
+    let other = isoloom_spec::images::Table::parse("os:\n  windows-server@2019: { vagrant: other/box }\n").unwrap();
+    let mut pinned = source("windows-hello")?;
+    for m in pinned.overrides.vagrant.as_mut().unwrap().machines.values_mut() {
+        m.box_name = Some("spec/box".into());
+    }
+    let own = crate::testing::vagrantfile(&Lab::new(pinned).with_images(other))?;
+    assert_eq!(crate::testing::define(&own, "web01").statements("m.vm.box = "), ["m.vm.box = \"spec/box\""]);
+    let bogus = isoloom_spec::images::Table::parse("bogus: 1\n")
+        .err()
+        .ok_or("an unknown key parses")?
+        .to_string();
+    assert!(bogus.contains("bogus"), "{bogus}");
+    // The OS is written as a spec writes it.
+    let os = isoloom_spec::images::Table::parse("os:\n  debian-12: { vagrant: x }\n")
+        .unwrap_err()
+        .to_string();
+    assert!(os.contains("os.debian-12: unknown OS `debian-12`"), "{os}");
+    let access = isoloom_spec::images::Table::parse("access:\n  vm: ubuntu-24.04\n").unwrap_err().to_string();
+    assert!(access.starts_with("access: unknown OS `ubuntu-24.04`"), "{access}");
+    Ok(())
+}

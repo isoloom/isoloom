@@ -1,0 +1,365 @@
+//! The `vagrant` target: one VM per machine, in `.isoloom/vagrant/Vagrantfile`, rendered from
+//! the plan ([`Environment`]).
+//!
+//! - Each network is a private network: a VirtualBox internal network (any address, isolated
+//!   from the host's LAN) or a libvirt network, with the machine's fixed address on it.
+//! - A VM's set-up is its planned steps (`isoloom_plan::lifecycle`), each rendered once by
+//!   `isoloom_render::steps` and run as a `vm.provision` ([`transport`]): the project copied
+//!   to `/opt/isoloom` by Isoloom's own provisioner (no shared folders, works on every host
+//!   OS), the other machines' names, settings, routes, waits for dependencies, the `provision`
+//!   steps (`.sh` with sh, `.yml` / `.yaml` with Ansible inside the VM, `reboot` with Vagrant's
+//!   own restart), egress rules, readiness.
+//! - A machine's `host_folders`: its provider's own two-way shared folder, set in that
+//!   provider's block, the providers with none refused (`crate::host_folders`).
+//! - Machines start in dependency order; Vagrant boots and provisions them one after the
+//!   other, so a machine's services are installed before the machines depending on it start.
+//! - Inputs are read from the environment (empty when unset), passed only to the machines
+//!   that list them.
+//! - On QEMU (vagrant-qemu), a machine boots its libvirt-format box with its own CPU, emulated
+//!   when the host's is another (x86 Windows on an Apple Silicon Mac: slow, so longer timeouts).
+//!   Without root, the VMs of a network link through a hub (a QEMU process with no machine, a
+//!   listen port per VM), each VM on one network; the QEMU provider's refusal ([`provider`])
+//!   says when a spec doesn't fit. A disk size grows the box's disk, never below the box's own.
+//! - On UTM (`vagrant_utm`), a VM boots a UTM box, and the plugin makes no adapter for a private
+//!   network: each network is an isolated vmnet network, each VM an adapter there with a fixed
+//!   MAC set before it boots, its address set in the guest ([`utm`]); the UTM provider's refusal
+//!   ([`provider`]) says when a machine has no UTM box.
+//! - On Hyper-V, Vagrant puts a VM's adapters on one switch and sets no address: each network
+//!   is a private switch, each VM an adapter there with a fixed MAC, its address set in the
+//!   guest ([`hyperv`]); the Hyper-V provider's refusal ([`provider`]) says when a machine has no
+//!   Hyper-V box.
+
+mod addresses;
+mod boot;
+mod bridged;
+mod checks;
+mod esxi;
+mod hyperv;
+mod libvirt;
+pub(crate) mod limits;
+mod machine;
+mod nested;
+mod once;
+mod own;
+pub(crate) mod provider;
+pub(crate) mod providers;
+pub(crate) mod qemu;
+mod resolver;
+mod transport;
+mod utm;
+pub(crate) mod values;
+mod vmware;
+mod windows;
+
+use indexmap::IndexMap;
+use isoloom_plan::{Environment, MachineShape};
+use isoloom_render::backend::Files;
+use isoloom_render::{GeneratedFile, header, steps};
+use isoloom_spec::contract::OUTPUT_DIR;
+use isoloom_spec::model::Target;
+
+use crate::backend::capabilities;
+use crate::boxes::ARM_HOST;
+use crate::error::{Error, Result};
+use crate::ruby::{Call, Ruby, Value};
+use crate::settings;
+use crate::vagrantfile;
+
+/// The name of a network on the host as a report shows it, `isoloom-<environment>-<key>-<network>`
+/// (after the contract's [`RESERVED_PREFIX`](isoloom_spec::contract::RESERVED_PREFIX)), the
+/// copy's key written `<key>`: its VirtualBox internal network, its libvirt network and its
+/// Hyper-V private switch, as the Vagrantfile makes them with the key it reads
+/// ([`isoloom_plan::Names::network`]).
+#[must_use]
+pub fn network_name(environment: &str, network: &str) -> String {
+    isoloom_plan::Names::new(environment).network(network).with_key("<key>")
+}
+
+/// The folder of the target's files, under [`OUTPUT_DIR`].
+const DIR: &str = "vagrant";
+/// The define names of Isoloom's own VMs (the router's is `router::NAME`), which are also their
+/// display names, step ids and file names: under the prefix an environment machine can't take, so none is
+/// ever a machine's.
+pub(crate) const CONTROLLER: &str = isoloom_spec::contract::CONTROLLER;
+const TOOL_SHELL: &str = "isoloom-tool-shell";
+
+/// The Ruby that copies the project into a VM (`vagrant_project.rb`): a tar.gz built when the
+/// step runs, symlinks kept as links, by Isoloom's own provisioner `isoloom_project`, leaving out
+/// what a copy leaves out (`IsoloomProject::COPY_RULES`, [`copy_rules`] for a machine that reads
+/// none of Isoloom's outputs), uploaded and unpacked as every target unpacks the project
+/// ([`steps::project_unpack`] as root on Linux, [`steps::windows_project_unpack`] on Windows).
+/// Every Vagrantfile Isoloom writes carries it, after `ROOT`.
+pub(crate) fn project_rb() -> String {
+    let unpack = steps::windows_project_unpack(steps::TopFolder::Kept);
+    // A Ruby heredoc ends at the first line that is its terminator, as sh's does.
+    let tag = isoloom_spec::shell::here_tag("PS1", &unpack);
+    format!(
+        "{}\n# What a copy of the project leaves out beyond .isoloomignore.\nIsoloomProject::COPY_RULES = {}\n# Where the project's archive is uploaded, and how it is unpacked, as root (on Windows,\n# with no tar.exe before Windows Server 2019).\nIsoloomProject::LINUX_ARCHIVE = {}\nIsoloomProject::LINUX_UNPACK = {}\nIsoloomProject::WINDOWS_ARCHIVE = {}\nIsoloomProject::WINDOWS_UNPACK = <<'{tag}'\n{unpack}{tag}\n",
+        include_str!("vagrant_project.rb"),
+        copy_rules(&[]),
+        Value::str(steps::PROJECT_ARCHIVE),
+        Value::str(&steps::project_unpack(steps::Archive::Uploaded, steps::TopFolder::Kept)),
+        Value::str(steps::WINDOWS_PROJECT_ARCHIVE),
+    )
+}
+
+/// What the project step of a machine reading Isoloom's `outputs` leaves out (its `rules:`), as a
+/// Ruby string: [`isoloom_spec::ignore::copy_rules`].
+pub(crate) fn copy_rules(outputs: &[&str]) -> Value {
+    Value::str(&isoloom_spec::ignore::copy_rules(outputs))
+}
+
+/// Where a Vagrantfile goes and what it carries besides the environment's VMs.
+#[derive(Clone, Copy)]
+pub(crate) struct Layout<'a> {
+    /// The folder under `.isoloom/`.
+    pub(crate) dir: &'a str,
+    /// What it writes at the end of the `configure` block, after the VMs.
+    pub(crate) extra: &'a dyn Fn(&mut Ruby),
+}
+
+/// What rendering the VMs needs at hand.
+struct Ctx<'a> {
+    env: &'a Environment,
+    /// The output folder under `.isoloom/`.
+    dir: &'a str,
+    /// Each VM's link under QEMU.
+    links: &'a IndexMap<String, qemu::Link>,
+    /// The checks, by where they run.
+    checks: &'a checks::Checks<'a>,
+}
+
+/// The Vagrantfile of `env` and the check runners it uploads.
+pub(crate) fn render(env: &Environment) -> Result<Files> {
+    render_in(env, &VAGRANT)
+}
+
+/// The `vagrant` target's layout: its folder, nothing after the VMs.
+const VAGRANT: Layout<'static> = Layout { dir: DIR, extra: &|_| {} };
+
+/// [`render`], into `layout`.
+fn render_in(env: &Environment, layout: &Layout) -> Result<Files> {
+    if let Some(refusal) = isoloom_plan::refusal(&env.requirements, &capabilities()) {
+        return Err(Error::Refused {
+            target: Target::Vagrant,
+            refusal,
+        });
+    }
+    if let Some(reason) = limits::refusal(env) {
+        return Err(Error::Unsupported {
+            target: Target::Vagrant,
+            reason,
+        });
+    }
+    let in_their_place = checks::in_their_place(env);
+    let checks = checks::Checks::of(env, &in_their_place);
+    let with_controller = with_controller(env, &checks);
+    let links = qemu::links(env, with_controller);
+    let ctx = Ctx {
+        env,
+        dir: layout.dir,
+        links: &links,
+        checks: &checks,
+    };
+    let mut r = Ruby::new();
+    preamble(&mut r, env, layout.dir, &checks);
+    qemu_preamble(&mut r, env, &links);
+    let mut runners = Vec::new();
+    r.configure(|r| {
+        settings(r, env);
+        own::router_vm(r, &ctx);
+        let vms = env
+            .start_order
+            .iter()
+            .filter(|n| env.machines.get(*n).is_some_and(|m| m.shape == MachineShape::Vm));
+        for name in vms {
+            runners.extend(machine::vm(r, &ctx, name));
+        }
+        own::tools(r, &ctx);
+        if with_controller {
+            runners.extend(own::controller_vm(r, &ctx));
+        }
+        (layout.extra)(r);
+    });
+    let mut files = vec![GeneratedFile {
+        path: format!("{OUTPUT_DIR}/{}/Vagrantfile", layout.dir),
+        contents: r.finish(),
+    }];
+    files.extend(runners);
+    Ok(files)
+}
+
+/// Before `Vagrant.configure`: how to run it, the constants and helpers the VMs use.
+fn preamble(r: &mut Ruby, env: &Environment, dir: &str, checks: &checks::Checks<'_>) {
+    r.text(&header("#"));
+    r.comment(&usage(env, dir, checks));
+    r.blank();
+    // Machines start one after the other, in dependency order: a machine's services are up
+    // before the ones depending on it boot, the controller comes last, and on QEMU the VM that
+    // listens on a network's link is up before the one that connects.
+    r.comment("One machine at a time, in order (QEMU and libvirt would boot them all at once).");
+    r.assign("ENV[\"VAGRANT_NO_PARALLEL\"]", Value::str("1"));
+    r.assign("ROOT", Value::raw("File.expand_path(\"../..\", __dir__)"));
+    r.comment("This host's CPU as QEMU names it: a machine built for another one runs emulated there.");
+    r.assign(
+        "HOST_ARCH",
+        Value::raw(format!("{ARM_HOST} ? {} : {}", Value::str("aarch64"), Value::str("x86_64"))),
+    );
+    r.text(&project_rb());
+    r.text(&hyperv::hyperv_rb());
+    r.text(utm::UTM_RB);
+    r.text(vagrantfile::PORT_CHECK_RB);
+    r.text(vagrantfile::KEY_RB);
+    if env.vms().next().is_some() {
+        r.text(crate::console::CONSOLE_RB);
+    }
+    r.blank();
+    vagrantfile::inputs(r, &env.input_names(), values::any_secret(env));
+    if env.machines.values().any(|m| !m.ports.is_empty()) {
+        vagrantfile::chosen_ports(r);
+    }
+    esxi(r, env);
+    r.blank();
+}
+
+/// How to start and stop the environment with Vagrant alone, start its access machine, give it
+/// its values, and run its checks, at the top of the Vagrantfile.
+fn usage(env: &Environment, dir: &str, checks: &checks::Checks<'_>) -> String {
+    let mut lines = vec![
+        format!("Start:  cd {OUTPUT_DIR}/{dir} && vagrant up"),
+        format!("Stop:   cd {OUTPUT_DIR}/{dir} && vagrant destroy -f"),
+    ];
+    let access: Vec<&str> = env
+        .start_order
+        .iter()
+        .filter(|n| machine::has_vm(env, n) && env.machines.get(*n).is_some_and(isoloom_plan::MachinePlan::is_access))
+        .map(String::as_str)
+        .collect();
+    for name in access {
+        lines.push(format!("Access: vagrant up {name} (`vagrant up` leaves it down)"));
+    }
+    let values = values::variables(env);
+    if !values.is_empty() {
+        lines.push(format!(
+            "Values: set {} in the environment of each vagrant command (unset: empty, or the value given before)",
+            values.join(", ")
+        ));
+    }
+    let mut vms: Vec<&str> = env
+        .start_order
+        .iter()
+        .filter(|n| machine::has_vm(env, n) && env.vm(n).is_some_and(|vm| !vm.plan.is_windows()) && checks.of_machine(n).is_some())
+        .map(String::as_str)
+        .collect();
+    let halts = !checks.controller.is_empty() && !env.controller.as_ref().is_some_and(|c| c.keep_running);
+    if !checks.controller.is_empty() {
+        vms.push(CONTROLLER);
+    }
+    if !vms.is_empty() {
+        lines.push(format!(
+            "Checks: vagrant ssh <vm> -c {}, for each of {}; each check prints a PASS or FAIL line,\n        and a failed one fails the command (ISOLOOM_DERIVED=0 after sudo leaves the derived checks out)",
+            isoloom_spec::shell::quote(&checks::command()),
+            vms.join(", ")
+        ));
+    }
+    if halts {
+        lines.push(format!(
+            "        {CONTROLLER} halts once set up: vagrant up {CONTROLLER} --no-provision boots it for its checks"
+        ));
+    }
+    lines.join("\n")
+}
+
+/// QEMU's helpers ([`qemu::QEMU_RB`]) and its networks' hubs, when a VM needs them.
+fn qemu_preamble(r: &mut Ruby, env: &Environment, links: &IndexMap<String, qemu::Link>) {
+    let machines = env.machines.values().any(|m| m.shape == MachineShape::Vm && m.resources.disk_gb.is_some());
+    let controller = links.contains_key(CONTROLLER) && env.controller.as_ref().is_some_and(|c| c.disk_gb.is_some());
+    let sized = machines || controller;
+    // A VM's host folders read `IsoloomQemu.virtiofs_squash` in its QEMU block.
+    let shares = env.machines.values().any(|m| m.shape == MachineShape::Vm && !m.host_folders.is_empty());
+    if !qemu::needs_ruby(links, sized) && !shares {
+        return;
+    }
+    r.text(qemu::QEMU_RB);
+    let hubs = qemu::hubs(links);
+    if !hubs.is_empty() {
+        r.comment("QEMU: each network's VMs, in the order they start, and their ports on its hub: picked for this");
+        r.comment("copy of the project when Vagrant reads this file (see IsoloomQemu.ports).");
+        let vms = |vms: &Vec<String>| Value::array(vms.iter().map(|vm| Value::str(vm)));
+        r.assign(
+            "QEMU_HUBS",
+            Value::raw(format!(
+                "IsoloomQemu.ports({})",
+                Value::hash(hubs.iter().map(|(net, names)| (Value::str(net), vms(names))))
+            )),
+        );
+    }
+    r.blank();
+}
+
+/// ESXi's port groups: `ESXI_VIRTUAL_NETWORK` lists the management network's, then one per
+/// network in order. Each VM names its own by their indexes ([`port_groups`]), in its define:
+/// what a VM boots with is all in its own statements, so its boot digest follows it.
+fn esxi(r: &mut Ruby, env: &Environment) {
+    let names = env.networks.keys().cloned().collect::<Vec<_>>().join(", ");
+    r.comment(&format!(
+        "ESXi (vagrant-vmware-esxi): ESXI_VIRTUAL_NETWORK lists port groups, comma-separated: the\nmanagement network first, then one per network, in order ({names}); a missing one reuses the last."
+    ));
+    r.assign(
+        "ESXI_NETWORKS",
+        Value::raw(format!("{}.split(\",\").map(&:strip)", settings::ESXI_VIRTUAL_NETWORK.fetch())),
+    );
+    r.text("def esxi_networks(indexes)\n  [ESXI_NETWORKS[0]] + indexes.map { |i| ESXI_NETWORKS[i] || ESXI_NETWORKS[-1] }\nend\n");
+}
+
+/// The indexes in `ESXI_VIRTUAL_NETWORK` of the port groups of `nets`, networks of `env`: 0 is
+/// the management network's, then one per network in the spec's order.
+pub(crate) fn port_groups<'a>(env: &Environment, nets: impl IntoIterator<Item = &'a str>) -> Vec<usize> {
+    nets.into_iter().filter_map(|n| env.networks.get_index_of(n)).map(|i| i + 1).collect()
+}
+
+/// The settings every VM shares.
+fn settings(r: &mut Ruby, env: &Environment) {
+    r.call(
+        Call::new("config.vm.synced_folder")
+            .arg(Value::str("."))
+            .arg(Value::str("/vagrant"))
+            .kw("disabled", true),
+    );
+    r.assign("config.vm.boot_timeout", 900u32);
+    vagrantfile::ssh_proxy(r, "config");
+    vagrantfile::libvirt_prefix(r, "config", &env.names().libvirt_prefix());
+    if let Some(n) = env.instance {
+        instance_stop(r, n);
+    }
+}
+
+/// An instance's `vagrant up` stopped, before any VM is made, on the providers whose networks
+/// are this computer's, one per address block (`provider::instance_refusal`): there the
+/// instance's networks are the environment's own.
+fn instance_stop(r: &mut Ruby, n: u8) {
+    let providers = provider::sharing_networks().iter().map(|p| format!(":{p}")).collect::<Vec<_>>().join(", ");
+    let why = format!(
+        "instance {n}'s networks are this computer's under this provider, one per address block, and the environment as written makes the same: run instances on VirtualBox, Hyper-V, QEMU or UTM"
+    );
+    r.block(Call::new("config.trigger.before").arg(Value::sym("up")), "t", |r| {
+        r.block("t.ruby", "_, machine", |r| {
+            r.line(format_args!(
+                "abort(\"#{{machine.name}}: \" + {}) if [{providers}].include?(machine.provider_name)",
+                Value::str(&why)
+            ));
+        });
+    });
+}
+
+/// Whether the Vagrantfile has a controller: to run the environment's playbooks, or checks.
+fn with_controller(env: &Environment, checks: &checks::Checks<'_>) -> bool {
+    env.controller.is_some() || !checks.controller.is_empty()
+}
+
+/// Each VM's link under QEMU, the controller included when the environment has one.
+fn qemu_links(env: &Environment) -> IndexMap<String, qemu::Link> {
+    let in_their_place = checks::in_their_place(env);
+    let checks = checks::Checks::of(env, &in_their_place);
+    qemu::links(env, with_controller(env, &checks))
+}

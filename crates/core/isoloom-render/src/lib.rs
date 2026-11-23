@@ -1,0 +1,75 @@
+//! What every Isoloom backend renders with, so the targets render the same decisions the same
+//! way. It sits between the plan (`isoloom-plan`, the facts) and the backends (Compose,
+//! Kubernetes, Vagrant, Terraform, Ansible), which implement its
+//! [`Backend`](backend::Backend) port.
+//!
+//! - **The port:** [`backend`] (the [`Backend`](backend::Backend) trait a target's renderer
+//!   implements) and its [`Error`].
+//! - **The builders** more than one backend writes with: [`powershell`] (a Windows machine's
+//!   literals) and [`inventory`] (Ansible's); shell is `isoloom_spec::shell`, below every crate.
+//!   A builder only one backend uses is that backend's own (HCL in `isoloom-terraform`, Ruby in
+//!   `isoloom-vagrant`).
+//! - **The configuration renderers** ([`configure`]): a machine's recipe as the shell and
+//!   PowerShell libraries' calls, the Dockerfile its container builds from, and Isoloom's supervisor,
+//!   the process of a container that runs services.
+//! - **A VM's set-up:** [`steps`] (each [`Step`](isoloom_plan::Step) as Linux shell or
+//!   PowerShell), the scripts kept across restarts ([`boot`]), [`secrets`] delivered at run time,
+//!   the network's [`constraints`], the [`controller`] that runs the playbooks, and the
+//!   [`project`] copied in.
+//! - **The network pieces:** [`router`], VLAN [`trunks`], [`ipv6`] and a VM's more
+//!   addresses.
+//! - **The containers' shared parts:** [`container`]; the check runners (the sh runner a
+//!   position's checks become, where a check reaches its host): [`checks`].
+//! - **What an ESXi host is told about a VM** (its guest OS type), which the `esxi` target and
+//!   Vagrant's ESXi provider share: [`esxi`].
+//! - **Numbers from names** that are the same on every build: [`stable_hash`].
+//!
+//! Everything here is a pure function of the plan: no I/O, no clock, no environment.
+//!
+//! ```
+//! use isoloom_plan::{Environment, Lab, Step};
+//! use isoloom_spec::model::Target;
+//!
+//! let lab = Lab::parse(
+//!     "version: 1\nname: demo\nnetworks: { lan: { cidr: 10.9.0.0/24 } }\nmachines:\n  web: { networks: { lan: 10 }, os: debian@12 }\n",
+//! )
+//! .expect("the spec parses");
+//! let env = lab.plan(&lab.for_target(Target::Vagrant), Target::Vagrant, None).expect("the spec plans");
+//! let ready = isoloom_render::steps::linux(&env, "web", &Step::Ready).expect("every VM gets ready");
+//! assert!(ready.ends_with("echo ready > /var/lib/isoloom/ready\n"));
+//! ```
+
+#![cfg_attr(
+    test,
+    expect(
+        clippy::disallowed_methods,
+        reason = "the tests run what the crate renders (sh, pwsh) to check it: test code, not an adapter"
+    )
+)]
+
+pub mod backend;
+pub mod boot;
+pub mod checks;
+pub mod configure;
+pub mod constraints;
+pub mod container;
+pub mod controller;
+mod error;
+pub mod esxi;
+pub mod inventory;
+mod network;
+mod output;
+pub mod powershell;
+pub mod project;
+pub mod secrets;
+pub mod stable_hash;
+pub mod steps;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
+#[cfg(test)]
+mod testing;
+pub mod windows;
+
+pub use error::{Error, Result};
+pub use network::{ipv6, route_line, router, trunks};
+pub use output::{GeneratedFile, header};

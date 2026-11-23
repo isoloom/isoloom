@@ -1,0 +1,63 @@
+//! The configuration renderers' shared parts: a machine's templates, and the files they add.
+
+use isoloom_spec::model::Target;
+
+use super::*;
+use crate::testing;
+
+#[test]
+fn a_template_is_filled_in_for_its_machine_on_its_target() {
+    let env = testing::machine(
+        "os: debian@12, app: { steps: [{ template: { from: conf/a.conf, to: /etc/a.conf } }] }",
+        Target::Vagrant,
+        &[("conf/a.conf", "name={{ machine.name }} at={{ machine.addresses.lan }}\n")],
+    );
+    let c = Configured::of(&env, "m").expect("a recipe");
+    assert_eq!(c.template(&"conf/a.conf".parse().unwrap()).as_deref(), Ok("name=m at=10.9.0.10\n"));
+    assert_eq!(
+        c.template(&"conf/b.conf".parse().unwrap()),
+        Err("the template conf/b.conf wasn't in the project when the files were generated: add it, then generate again".to_owned())
+    );
+}
+
+#[test]
+fn a_template_filled_in_for_two_places_is_one_file() {
+    let env = testing::machine(
+        "os: debian@12, app: { steps: [{ template: { from: conf/a.conf, to: /etc/a.conf } }, { template: { from: conf/a.conf, to: /etc/b.conf } }] }",
+        Target::Vagrant,
+        &[("conf/a.conf", "name={{ machine.name }}\n")],
+    );
+    let c = Configured::of(&env, "m").expect("a recipe");
+    let paths: Vec<String> = c.templates(|from| format!("rendered/{from}")).into_iter().map(|f| f.path).collect();
+    assert_eq!(paths, ["rendered/conf/a.conf"]);
+}
+
+#[test]
+fn a_machine_without_steps_has_nothing_to_configure() {
+    let env = testing::machine("os: debian@12", Target::Vagrant, &[]);
+    assert!(Configured::of(&env, "m").is_none());
+    assert_eq!(files(&env), []);
+}
+
+#[test]
+fn each_library_is_generated_once_when_a_recipe_calls_it() {
+    let scripts = testing::machine("os: debian@12, app: { steps: [{ run: a.sh }] }", Target::Vagrant, &[]);
+    assert_eq!(files(&scripts), [], "scripts alone call no library");
+    let linux = testing::machine("os: debian@12, app: { steps: [{ packages: [curl] }] }", Target::Vagrant, &[]);
+    let on_linux: Vec<String> = files(&linux).into_iter().map(|f| f.path).collect();
+    assert_eq!(on_linux, [shell::LIBRARY_PATH]);
+    let windows = testing::machine("os: windows-server@2022, app: { steps: [{ packages: [Web-Server] }] }", Target::Vagrant, &[]);
+    let on_windows: Vec<String> = files(&windows).into_iter().map(|f| f.path).collect();
+    assert_eq!(on_windows, [powershell::LIBRARY_PATH]);
+}
+
+#[test]
+fn the_configuration_files_and_the_compose_outputs_are_under_the_output_folder() {
+    use isoloom_spec::contract::OUTPUT_DIR;
+    assert_eq!(DIR, format!("{OUTPUT_DIR}/configure"));
+    for library in [shell::LIBRARY_PATH, powershell::LIBRARY_PATH] {
+        assert!(library.starts_with(&format!("{DIR}/")), "{library}");
+    }
+    assert_eq!(crate::container::COMPOSE_OUTPUTS, [format!("{OUTPUT_DIR}/docker"), DIR.to_owned()]);
+    assert!(dockerfile::path("web").starts_with(&format!("{OUTPUT_DIR}/docker/")));
+}

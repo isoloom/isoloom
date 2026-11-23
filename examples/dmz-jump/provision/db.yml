@@ -1,0 +1,11 @@
+# The database as a VM: Debian 12's PostgreSQL, listening on the internal network as the
+# postgres:16 image does on containers.
+- hosts: all
+  become: true
+  tasks:
+    - name: PostgreSQL
+      ansible.builtin.apt: { name: postgresql, update_cache: true }
+    - name: Listen on the internal network
+      ansible.builtin.lineinfile: { path: /etc/postgresql/15/main/postgresql.conf, regexp: "^#?listen_addresses", line: "listen_addresses = '*'" }
+    - name: Restarted
+      ansible.builtin.service: { name: postgresql, state: restarted }

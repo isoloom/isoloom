@@ -1,0 +1,189 @@
+//! The checks on Vagrant: a runner script per Linux VM that has some, run where the machine
+//! stands, and one for the controller (on every network). Each is installed in its VM at every
+//! provisioning ([`INSTALLED`]), so Vagrant alone runs them on demand: `vagrant ssh <vm> -c
+//! 'sudo sh /var/lib/isoloom/checks.sh'` ([`command`]). The `checks` provisioner
+//! (`vagrant provision <vm> --provision-with checks`) runs them too, the project's check scripts
+//! read from the host first.
+
+use isoloom_plan::Environment;
+use isoloom_plan::checks::{self, Host, Position, Probe, Resolved};
+use isoloom_render::GeneratedFile;
+use isoloom_render::inventory::CONTROLLER_INVENTORY;
+use isoloom_render::steps::PROJECT_DIR;
+use isoloom_spec::contract::OUTPUT_DIR;
+use isoloom_spec::linux::STATE_DIR;
+use isoloom_spec::shell::quote;
+
+use crate::ruby::{Ruby, Value};
+use crate::vagrantfile;
+
+/// The environment's checks, by where they run.
+pub(crate) struct Checks<'a> {
+    /// Each position's checks, in the plan's order.
+    groups: Vec<(Position, Vec<&'a Resolved>)>,
+    /// The checks the controller runs.
+    pub(crate) controller: Vec<&'a Resolved>,
+}
+
+impl<'a> Checks<'a> {
+    /// The checks of `env`, `in_their_place` standing in for the derived checks no Linux VM can
+    /// run here (see [`in_their_place`]).
+    pub(crate) fn of(env: &'a Environment, in_their_place: &'a [Resolved]) -> Checks<'a> {
+        let controller = env
+            .checks
+            .iter()
+            .filter(|c| matches!(c.probe, Probe::Playbook { .. }) || (!runs_on_vm(env, &c.position) && (!c.derived || c.position == Position::Networks)))
+            .chain(in_their_place)
+            .collect();
+        Checks {
+            groups: env.checks_by_position(),
+            controller,
+        }
+    }
+
+    /// The checks of machine `name`, if it has some.
+    pub(crate) fn of_machine(&self, name: &str) -> Option<&[&'a Resolved]> {
+        self.groups
+            .iter()
+            .find(|(p, _)| matches!(p, Position::Machine(m) if m == name))
+            .map(|(_, g)| g.as_slice())
+    }
+}
+
+/// Whether a position's checks run on that machine itself: a Linux VM of the environment.
+fn runs_on_vm(env: &Environment, pos: &Position) -> bool {
+    match pos {
+        Position::Machine(m) => env.vm(m).is_some_and(|vm| !vm.plan.is_windows()),
+        Position::Networks => false,
+    }
+}
+
+/// The derived checks the controller runs from the networks when the spec's machines could run
+/// them but none is a Linux VM here (Windows VMs only, or
+/// a supplied access machine): nothing else would check the services. Empty when a Linux VM
+/// runs them, or when they already stand on the networks.
+pub(crate) fn in_their_place(env: &Environment) -> Vec<Resolved> {
+    let any_vm = env.machines.keys().any(|m| runs_on_vm(env, &Position::Machine(m.clone())));
+    let dropped = env.checks.iter().any(|c| c.derived && c.position != Position::Networks);
+    if any_vm || !dropped {
+        return Vec::new();
+    }
+    checks::from_networks(env.spec())
+}
+
+/// Where a VM keeps its checks' runner script, readable by root alone.
+pub(crate) const INSTALLED: &str = isoloom_spec::linux_state_path!("/checks.sh");
+
+/// The command that runs a VM's checks inside it, `vagrant ssh <vm> -c` running it: each check
+/// prints a PASS or FAIL line, and it exits non-zero when one failed. `ISOLOOM_DERIVED=0` after
+/// `sudo` leaves the checks Isoloom derives from the spec out.
+#[must_use]
+pub(crate) fn command() -> String {
+    format!("sudo sh {INSTALLED}")
+}
+
+/// The provisioner installing a position's runner (`checks/<file>.sh`, read when Vagrant reads
+/// the Vagrantfile) at [`INSTALLED`] in the VM, at every provisioning, so the copy in the VM is
+/// the one generated last. `runner` is that file's text: the here-document's terminator is one
+/// none of its lines is ([`isoloom_spec::shell::here_tag`]), so a check's own line never ends it.
+pub(crate) fn installer(r: &mut Ruby, file: &str, runner: &str) {
+    let tag = isoloom_spec::shell::here_tag("ISOLOOM_CHECKS", runner);
+    let open = format!("umask 077\nmkdir -p {STATE_DIR}\ncat > {INSTALLED}.new <<'{tag}'\n");
+    // A line break first: the heredoc ends on a line of its own whatever the runner ends with.
+    let close = format!("\n{tag}\nmv -f {INSTALLED}.new {INSTALLED}\n");
+    // Each part on the provisioner's line, its line breaks written `\n`.
+    let one_line = |text: &str| crate::ruby::quote(text).replace('\n', "\\n");
+    let script = Value::raw(format!(
+        "{} + File.read(File.join(__dir__, {})) + {}",
+        one_line(&open),
+        Value::str(&format!("checks/{file}.sh")),
+        one_line(&close)
+    ));
+    r.provision(vagrantfile::shell("m", "checks script").kw("inline", script));
+}
+
+/// The runner script of a position's checks, next to the Vagrantfile as `checks/<file>.sh`.
+pub(crate) fn runner(env: &Environment, dir: &str, file: &str, position: &Position, group: &[&Resolved]) -> GeneratedFile {
+    let host = |h: &Host, _: &Position| isoloom_render::checks::address_of(env, h);
+    let run_playbook = |path: &str| {
+        let (folder, playbook) = path.rsplit_once('/').unwrap_or((".", path));
+        format!(
+            "{} && cd {} && ansible-playbook -i {CONTROLLER_INVENTORY} {}",
+            isoloom_render::controller::PLAYBOOK_ENVIRONMENT,
+            quote(&format!("{PROJECT_DIR}/{folder}")),
+            quote(playbook)
+        )
+    };
+    let render = isoloom_render::checks::Render {
+        host: &host,
+        script: Some(&isoloom_render::checks::script_command),
+        playbook: Some(&run_playbook),
+    };
+    GeneratedFile {
+        path: format!("{OUTPUT_DIR}/{dir}/checks/{file}.sh"),
+        contents: isoloom_render::checks::script(position, group, &render),
+    }
+}
+
+/// A position's checks, on demand. The Vagrantfile is read on every `vagrant` command, so the
+/// project's check scripts are read then and written over the VM's copy first: an edited
+/// script runs at the next `--provision-with checks`, not the copy made when the VM was provisioned. Then
+/// the runner itself.
+pub(crate) fn provisioner(r: &mut Ruby, file: &str, group: &[&Resolved]) {
+    let runner = format!("checks/{file}.sh");
+    let mut scripts: Vec<&str> = group
+        .iter()
+        .filter_map(|c| match &c.probe {
+            Probe::Script { path } => Some(path.as_str()),
+            _ => None,
+        })
+        .collect();
+    scripts.dedup();
+    let call = vagrantfile::shell("m", "checks").kw("run", Value::str("never"));
+    let call = if scripts.is_empty() {
+        call.kw("path", Value::str(&runner))
+    } else {
+        let list = Value::array(scripts.iter().map(|p| refreshed(p)));
+        call.kw(
+            "inline",
+            Value::raw(format!("{list}{REFRESH} + File.read(File.join(__dir__, {}))", Value::str(&runner))),
+        )
+    };
+    let derived = crate::vagrantfile::derived_from_host();
+    r.provision(call.kw("env", derived));
+}
+
+/// Check script `path` as [`REFRESH`] takes it: its path in the project, then its folder and
+/// itself in the VM's copy, each quoted for the shell (a project path may hold a space).
+fn refreshed(path: &str) -> Value {
+    let in_vm = format!("{PROJECT_DIR}/{path}");
+    let folder = std::path::Path::new(&in_vm).parent().map_or(PROJECT_DIR.into(), |f| f.to_string_lossy());
+    Value::array([Value::str(path), Value::str(&quote(&folder)), Value::str(&quote(&in_vm))])
+}
+
+/// Writes each listed check script over the VM's copy, from the project on the host, through a
+/// here-document whose terminator is no line of the script (as `isoloom_spec::shell::here_tag`
+/// picks it, in Ruby: the script is read when the step runs).
+const REFRESH: &str = ".map { |p, folder, file| body = File.read(File.join(ROOT, p)); tag = 'ISOLOOM_EOF'; tag += '_' while body.lines.map(&:chomp).include?(tag); \"mkdir -p #{folder} && cat > #{file} <<'#{tag}'\\n#{body}\\n#{tag}\\n\" }.join";
+
+#[cfg(test)]
+mod tests {
+    use super::installer;
+    use crate::ruby::Ruby;
+
+    /// The installer's provisioner, as the Vagrantfile has it.
+    fn installed(runner: &str) -> String {
+        let mut r = Ruby::new();
+        installer(&mut r, "web", runner);
+        r.finish()
+    }
+
+    #[test]
+    fn the_installer_ends_its_here_document_on_a_line_the_runner_does_not_have() {
+        let plain = installed("#!/bin/sh\necho ok\n");
+        assert!(plain.contains("<<'ISOLOOM_CHECKS'\\n") && plain.contains("\\nISOLOOM_CHECKS\\n"), "{plain}");
+        // A check whose own line is the usual terminator would end the document early.
+        let clash = installed("#!/bin/sh\necho start\nISOLOOM_CHECKS\necho rest\n");
+        assert!(clash.contains("<<'ISOLOOM_CHECKS_1'\\n") && clash.contains("\\nISOLOOM_CHECKS_1\\n"), "{clash}");
+    }
+}

@@ -1,0 +1,78 @@
+name: Set up Isoloom
+description: Installs the isoloom CLI (a release binary, checked against the release's SHA256SUMS) and puts it on the PATH; with targets, validates the spec and generates each of them.
+branding:
+  icon: layers
+  color: orange
+inputs:
+  version:
+    description: A release tag (e.g. v2.1.9), or latest.
+    default: latest
+  targets:
+    description: >-
+      The targets a lab must generate (`docker vagrant`, space- or comma-separated). Each is
+      generated after `isoloom validate`; a problem, a target that refuses the spec or a backend
+      failure fails the step. Empty (the default) only installs.
+    default: ''
+  project:
+    description: The project folder holding isoloom.yml, for targets.
+    default: .
+runs:
+  using: composite
+  steps:
+    - name: Install isoloom (macOS, Linux)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        ISOLOOM_VERSION: ${{ inputs.version }}
+        ISOLOOM_INSTALL_DIR: ${{ runner.temp }}/isoloom-bin
+        ACTION_PATH: ${{ github.action_path }}
+      # Writes the install folder (under the runner's temporary folder) to GITHUB_PATH.
+      run: | # zizmor: ignore[github-env]
+        sh "$ACTION_PATH/packaging/install.sh"
+        echo "$ISOLOOM_INSTALL_DIR" >> "$GITHUB_PATH"
+    - name: Install isoloom (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        ISOLOOM_VERSION: ${{ inputs.version }}
+        ISOLOOM_INSTALL_DIR: ${{ runner.temp }}/isoloom-bin
+      # Writes the install folder (under the runner's temporary folder) to GITHUB_PATH.
+      run: | # zizmor: ignore[github-env]
+        $ErrorActionPreference = 'Stop'
+        $ProgressPreference = 'SilentlyContinue'
+        $v = $env:ISOLOOM_VERSION
+        $name = "isoloom-x86_64-pc-windows-msvc"
+        $asset = "$name.zip"
+        $base = if ($v -eq "latest") { "https://github.com/isoloom/isoloom/releases/latest/download" }
+                elseif ($v.StartsWith("v")) { "https://github.com/isoloom/isoloom/releases/download/$v" }
+                else { "https://github.com/isoloom/isoloom/releases/download/v$v" }
+        $dir = $env:ISOLOOM_INSTALL_DIR
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        $zip = Join-Path $dir $asset
+        $sums = Join-Path $dir "SHA256SUMS"
+        Write-Host "Downloading $base/$asset"
+        Invoke-WebRequest "$base/$asset" -OutFile $zip
+        Invoke-WebRequest "$base/SHA256SUMS" -OutFile $sums
+        # The archive's line of SHA256SUMS, checked; a missing line is a failure, not a skip.
+        $line = Get-Content $sums | Where-Object { $_ -match "^[0-9a-f]{64}  $([regex]::Escape($asset))$" }
+        if (-not $line) { throw "isoloom: $asset isn't in the release's SHA256SUMS" }
+        $expected = ($line -split '\s+')[0]
+        $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+        if ($actual -ne $expected) { throw "isoloom: $asset doesn't match SHA256SUMS ($actual, expected $expected)" }
+        Expand-Archive -Force $zip $dir
+        $bin = Join-Path $dir $name
+        & (Join-Path $bin "isoloom.exe") --version
+        $bin | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+    - name: Validate, then generate each target
+      if: inputs.targets != ''
+      shell: bash
+      env:
+        ISOLOOM_TARGETS: ${{ inputs.targets }}
+        ISOLOOM_PROJECT: ${{ inputs.project }}
+      run: |
+        set -euo pipefail
+        isoloom validate "$ISOLOOM_PROJECT"
+        for target in ${ISOLOOM_TARGETS//,/ }; do
+          echo "isoloom generate --target $target"
+          isoloom generate "$ISOLOOM_PROJECT" --target "$target"
+        done

@@ -1,0 +1,36 @@
+---
+source: crates/frontends/isoloom-topology/tests/topology/fixtures.rs
+expression: "compiled(\"office\", &[\"vagrant\"])?"
+---
+version: 1
+name: office
+networks:
+  office:
+    cidr: 10.10.1.0/24
+  servers:
+    cidr: 10.10.2.0/24
+reach:
+- from: office
+  to: servers
+- from: servers
+  to: office
+machines:
+  user:
+    os: debian@12
+    networks:
+      office: 10
+    access: true
+  web:
+    os: alpine@3.24
+    service: nginx@1.30
+    networks:
+      servers: 10
+  db:
+    os: debian@12
+    app:
+      steps:
+      - run: provision/db.sh
+    networks:
+      servers: 20
+    ports:
+      postgres: 5432

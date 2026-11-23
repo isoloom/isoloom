@@ -1,0 +1,304 @@
+//! Each machine's security group, public IP, interfaces and VM, set up from its own custom data
+//! through the VM core; the Windows machines' and the controller's.
+
+use std::net::{Ipv4Addr, Ipv6Addr};
+
+use crate::cloud::user_data_limit::Limit;
+use crate::hcl_builder::{Block, BlockBuilder, Expression, Module, Template, boolean, call, list, number, reference, string};
+use crate::machine::controller::WinrmAuth;
+use indexmap::IndexMap;
+use isoloom_plan::{Environment, MachinePlan, Vm};
+
+use super::network::{MAX_ALLOWS, Nic, Nsg, nic, nic_id, placed, public_ip};
+use super::{RULES, USER, image, public_ip as address_of};
+use crate::Result;
+use crate::cloud::auto_stop;
+use crate::cloud::instance::{self, name_with};
+use crate::cloud::vm::{controller_setup, disks, hooks, interfaces, own_image, reach};
+use crate::machine::user_data::Capped;
+use crate::machine::{Remote, controller, user_data, windows};
+use crate::module::ident;
+
+/// How Azure takes a Linux VM's user data: its custom data, base64 only, 65535 bytes of it.
+const CAP: Capped = Capped {
+    limit: Limit(crate::cloud::Cloud::Azure),
+    gzipped: false,
+};
+
+/// A Linux machine: its security group, public IP, interfaces and VM, set up from its custom data.
+pub(super) fn linux(env: &Environment, Vm { name, plan: mp, os }: Vm<'_>, module: &mut Module) -> Result<()> {
+    let id = ident(name);
+    module.commented(&format!("Machine `{name}`: what may reach it."), group(env, (name, mp), false));
+    module.block(public_ip(&id, name));
+    module.blocks(nics(&id, name, mp));
+    let disk = mp.size().disk_gb.max(30);
+    let ids = mp
+        .addresses
+        .keys()
+        .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
+    let own = own_image::of(mp, own_image::azure);
+    let at_boot = interfaces::up(env, &mp.addresses, &|n| mac(&nic_id(&id, n)));
+    let setup = hooks::user_data(env, (name, mp), USER, at_boot, CAP)?;
+    module.block(linux_vm(&id, name, (os, own), (RULES.size_of(mp), disk, mp.tpm.is_some()), (list(ids), setup)));
+    module.blocks(disks::azure(name, "azurerm_linux_virtual_machine", &mp.disks));
+    Ok(())
+}
+
+/// The MAC address of an Azure interface (uppercase, dash-separated), as `ip link` writes it.
+fn mac(nic: &str) -> Expression {
+    let raw = reference(&format!("azurerm_network_interface.{nic}.mac_address"));
+    call("lower", [call("replace", [raw, string("-"), string(":")])])
+}
+
+/// An interface per network (the first carries the public IP; forwarding on for a machine on
+/// several, and for a gateway), each with its association to the machine's security group.
+fn nics(id: &str, who: &str, mp: &MachinePlan) -> Vec<Block> {
+    controller_nics(id, who, (&mp.addresses, &mp.addresses6, &mp.more_addresses), mp.is_gateway)
+}
+
+/// A machine's addresses by network: its IPv4 ones, its IPv6 ones, its further IPv4 ones.
+type Addresses<'a> = (
+    &'a IndexMap<String, Ipv4Addr>,
+    &'a IndexMap<String, Ipv6Addr>,
+    &'a IndexMap<String, Vec<Ipv4Addr>>,
+);
+
+/// The same from the addresses themselves (each IPv6 one beside its network's IPv4 one).
+fn controller_nics(id: &str, who: &str, (addresses, addresses6, more): Addresses<'_>, gateway: bool) -> Vec<Block> {
+    let forwarding = gateway || addresses.len() > 1;
+    addresses
+        .iter()
+        .enumerate()
+        .flat_map(|(i, (net, address))| {
+            nic(&Nic {
+                id,
+                who,
+                net,
+                address: *address,
+                address6: addresses6.get(net).copied(),
+                more: more.get(net).map_or(&[], Vec::as_slice),
+                primary: i == 0,
+                forwarding,
+            })
+        })
+        .collect()
+}
+
+/// A Linux VM (its size, its disk in GB, and whether it has a virtual TPM), as `isoloom` with
+/// the operator's key, on `nics`, set up by `setup` (its custom data, which cloud-init runs).
+fn linux_vm(id: &str, who: &str, (os, own): (&str, Option<&str>), (vm_size, disk, tpm): (&str, u32, bool), (nics, setup): (Expression, Expression)) -> Block {
+    let custom_data = call("base64encode", [setup]);
+    let vm = trusted_launch(placed("azurerm_linux_virtual_machine", id, name_with(&format!("-{who}"))), tpm)
+        .add_attribute(("size", string(vm_size)))
+        .add_attribute(("admin_username", string(USER)))
+        .add_attribute(("network_interface_ids", nics))
+        .add_attribute(("custom_data", custom_data))
+        .add_block(
+            Block::builder("admin_ssh_key")
+                .add_attribute(("username", string(USER)))
+                .add_attribute(("public_key", reference("var.ssh_public_key")))
+                .build(),
+        )
+        .add_block(os_disk(disk));
+    with_image(vm, (os, own), tpm)
+        .add_block(instance::set_up_once(reference("custom_data")).build())
+        .build()
+}
+
+/// Trusted launch, when the VM has a TPM: a virtual TPM and secure boot (on a generation 2 image).
+fn trusted_launch(b: BlockBuilder, tpm: bool) -> BlockBuilder {
+    if tpm {
+        b.add_attribute(("secure_boot_enabled", boolean(true)))
+            .add_attribute(("vtpm_enabled", boolean(true)))
+    } else {
+        b
+    }
+}
+
+/// A VM's OS disk of `gb` GB, the same on both targets.
+pub(in crate::cloud::azure) fn os_disk(gb: u32) -> Block {
+    Block::builder("os_disk")
+        .add_attribute(("caching", string("ReadWrite")))
+        .add_attribute(("storage_account_type", string("StandardSSD_LRS")))
+        .add_attribute(("disk_size_gb", number(u64::from(gb))))
+        .build()
+}
+
+/// The VM's image: its own (`vm.image.azure`, by resource id), else the Marketplace's for its OS.
+fn with_image(vm: BlockBuilder, (os, own): (&str, Option<&str>), tpm: bool) -> BlockBuilder {
+    match own {
+        Some(id) => vm.add_attribute(("source_image_id", string(id))),
+        None => vm.add_block(source_image(os, tpm)),
+    }
+}
+
+/// An OS's Marketplace image; with a TPM, its generation 2 build (trusted launch needs one).
+pub(in crate::cloud::azure) fn source_image(os: &str, tpm: bool) -> Block {
+    let (publisher, offer, sku) = image(os).unwrap_or_default();
+    let sku = if tpm { sku.strip_suffix("-gen1").unwrap_or(sku) } else { sku };
+    Block::builder("source_image_reference")
+        .add_attribute(("publisher", string(publisher)))
+        .add_attribute(("offer", string(offer)))
+        .add_attribute(("sku", string(sku)))
+        .add_attribute(("version", string("latest")))
+        .build()
+}
+
+/// Why a machine's security group can't hold its rules, if one can't: a machine with more allow
+/// rules than fit below the group's deny rule ([`MAX_ALLOWS`]) would have rules at or past it,
+/// which never apply (and past priority 4096, Azure refuses the plan).
+pub(in crate::cloud::azure) fn too_many_rules(env: &Environment) -> Option<String> {
+    env.machines.iter().filter_map(|(name, mp)| Vm::of(name, mp)).find_map(|Vm { name, plan: mp, .. }| {
+        let allows = rules(env, (name, mp), mp.is_windows()).allows();
+        (allows > MAX_ALLOWS).then(|| {
+            format!(
+                "machine `{name}` needs {allows} inbound rules on Azure (its networks, its set-up, each `reach` port in TCP and UDP, and its published ports), and a network security group holds {MAX_ALLOWS} below the rule that denies the rest of the virtual network: open fewer ports to it"
+            )
+        })
+    })
+}
+
+/// Who may reach a machine: its own networks, its set-up from `allowed_cidr` (SSH, or WinRM on
+/// Windows), the networks `reach` opens to it (on their ports, TCP and UDP), and its published
+/// ports from `allowed_cidr`.
+fn group(env: &Environment, machine: (&str, &MachinePlan), windows: bool) -> Block {
+    rules(env, machine, windows).build()
+}
+
+/// The allow rules of a machine's security group, in order ([`group`]).
+fn rules(env: &Environment, (name, mp): (&str, &MachinePlan), windows: bool) -> Nsg {
+    let allowed = || reference("var.allowed_cidr");
+    let mut g = Nsg::new(&ident(name), name);
+    let Some(m) = env.spec().machines.get(name) else { return g };
+    for (n, p) in reach::own(env, m) {
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
+        if let Some(v6) = &p.ipv6 {
+            g = g.allow(&format!("net-{n}-ipv6"), "*", "*", string(v6.cidr.to_string()));
+        }
+    }
+    g = if windows {
+        g.allow("winrm", "Tcp", "5985", allowed())
+    } else {
+        g.allow("ssh", "Tcp", "22", allowed())
+    };
+    for (i, (reach, from)) in reach::opening(env, m).enumerate() {
+        // Each block of the network the rule opens from: its IPv4 one, and its IPv6 one when
+        // both ends are IPv6.
+        let both6 = from.ipv6.is_some() && env.networks.get(&reach.to).is_some_and(|to| to.ipv6.is_some());
+        let v6 = from.ipv6.as_ref().filter(|_| both6).map(|v| (v.cidr.to_string(), "-ipv6"));
+        let v4 = from.cidr.to_string();
+        for (block, suffix) in std::iter::once((v4, "")).chain(v6) {
+            let rule = format!("reach-{i}-{}{suffix}", reach.from);
+            g = reach_rules(g, &rule, &reach.ports, &block);
+        }
+    }
+    for p in &mp.ports {
+        let (rule, protocol) = if p.protocol.is_tcp() {
+            (format!("published-{}", p.publish), "Tcp")
+        } else {
+            (format!("published-{}-udp", p.publish), "Udp")
+        };
+        g = g.allow(&rule, protocol, &p.publish.to_string(), allowed());
+    }
+    g
+}
+
+/// A Windows machine: its security group, public IP, interface and VM (its name, the
+/// administrator and a WinRM listener set at creation), its set-up over WinRM.
+pub(super) fn windows(env: &Environment, vm @ Vm { name, plan: mp, .. }: Vm<'_>, module: &mut Module) {
+    let id = ident(name);
+    module.commented(&format!("Machine `{name}` (Windows): what may reach it."), group(env, (name, mp), true));
+    module.block(public_ip(&id, name));
+    module.blocks(nics(&id, name, mp));
+    module.block(windows_vm(vm));
+    module.blocks(disks::azure(name, "azurerm_windows_virtual_machine", &mp.disks));
+    module.blocks(windows::blocks(windows::Machine {
+        remote: Remote {
+            env,
+            name,
+            plan: mp,
+            replace_on: reference(&format!("azurerm_windows_virtual_machine.{id}.id")),
+            host: address_of(&id),
+        },
+        password: reference(windows::PASSWORD),
+        skip: hooks::network_does,
+        platform: windows::Platform {
+            named: true,
+            ntlm: true,
+            before: vec![windows_auto_stop()],
+        },
+    }));
+}
+
+fn windows_vm(Vm { name, plan: mp, os }: Vm<'_>) -> Block {
+    let id = ident(name);
+    // Azure's Windows images are a 127 GB disk.
+    let disk = mp.size().disk_gb.max(127);
+    let ids = mp
+        .addresses
+        .keys()
+        .map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(&id, n))));
+    let vm = trusted_launch(placed("azurerm_windows_virtual_machine", &id, name_with(&format!("-{name}"))), mp.tpm.is_some())
+        .add_attribute(("computer_name", string(name)))
+        .add_attribute(("size", string(RULES.size_of(mp))))
+        .add_attribute(("admin_username", string(USER)))
+        .add_attribute(("admin_password", reference(windows::PASSWORD)))
+        .add_attribute(("network_interface_ids", list(ids)))
+        .add_block(Block::builder("winrm_listener").add_attribute(("protocol", string("Http"))).build())
+        .add_block(os_disk(disk));
+    with_image(vm, (os, own_image::of(mp, own_image::azure)), mp.tpm.is_some()).build()
+}
+
+/// The auto-stop on Windows, a scheduled task registered over WinRM (Azure runs no user data
+/// there).
+fn windows_auto_stop() -> Expression {
+    let mut task = Template::text("powershell -NoProfile -Command \"");
+    task.append(auto_stop::windows_task());
+    task.push_text("\"");
+    auto_stop::if_expires(task.into_expression(), string("cmd /c ver"))
+}
+
+/// The rules a `reach` rule opens from `block`: every port, or each port in TCP and UDP.
+fn reach_rules(mut g: Nsg, rule: &str, ports: &[u16], block: &str) -> Nsg {
+    if ports.is_empty() {
+        return g.allow(rule, "*", "*", string(block));
+    }
+    for p in ports {
+        g = g.allow(&format!("{rule}-{p}-tcp"), "Tcp", &p.to_string(), string(block));
+        g = g.allow(&format!("{rule}-{p}-udp"), "Udp", &p.to_string(), string(block));
+    }
+    g
+}
+
+/// The controller: its security group (every network may reach it, and SSH from
+/// `allowed_cidr`), an interface on every network at the controller address, its VM, set up from
+/// its custom data (it waits for every machine's own set-up before the playbooks).
+pub(super) fn controller(env: &Environment, module: &mut Module) -> Result<()> {
+    let id = "isoloom_controller";
+    let mut g = Nsg::new(id, controller::NAME);
+    for (n, p) in &env.networks {
+        g = g.allow(&format!("net-{n}"), "*", "*", string(p.cidr.to_string()));
+    }
+    module.commented(
+        "The controller (Ansible): every network may reach it, and SSH from allowed_cidr.",
+        g.allow("ssh", "Tcp", "22", reference("var.allowed_cidr")).build(),
+    );
+    module.block(public_ip(id, controller::NAME));
+    let addresses = controller::addresses(env);
+    module.blocks(controller_nics(id, controller::NAME, (&addresses, &IndexMap::new(), &IndexMap::new()), false));
+    let ids = addresses.keys().map(|n| reference(&format!("azurerm_network_interface.{}.id", nic_id(id, n))));
+    let disk = controller::size(env).disk_gb;
+    // Azure's Debian image is a 30 GB disk: the least it takes.
+    let disk = disk.max(30);
+    let inventory = controller::cloud_inventory(env, |_| USER.to_owned(), WinrmAuth::Ntlm);
+    let at_boot = interfaces::up(env, &addresses, &|n| mac(&nic_id(id, n)));
+    let setup = controller_setup::set_up(env, &|_| USER.to_owned(), inventory, &at_boot);
+    module.block(linux_vm(
+        id,
+        controller::NAME,
+        (controller::OS, None),
+        (RULES.controller_size(env), disk, false),
+        (list(ids), user_data::capped(&setup, "the controller", CAP)?),
+    ));
+    Ok(())
+}

@@ -1,0 +1,115 @@
+//! `isoloom defaults`: the defaults in effect here, and where each comes from.
+
+use super::{CliError, Console, Project, Result, Verdict, spec};
+
+#[derive(Debug, clap::Args)]
+pub(crate) struct Args {
+    #[command(flatten)]
+    project: Project,
+    /// Only the built-in layer.
+    #[arg(long)]
+    system: bool,
+    /// Machine-readable output.
+    #[arg(long)]
+    json: bool,
+    #[command(flatten)]
+    settings: spec::Settings,
+}
+
+/// Prints the built-in defaults, or every layer merged with each value's source.
+pub(crate) fn run(a: &Args, profile: &spec::Profile, console: &mut Console) -> Result<Verdict> {
+    if !a.system {
+        return in_effect(profile, a, console);
+    }
+    let value = builtin();
+    if a.json {
+        console.json(&serde_json::to_value(&value)?)?;
+    } else {
+        console.print(serde_yaml_ng::to_string(&value)?)?;
+    }
+    Ok(Verdict::Pass)
+}
+
+/// Every layer merged, each value with its source: the image table given to `--images` and the
+/// `-s defaults.<key>=<value>` overrides among them.
+fn in_effect(profile: &spec::Profile, a: &Args, console: &mut Console) -> Result<Verdict> {
+    let (dir, json) = (a.project.dir.as_path(), a.json);
+    let profile = profile.load(dir)?;
+    let host = spec::host();
+    let layers = spec::defaults_of(dir, a.settings.images.as_deref(), profile.as_ref(), &a.settings.sets);
+    let r = isoloom_spec::defaults::load(&layers).map_err(CliError::Defaults)?;
+    let mut merged = builtin();
+    isoloom_spec::defaults::merge(&mut merged, &r.merged);
+    let project_file = dir.join(isoloom_spec::defaults::PROJECT_FILE);
+    if json {
+        let sources: serde_json::Map<String, serde_json::Value> = r.sources.iter().map(|(k, v)| (k.clone(), serde_json::json!(v))).collect();
+        let out = serde_json::json!({ "defaults": serde_json::to_value(&merged)?, "sources": sources, "user_file": isoloom_spec::defaults::user_file(&host), "project_file": project_file });
+        console.json(&out)?;
+        return Ok(Verdict::Pass);
+    }
+    for line in source_lines(&merged, &r.sources) {
+        console.line(line)?;
+    }
+    console.line(format_args!(
+        "\nfiles: {} (yours), {} (the project's); environment ISOLOOM_<KEY>; -s defaults.<key>=<value>",
+        isoloom_spec::defaults::user_file(&host).display(),
+        project_file.display()
+    ))?;
+    Ok(Verdict::Pass)
+}
+
+/// One line per value: its key, the value and where it comes from, in aligned columns.
+fn source_lines(merged: &serde_yaml_ng::Value, sources: &[(String, String)]) -> Vec<String> {
+    let builtin_leaves = isoloom_spec::defaults::leaves(&builtin(), "");
+    let width = sources
+        .iter()
+        .map(|(k, _)| k.len())
+        .chain(builtin_leaves.iter().map(String::len))
+        .max()
+        .unwrap_or(0);
+    isoloom_spec::defaults::leaves(merged, "")
+        .into_iter()
+        .map(|leaf| {
+            let value = leaf
+                .split('.')
+                .try_fold(merged, |v, k| v.get(k))
+                .and_then(|v| serde_yaml_ng::to_string(v).ok())
+                .map(|text| text.trim().to_owned())
+                .unwrap_or_default();
+            let source = sources.iter().find(|(k, _)| *k == leaf).map_or("built in", |(_, s)| s.as_str());
+            format!("{leaf:<width$}  {value:<24}  {source}")
+        })
+        .collect()
+}
+
+/// The built-in layer: each cloud's region, as its modules default to it (the image table is
+/// documented on its own page and read from the code).
+fn builtin() -> serde_yaml_ng::Value {
+    use serde_yaml_ng::{Mapping, Value};
+    let mut cloud = Mapping::new();
+    for (c, r) in isoloom_targets::default_regions() {
+        let mut m = Mapping::new();
+        m.insert(Value::String("region".into()), Value::String(r.into()));
+        cloud.insert(Value::String(c.into()), Value::Mapping(m));
+    }
+    let mut top = Mapping::new();
+    top.insert(Value::String("cloud".into()), Value::Mapping(cloud));
+    Value::Mapping(top)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_value_is_listed_with_where_it_comes_from() -> std::result::Result<(), serde_yaml_ng::Error> {
+        let merged: serde_yaml_ng::Value = serde_yaml_ng::from_str("vagrant: { provider: libvirt }")?;
+        let lines = source_lines(&merged, &[("vagrant.provider".to_owned(), "the project's".to_owned())]);
+        let line = lines
+            .iter()
+            .find(|l| l.starts_with("vagrant.provider"))
+            .map(|l| l.split_whitespace().collect::<Vec<_>>());
+        assert_eq!(line, Some(vec!["vagrant.provider", "libvirt", "the", "project's"]));
+        Ok(())
+    }
+}

@@ -1,0 +1,434 @@
+//! Each set-up step of a VM ([`Step`]) written once: as a root shell script for Linux, and as
+//! PowerShell where Windows has the step. A VM backend only picks how the scripts reach the
+//! machine (a Vagrant provisioner, cloud-init, `remote-exec`, WinRM), so every target sets a
+//! machine up the same way.
+
+use isoloom_plan::Environment;
+use isoloom_plan::lifecycle::{RunKind, Step};
+use isoloom_spec::ready_line::ReadyLine;
+use isoloom_spec::shell::quote;
+use isoloom_spec::windows::ISOLOOM_DIR;
+
+use crate::configure::{self, Configured, shell};
+use crate::network::{ipv6, more_addresses};
+use crate::{constraints, powershell, secrets};
+
+mod disks;
+mod files;
+mod network;
+mod process;
+mod settings;
+mod shared_volume;
+mod wait;
+
+/// Where the project is unpacked on a VM.
+pub const PROJECT_DIR: &str = isoloom_spec::linux::PROJECT_DIR;
+/// Isoloom's own folder on a Linux VM: its marks, and what it keeps between boots.
+pub(crate) const STATE_DIR: &str = isoloom_spec::linux::STATE_DIR;
+/// Makes `STATE_DIR`: the command before a mark is written there.
+pub const MAKE_STATE_DIR: &str = concat!("mkdir -p ", isoloom_spec::linux_state_path!());
+/// The project's archive, uploaded before the steps run.
+pub const PROJECT_ARCHIVE: &str = "/tmp/isoloom-project.tgz";
+/// The project's archive on a Windows VM, uploaded before the steps run.
+pub const WINDOWS_PROJECT_ARCHIVE: &str = "C:\\Windows\\Temp\\isoloom-project.tgz";
+
+/// How a command run over SSH as a VM's login user gets root: the one rule every way into a VM
+/// shares. A user other than root goes through `sudo`; root runs the command as it is, since its
+/// image may have no `sudo` (Linode's Debian).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AsRoot {
+    /// The login user is root: no prefix.
+    Root,
+    /// Another user, through `sudo`.
+    Sudo,
+}
+
+impl AsRoot {
+    /// The rule for login user `user`.
+    #[must_use]
+    pub fn of(user: &str) -> AsRoot {
+        if user == "root" { AsRoot::Root } else { AsRoot::Sudo }
+    }
+
+    /// What goes before a command run as root: `sudo `, or nothing.
+    #[must_use]
+    pub fn prefix(self) -> &'static str {
+        match self {
+            AsRoot::Root => "",
+            AsRoot::Sudo => "sudo ",
+        }
+    }
+
+    /// [`AsRoot::prefix`], keeping the session's environment (the values the way in forwarded):
+    /// `sudo -E `, or nothing.
+    #[must_use]
+    pub fn keeping_env(self) -> &'static str {
+        match self {
+            AsRoot::Root => "",
+            AsRoot::Sudo => "sudo -E ",
+        }
+    }
+}
+
+/// Where the project's archive is read from when it is unpacked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Archive {
+    /// [`PROJECT_ARCHIVE`] on the VM, uploaded before, and removed once unpacked.
+    Uploaded,
+    /// The command's standard input (piped over SSH).
+    Stdin,
+}
+
+/// What an unpack does with the archive's top folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TopFolder {
+    /// Kept: the archive holds the project's files at its top (an archive a runner writes).
+    Kept,
+    /// Left out: the archive holds the project in one folder (`git archive --prefix`).
+    Stripped,
+}
+
+/// The project unpacked into [`PROJECT_DIR`] as root, replacing what an earlier copy left, so a
+/// file deleted from the project goes from the VM too: the archive read `from`, its top folder
+/// as `top` says. The files are root's (an archive Isoloom or a runner writes holds uid
+/// 0). One line, with no single quote, so a caller can wrap it in `sh -c '…'`. Every way of
+/// getting the project into a Linux VM unpacks it with this line.
+#[must_use]
+pub fn project_unpack(from: Archive, top: TopFolder) -> String {
+    let strip = match top {
+        TopFolder::Stripped => " --strip-components=1",
+        TopFolder::Kept => "",
+    };
+    let fresh = format!("rm -rf {PROJECT_DIR} && mkdir -p {PROJECT_DIR}");
+    match from {
+        Archive::Uploaded => format!("{fresh} && tar -xzf {PROJECT_ARCHIVE} -C {PROJECT_DIR}{strip} && rm -f {PROJECT_ARCHIVE}"),
+        Archive::Stdin => format!("{fresh} && tar -xzf - -C {PROJECT_DIR}{strip}"),
+    }
+}
+
+/// [`project_unpack`] on Windows, in PowerShell: [`WINDOWS_PROJECT_ARCHIVE`] (uploaded before)
+/// unpacked into [`ISOLOOM_DIR`], replacing what an earlier copy left, its top folder as `top`
+/// says. Every way of getting the project into a Windows VM unpacks it with this.
+#[must_use]
+pub fn windows_project_unpack(top: TopFolder) -> String {
+    format!(
+        "$archive = '{WINDOWS_PROJECT_ARCHIVE}'; $dest = '{ISOLOOM_DIR}'; $strip = {}\n{}",
+        u8::from(top == TopFolder::Stripped),
+        powershell::UNTAR
+    )
+}
+
+/// The inputs, uploaded before the steps run (`KEY=value` lines).
+pub const INPUTS_FILE: &str = "/tmp/isoloom-inputs.env";
+/// Where the inputs are kept when a reboot comes (`/tmp` is emptied at boot).
+pub const KEPT_INPUTS_FILE: &str = isoloom_spec::linux_state_path!("/inputs.env");
+/// Where a Linux VM's set-up says how far it got, for the runner to poll (the `isoloom-ready/1`
+/// grammar: `running: <step>`, `failed: <step>`, then `ready`; no file yet: still booting).
+pub const READY_FILE: &str = isoloom_spec::linux_state_path!("/ready");
+
+/// `line` written to [`READY_FILE`], as a shell command: the one writer of the ready file's
+/// lines on Linux. Its folder must exist ([`MAKE_STATE_DIR`]).
+#[must_use]
+pub fn ready_mark(line: &ReadyLine) -> String {
+    match line {
+        // One word with nothing to quote, as the other lines are once quoted.
+        ReadyLine::Ready => format!("echo {line} > {READY_FILE}"),
+        _ => format!("echo {} > {READY_FILE}", quote(&line.to_string())),
+    }
+}
+
+/// The `case` pattern of a ready file's line that stopped the set-up (`failed: <step>`), for a
+/// shell that reads the file: the grammar's prefix, double-quoted (it holds no `"`, `$`, `` ` ``
+/// or `\`), then anything. A done set-up's line is [`ReadyLine::READY`], one word.
+#[must_use]
+pub fn failed_pattern() -> String {
+    format!("\"{}\"*", ReadyLine::FAILED_PREFIX)
+}
+
+/// `command` as the set-up step `label` of the ready file: `running: <label>` before it, and
+/// `failed: <label>` with the set-up stopped (`exit 1`) when it fails. `as_root` gives each
+/// mark the way the command gets root (the identity when the script runs as root already). The
+/// running mark is its own command rather than chained with `&&` (`A && B || C` reads as an
+/// if-then-else that isn't one): a mark that can't be written doesn't skip the step, and the
+/// step's own failure always reaches the failure mark.
+#[must_use]
+pub fn tracked(label: &str, command: &str, as_root: &dyn Fn(&str) -> String) -> String {
+    format!(
+        "{}; {command} || {{ {}; exit 1; }}",
+        as_root(&ready_mark(&ReadyLine::running(label))),
+        as_root(&ready_mark(&ReadyLine::failed(label)))
+    )
+}
+/// Waits for cloud-init to be done (its packages in, `apt` free): the first command of a set-up
+/// run over SSH on a VM cloud-init boots. Its failure doesn't stop the set-up.
+pub const CLOUD_INIT_WAIT: &str = "cloud-init status --wait >/dev/null 2>&1 || true";
+
+/// On a Docker host VM, published ports reach containers whatever their routes: what arrives from
+/// outside the VM (a forward to this computer, a client of the server's address) is DNAT'ed by
+/// Docker with its source kept, and a container of an `internet: false` network, its default route
+/// removed, can't answer it. Masquerading that traffic into the environment's bridges makes it come from
+/// the bridge's own address, which every container reaches. A unit keeps the rule across reboots,
+/// after Docker's own. Run as root; running it again changes nothing.
+pub const PUBLISHED_FROM_OUTSIDE: &str = r"cat > /etc/systemd/system/isoloom-published.service <<'UNIT'
+[Unit]
+Description=Isoloom: published ports reach containers of networks without a default route
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -t nat -C POSTROUTING -m conntrack --ctstate DNAT -o br-+ -j MASQUERADE 2>/dev/null || iptables -t nat -I POSTROUTING -m conntrack --ctstate DNAT -o br-+ -j MASQUERADE'
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now isoloom-published.service
+";
+
+/// The Docker Engine a Docker host gets (`cloud-docker`), exactly: the
+/// version Isoloom's Compose files are proven with, so two runs of one environment get the same engine.
+const DOCKER_VERSION: &str = "29.9.0";
+
+/// The Compose plugin a Docker host gets, exactly (on hosts with `apt`: Debian and Ubuntu).
+const COMPOSE_VERSION: &str = "5.6.0";
+
+/// Docker's apt signing key, pinned by SHA-256 (the same armored key for Debian and Ubuntu,
+/// `download.docker.com/linux/<id>/gpg`); the pins refresh verifies it against download.docker.com.
+const DOCKER_APT_KEY_SHA256: &str = "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570";
+
+/// Installs Docker, unless it is there, as a root script. On the apt family (Debian, Ubuntu) it
+/// adds Docker's own repository with the signing key pinned by SHA-256 (`DOCKER_APT_KEY_SHA256`,
+/// no `curl | sh`), then installs the engine at `DOCKER_VERSION` (the exact package resolved from
+/// the repository, so its epoch and build suffix are the repo's) and the Compose plugin at
+/// `COMPOSE_VERSION`. The RPM family (Rocky, AlmaLinux, CentOS, Fedora) uses Docker's own
+/// install script, pinned to `DOCKER_VERSION` only: its repository key isn't checked against a
+/// pinned SHA-256 as the apt branch's is. The apt branch fails closed (a `set -e` subshell, the
+/// key verified before use). On a non-x86 host (an Apple Silicon Mac's VM, an Arm cloud VM) the
+/// apt branch adds QEMU's user-mode emulation (`qemu-user-static`, registered with binfmt for
+/// every container), for the containers pinned to x86 (their spec's `hardware.arch`, or an image
+/// published for x86 only); the others run on the host's own architecture.
+#[must_use]
+pub fn install_docker() -> String {
+    // The engine's version as `apt-cache madison` writes it, after an optional epoch.
+    let madison = DOCKER_VERSION.replace('.', "[.]");
+    format!(
+        r#"command -v docker >/dev/null || if command -v apt-get >/dev/null; then (
+  set -e
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl
+  install -m 0755 -d /etc/apt/keyrings
+  k=$(mktemp)
+  # shellcheck disable=SC1091,SC2154 # /etc/os-release is on the guest, not here.
+  _id=$(. /etc/os-release && printf %s "$ID")
+  # shellcheck disable=SC1091,SC2154
+  _cn=$(. /etc/os-release && printf %s "$VERSION_CODENAME")
+  curl -fsSL "https://download.docker.com/linux/$_id/gpg" -o "$k"
+  echo "{DOCKER_APT_KEY_SHA256}  $k" | sha256sum -c -
+  install -m 0644 "$k" /etc/apt/keyrings/docker.asc
+  rm -f "$k"
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$_id $_cn stable" > /etc/apt/sources.list.d/docker.list
+  apt-get update -qq
+  v=$(apt-cache madison docker-ce | awk '$3 ~ /(^|:){madison}/ {{ print $3; exit }}')
+  [ -n "$v" ] || {{ echo "docker-ce {DOCKER_VERSION} is not in Docker's apt repository" >&2; exit 1; }}
+  apt-get install -y -qq --allow-downgrades "docker-ce=$v" "docker-ce-cli=$v" containerd.io docker-buildx-plugin "docker-compose-plugin={COMPOSE_VERSION}-*"
+  # A container pinned to x86 (its spec's hardware.arch, or an image published for x86 only): on
+  # another CPU (an Apple Silicon Mac's VM, an Arm cloud VM) the engine runs it through QEMU's
+  # user-mode emulation, which Debian registers with binfmt for every container (Docker Desktop
+  # does the same on its own).
+  [ "$(dpkg --print-architecture)" = amd64 ] || apt-get install -y -qq qemu-user-static binfmt-support
+)
+else
+  curl -fsSL https://get.docker.com | VERSION={DOCKER_VERSION} sh
+fi"#
+    )
+}
+
+/// The root script trusting the spec's certificate authorities from the unpacked project
+/// ([`isoloom_plan::lifecycle::ca_certificates`]) on one of Isoloom's own VMs (a Docker host, the
+/// controller, the router), before it installs Docker or packages, which a TLS-inspecting proxy
+/// would fail otherwise. `None` when the spec names none.
+#[must_use]
+pub fn trust_authorities(env: &Environment) -> Option<String> {
+    isoloom_plan::lifecycle::ca_certificates(env.constraints.as_ref()).and_then(|step| linux(env, "", &step))
+}
+
+/// A shell loop waiting for the file `mark`, the runner's sign that it delivered something,
+/// looking every 5 seconds: it says `waiting` once, and gives up with `missing` (on stderr, exit
+/// 1) after `timeout_s` seconds. One line, without its newline.
+#[must_use]
+pub fn wait_for_mark(mark: &str, timeout_s: u32, waiting: &str, missing: &str) -> String {
+    let (waiting, missing) = (quote(waiting), quote(missing));
+    format!(
+        "i=0; until [ -f {mark} ]; do [ \"$i\" -gt 0 ] || echo {waiting}; i=$((i+5)); if [ \"$i\" -gt {timeout_s} ]; then echo {missing} >&2; exit 1; fi; sleep 5; done"
+    )
+}
+
+/// Installs packages with the machine's own package manager: Debian and Ubuntu's apt, the RHEL
+/// family's dnf (Rocky, AlmaLinux, CentOS, Fedora) or yum, Alpine's apk.
+const PKG: &str = "pkg() { if command -v apt-get >/dev/null; then apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \"$@\"; elif command -v dnf >/dev/null; then dnf install -y -q \"$@\"; elif command -v apk >/dev/null; then apk add -q --no-cache \"$@\"; else yum install -y -q \"$@\"; fi; }";
+
+/// `nft`, installed unless it is there, with the machine's own package manager, as root script
+/// lines.
+#[must_use]
+pub fn nftables() -> String {
+    format!("{PKG}\ncommand -v nft >/dev/null || pkg nftables\n")
+}
+
+/// This boot's id: it changes at each boot.
+const BOOT_ID: &str = "/proc/sys/kernel/random/boot_id";
+
+/// A gateway's forwarding (`Step::Forwarding`): its kernel parameters in a sysctl file, which
+/// every boot reads, applied now.
+fn forwarding(sysctls: &[(&str, &str)]) -> String {
+    const FILE: &str = "/etc/sysctl.d/90-isoloom-forwarding.conf";
+    let lines: Vec<String> = sysctls.iter().map(|(k, v)| quote(&format!("{k}={v}"))).collect();
+    format!("printf '%s\\n' {} > {FILE} && sysctl -q -p {FILE}\n", lines.join(" "))
+}
+
+/// `step` of `machine` as a root shell script for a Linux VM; `None` when it has nothing to do
+/// there.
+#[must_use]
+pub fn linux(env: &Environment, machine: &str, step: &Step) -> Option<String> {
+    match step {
+        Step::Prelude => constraints::linux_prelude(env.constraints.as_ref()),
+        Step::DiskGrow => Some(disks::GROW_ROOT_SH.to_owned()),
+        Step::Disks { disks } => disks::linux(disks),
+        Step::Settings => env.spec().machines.get(machine).and_then(settings::linux),
+        Step::Hosts { entries } => network::hosts(entries),
+        Step::Routes { routes, default } => network::routes(routes, *default),
+        Step::Forwarding { sysctls } => Some(forwarding(sysctls)),
+        Step::Ipv6 { addresses, routes } => Some(ipv6::linux(addresses, routes)),
+        Step::MoreAddresses { addresses } => Some(more_addresses::linux(addresses)),
+        Step::Trunks => network::trunks(env, machine),
+        Step::Volumes { paths } => (!paths.is_empty()).then(|| format!("mkdir -p {}\n", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(" "))),
+        Step::SharedVolume { volume, path, role } => Some(shared_volume::linux(volume, path, role)),
+        Step::Project => Some(format!("{}\n", project_unpack(Archive::Uploaded, TopFolder::Stripped))),
+        Step::CaCertificates { files } => Some(constraints::trust_linux(
+            &files.iter().map(|f| format!("{PROJECT_DIR}/{f}")).collect::<Vec<_>>(),
+        )),
+        Step::Files { files } => Some(files::linux(files)),
+        Step::Secrets => env.machines.get(machine).map(|mp| secrets::step(machine, &mp.secrets)),
+        Step::Inputs { persist } => persist.then(|| format!("{MAKE_STATE_DIR} && install -m 600 {INPUTS_FILE} {KEPT_INPUTS_FILE}\n")),
+        Step::WaitFor { machine: dep, ports } => Some(wait::linux(dep, ports)),
+        Step::Run { path, kind, creates } => run(env, machine, path, *kind).map(|line| guarded(line, creates.as_deref())),
+        Step::Configure { resources, fresh } => Configured::of(env, machine).map(|c| shell::script(&c, resources, *fresh)),
+        Step::Reboot => Some(format!("{}(sleep 2 && reboot) >/dev/null 2>&1 &\n", record_boot())),
+        Step::Egress => Some(network::egress(env)),
+        Step::Tc => network::tc(env, machine),
+        Step::Command => process::command(env, machine),
+        Step::Setup { paths } => process::setup(env, machine, paths),
+        Step::Ready => Some(format!(
+            "{}{MAKE_STATE_DIR} && {}\n",
+            process::healthy(env, machine).unwrap_or_default(),
+            ready_mark(&ReadyLine::Ready)
+        )),
+    }
+}
+
+/// `step` of `machine` as PowerShell for a Windows VM; `None` when Windows has no such step (or
+/// nothing to do for it).
+#[must_use]
+pub fn windows(env: &Environment, machine: &str, step: &Step) -> Option<String> {
+    match step {
+        Step::DiskGrow => Some(disks::GROW_ROOT_PS1.to_owned()),
+        Step::Disks { disks } => disks::windows(disks),
+        Step::Settings => env.spec().machines.get(machine).and_then(settings::windows),
+        Step::Hosts { entries } => network::windows_hosts(entries),
+        Step::Routes { routes, .. } => network::windows_routes(routes),
+        Step::Ipv6 { addresses, routes } => Some(ipv6::windows(addresses, routes)),
+        Step::MoreAddresses { addresses } => Some(more_addresses::windows(addresses)),
+        Step::Project => Some(windows_project_unpack(TopFolder::Stripped)),
+        Step::CaCertificates { files } => Some(constraints::trust_windows(
+            &files.iter().map(|f| format!("{ISOLOOM_DIR}\\{}", f.replace('/', "\\"))).collect::<Vec<_>>(),
+        )),
+        Step::Files { files } => Some(files::windows(files)),
+        Step::Secrets => env.machines.get(machine).map(|mp| secrets::windows::step(machine, &mp.secrets)),
+        Step::WaitFor { machine: dep, ports } => wait::windows(dep, ports),
+        Step::Run {
+            path,
+            kind: RunKind::PowerShell,
+            creates,
+        } => {
+            let run = format!("Set-Location {ISOLOOM_DIR}; {}", powershell::run_file(path));
+            Some(match creates {
+                Some(done) => format!("if (-not (Test-Path -LiteralPath {})) {{ {run} }}", powershell::quote(done)),
+                None => run,
+            })
+        }
+        Step::Configure { resources, fresh } => Configured::of(env, machine).map(|c| configure::powershell::script(&c, resources, *fresh)),
+        Step::Command => process::windows_command(env, machine),
+        Step::Setup { paths } => Some(process::windows_setup(paths)),
+        Step::Ready => Some(format!(
+            "{}New-Item -ItemType Directory -Force {ISOLOOM_DIR} | Out-Null; Set-Content {} {}",
+            process::windows_healthy(env, machine).unwrap_or_default(),
+            isoloom_spec::windows::READY_FILE,
+            ReadyLine::Ready
+        )),
+        // Linux's alone: the constraints, trunks, forwarding and impairment are Linux tools (a
+        // Windows gateway is refused); a Windows VM's volumes, inputs and reboots are its own
+        // scripts'.
+        Step::Prelude
+        | Step::Trunks
+        | Step::Forwarding { .. }
+        | Step::Volumes { .. }
+        | Step::SharedVolume { .. }
+        | Step::Inputs { .. }
+        | Step::Run { .. }
+        | Step::Reboot
+        | Step::Egress
+        | Step::Tc => None,
+    }
+}
+
+/// One `provision` step, from the project folder, with the machine's inputs in its environment;
+/// `None` for a PowerShell script, which only [`windows`] runs.
+fn run(env: &Environment, machine: &str, path: &str, kind: RunKind) -> Option<String> {
+    let inputs = inputs_file(env, machine).map(|f| format!("set -a; . {f}; set +a; ")).unwrap_or_default();
+    match kind {
+        RunKind::PowerShell => None,
+        RunKind::Shell => Some(format!("cd {PROJECT_DIR} && sh -c {}\n", quote(&format!("{inputs}sh {}", quote(path))))),
+        // Installed with the machine's own package manager; its inventory is the machine, by
+        // its name (a play may name it), run locally.
+        // `set -e`: an Ansible install that fails fails the step with the package manager's
+        // words, not with "ansible-playbook: not found" a line later.
+        RunKind::Playbook => Some(format!(
+            "set -e\n{PKG}\ncommand -v ansible-playbook >/dev/null || pkg ansible-core\ncd {PROJECT_DIR} && sh -c {}\n",
+            quote(&format!("{inputs}ansible-playbook -c local -i {machine}, {}", quote(path)))
+        )),
+    }
+}
+
+/// A script's line behind its `creates`: skipped when that path exists.
+fn guarded(line: String, creates: Option<&str>) -> String {
+    match creates {
+        Some(path) => format!("[ -e {} ] || {{ {} }}\n", quote(path), line.trim_end()),
+        None => line,
+    }
+}
+
+/// Where machine `machine`'s inputs are, when it reads any: kept on disk when a reboot comes or
+/// a service reads them at every boot, else where they were uploaded.
+fn inputs_file(env: &Environment, machine: &str) -> Option<&'static str> {
+    let m = env.machines.get(machine).filter(|m| !m.inputs.is_empty())?;
+    let kept = m.lifecycle.iter().any(|s| matches!(s, Step::Inputs { persist: true }));
+    Some(if kept { KEPT_INPUTS_FILE } else { INPUTS_FILE })
+}
+
+/// Records this boot's id, for [`reboot_check`]: a transport that restarts the machine itself
+/// (Terraform's `remote-exec`) runs it before restarting.
+#[must_use]
+pub fn record_boot() -> String {
+    format!("{MAKE_STATE_DIR} && cp {BOOT_ID} {STATE_DIR}/boot-id\n")
+}
+
+/// After a reboot step: fails when the machine didn't actually restart.
+#[must_use]
+pub fn reboot_check() -> String {
+    format!("if [ \"$(cat {BOOT_ID})\" = \"$(cat {STATE_DIR}/boot-id)\" ]; then echo 'the reboot step: the machine did not restart' >&2; exit 1; fi\n")
+}
+
+#[cfg(test)]
+mod tests;
