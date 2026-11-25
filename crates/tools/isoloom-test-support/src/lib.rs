@@ -5,6 +5,8 @@
 //!   the script, and the calls it made are read back as argument lists.
 //! - [`ChildGuard`]: a helper process killed with its process group and reaped when dropped, so
 //!   none outlives its test (nor holds a build's lock).
+//! - [`output_with_input`]: what a program did with its standard input given, how a test feeds
+//!   `sh` a script (on Windows an argument full of `"` doesn't arrive as written).
 //! - [`write_executable`]: a program a test runs, written by a child process. A test never
 //!   executes a file its own process wrote: that file is open for writing in every process
 //!   another test thread forks meanwhile, and executing it then fails with "Text file busy".
@@ -148,6 +150,18 @@ impl FakeBin {
         };
         Ok(text.lines().map(|l| l.split_whitespace().map(str::to_owned).collect()).collect())
     }
+}
+
+/// What `command` did with `input` on its standard input, its output and errors captured.
+///
+/// # Errors
+/// When it can't be started, given its input, or waited for.
+pub fn output_with_input(command: &mut Command, input: &[u8]) -> std::io::Result<Output> {
+    use std::io::Write as _;
+    use std::process::Stdio;
+    let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    child.stdin.take().ok_or_else(|| std::io::Error::other("no stdin"))?.write_all(input)?;
+    child.wait_with_output()
 }
 
 /// Writes `contents` to `path`, executable or not, from a child process (`cat`) rather than from
