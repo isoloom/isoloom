@@ -48,14 +48,7 @@ pub(crate) fn vmx(r: &mut Ruby, vm: &str, nics: &[Nic]) {
 /// The script that gives each adapter (found by its MAC) its address now, NetworkManager told to
 /// leave the adapters alone (it would ask DHCP there, which these networks don't have).
 pub(crate) fn script(vm: &str, nics: &[Nic]) -> String {
-    let macs: Vec<String> = nics.iter().map(|n| hyperv::linux_mac_text(mac(vm, n.net))).collect();
-    let lines: Vec<String> = nics
-        .iter()
-        .zip(&macs)
-        .map(|(n, m)| format!("set_address {m} {}/{} || rc=1\n", n.ip, n.len))
-        .collect();
-    let lines = lines.concat();
-    let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
+    let hyperv::Adapters { lines, unmanaged, .. } = hyperv::adapters(nics, |net| hyperv::linux_mac_text(mac(vm, net)));
     format!(
         "{}if [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{lines}exit $rc\n",
         hyperv::ENV_NET
