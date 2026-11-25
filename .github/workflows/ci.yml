@@ -54,4 +54,7 @@ jobs:
           tool: cargo-nextest@0.9.148
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
+      # Every platform's crates: the lockfile and dependency checks read the whole graph with
+      # `cargo metadata --offline`, and a build only downloads the runner's own platform's.
+      - run: cargo fetch --locked
       - run: cargo run -q -p xtask --locked -- check ${{ matrix.check }}
