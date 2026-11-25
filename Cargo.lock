@@ -674,7 +674,6 @@ name = "isoloom"
 version = "3.0.0"
 dependencies = [
  "clap",
- "flate2",
  "insta",
  "isoloom-catalogue",
  "isoloom-import",
@@ -870,6 +869,7 @@ dependencies = [
 name = "isoloom-test-support"
 version = "3.0.0"
 dependencies = [
+ "flate2",
  "hcl-rs",
  "serde",
  "serde_yaml_ng",
