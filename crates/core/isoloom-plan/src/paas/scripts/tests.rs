@@ -11,9 +11,21 @@ use super::*;
 /// Secrets with every character the formats treat specially.
 const NASTY: [&str; 4] = ["pa\"ss", "back\\slash", "both\\\"mix\\\\ed\"", "tab\there$HOME`id`'q'"];
 
-/// Runs `script` with `sh -eu` in `dir`; its status, and what it said on stderr.
+/// Runs `script` with `sh -eu` in `dir`; its status, and what it said on stderr. The script goes
+/// in on stdin: on Windows a program's arguments are one quoted line, which Git's `sh` splits
+/// again with other rules, so a script full of `"` would not arrive as written.
 fn run(script: &str, dir: &Path) -> (bool, String) {
-    let out = tool("sh").arg("-euc").arg(script).current_dir(dir).output().unwrap();
+    use std::io::Write as _;
+    let mut child = tool("sh")
+        .args(["-eus"])
+        .current_dir(dir)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(script.as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
     (out.status.success(), String::from_utf8_lossy(&out.stderr).into_owned())
 }
 
