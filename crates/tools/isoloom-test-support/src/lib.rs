@@ -15,6 +15,8 @@
 //!   substrings of its text.
 //! - [`sh_decode`], [`hcl_decode`] and the other decoders: a literal the builders write read back
 //!   as its language reads it, for the quoting properties and the fuzz target.
+//! - [`gzip_decoded`]: a rendered file with each gzip-and-base64 value written as the text it
+//!   holds, for a snapshot that holds across deflate versions and CPUs.
 //! - [`owned_pairs`]: (name, value) pairs written as string literals, owned.
 //!
 //! A test-only crate: it panics where a test should fail.
@@ -295,6 +297,48 @@ pub use parsed_hcl::{hcl_attribute, hcl_blocks, hcl_body, hcl_literals, hcl_map,
 pub use parsed_ini::ini_groups;
 pub use parsed_ruby::{RubyBlock, ruby_blocks};
 pub use parsed_yaml::{manifest, manifest_names, named, yaml, yaml_at, yaml_documents, yaml_keys_at, yaml_str, yaml_strs, yaml_values};
+
+/// `text` with each gzip-and-base64 value (a cloud-init file's `content`) written as what it
+/// holds: the value becomes `<gzip N>`, and value N's decoded text follows the file. A deflate
+/// library writes other bytes for the same payload from one version to the next; the snapshot
+/// follows the payload, and isoloom-render's own test pins the compressed bytes once. The
+/// bytes also differ between CPUs (zlib-rs picks its hashing by CPU feature).
+#[must_use]
+pub fn gzip_decoded(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut payloads = Vec::new();
+    let mut rest = text;
+    while let Some(at) = rest.find("\"H4sI") {
+        let (before, value) = rest.split_at(at + 1);
+        let end = value.find('"').unwrap_or(value.len());
+        let (encoded, after) = value.split_at(end);
+        out.push_str(before);
+        if let Some(payload) = gunzip_base64(encoded) {
+            payloads.push(payload);
+            out.push_str(&["<gzip ", &payloads.len().to_string(), ">"].concat());
+        } else {
+            out.push_str(encoded);
+        }
+        rest = after;
+    }
+    out.push_str(rest);
+    for (n, payload) in payloads.iter().enumerate() {
+        out.push_str(&["### <gzip ", &(n + 1).to_string(), "> decoded\n", payload].concat());
+        if !payload.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    out
+}
+
+/// The text gzip-compressed and base64-encoded in `encoded`, or `None` when it isn't that.
+fn gunzip_base64(encoded: &str) -> Option<String> {
+    use std::io::Read as _;
+    let bytes = b64_decode(encoded)?;
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(bytes.as_slice()).read_to_string(&mut text).ok()?;
+    Some(text)
+}
 
 #[cfg(test)]
 mod tests {

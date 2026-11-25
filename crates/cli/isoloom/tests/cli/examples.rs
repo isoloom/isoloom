@@ -108,47 +108,7 @@ fn target_block(listing: &str, id: &str) -> Outcome<String> {
 
 /// A file's contents as the snapshot shows them: its text, or a fingerprint of its bytes.
 fn shown(bytes: &[u8], dir: &Path, home: &Path) -> String {
-    std::str::from_utf8(bytes).map_or_else(|_| fingerprint(bytes), |text| decoded(&normalize(text, dir, home)))
-}
-
-/// `text` with each gzip-and-base64 value (a cloud-init file's `content`) written as what it
-/// holds: the value becomes `<gzip N>`, and value N's decoded text follows the file. A deflate
-/// library writes other bytes for the same payload from one version to the next; the snapshot
-/// follows the payload, and isoloom-render's own test pins the compressed bytes once.
-fn decoded(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut payloads = Vec::new();
-    let mut rest = text;
-    while let Some(at) = rest.find("\"H4sI") {
-        let (before, value) = rest.split_at(at + 1);
-        let end = value.find('"').unwrap_or(value.len());
-        let (encoded, after) = value.split_at(end);
-        out.push_str(before);
-        if let Some(payload) = gunzip_base64(encoded) {
-            payloads.push(payload);
-            out.push_str(&["<gzip ", &payloads.len().to_string(), ">"].concat());
-        } else {
-            out.push_str(encoded);
-        }
-        rest = after;
-    }
-    out.push_str(rest);
-    for (n, payload) in payloads.iter().enumerate() {
-        out.push_str(&["### <gzip ", &(n + 1).to_string(), "> decoded\n", payload].concat());
-        if !payload.ends_with('\n') {
-            out.push('\n');
-        }
-    }
-    out
-}
-
-/// The text gzip-compressed and base64-encoded in `encoded`, or `None` when it isn't that.
-fn gunzip_base64(encoded: &str) -> Option<String> {
-    use std::io::Read as _;
-    let bytes = isoloom_test_support::b64_decode(encoded)?;
-    let mut text = String::new();
-    flate2::read::GzDecoder::new(bytes.as_slice()).read_to_string(&mut text).ok()?;
-    Some(text)
+    std::str::from_utf8(bytes).map_or_else(|_| fingerprint(bytes), |text| isoloom_test_support::gzip_decoded(&normalize(text, dir, home)))
 }
 
 /// [`isoloom`] across the examples' threads: its error as text, which crosses them.
