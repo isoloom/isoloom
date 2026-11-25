@@ -268,10 +268,17 @@ fn env_net_at_boot() -> String {
     )
 }
 
-/// A Linux VM's addresses on its networks under Hyper-V (and UTM): [`ENV_NET_SCRIPT`] written,
-/// run at every boot, and now.
-pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
-    let macs: Vec<String> = nics.iter().map(|n| linux_mac_text(mac(vm_name, n.net))).collect();
+/// A Linux VM's adapters as [`ENV_NET`]'s callers write them: each adapter's MAC, the
+/// `set_address` line of each, and NetworkManager's `unmanaged-devices` value for them all.
+pub(super) struct Adapters {
+    pub(super) macs: Vec<String>,
+    pub(super) lines: String,
+    pub(super) unmanaged: String,
+}
+
+/// [`Adapters`] of `nics`, `mac` giving each network's adapter MAC (each provider has its own).
+pub(super) fn adapters(nics: &[Nic], mac: impl Fn(&str) -> String) -> Adapters {
+    let macs: Vec<String> = nics.iter().map(|n| mac(n.net)).collect();
     let lines: Vec<String> = nics
         .iter()
         .zip(&macs)
@@ -279,6 +286,13 @@ pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
         .collect();
     let lines = lines.concat();
     let unmanaged = macs.iter().map(|m| format!("mac:{m}")).collect::<Vec<_>>().join(";");
+    Adapters { macs, lines, unmanaged }
+}
+
+/// A Linux VM's addresses on its networks under Hyper-V (and UTM): [`ENV_NET_SCRIPT`] written,
+/// run at every boot, and now.
+pub(super) fn linux_addresses(vm_name: &str, nics: &[Nic]) -> String {
+    let Adapters { macs, lines, unmanaged } = adapters(nics, |net| linux_mac_text(mac(vm_name, net)));
     let script = isoloom_spec::shell::heredoc(&format!("cat > {ENV_NET_SCRIPT}"), "NET", &format!("{ENV_NET}{lines}exit $rc\n"));
     format!(
         "set -e\nmkdir -p {CONFIG_DIR}\n{script}chmod +x {ENV_NET_SCRIPT}\n# NetworkManager would try DHCP there.\nif [ -d /etc/NetworkManager/conf.d ]; then\n  printf '[keyfile]\\nunmanaged-devices={unmanaged}\\n' > /etc/NetworkManager/conf.d/90-isoloom-env-net.conf\nfi\n{}{}{ENV_NET_SCRIPT}\n",
