@@ -4,16 +4,18 @@
 
 use std::path::Path;
 
-use isoloom_test_support::tool;
+use isoloom_test_support::{output_with_input, tool};
 
 use super::*;
 
 /// Secrets with every character the formats treat specially.
 const NASTY: [&str; 4] = ["pa\"ss", "back\\slash", "both\\\"mix\\\\ed\"", "tab\there$HOME`id`'q'"];
 
-/// Runs `script` with `sh -eu` in `dir`; its status, and what it said on stderr.
+/// Runs `script` with `sh -eu` in `dir`; its status, and what it said on stderr. The script goes
+/// in on stdin: on Windows a program's arguments are one quoted line, which Git's `sh` splits
+/// again with other rules, so a script full of `"` would not arrive as written.
 fn run(script: &str, dir: &Path) -> (bool, String) {
-    let out = tool("sh").arg("-euc").arg(script).current_dir(dir).output().unwrap();
+    let out = output_with_input(tool("sh").args(["-eus"]).current_dir(dir), script.as_bytes()).unwrap();
     (out.status.success(), String::from_utf8_lossy(&out.stderr).into_owned())
 }
 

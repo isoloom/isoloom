@@ -49,20 +49,11 @@ fn file(name: &str, path: &str, uid: Option<u32>, mode: Option<u32>) -> SecretFi
 /// input; what it did, the kept folder (which the script makes), and the temporary folder that
 /// holds it, removed when it goes.
 fn run(script: &str, input: &str, tag: &str) -> (std::process::Output, std::path::PathBuf, tempfile::TempDir) {
-    use std::io::Write as _;
     let scratch = tempfile::Builder::new().prefix(&format!("isoloom-secrets-{tag}-")).tempdir().unwrap();
     let dir = scratch.path().join("kept");
     let script = script.replace(KEPT_DIR, &dir.display().to_string());
-    let mut child = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(script)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
-    child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
-    (child.wait_with_output().unwrap(), dir, scratch)
+    let out = isoloom_test_support::output_with_input(std::process::Command::new("sh").arg("-c").arg(script), input.as_bytes()).unwrap();
+    (out, dir, scratch)
 }
 
 // The script runs on a Linux machine: run it where `sh` and Unix paths are the host's.
