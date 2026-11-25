@@ -46,6 +46,9 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest@0.9.148
+      # Every platform's crates: the dependency checks read the whole graph with `cargo metadata
+      # --offline`, and a build only downloads the runner's own platform's.
+      - run: cargo fetch --locked
       - run: cargo run -q -p xtask --locked -- check --only lockfile,clippy,test,paas
 
   coverage:
