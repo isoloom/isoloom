@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use isoloom_test_support::tool;
+use isoloom_test_support::{output_with_input, tool};
 
 use super::*;
 
@@ -15,17 +15,7 @@ const NASTY: [&str; 4] = ["pa\"ss", "back\\slash", "both\\\"mix\\\\ed\"", "tab\t
 /// in on stdin: on Windows a program's arguments are one quoted line, which Git's `sh` splits
 /// again with other rules, so a script full of `"` would not arrive as written.
 fn run(script: &str, dir: &Path) -> (bool, String) {
-    use std::io::Write as _;
-    let mut child = tool("sh")
-        .args(["-eus"])
-        .current_dir(dir)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
-    child.stdin.take().unwrap().write_all(script.as_bytes()).unwrap();
-    let out = child.wait_with_output().unwrap();
+    let out = output_with_input(tool("sh").args(["-eus"]).current_dir(dir), script.as_bytes()).unwrap();
     (out.status.success(), String::from_utf8_lossy(&out.stderr).into_owned())
 }
 
