@@ -392,12 +392,18 @@ machines:
         // pwsh stands in for Windows PowerShell.
         let env = env();
         let mp = &env.machines["win"];
+        // PowerShell makes its host pipe in the temporary folder, and one stopped at its timeout
+        // leaves it: this test's own folder, gone with it.
+        let temp = tempfile::tempdir().expect("a temporary folder");
         let passes = |text: &str, timeout: u32| {
             let test = super::windows_test(mp, &CommandLine::Shell(text.to_owned()), timeout)
                 .replace("'C:\\isoloom'", "'.'")
                 .replace("-FilePath powershell.exe", "-FilePath pwsh");
             let out = std::process::Command::new("pwsh")
                 .args(["-NoProfile", "-NonInteractive", "-Command", &test])
+                .env("TMPDIR", temp.path())
+                .env("TMP", temp.path())
+                .env("TEMP", temp.path())
                 .output()
                 .expect("pwsh runs");
             match String::from_utf8_lossy(&out.stdout).trim() {
