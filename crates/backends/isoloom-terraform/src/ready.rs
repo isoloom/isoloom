@@ -206,7 +206,7 @@ fn remote_exec(command: &str, continue_on_failure: bool) -> Block {
 mod tests {
     use super::*;
     use crate::hcl_builder::Module;
-    use isoloom_render::test_support::posix_sh;
+    use isoloom_render::test_support::{posix_sh, sh_path};
 
     fn wait(reboots: usize, project: bool) -> Wait {
         Wait {
@@ -299,8 +299,8 @@ mod tests {
         w.within_s = 0;
         let script = w
             .wait()
-            .replace(READY_FILE, &ready.to_string_lossy())
-            .replace("/var/log/isoloom-setup.log", &log.to_string_lossy());
+            .replace(READY_FILE, &sh_path(&ready))
+            .replace("/var/log/isoloom-setup.log", &sh_path(&log));
         let run = || posix_sh().unwrap().arg("-c").arg(&script).output().unwrap();
         std::fs::write(&ready, "ready\n").unwrap();
         assert!(run().status.success());

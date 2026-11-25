@@ -60,7 +60,8 @@ impl Ran {
     /// The stood-in commands' calls, in order (`systemctl daemon-reload`), the stand-in `/etc`
     /// written `$ETC`.
     pub(crate) fn calls(&self) -> Vec<String> {
-        let etc = self.dir.path().join("etc").display().to_string();
+        // As the script was given it: Git's `sh` on Windows takes forward slashes.
+        let etc = crate::test_support::sh_path(&self.dir.path().join("etc"));
         let calls = std::fs::read_to_string(self.dir.path().join("calls")).unwrap_or_default();
         calls.lines().map(|l| l.replace(&etc, "$ETC")).collect()
     }
