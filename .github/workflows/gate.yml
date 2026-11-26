@@ -334,3 +334,8 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: rustup component add llvm-tools
       - run: cargo run -q -p xtask --locked -- check --only windows-binary
+
+  real-labs:
+    name: Real labs on a hosted runner
+    # The catalogue's contract run for real, in containers and VMs (real-labs.yml).
+    uses: ./.github/workflows/real-labs.yml

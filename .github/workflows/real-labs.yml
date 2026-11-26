@@ -1,0 +1,84 @@
+name: Real labs on a hosted runner
+
+# What Isoloom generates, run for real rather than only validated: `cargo xtask catalogue check`
+# turns an entry's parity contract into small labs, generates each for `docker` and for `vagrant`,
+# then runs it with the commands the generated files document (`docker compose`, `vagrant`): up,
+# the checks, down. A case passes when every check passes in both forms and every fact reads the
+# same in both.
+#
+# GitHub's Linux runner has Docker Engine and KVM, so both forms run there: the containers on
+# Docker, the VMs on libvirt through vagrant-libvirt. The other providers (VirtualBox, VMware,
+# Hyper-V, UTM, Parallels) stay on our own machines.
+#
+# Before main and a release (gate.yml calls it), by hand, and on a pull request into dev that
+# changes the catalogue's harness or this workflow: a run takes 15-30 minutes.
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - .github/workflows/real-labs.yml
+      - xtask/src/catalogue/check.rs
+      - xtask/src/catalogue/harness.rs
+      - crates/core/isoloom-catalogue/src/conformance/**
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-labs-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  catalogue:
+    name: Catalogue contract, container and VM (${{ matrix.entry }} ${{ matrix.release }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # A release whose recipe sets the VM up: postgres's default (16, its official image on
+        # Debian 12) has no recipe for a VM, its exact releases (16.16, Ubuntu 24.04) have.
+        include:
+          - entry: nginx
+            release: ""
+          - entry: postgres
+            release: "16.16"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install --profile minimal
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # Only main writes the cache, so a pull request can't seed what it builds with.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: KVM for this account
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm-runner.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - name: libvirt, Vagrant and vagrant-libvirt
+        run: |
+          wget -qO- https://apt.releases.hashicorp.com/gpg \
+            | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends vagrant libvirt-daemon-system libvirt-dev \
+            qemu-system-x86 qemu-utils dnsmasq-base ebtables build-essential pkg-config
+          sudo usermod -aG libvirt "$(id -un)"
+          vagrant plugin install vagrant-libvirt
+      - name: The contract, in both forms
+        timeout-minutes: 45
+        run: |
+          # sudo, to the same account, reads its groups afresh (libvirt, joined above) as a login does.
+          sudo --preserve-env -u "$(id -un)" env PATH="$PATH" \
+            cargo run -q -p xtask --locked -- catalogue check "${{ matrix.entry }}" --provider libvirt \
+            ${{ matrix.release && format('--release {0}', matrix.release) || '' }}
