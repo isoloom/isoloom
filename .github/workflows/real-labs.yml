@@ -35,11 +35,17 @@ env:
 
 jobs:
   catalogue:
-    name: Catalogue contract, container and VM (${{ matrix.entry }})
+    name: Catalogue contract, container and VM (${{ matrix.entry }} ${{ matrix.release }})
     strategy:
       fail-fast: false
       matrix:
-        entry: [nginx, postgres]
+        # A release whose recipe sets the VM up: postgres's default (16, its official image on
+        # Debian 12) has no recipe for a VM, its exact releases (16.16, Ubuntu 24.04) have.
+        include:
+          - entry: nginx
+            release: ""
+          - entry: postgres
+            release: "16.16"
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -74,4 +80,5 @@ jobs:
         run: |
           # sudo, to the same account, reads its groups afresh (libvirt, joined above) as a login does.
           sudo --preserve-env -u "$(id -un)" env PATH="$PATH" \
-            cargo run -q -p xtask --locked -- catalogue check "${{ matrix.entry }}" --provider libvirt
+            cargo run -q -p xtask --locked -- catalogue check "${{ matrix.entry }}" --provider libvirt \
+            ${{ matrix.release && format('--release {0}', matrix.release) || '' }}
