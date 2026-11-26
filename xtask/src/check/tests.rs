@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use super::outputs::{differences, phases, provider_entry};
+use super::outputs::{differences, phases, provider_entry, prune_unbuilt};
 use super::{Args, SEMVER_CRATES, STEPS, chosen, latest_release, release_type, rust_version};
 
 #[derive(Parser)]
@@ -159,4 +159,20 @@ fn the_gate_runs_every_step_and_ci_the_short_list() {
     );
     let checks = isoloom_test_support::yaml_values(&ci["jobs"]["fast"]["strategy"]["matrix"], "check");
     isoloom_test_support::assert_every!(&checks, |c: &String| c == "--fast" || c.starts_with("--fast --skip "));
+}
+
+/// A cached provider whose folder lost its binary is removed, so Terraform fetches it again; a
+/// whole one stays.
+#[test]
+fn a_cached_provider_without_its_binary_is_removed_and_a_whole_one_stays() {
+    let cache = tempfile::tempdir().unwrap();
+    let whole = cache.path().join("registry.terraform.io/hashicorp/aws/6.67.0/linux_amd64");
+    let empty = cache.path().join("registry.terraform.io/hashicorp/local/2.9.1/linux_amd64");
+    std::fs::create_dir_all(&whole).unwrap();
+    std::fs::write(whole.join("terraform-provider-aws_v6.67.0_x5"), "").unwrap();
+    std::fs::create_dir_all(&empty).unwrap();
+    std::fs::write(empty.join("LICENSE.txt"), "").unwrap();
+    let removed = prune_unbuilt(cache.path()).unwrap();
+    assert_eq!(removed, [std::path::PathBuf::from("registry.terraform.io/hashicorp/local/2.9.1/linux_amd64")]);
+    assert!(whole.is_dir() && !empty.exists());
 }
