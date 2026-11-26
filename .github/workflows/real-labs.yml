@@ -2,8 +2,9 @@ name: Real labs on a hosted runner
 
 # What Isoloom generates, run for real rather than only validated: `cargo xtask catalogue check`
 # turns an entry's parity contract into small labs, generates each for `docker` and for `vagrant`,
-# then runs it through Isothrum's command line (`up`, `check --json`, `down`). A case passes when
-# every check passes in both forms and every fact reads the same in both.
+# then runs it with the commands the generated files document (`docker compose`, `vagrant`): up,
+# the checks, down. A case passes when every check passes in both forms and every fact reads the
+# same in both.
 #
 # GitHub's Linux runner has Docker Engine and KVM, so both forms run there: the containers on
 # Docker, the VMs on libvirt through vagrant-libvirt. The other providers (VirtualBox, VMware,
@@ -18,6 +19,7 @@ on:
       - .github/workflows/real-labs.yml
       - xtask/src/catalogue/check.rs
       - xtask/src/catalogue/harness.rs
+      - crates/core/isoloom-catalogue/src/conformance/**
   workflow_call:
   workflow_dispatch:
 
@@ -30,10 +32,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # The runner the labs run through: Isothrum built from this ref.
-  ISOTHRUM_REF: ${{ vars.ISOTHRUM_REF || 'dev' }}
-  # In-process: nothing outlives the job.
-  ISOTHRUM_NO_SERVICE: "1"
 
 jobs:
   catalogue:
@@ -48,19 +46,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Check out Isothrum (the runner)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          repository: Isothrum/isothrum
-          ref: ${{ env.ISOTHRUM_REF }}
-          path: .isothrum-src
       - run: rustup toolchain install --profile minimal
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: |
-            .
-            .isothrum-src
           # Only main writes the cache, so a pull request can't seed what it builds with.
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: KVM for this account
@@ -81,12 +69,9 @@ jobs:
             qemu-system-x86 qemu-utils dnsmasq-base ebtables build-essential pkg-config
           sudo usermod -aG libvirt "$(id -un)"
           vagrant plugin install vagrant-libvirt
-      - name: Build Isothrum
-        run: cargo build -q -p isothrum-cli --manifest-path .isothrum-src/Cargo.toml
       - name: The contract, in both forms
         timeout-minutes: 45
         run: |
           # sudo, to the same account, reads its groups afresh (libvirt, joined above) as a login does.
           sudo --preserve-env -u "$(id -un)" env PATH="$PATH" \
-            cargo run -q -p xtask --locked -- catalogue check "${{ matrix.entry }}" \
-            --runner "$GITHUB_WORKSPACE/.isothrum-src/target/debug/isothrum" --provider libvirt
+            cargo run -q -p xtask --locked -- catalogue check "${{ matrix.entry }}" --provider libvirt
