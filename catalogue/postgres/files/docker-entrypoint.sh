@@ -52,7 +52,8 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   printf '\nhost all all all %s\n' "$method" >> "$PGDATA/pg_hba.conf"
   as pg_ctl -D "$PGDATA" -o "-c listen_addresses=''" -w start
   if [ -n "$password" ]; then
-    as psql -v ON_ERROR_STOP=1 --username "$user" --dbname postgres --set pw="$password" -c "ALTER USER \"$user\" PASSWORD :'pw'" >/dev/null
+    # Read from its input: psql fills in :'pw' (quoted as a literal) there, never in a -c command.
+    echo "ALTER USER \"$user\" PASSWORD :'pw'" | as psql -v ON_ERROR_STOP=1 --username "$user" --dbname postgres --set pw="$password" >/dev/null
   fi
   [ "$db" = postgres ] || as psql -v ON_ERROR_STOP=1 --username "$user" --dbname postgres -c "CREATE DATABASE \"$db\""
   for f in /docker-entrypoint-initdb.d/*; do
