@@ -138,10 +138,10 @@ machines:
         .take_while(|l| !l.starts_with("systemctl"))
         .collect::<Vec<_>>()
         .join("\n")
-        .replace("/etc/fstab", &fstab.display().to_string())
-        .replace("/proc/mounts", &mounts.display().to_string())
-        .replace("mkdir -p \"$p\"", &format!("mkdir -p \"{}$p\"", root.display()));
-    let shim = format!("mount() {{ printf '%s\\n' \"$*\" >> {}; }}\n", calls.display());
+        .replace("/etc/fstab", &crate::test_support::sh_path(&fstab))
+        .replace("/proc/mounts", &crate::test_support::sh_path(&mounts))
+        .replace("mkdir -p \"$p\"", &format!("mkdir -p \"{}$p\"", crate::test_support::sh_path(&root)));
+    let shim = format!("mount() {{ printf '%s\\n' \"$*\" >> {}; }}\n", crate::test_support::sh_path(&calls));
     let out = posix.arg("-c").arg(format!("set -e\n{shim}{script}\n")).output().expect("sh runs");
     assert!(out.status.success(), "{}\n{script}", String::from_utf8_lossy(&out.stderr));
     assert_eq!(

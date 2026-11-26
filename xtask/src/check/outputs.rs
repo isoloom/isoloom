@@ -93,6 +93,9 @@ pub(super) fn terraform(root: &Path) -> Res<bool> {
     }
     let cache = std::env::var_os("TF_PLUGIN_CACHE_DIR").map_or_else(|| repo::target_dir(root).join("terraform-plugin-cache"), PathBuf::from);
     std::fs::create_dir_all(&cache)?;
+    for gone in prune_unbuilt(&cache)? {
+        println!("== the plugin cache's {} has no provider binary: removed", gone.display());
+    }
     let (first, rest) = phases(&modules);
     // The cache isn't safe for concurrent writes: the modules that bring a provider it lacks fill
     // it in turn, then the others read it, a few at a time.
@@ -115,6 +118,33 @@ pub(super) fn terraform(root: &Path) -> Res<bool> {
         }
     });
     Ok(valid && results.into_inner().unwrap_or(false))
+}
+
+/// Removes each provider of the plugin cache (`<host>/<namespace>/<type>/<version>/<platform>`)
+/// whose folder holds no `terraform-provider-*` binary, and says which: Terraform takes such a
+/// folder for the provider and never fetches it again ("provider binary not found"). A cache
+/// restored without its binaries (CI's build-folder cache) or an interrupted fetch leaves them.
+pub(super) fn prune_unbuilt(cache: &Path) -> Res<Vec<PathBuf>> {
+    fn dirs(dir: &Path) -> Vec<PathBuf> {
+        std::fs::read_dir(dir)
+            .map(|d| d.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect())
+            .unwrap_or_default()
+    }
+    let mut removed = Vec::new();
+    let mut level = vec![cache.to_path_buf()];
+    for _ in 0..5 {
+        level = level.iter().flat_map(|d| dirs(d)).collect();
+    }
+    for platform in level {
+        let built = std::fs::read_dir(&platform)?
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with("terraform-provider-"));
+        if !built {
+            repo::remove(&platform)?;
+            removed.push(platform.strip_prefix(cache).unwrap_or(&platform).to_path_buf());
+        }
+    }
+    Ok(removed)
 }
 
 /// The Terraform modules of a generated tree, sorted.

@@ -259,16 +259,15 @@ non-zero on any drift; `--propose` lists newer upstream releases without adding 
 ### Proving parity
 
 ```sh
-cargo xtask catalogue check <entry> --runner PATH [--release V] [--os OS]
+cargo xtask catalogue check <entry> [--release V] [--os OS]
     [--form container|vm|both] [--case NAME]... [--provider P] [--keep]
 ```
 
 `catalogue check` runs the entry's parity contract for real: each case becomes an environment, generated
-for `docker` and for `vagrant`, run through a runner (up, check, down), and a case
-passes only when every check passes in both forms and every contract fact reads the same in both.
-`--case` runs only the cases named (repeat it; default: every case), `--runner` (required) is the
-runner's command line (one taking `up`, `check --json` and `down`),
-`--provider` the Vagrant provider of the VM form (default: `virtualbox`, `libvirt` on Linux), and
+for `docker` and for `vagrant`, run with the commands the generated files document (`docker
+compose` and `vagrant`: up, the checks, down), and a case passes only when every check passes in
+both forms and every contract fact reads the same in both. `--case` runs only the cases named
+(repeat it; default: every case), `--provider` the Vagrant provider of the VM form (default: `virtualbox`, `libvirt` on Linux), and
 `--keep` leaves each environment running after its checks.
 
 ## Releasing (maintainers)

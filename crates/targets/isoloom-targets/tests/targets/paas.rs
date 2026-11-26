@@ -62,7 +62,8 @@ fn proxmox_runs_each_service_as_a_debian_vm() -> Outcome {
     for vm in ["db", "files", "bus"] {
         assert!(vms.iter().any(|v| v == vm), "{vm} is a VM of the module: {vms:?}");
     }
-    insta::assert_snapshot!("shop_proxmox_main_tf", main);
+    // The cloud-init payloads as their text: their compressed bytes differ between CPUs.
+    insta::assert_snapshot!("shop_proxmox_main_tf", isoloom_test_support::gzip_decoded(main));
     Ok(())
 }
 

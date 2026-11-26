@@ -176,6 +176,27 @@ fn parses_tool_output(text: &str) -> Vec<usize> {
 mod tests {
     use super::*;
 
+    /// Every symbolic link under `crates/` resolves: a crate's `LICENSE` and `NOTICE` link to the
+    /// workspace's, and `cargo publish` can't package a link that leads nowhere (a crate moved to
+    /// another depth keeps its old links).
+    #[test]
+    fn every_link_under_the_crates_resolves() {
+        fn broken(dir: &Path, out: &mut Vec<String>) {
+            for e in std::fs::read_dir(dir).unwrap().map(Result::unwrap) {
+                let path = e.path();
+                let kind = e.file_type().unwrap();
+                if kind.is_symlink() && !path.exists() {
+                    out.push(format!("{} -> {}", path.display(), std::fs::read_link(&path).unwrap().display()));
+                } else if kind.is_dir() && e.file_name() != "target" {
+                    broken(&path, out);
+                }
+            }
+        }
+        let mut found = Vec::new();
+        broken(&repo::root().join("crates"), &mut found);
+        assert_eq!(found, Vec::<String>::new(), "links that lead nowhere");
+    }
+
     #[test]
     fn a_shell_script_is_quoted_by_the_quoting_module_not_by_hand() {
         let found: Vec<String> = sources(&["rs"])

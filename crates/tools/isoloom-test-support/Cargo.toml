@@ -12,6 +12,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+flate2.workspace = true
 hcl.workspace = true
 serde.workspace = true
 serde_yaml_ng.workspace = true

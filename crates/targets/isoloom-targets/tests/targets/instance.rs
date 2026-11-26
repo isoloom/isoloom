@@ -251,7 +251,6 @@ fn every_path_an_examples_instance_names_is_one_it_writes() -> Outcome {
 fn every_path_an_instance_of_a_catalogue_service_names_is_one_it_writes() -> Outcome {
     // Regression: a catalogue template, rendered for the image's build under a nested `.isoloom/`,
     // was written there while the Dockerfile copied it from `.isoloom-<n>/`: the build failed.
-    use isoloom_catalogue::conformance::PROBE;
     let catalogue = isoloom_catalogue::Catalogue::embedded().map_err(ToString::to_string)?;
     let (mut broken, mut checked) = (Vec::new(), Vec::new());
     for entry in catalogue.entries() {
@@ -265,14 +264,9 @@ fn every_path_an_instance_of_a_catalogue_service_names_is_one_it_writes() -> Out
             shapes.push((os, &release.source));
             for case in entry.contract().cases.keys() {
                 let written = entry.conformance_lab(catalogue, case, release, *os)?;
-                // The access machine is the runner's to supply: here, the service machine's OS.
-                let mut spec: serde_yaml_ng::Value = serde_yaml_ng::from_str(&written.spec)?;
-                spec["machines"][PROBE]["os"] = os.to_string().into();
+                // As written: `cargo xtask catalogue check` generates it with no image table.
                 let dir = tempfile::tempdir()?;
-                for (path, text) in [("isoloom.yml".to_owned(), serde_yaml_ng::to_string(&spec)?)]
-                    .into_iter()
-                    .chain(written.project.clone())
-                {
+                for (path, text) in [("isoloom.yml".to_owned(), written.spec.clone())].into_iter().chain(written.project.clone()) {
                     let at = dir.path().join(path);
                     std::fs::create_dir_all(at.parent().ok_or("a project file in no folder")?)?;
                     std::fs::write(at, text)?;
