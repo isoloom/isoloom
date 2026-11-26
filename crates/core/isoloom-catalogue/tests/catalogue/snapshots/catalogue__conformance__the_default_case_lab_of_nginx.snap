@@ -16,6 +16,7 @@ machines:
     networks:
       lab: 10
   probe:
+    os: debian@12
     access: true
     networks:
       lab: 200

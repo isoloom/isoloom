@@ -1,5 +1,5 @@
 //! One case of an entry's contract as an environment: the service machine (`web`), the case's helper
-//! machines, and an access machine the runner supplies (`probe`), on one network with the
+//! machines, and an access machine on the same OS (`probe`), on one network with the
 //! internet (the recipe fetches its packages); the contract's checks, filled in for the case, run
 //! from `probe` (an `exec`, in `web`); each fact as a check of its own.
 
@@ -93,7 +93,10 @@ impl Entry {
             helper.insert("networks".to_owned(), json!({ "lab": 20 + i }));
             machines.insert(name.clone(), Value::Object(helper));
         }
-        machines.insert(PROBE.to_owned(), json!({ "access": true, "networks": { "lab": 200 } }));
+        // Its OS written, as the examples' access machines have it: a machine left to the runner
+        // (no `os`) would need the image table's access forms, which a generate without
+        // `--images` hasn't.
+        machines.insert(PROBE.to_owned(), json!({ "os": os.to_string(), "access": true, "networks": { "lab": 200 } }));
         let with = self.check_values(&c.with);
         let values = CheckValues {
             machine: MACHINE,
